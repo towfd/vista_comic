@@ -7,17 +7,16 @@
 
 import SwiftUI
 
-struct ContentView: View {
+struct HomeView: View {
     var body: some View {
         VStack {
             Text("Favourite")
+            Spacer()
         }
-        
-        
         .padding()
     }
 }
 
 #Preview {
-    ContentView()
+    HomeView()
 }

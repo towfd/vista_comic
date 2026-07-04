@@ -11,7 +11,7 @@ import SwiftUI
 struct vista_comicApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            HomeView()
         }
     }
 }
