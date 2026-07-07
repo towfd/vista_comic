@@ -8,12 +8,8 @@
 import SwiftUI
 
 struct HomeView: View {
-    var body: some View {
-        VStack {
-            Text("Favourite")
-            Spacer()
-        }
-        .padding()
+    var body: some View{
+        FavouriteView()
     }
 }
 
