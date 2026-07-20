@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review vista_comic Code"
+  short_description: "Review and verify vista_comic code changes"
+  default_prompt: "Use $review-vista-comic-code to review and verify the current vista_comic changes."
