@@ -7,19 +7,30 @@
 import SwiftUI
 
 struct ChapterPageView: View{
+    let comic: Comic
+
     var body: some View{
         VStack{
-            Image("Landscape_4")
+            Image(comic.coverImageName)
                 .resizable()
                 .frame(width: 187, height: 187)
-            Text("Furiren")
-                .font(.system(size: 36, weight: .bold))
-            
+            Text(comic.title)
+                .font(AppFont.title)
+
             ScrollView{
-                ForEach(1..<10){ _ in
-                    ChapterListView()
+                ForEach(comic.chapters){ chapter in
+                    ChapterListView(comic: comic, chapter: chapter)
                 }
             }
         }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        ChapterPageView(comic: SampleData.comics[0])
+            .navigationDestination(for: ReaderRoute.self) { route in
+                ComicView(comic: route.comic, chapter: route.chapter)
+            }
     }
 }

@@ -8,29 +8,32 @@
 import SwiftUI
 
 struct ComicListView: View {
+    let comic: Comic
+
     var body: some View{
         VStack{
             HStack(spacing: 17){
-                Image("Landscape_4")
+                Image(comic.coverImageName)
                     .resizable()
                     .frame(width: 76, height: 64, alignment: .center)
                 VStack(alignment: .leading){
                     HStack{
-                        Text("furiren")
-                            .font(.system(size: 14, weight: .bold))
+                        Text(comic.title)
+                            .font(AppFont.rowTitle)
                         Spacer()
-                        Text("#200")
-                            .font(.system(size: 14))
+                        Text("#\(comic.chapters.count)")
+                            .font(AppFont.rowTitle)
                             .foregroundStyle(.grayFont)
                     }.padding(.bottom)
-                    
-                    Text("30 Jan, 12:30 . last read")
-                        .font(.system(size: 12))
+
+                    Text(lastReadText)
+                        .font(AppFont.caption)
                         .foregroundStyle(.grayFont)
                 }
             }
-            
+
             HStack(spacing: 30){
+                // Continue Reading behaviour is owned by the Library milestone (M2).
                 Button(action: {}){
                     Text("continue")
                         .font(.system(size: 12, weight: .bold))
@@ -44,17 +47,32 @@ struct ComicListView: View {
                         .stroke(.primaryRed, lineWidth: 2)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                
-                Button(action: {}){
-                    Text("chapter(500)")
+
+                NavigationLink(value: comic){
+                    Text("chapter(\(comic.chapters.count))")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(.primaryRed)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(.primaryRed)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }.frame(maxWidth: .infinity, maxHeight: 147, alignment: .center)
+    }
+
+    private var lastReadText: String {
+        guard let lastReadAt = comic.lastReadAt else {
+            return "not started yet"
+        }
+        let when = lastReadAt.formatted(date: .abbreviated, time: .shortened)
+        return "\(when) · last read"
+    }
+}
+
+#Preview {
+    NavigationStack {
+        ComicListView(comic: SampleData.comics[0])
+            .padding()
     }
 }
