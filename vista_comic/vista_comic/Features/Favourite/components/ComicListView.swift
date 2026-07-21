@@ -77,7 +77,9 @@ struct ComicListView: View {
             .font(.system(size: 12, weight: .bold))
             .padding()
             .frame(maxWidth: .infinity)
-            .background(.white)
+            // Adaptive so the outlined button stays readable in dark mode
+            // instead of rendering as a hardcoded white block.
+            .background(Color(.systemBackground))
             .foregroundStyle(.primaryRed)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)

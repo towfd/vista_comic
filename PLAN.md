@@ -4,10 +4,10 @@ Last updated: 2026-07-21
 
 ## Current status
 
-- Active milestone: M1 — Shared UI foundation
-- Status: Complete (shared contract in place; simulator tap-through not yet run)
+- Milestones M1–M4 are complete; the local UI release goal (library → chapters → reader with sample data) is met.
+- Also shipped: Traditional Chinese localization (localization-ready) and reader pull-past-bottom auto-advance.
 - Current owner: Coordinator
-- Next action: assign M2 (Library) and M3 (Reader) as non-overlapping parallel work on the shared contract.
+- Next action: pick the next product area — remembering read position (needs persistence/backend), Dynamic Type support, or content import — none are started.
 
 ## Current release goal
 
@@ -128,23 +128,29 @@ Acceptance criteria for the additional tasks:
 
 ### M4 — Integration review
 
-- Status: Not started
+- Status: Complete
 - Owner: Coordinator and Code reviewer
 - Dependencies: M2 and M3
 
 Tasks:
 
-- [ ] Integrate the library, chapter, and reader flows.
-- [ ] Run available builds and SwiftUI previews.
-- [ ] Check compact and larger iPhone layouts.
-- [ ] Check dark mode, Dynamic Type, and accessibility labels.
-- [ ] Run `$review-vista-comic-code` and assign confirmed findings to the existing owners.
+- [x] Integrate the library, chapter, and reader flows. (all merged to `main`)
+- [x] Run available builds and SwiftUI previews. (`BUILD SUCCEEDED` on integrated `main`)
+- [x] Check compact and larger iPhone layouts. (iPhone SE + iPhone 16 Pro Max)
+- [x] Check dark mode, Dynamic Type, and accessibility labels. (dark-mode + max-Dynamic-Type screenshots on iPhone SE; reader controls have labels)
+- [x] Review and assign confirmed findings. (fixed P2 below; P3s recorded as backlog)
+
+Findings:
+
+- [x] **P2 (fixed)** — Continue button used a hardcoded `.background(.white)`, rendering as a white block in dark mode. Now `Color(.systemBackground)`, verified adaptive in a dark-mode screenshot.
+- [ ] **P3 (backlog)** — Text uses fixed font sizes (`AppFont`, inline `.system(size:)`), so it does not scale with Dynamic Type (confirmed unchanged at the max accessibility size). Move to relative text styles later.
+- [ ] **P3 (backlog)** — `grayFont` / `primaryRed` / `AccentColor` have no dark-appearance variant (readable in dark, but not tuned).
 
 Acceptance criteria:
 
-- The complete sample-data flow is demonstrable.
-- No confirmed high-severity UI or navigation issue remains.
-- Verification results and environment limitations are documented.
+- [x] The complete sample-data flow is demonstrable.
+- [x] No confirmed high-severity UI or navigation issue remains. (only the P2 dark-mode issue, now fixed)
+- [x] Verification results and environment limitations are documented.
 
 ## Known issues and constraints
 
@@ -164,4 +170,4 @@ Acceptance criteria:
 
 ## Next action
 
-M1 is complete and the shared contract is stable. Assign M2 (Library, owns `Features/Favourite/` + `Features/ChapterPage/`) and M3 (Reader, owns `Features/ComicPage/`) as non-overlapping parallel work. Optionally run an interactive simulator tap-through to confirm the library → chapter list → reader path at runtime before feature work begins.
+The M1–M4 release goal is complete. Choose the next area from the backlog: (1) remember read position once persistence/backend exists; (2) Dynamic Type support (move off fixed font sizes); (3) dark-appearance colour variants; or (4) begin content import (Roadmap §2). No option is started yet.
