@@ -16,36 +16,37 @@ enum SampleData {
         Comic(
             title: "Frieren",
             coverImageName: "Landscape_4",
-            chapters: chapters(count: 12, pagesEach: 8),
+            chapters: chapters(count: 12, pagesEach: 8, started: true),
             lastReadAt: Date(timeIntervalSinceNow: -3600)      // read an hour ago
         ),
         Comic(
             title: "Spy Family",
             coverImageName: "Landscape_4",
-            chapters: chapters(count: 8, pagesEach: 6),
+            chapters: chapters(count: 8, pagesEach: 6, started: true),
             lastReadAt: Date(timeIntervalSinceNow: -86_400 * 3) // read three days ago
         ),
         Comic(
             title: "Dandadan",
             coverImageName: "Landscape_4",
-            chapters: chapters(count: 5, pagesEach: 10)          // never started
+            chapters: chapters(count: 5, pagesEach: 10, started: false) // never started
         )
     ]
 
-    /// Builds a run of chapters with a mix of read states so downstream
-    /// screens have realistic data to present.
-    private static func chapters(count: Int, pagesEach: Int) -> [Chapter] {
+    /// Builds a run of chapters. A started comic has an in-progress mix of read
+    /// states; an unstarted comic keeps every chapter unread so the chapter data
+    /// stays consistent with the comic's `lastReadAt`.
+    private static func chapters(count: Int, pagesEach: Int, started: Bool) -> [Chapter] {
         (1...count).map { number in
             Chapter(
                 number: number,
                 title: "Chapter \(number)",
                 pageImageNames: Array(repeating: "Landscape_4", count: pagesEach),
-                readState: readState(for: number)
+                readState: started ? startedReadState(for: number) : .unread
             )
         }
     }
 
-    private static func readState(for number: Int) -> ReadState {
+    private static func startedReadState(for number: Int) -> ReadState {
         switch number {
         case 1: return .read
         case 2: return .reading

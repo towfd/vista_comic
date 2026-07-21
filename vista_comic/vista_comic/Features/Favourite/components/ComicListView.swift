@@ -33,20 +33,15 @@ struct ComicListView: View {
             }
 
             HStack(spacing: 30){
-                // Continue Reading behaviour is owned by the Library milestone (M2).
-                Button(action: {}){
-                    Text("continue")
-                        .font(.system(size: 12, weight: .bold))
+                // Continue Reading opens the in-progress chapter, else the first
+                // unread chapter, else the first chapter.
+                if let continueChapter {
+                    NavigationLink(value: ReaderRoute(comic: comic, chapter: continueChapter)){
+                        continueLabel
+                    }
+                } else {
+                    continueLabel.opacity(0.4)
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(.white)
-                .foregroundStyle(.primaryRed)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(.primaryRed, lineWidth: 2)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 NavigationLink(value: comic){
                     Text("chapter(\(comic.chapters.count))")
@@ -67,6 +62,28 @@ struct ComicListView: View {
         }
         let when = lastReadAt.formatted(date: .abbreviated, time: .shortened)
         return "\(when) · last read"
+    }
+
+    /// The chapter Continue Reading should open: the in-progress chapter,
+    /// else the first unread chapter, else the first chapter.
+    private var continueChapter: Chapter? {
+        comic.chapters.first { $0.readState == .reading }
+            ?? comic.chapters.first { $0.readState == .unread }
+            ?? comic.chapters.first
+    }
+
+    private var continueLabel: some View {
+        Text("continue")
+            .font(.system(size: 12, weight: .bold))
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(.white)
+            .foregroundStyle(.primaryRed)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(.primaryRed, lineWidth: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
