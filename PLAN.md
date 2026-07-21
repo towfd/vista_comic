@@ -98,7 +98,7 @@ Acceptance criteria:
 
 ### M3 — Reader experience
 
-- Status: Complete (build + simulator verified)
+- Status: Core complete (build + simulator verified); additional reader tasks below are pending
 - Owner: Reader agent
 - File ownership: `Features/ComicPage/`
 - Consumes (do not change): `Shared/Models.swift` (`Chapter.pageImageNames`, `ReaderRoute`), `Shared/AppTheme.swift`, and the `HomeView` navigation contract.
@@ -116,6 +116,16 @@ Acceptance criteria:
 - [x] Comic images form a continuous vertical reading experience.
 - [x] Reader controls remain usable within safe areas.
 - [x] Previous and next chapter behavior handles boundaries correctly. (verified by `ReaderFlowUITests` on iPhone SE, iOS 18.1)
+
+Additional reader tasks (requested 2026-07-21, no backend required):
+
+- [ ] Remember the last-read position within each chapter and resume there when the chapter is reopened. In-session (in-memory) only for now; persisting across app launches needs storage and is deferred to a later persistence/backend milestone.
+- [ ] When the reader is scrolled to the bottom of a chapter, continue into the next chapter (auto-advance / continuous reading). Respect the last-chapter boundary. Pure UI, no backend.
+
+Acceptance criteria for the additional tasks:
+
+- Reopening a chapter returns to the last-read position within the same app session.
+- Reaching the bottom of a chapter moves the reader into the next chapter, and does nothing on the last chapter.
 
 ### M4 — Integration review
 
@@ -141,12 +151,16 @@ Acceptance criteria:
 
 - Xcode builds may report simulator-service or cache permission limitations in restricted execution environments.
 - The current unit and UI tests are still boilerplate and do not yet verify product behavior.
-- UI language and the user-facing label for the existing Favourite feature remain product decisions.
+- UI strings are currently English and need a one-off localization pass to Traditional Chinese (see Open decisions).
 
 ## Open decisions
 
-- [ ] Choose the first-release UI language.
-- [ ] Decide whether the user-facing section should be called Library or Favourite while preserving internal filenames initially.
+- [x] First-release UI language: **Traditional Chinese (繁體中文)** (resolved 2026-07-21). On-screen text (not the SwiftUI framework). A localization pass is pending; UI strings are currently English.
+- [x] User-facing section name: **Library** (resolved 2026-07-21) — renders as **書庫** under the Traditional Chinese UI. Keep internal filenames and types (`FavouriteView`, `FavouriteView.swift`, …) for now.
+
+## Pending cross-cutting work
+
+- [ ] Localize all UI strings to Traditional Chinese (書庫, 繼續閱讀, 未讀/閱讀中/已讀, …). Cross-cutting across `Features/Favourite/`, `Features/ChapterPage/`, and `Features/ComicPage/`; also update `LibraryFlowUITests` / `ReaderFlowUITests`, which currently assert English strings. Coordinator-owned; best done as one focused change after M3 merges.
 
 ## Next action
 
