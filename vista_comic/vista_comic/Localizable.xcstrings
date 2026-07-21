@@ -1,0 +1,174 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "#%lld" : {
+
+    },
+    "%@ · last read" : {
+      "comment" : "Library card: last read timestamp",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 上次閱讀"
+          }
+        }
+      }
+    },
+    "Back" : {
+      "comment" : "Reader: back button",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
+          }
+        }
+      }
+    },
+    "Chapter list" : {
+      "comment" : "Reader: open the chapter list",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "章節列表"
+          }
+        }
+      }
+    },
+    "chapter(%lld)" : {
+      "comment" : "Library card: opens the chapter list, with chapter count",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "章節（%lld）"
+          }
+        }
+      }
+    },
+    "Comics you add will appear here." : {
+      "comment" : "Empty library description",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你加入的漫畫會顯示在這裡。"
+          }
+        }
+      }
+    },
+    "continue" : {
+      "comment" : "Library card: continue reading",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續閱讀"
+          }
+        }
+      }
+    },
+    "Couldn't load this page" : {
+      "comment" : "Reader: page failed to load",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入此頁"
+          }
+        }
+      }
+    },
+    "Library" : {
+      "comment" : "Library screen title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書庫"
+          }
+        }
+      }
+    },
+    "Next chapter" : {
+      "comment" : "Reader: next chapter",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一章"
+          }
+        }
+      }
+    },
+    "No comics yet" : {
+      "comment" : "Empty library title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還沒有漫畫"
+          }
+        }
+      }
+    },
+    "not started yet" : {
+      "comment" : "Library card: comic never opened",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未開始"
+          }
+        }
+      }
+    },
+    "Previous chapter" : {
+      "comment" : "Reader: previous chapter",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一章"
+          }
+        }
+      }
+    },
+    "read" : {
+      "comment" : "Chapter read state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已讀"
+          }
+        }
+      }
+    },
+    "reading" : {
+      "comment" : "Chapter read state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閱讀中"
+          }
+        }
+      }
+    },
+    "unread" : {
+      "comment" : "Chapter read state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未讀"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

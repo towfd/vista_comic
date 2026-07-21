@@ -47,9 +47,9 @@ struct ChapterListView: View {
 
     private var readStateLabel: String {
         switch chapter.readState {
-        case .unread: return "unread"
-        case .reading: return "reading"
-        case .read: return "read"
+        case .unread: return String(localized: "unread")
+        case .reading: return String(localized: "reading")
+        case .read: return String(localized: "read")
         }
     }
 

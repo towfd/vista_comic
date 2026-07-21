@@ -16,6 +16,8 @@ final class ReaderFlowUITests: XCTestCase {
 
     func testChapterNavigationAndBoundary() throws {
         let app = XCUIApplication()
+        // Force English so text/label assertions are stable regardless of locale.
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         // Library -> chapter list
@@ -33,8 +35,8 @@ final class ReaderFlowUITests: XCTestCase {
         firstChapter.tap()
 
         // Reader on Chapter 1: previous is a boundary, next is available
-        let previous = app.buttons["上一章"]
-        let next = app.buttons["下一章"]
+        let previous = app.buttons["Previous chapter"]
+        let next = app.buttons["Next chapter"]
         XCTAssertTrue(previous.waitForExistence(timeout: 5))
         XCTAssertFalse(previous.isEnabled, "Previous should be disabled on the first chapter")
         XCTAssertTrue(next.isEnabled, "Next should be enabled on the first chapter")
@@ -48,6 +50,6 @@ final class ReaderFlowUITests: XCTestCase {
         // Next advances to Chapter 2
         next.tap()
         XCTAssertTrue(app.staticTexts["Chapter 2"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["上一章"].isEnabled, "Previous should be enabled after leaving the first chapter")
+        XCTAssertTrue(app.buttons["Previous chapter"].isEnabled, "Previous should be enabled after leaving the first chapter")
     }
 }

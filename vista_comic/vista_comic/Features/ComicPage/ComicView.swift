@@ -87,12 +87,12 @@ struct ComicView: View{
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
                 }
-                .accessibilityLabel("返回")
+                .accessibilityLabel("Back")
                 Spacer()
                 Button { showChapterList = true } label: {
                     Image(systemName: "list.bullet")
                 }
-                .accessibilityLabel("章節列表")
+                .accessibilityLabel("Chapter list")
             }
             .padding(.horizontal, 15)
             .padding(.vertical, 12)
@@ -105,7 +105,7 @@ struct ComicView: View{
                     Image(systemName: "chevron.backward")
                 }
                 .disabled(previousChapter == nil)
-                .accessibilityLabel("上一章")
+                .accessibilityLabel("Previous chapter")
 
                 Spacer()
 
@@ -118,7 +118,7 @@ struct ComicView: View{
                     Image(systemName: "chevron.forward")
                 }
                 .disabled(nextChapter == nil)
-                .accessibilityLabel("下一章")
+                .accessibilityLabel("Next chapter")
             }
             .padding(.horizontal, 15)
             .padding(.vertical, 12)

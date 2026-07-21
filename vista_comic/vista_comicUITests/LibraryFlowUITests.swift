@@ -24,10 +24,13 @@ final class LibraryFlowUITests: XCTestCase {
 
     func testLibraryToChapterToReader() throws {
         let app = XCUIApplication()
+        // Force English so assertions on visible text are stable regardless of
+        // the host locale (the UI is localization-ready with English keys).
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         // Library
-        XCTAssertTrue(app.staticTexts["Favourite"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Library"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Frieren"].exists)
         XCTAssertTrue(app.staticTexts["not started yet"].exists, "Unstarted comic should read 'not started yet'")
         attach(app, "01-library")
@@ -51,12 +54,12 @@ final class LibraryFlowUITests: XCTestCase {
         ).firstMatch.tap()
 
         // Reader: immersive controls (custom back + chapter list) prove we arrived
-        XCTAssertTrue(app.buttons["章節列表"].waitForExistence(timeout: 5), "Reader chapter-list control should exist")
-        XCTAssertTrue(app.buttons["返回"].exists, "Reader back control should exist")
+        XCTAssertTrue(app.buttons["Chapter list"].waitForExistence(timeout: 5), "Reader chapter-list control should exist")
+        XCTAssertTrue(app.buttons["Back"].exists, "Reader back control should exist")
         attach(app, "03-reader")
 
         // Custom back returns to the chapter list
-        app.buttons["返回"].tap()
+        app.buttons["Back"].tap()
         XCTAssertTrue(app.staticTexts["Chapter 1"].waitForExistence(timeout: 5))
     }
 }
