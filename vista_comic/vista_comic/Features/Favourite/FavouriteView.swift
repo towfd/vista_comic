@@ -13,7 +13,7 @@ struct FavouriteView: View {
     var body: some View {
         ScrollView {
             VStack {
-                Text("Favourite")
+                Text("Library")
                     .font(AppFont.title)
 
                 if comics.isEmpty {

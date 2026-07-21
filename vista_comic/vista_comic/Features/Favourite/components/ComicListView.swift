@@ -58,10 +58,10 @@ struct ComicListView: View {
 
     private var lastReadText: String {
         guard let lastReadAt = comic.lastReadAt else {
-            return "not started yet"
+            return String(localized: "not started yet")
         }
         let when = lastReadAt.formatted(date: .abbreviated, time: .shortened)
-        return "\(when) · last read"
+        return String(localized: "\(when) · last read")
     }
 
     /// The chapter Continue Reading should open: the in-progress chapter,
