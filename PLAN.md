@@ -77,24 +77,24 @@ Acceptance criteria:
 
 ### M2 — Library and chapter experience
 
-- Status: Ready (unblocked by M1)
+- Status: Complete (build + simulator verified)
 - Owner: Library agent
 - File ownership: `Features/Favourite/` and `Features/ChapterPage/`
 - Consumes (do not change): `Shared/Models.swift`, `Shared/SampleData.swift`, `Shared/AppTheme.swift`, and the `HomeView` navigation contract.
-- Note: `Comic` now carries `lastReadAt: Date?`; `ComicListView` renders it (real reading-progress logic is still M2).
+- Note: `Comic` now carries `lastReadAt: Date?`; `ComicListView` renders it. After review, `Shared/SampleData.swift` was made self-consistent — an unstarted comic (`lastReadAt == nil`) keeps every chapter unread.
 
 Tasks:
 
-- [ ] Make library and chapter components data-driven.
-- [ ] Support populated and empty library states.
-- [ ] Support unread, reading, and read chapter presentation.
-- [ ] Verify library-to-chapter and continue-reading navigation.
+- [x] Make library and chapter components data-driven. (done across M1 and M2)
+- [x] Support populated and empty library states. (`FavouriteView` shows a vertically centred `ContentUnavailableView` when `comics.isEmpty`)
+- [x] Support unread, reading, and read chapter presentation. (`ChapterListView` shows state-specific label, icon, and colour)
+- [x] Verify library-to-chapter and continue-reading navigation. (verified on iPhone SE + iPhone 16 Pro Max, iOS 18.1; `LibraryFlowUITests` drives library → chapter list → reader and back, and passes)
 
 Acceptance criteria:
 
-- Users can choose a comic and chapter from sample data.
-- Empty and populated states render correctly.
-- Continue Reading opens the expected chapter.
+- [x] Users can choose a comic and chapter from sample data.
+- [x] Empty and populated states render correctly. (populated + empty `#Preview` added; build-verified)
+- [x] Continue Reading opens the expected chapter. (`ComicListView` navigates to the in-progress chapter, else first unread, else first)
 
 ### M3 — Reader experience
 

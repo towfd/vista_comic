@@ -16,20 +16,39 @@ struct FavouriteView: View {
                 Text("Favourite")
                     .font(AppFont.title)
 
-                ForEach(comics) { comic in
-                    ComicListView(comic: comic)
+                if comics.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(comics) { comic in
+                        ComicListView(comic: comic)
+                    }
                 }
             }
             .padding()
         }
     }
+
+    private var emptyState: some View {
+        ContentUnavailableView(
+            "No comics yet",
+            systemImage: "books.vertical",
+            description: Text("Comics you add will appear here.")
+        )
+        .frame(maxWidth: .infinity, minHeight: 400)
+    }
 }
 
-#Preview {
+#Preview("Populated") {
     NavigationStack {
         FavouriteView(comics: SampleData.comics)
             .navigationDestination(for: Comic.self) { comic in
                 ChapterPageView(comic: comic)
             }
+    }
+}
+
+#Preview("Empty") {
+    NavigationStack {
+        FavouriteView(comics: [])
     }
 }

@@ -22,9 +22,15 @@ struct ChapterListView: View {
                     VStack(alignment: .leading, spacing: 10){
                         Text(chapter.title)
                             .font(AppFont.rowTitle)
-                        // Read-state presentation is refined in the Library milestone (M2).
-                        Text(readStateLabel)
-                            .font(AppFont.caption)
+
+                        HStack(spacing: 4){
+                            if let icon = readStateIcon {
+                                Image(systemName: icon)
+                            }
+                            Text(readStateLabel)
+                        }
+                        .font(AppFont.caption)
+                        .foregroundStyle(readStateColor)
                     }
 
                     Spacer()
@@ -44,6 +50,21 @@ struct ChapterListView: View {
         case .unread: return "unread"
         case .reading: return "reading"
         case .read: return "read"
+        }
+    }
+
+    private var readStateIcon: String? {
+        switch chapter.readState {
+        case .unread: return nil
+        case .reading: return "book.fill"
+        case .read: return "checkmark.circle.fill"
+        }
+    }
+
+    private var readStateColor: Color {
+        switch chapter.readState {
+        case .reading: return Color(.primaryRed)
+        case .unread, .read: return Color(.grayFont)
         }
     }
 }
