@@ -14,6 +14,10 @@ struct ComicView: View{
     @State private var showChapterList = false
     @Environment(\.dismiss) private var dismiss
 
+    /// How far the reader must be pulled *past* the bottom (points of overscroll)
+    /// before advancing to the next chapter.
+    private let pullThreshold: CGFloat = 120
+
     init(comic: Comic, chapter: Chapter) {
         self.comic = comic
         _currentChapter = State(initialValue: chapter)
@@ -27,6 +31,20 @@ struct ComicView: View{
                     ForEach(Array(currentChapter.pageImageNames.enumerated()), id: \.offset){ _, imageName in
                         pageView(for: imageName)
                     }
+                }
+            }
+            // Auto-advance: after reaching the bottom, the user must keep pulling
+            // *past* the end (overscroll) to continue into the next chapter — so
+            // simply reaching the bottom is not enough. Does nothing on the last
+            // chapter (nextChapter == nil), and only for content taller than the
+            // screen (otherwise there is no bottom to pull past).
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                let maxScroll = geometry.contentSize.height - geometry.containerSize.height
+                guard maxScroll > 0 else { return false }
+                return geometry.contentOffset.y >= maxScroll + pullThreshold
+            } action: { wasPulledPastEnd, isPulledPastEnd in
+                if isPulledPastEnd && !wasPulledPastEnd {
+                    goTo(nextChapter)
                 }
             }
             // Rebuild the scroll view when the chapter changes so a newly opened
