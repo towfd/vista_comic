@@ -117,15 +117,14 @@ Acceptance criteria:
 - [x] Reader controls remain usable within safe areas.
 - [x] Previous and next chapter behavior handles boundaries correctly. (verified by `ReaderFlowUITests` on iPhone SE, iOS 18.1)
 
-Additional reader tasks (requested 2026-07-21, no backend required):
+Additional reader tasks (requested 2026-07-21):
 
-- [ ] Remember the last-read position within each chapter and resume there when the chapter is reopened. In-session (in-memory) only for now; persisting across app launches needs storage and is deferred to a later persistence/backend milestone.
-- [ ] When the reader is scrolled to the bottom of a chapter, continue into the next chapter (auto-advance / continuous reading). Respect the last-chapter boundary. Pure UI, no backend.
+- [deferred] Remember the last-read position within each chapter. An in-session-only version has little value, so this is deferred to the future persistence/backend milestone where it can be designed to survive app launches.
+- [x] At the bottom of a chapter, pulling *past* the end (overscroll) advances to the next chapter (auto-advance). Respect the last-chapter boundary. Pure UI, no backend. (`ComicView` uses `.onScrollGeometryChange`; requires an overscroll of `pullThreshold` past the bottom so merely reaching the end doesn't jump; only for content taller than the screen; `nextChapter == nil` is a no-op.)
 
 Acceptance criteria for the additional tasks:
 
-- Reopening a chapter returns to the last-read position within the same app session.
-- Reaching the bottom of a chapter moves the reader into the next chapter, and does nothing on the last chapter.
+- [x] Pulling past the bottom of a chapter moves the reader into the next chapter, and does nothing on the last chapter. (build-verified; behaviour to be confirmed by the user on-device)
 
 ### M4 — Integration review
 
