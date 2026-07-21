@@ -155,12 +155,18 @@ Acceptance criteria:
 
 ## Open decisions
 
-- [x] First-release UI language: **Traditional Chinese (繁體中文)** (resolved 2026-07-21). On-screen text (not the SwiftUI framework). A localization pass is pending; UI strings are currently English.
+- [x] First-release UI language: **Traditional Chinese (繁體中文)** (resolved 2026-07-21), delivered **localization-ready via a String Catalog — not hardcoded** (see Pending cross-cutting work). On-screen text only, not the SwiftUI framework.
 - [x] User-facing section name: **Library** (resolved 2026-07-21) — renders as **書庫** under the Traditional Chinese UI. Keep internal filenames and types (`FavouriteView`, `FavouriteView.swift`, …) for now.
 
 ## Pending cross-cutting work
 
-- [ ] Localize all UI strings to Traditional Chinese (書庫, 繼續閱讀, 未讀/閱讀中/已讀, …). Cross-cutting across `Features/Favourite/`, `Features/ChapterPage/`, and `Features/ComicPage/`; also update `LibraryFlowUITests` / `ReaderFlowUITests`, which currently assert English strings. Coordinator-owned; best done as one focused change after M3 merges.
+- [ ] Make the UI localization-ready and provide Traditional Chinese — **do not hardcode Chinese**. Approach:
+  - Add a `Localizable.xcstrings` String Catalog; keep `Text("…")` literals as **English development keys** and supply 繁中 translations (書庫, 繼續閱讀, 未讀/閱讀中/已讀, …).
+  - Fix `String`-typed values that `Text` will not auto-localize — `ChapterListView.readStateLabel`, `ComicListView.lastReadText` (interpolated), and similar — using `String(localized:)` / `LocalizedStringResource`.
+  - Keep `.accessibilityLabel` values as localized keys too.
+  - Update `LibraryFlowUITests` / `ReaderFlowUITests`, which currently assert English strings (prefer accessibility identifiers over visible text where practical, so they survive language changes).
+  - Follow the device language by default (English keys as base, 繁中 as the first translation); adding another language later is only a new catalog column, no refactor.
+  - Cross-cutting across `Features/Favourite/`, `Features/ChapterPage/`, and `Features/ComicPage/`; coordinator-owned; best done as one focused change after M3 merges.
 
 ## Next action
 
