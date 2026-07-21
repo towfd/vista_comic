@@ -5,6 +5,7 @@
 //  Created by 林鈺峯 on 2026/7/12.
 //
 import SwiftUI
+import UIKit
 
 struct ComicView: View{
     let comic: Comic
@@ -22,14 +23,9 @@ struct ComicView: View{
         ZStack{
             ScrollView{
                 VStack(spacing: 0){
-                    // Renders the current chapter's pages as a continuous vertical
-                    // read. Loading / failure states and previous / next chapter
-                    // navigation are still owned by the Reader milestone (M3).
+                    // Renders the current chapter's pages as a continuous vertical read.
                     ForEach(Array(currentChapter.pageImageNames.enumerated()), id: \.offset){ _, imageName in
-                        Image(imageName)
-                            .resizable()
-                            .frame(maxWidth: .infinity)
-                            .aspectRatio(contentMode: .fit)
+                        pageView(for: imageName)
                     }
                 }
             }
@@ -54,6 +50,37 @@ struct ComicView: View{
         }
     }
 
+    // MARK: - Pages
+
+    /// A single reading page. Local assets load synchronously, so only a failure
+    /// placeholder is needed here; a loading state belongs with real asynchronous
+    /// image loading in a later milestone.
+    @ViewBuilder
+    private func pageView(for imageName: String) -> some View {
+        if UIImage(named: imageName) != nil {
+            Image(imageName)
+                .resizable()
+                .frame(maxWidth: .infinity)
+                .aspectRatio(contentMode: .fit)
+        } else {
+            failurePlaceholder
+        }
+    }
+
+    private var failurePlaceholder: some View {
+        VStack(spacing: 8){
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+            Text("Couldn't load this page")
+                .font(AppFont.caption)
+        }
+        .foregroundStyle(.grayFont)
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding()
+    }
+
+    // MARK: - Controls
+
     private var controlsOverlay: some View {
         VStack(spacing: 0){
             HStack(spacing: 17){
@@ -69,17 +96,34 @@ struct ComicView: View{
             }
             .padding(.horizontal, 15)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial)
+            .background(.ultraThinMaterial, ignoresSafeAreaEdges: .top)
 
             Spacer()
 
             HStack{
+                Button { goTo(previousChapter) } label: {
+                    Image(systemName: "chevron.backward")
+                }
+                .disabled(previousChapter == nil)
+                .accessibilityLabel("上一章")
+
+                Spacer()
+
                 Text(currentChapter.title)
                     .font(AppFont.rowTitle)
+
+                Spacer()
+
+                Button { goTo(nextChapter) } label: {
+                    Image(systemName: "chevron.forward")
+                }
+                .disabled(nextChapter == nil)
+                .accessibilityLabel("下一章")
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 15)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial)
+            .frame(maxWidth: .infinity)
+            .background(.ultraThinMaterial, ignoresSafeAreaEdges: .bottom)
         }
     }
 
@@ -105,10 +149,40 @@ struct ComicView: View{
             .navigationBarTitleDisplayMode(.inline)
         }
     }
+
+    // MARK: - Chapter navigation
+
+    private var currentIndex: Int {
+        comic.chapters.firstIndex { $0.id == currentChapter.id } ?? 0
+    }
+
+    private var previousChapter: Chapter? {
+        currentIndex > 0 ? comic.chapters[currentIndex - 1] : nil
+    }
+
+    private var nextChapter: Chapter? {
+        currentIndex < comic.chapters.count - 1 ? comic.chapters[currentIndex + 1] : nil
+    }
+
+    private func goTo(_ chapter: Chapter?) {
+        guard let chapter else { return }
+        currentChapter = chapter
+    }
 }
 
-#Preview {
+#Preview("Reader") {
     NavigationStack {
         ComicView(comic: SampleData.comics[0], chapter: SampleData.comics[0].chapters[1])
+    }
+}
+
+#Preview("Missing page") {
+    let comic = Comic(
+        title: "Broken",
+        coverImageName: "Landscape_4",
+        chapters: [Chapter(number: 1, title: "Chapter 1", pageImageNames: ["no_such_asset"])]
+    )
+    return NavigationStack {
+        ComicView(comic: comic, chapter: comic.chapters[0])
     }
 }

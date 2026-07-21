@@ -98,7 +98,7 @@ Acceptance criteria:
 
 ### M3 — Reader experience
 
-- Status: In progress (reader chrome started by Coordinator via a direct user request)
+- Status: Complete (build + simulator verified)
 - Owner: Reader agent
 - File ownership: `Features/ComicPage/`
 - Consumes (do not change): `Shared/Models.swift` (`Chapter.pageImageNames`, `ReaderRoute`), `Shared/AppTheme.swift`, and the `HomeView` navigation contract.
@@ -106,16 +106,16 @@ Acceptance criteria:
 Tasks:
 
 - [x] Render multiple vertically scrolling comic images from sample data.
-- [x] Show and hide reader controls. (tap to toggle; system nav bar hidden for immersive reading; back / list buttons carry accessibility labels; safe-area refinement still pending)
-- [~] Support back, chapter list, previous chapter, and next chapter actions. (back + chapter-list sheet with in-place chapter switching done; scroll resets to the first page on chapter change; previous / next chapter still pending)
-- [ ] Handle first and last chapter boundaries.
-- [ ] Add placeholder loading and failure states.
+- [x] Show and hide reader controls. (tap to toggle; system nav bar hidden; back / list buttons carry accessibility labels; control-bar material now extends into the top/bottom safe areas)
+- [x] Support back, chapter list, previous chapter, and next chapter actions. (custom back, chapter-list sheet, and previous/next controls in the bottom bar; scroll resets to the first page on chapter change)
+- [x] Handle first and last chapter boundaries. (previous is disabled on the first chapter, next on the last)
+- [~] Add placeholder loading and failure states. (failure placeholder done and reachable via a missing asset; a loading state is deferred to the future asynchronous image-loading milestone, since local assets load synchronously)
 
 Acceptance criteria:
 
-- Comic images form a continuous vertical reading experience.
-- Reader controls remain usable within safe areas.
-- Previous and next chapter behavior handles boundaries correctly.
+- [x] Comic images form a continuous vertical reading experience.
+- [x] Reader controls remain usable within safe areas.
+- [x] Previous and next chapter behavior handles boundaries correctly. (verified by `ReaderFlowUITests` on iPhone SE, iOS 18.1)
 
 ### M4 — Integration review
 
