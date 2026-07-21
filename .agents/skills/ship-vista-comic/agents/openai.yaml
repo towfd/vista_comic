@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ship vista_comic"
+  short_description: "Branch, verify, and open a PR for reviewed vista_comic changes"
+  default_prompt: "Use $ship-vista-comic to open a pull request for the reviewed change."

@@ -68,6 +68,7 @@ Each skill is authored once per agent runtime. Invoke a skill by name using the 
 - `coordinate-vista-comic`: coordinate active milestones, sub-agent ownership, integration, and project status.
 - `review-vista-comic-code`: perform read-only code review and run evidence-based verification.
 - `capture-vista-comic-progress`: record verified progress under the Notion `vista_comic` date page after the user authorizes the update.
+- `ship-vista-comic`: after the user has reviewed a change and asked to publish it, verify the build, branch, commit, push, and open a pull request. Never pushes to the default branch unless explicitly overridden.
 
 ## Delegation rules
 
