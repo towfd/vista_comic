@@ -71,7 +71,7 @@ struct ComicView: View{
             LazyVStack(spacing: 0){
                 // Renders the current chapter's pages as a continuous vertical read.
                 ForEach(Array(urls.enumerated()), id: \.offset){ _, url in
-                    pageView(for: url)
+                    ReaderPage(url: url)
                 }
             }
         }
@@ -96,39 +96,6 @@ struct ComicView: View{
         .onTapGesture {
             withAnimation { showControls.toggle() }
         }
-    }
-
-    /// A single reading page. `AsyncImage` gives the real loading state deferred
-    /// in M3; `.failure` routes into the existing failure placeholder.
-    private func pageView(for url: URL) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-            case .empty:
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 220)
-            case .failure:
-                failurePlaceholder
-            @unknown default:
-                failurePlaceholder
-            }
-        }
-    }
-
-    private var failurePlaceholder: some View {
-        VStack(spacing: 8){
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-            Text("Couldn't load this page")
-                .font(AppFont.caption)
-        }
-        .foregroundStyle(.grayFont)
-        .frame(maxWidth: .infinity, minHeight: 220)
-        .padding()
     }
 
     // MARK: - Controls
@@ -234,6 +201,57 @@ struct ComicView: View{
         } catch {
             pagesState = .failed(error)
         }
+    }
+}
+
+/// A single reading page. `AsyncImage` provides the real loading state deferred
+/// in M3. Because `AsyncImage` has no built-in retry, a failed page would stay
+/// failed forever, so the failure placeholder is tappable: tapping bumps
+/// `reloadToken`, which re-keys the `AsyncImage` so it re-issues the request.
+private struct ReaderPage: View {
+    let url: URL
+    @State private var reloadToken = 0
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+            case .empty:
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 220)
+            case .failure:
+                failurePlaceholder
+            @unknown default:
+                failurePlaceholder
+            }
+        }
+        // Re-issue the request when the retry token changes.
+        .id(reloadToken)
+    }
+
+    private var failurePlaceholder: some View {
+        Button {
+            reloadToken += 1
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.largeTitle)
+                Text("Couldn't load this page")
+                    .font(AppFont.caption)
+                Text("Tap to retry")
+                    .font(AppFont.caption)
+            }
+            .foregroundStyle(.grayFont)
+            .frame(maxWidth: .infinity, minHeight: 220)
+            .padding()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Tap to retry")
     }
 }
 

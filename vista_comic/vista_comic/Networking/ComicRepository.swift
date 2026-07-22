@@ -39,13 +39,24 @@ enum LoadState<Value> {
     case failed(Error)
 }
 
-/// Where the app looks for the backend. The dev default is the local FastAPI
-/// service; point this elsewhere (LAN IP / tunnel) by changing one value.
-/// Uses the explicit IPv4 loopback rather than `localhost`, which macOS
-/// resolves to IPv6 `::1` first — and anything else on `::1:8000` (e.g. a
+/// Where the app looks for the backend.
+///
+/// The developer overrides the host at runtime with the `VISTA_BASE_URL`
+/// environment variable (set it in the Xcode scheme, e.g. a LAN IP or tunnel
+/// host) so no machine-specific address lives in tracked source. When it is
+/// unset or not a valid URL, it falls back to the compiled default.
+///
+/// The default uses the explicit IPv4 loopback rather than `localhost`, which
+/// macOS resolves to IPv6 `::1` first — anything else on `::1:8000` (e.g. a
 /// Docker port proxy) would otherwise shadow the IPv4 uvicorn dev server.
 enum APIConfig {
-    static let baseURL = URL(string: "http://127.0.0.1:8000")!
+    static let baseURL: URL = {
+        if let override = ProcessInfo.processInfo.environment["VISTA_BASE_URL"],
+           let url = URL(string: override) {
+            return url
+        }
+        return URL(string: "http://127.0.0.1:8000")!
+    }()
 }
 
 // MARK: - Environment injection

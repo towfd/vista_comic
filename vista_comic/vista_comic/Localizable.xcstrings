@@ -191,6 +191,17 @@
         }
       }
     },
+    "Tap to retry" : {
+      "comment" : "Reader: retry loading a single page that failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下重試"
+          }
+        }
+      }
+    },
     "unread" : {
       "comment" : "Chapter read state",
       "localizations" : {
