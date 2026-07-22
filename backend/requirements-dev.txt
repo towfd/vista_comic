@@ -1,0 +1,7 @@
+# Development / test-only dependencies (not needed to run the service).
+# Install with:  pip install -r requirements.txt -r requirements-dev.txt
+-r requirements.txt
+
+pytest==9.1.1
+# FastAPI's TestClient (Starlette) drives the app through httpx.
+httpx==0.28.1

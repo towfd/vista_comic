@@ -162,10 +162,10 @@ Acceptance criteria:
 
 Slices (each ships only after the prior one has an observable acceptance test):
 
-- [ ] **Slice 0 — contract + folder validation** (Coordinator / `service-explorer`, read-only). Validate the confirmed folder format against the real library; lock the API contract and stable, path-derived IDs.
-  - Acceptance: the real folder structure matches the recorded format, or differences are reconciled into the doc.
-- [ ] **Slice 1 — in-memory catalog API** (`backend-implementer`, new `backend/`). FastAPI scans `MANGA_LIBRARY_PATH` into memory; serves `GET /comics`, `GET /comics/{id}`.
-  - Acceptance: `curl /comics` counts match the folder; a re-run is byte-identical; never writes to the library.
+- [x] **Slice 0 — contract + folder validation** (Coordinator, read-only). The real library matched the recorded format (3-level nesting, `NN-title` chapter dirs, zero-padded `.jpg` pages, one comic with `cover.jpg` and one relying on the fallback, `.DS_Store` present). No contract changes needed.
+- [x] **Slice 1 — in-memory catalog API** (`backend-implementer`, new `backend/`; reviewed by `code-reviewer`). FastAPI scans `MANGA_LIBRARY_PATH` into memory; serves `GET /comics`, `GET /comics/{id}`; IDs are stable path hashes; read-only; no DB.
+  - Verified: `/healthz` → 2 comics / 6 chapters; `curl` counts match disk; re-run byte-identical; IDs unchanged after the review fixes; 38 unit tests pass.
+  - Review fixes applied: P2 symlink-escape guard (resolve + stay-under-root), P3 IDs derived from `relative_to(root)`. Deferred: `coverUrl` absolute shape + a dedicated cover route (Slice 2), the fail-fast-vs-503 cleanup, and counting non-page files at the comic/root level (minor).
 - [ ] **Slice 2 — page images + reader endpoint** (`backend-implementer`). `GET /comics/{id}/chapters/{cid}` + `GET /media/...`.
   - Acceptance: opening a page URL in a browser shows the correct image in correct order.
 - [ ] **Slice 3 — iOS consumes it** (`frontend-implementer`; `Shared/Models.swift` URL retype is a coordinator-owned change). Repository + `HomeView` data-source swap + three `Image → AsyncImage` sites + catalog loading/error states.
