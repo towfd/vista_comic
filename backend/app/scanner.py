@@ -113,15 +113,38 @@ class ScanReport:
 
 @dataclass
 class Catalog:
-    """The in-memory catalog produced by one scan."""
+    """The in-memory catalog produced by one scan.
+
+    ``root`` is the library root the scan was run against; the media route joins
+    it with the stored relative page/cover paths and re-validates containment
+    before streaming any bytes. ``by_id`` maps ``comic_id -> ComicEntry`` (which
+    carries ``cover_path`` and ``chapters``); ``chapters_by_id`` maps
+    ``chapter_id -> ChapterEntry`` (which carries the ordered ``page_paths``).
+    Both reverse indexes let the opaque IDs in ``/media/...`` URLs resolve back
+    to stored relative paths without accepting raw folder names.
+    """
 
     comics: List[ComicEntry]
     by_id: Dict[str, ComicEntry]
+    chapters_by_id: Dict[str, ChapterEntry]
     report: ScanReport
+    root: Path
 
     @classmethod
-    def build(cls, comics: List[ComicEntry], report: ScanReport) -> "Catalog":
-        return cls(comics=comics, by_id={c.id: c for c in comics}, report=report)
+    def build(
+        cls, comics: List[ComicEntry], report: ScanReport, root: Path
+    ) -> "Catalog":
+        chapters_by_id: Dict[str, ChapterEntry] = {}
+        for comic in comics:
+            for chapter in comic.chapters:
+                chapters_by_id[chapter.id] = chapter
+        return cls(
+            comics=comics,
+            by_id={c.id: c for c in comics},
+            chapters_by_id=chapters_by_id,
+            report=report,
+            root=root,
+        )
 
 
 def _parse_chapter_name(name: str) -> Optional[Tuple[int, str]]:
@@ -274,4 +297,4 @@ def scan_library(root: Path) -> Catalog:
     if report.escaped_entries:
         logger.warning("Skipped escaping symlinks: %s", report.escaped_entries)
 
-    return Catalog.build(comics, report)
+    return Catalog.build(comics, report, root)

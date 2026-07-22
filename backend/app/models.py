@@ -79,3 +79,16 @@ class ComicDetail(BaseModel):
     title: str
     coverUrl: str
     chapters: List[ChapterSummary]
+
+
+class ChapterDetail(BaseModel):
+    """Response for ``GET /comics/{comicId}/chapters/{chapterId}``.
+
+    ``pages`` are absolute image URLs in reading order; the app fetches each as
+    an image. See ``docs/backend-architecture.md`` (reader endpoint).
+    """
+
+    id: str
+    number: int
+    title: str
+    pages: List[str]
