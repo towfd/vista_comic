@@ -1,0 +1,13 @@
+# Python virtual environment
+.venv/
+venv/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local env overrides (the real MANGA_LIBRARY_PATH lives in the repo-root .env)
+.env
+.env.*
