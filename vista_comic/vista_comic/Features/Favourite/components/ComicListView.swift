@@ -13,15 +13,14 @@ struct ComicListView: View {
     var body: some View{
         VStack{
             HStack(spacing: 17){
-                Image(comic.coverImageName)
-                    .resizable()
+                CoverImage(url: comic.coverURL)
                     .frame(width: 76, height: 64, alignment: .center)
                 VStack(alignment: .leading){
                     HStack{
                         Text(comic.title)
                             .font(AppFont.rowTitle)
                         Spacer()
-                        Text("#\(comic.chapters.count)")
+                        Text("#\(comic.chapterCount)")
                             .font(AppFont.rowTitle)
                             .foregroundStyle(.grayFont)
                     }.padding(.bottom)
@@ -34,17 +33,17 @@ struct ComicListView: View {
 
             HStack(spacing: 30){
                 // Continue Reading opens the in-progress chapter, else the first
-                // unread chapter, else the first chapter.
+                // unread chapter, else the first chapter. Hidden entirely when no
+                // chapter is known (e.g. the live `/comics` list omits chapters),
+                // so the card never shows a permanently disabled CTA.
                 if let continueChapter {
                     NavigationLink(value: ReaderRoute(comic: comic, chapter: continueChapter)){
                         continueLabel
                     }
-                } else {
-                    continueLabel.opacity(0.4)
                 }
 
                 NavigationLink(value: comic){
-                    Text("chapter(\(comic.chapters.count))")
+                    Text("chapter(\(comic.chapterCount))")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
                         .padding()
