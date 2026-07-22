@@ -32,7 +32,8 @@ def test_list_comics_shape_and_counts(client):
     assert set(alpha) == {"id", "title", "coverUrl", "chapterCount", "lastReadAt"}
     assert alpha["id"] == stable_id("Alpha")
     assert alpha["chapterCount"] == 2
-    assert alpha["coverUrl"] == f"/media/{stable_id('Alpha')}/cover"
+    # coverUrl is now an absolute URL derived from the request origin.
+    assert alpha["coverUrl"] == f"http://testserver/media/{stable_id('Alpha')}/cover"
     assert alpha["lastReadAt"] is None
 
 

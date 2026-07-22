@@ -1,14 +1,18 @@
 """FastAPI application: scan the manga library on startup and serve the catalog.
 
-Slice 1 endpoints (see docs/backend-architecture.md):
-    GET  /comics            -> [ { id, title, coverUrl, chapterCount, lastReadAt } ]
-    GET  /comics/{comicId}  -> { id, title, coverUrl, chapters: [ ... ] }
+Endpoints (see docs/backend-architecture.md):
+    GET  /comics                               -> [ { id, title, coverUrl, ... } ]
+    GET  /comics/{comicId}                     -> { id, title, coverUrl, chapters }
+    GET  /comics/{comicId}/chapters/{chapterId}-> { id, number, title, pages }
+    GET  /media/{comicId}/{chapterId}/{page}   -> image bytes (1-based page index)
+    GET  /media/{comicId}/cover                -> cover image bytes
 
 Also provides:
     GET  /healthz           -> liveness + catalog size
     POST /rescan            -> manual re-scan hook (optional per the doc)
 
-Not in this slice: /media and the per-chapter pages endpoint (Slice 2).
+Media is served read-only: every request re-resolves the joined filesystem path
+and requires it to stay under the library root before streaming (see _safe_file).
 """
 
 from __future__ import annotations
@@ -17,11 +21,22 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 
 from .config import get_library_root
-from .models import ChapterSummary, ComicDetail, ComicSummary
+from .models import ChapterDetail, ChapterSummary, ComicDetail, ComicSummary
 from .scanner import Catalog, ComicEntry, scan_library
+
+# Map a file extension (lowercased, with dot) to the Content-Type we serve.
+# Only the accepted page extensions are here; anything else never reaches the
+# media route because the scanner does not store non-image paths.
+_CONTENT_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vista_comic.api")
@@ -71,20 +86,56 @@ def _require_catalog() -> Catalog:
     return state.catalog
 
 
-def _cover_url(comic_id: str) -> str:
-    """Consistent media-path shape using the opaque comic ID.
+def _base_url(request: Request) -> str:
+    """Absolute origin for building media URLs (no trailing slash).
 
-    v1 does not serve images; Slice 2 implements this route. The shape uses the
-    stable ID (not a raw folder name) to avoid path-encoding / traversal.
+    Derived from the incoming request so the same server works on any host/port
+    (localhost, LAN IP, or a tunnel) without hardcoding an origin.
     """
-    return f"/media/{comic_id}/cover"
+    return str(request.base_url).rstrip("/")
 
 
-def _to_summary(comic: ComicEntry) -> ComicSummary:
+def _cover_url(base: str, comic_id: str) -> str:
+    """Absolute cover URL using the opaque comic ID.
+
+    The shape uses the stable ID (not a raw folder name) to avoid path-encoding
+    / traversal, and matches the page URL shape so the app configures one base.
+    """
+    return f"{base}/media/{comic_id}/cover"
+
+
+def _page_url(base: str, comic_id: str, chapter_id: str, index_1based: int) -> str:
+    """Absolute page URL. The selector is a 1-based page index (see media route)."""
+    return f"{base}/media/{comic_id}/{chapter_id}/{index_1based}"
+
+
+def _content_type_for(rel_path: str) -> str:
+    return _CONTENT_TYPES.get(Path(rel_path).suffix.lower(), "application/octet-stream")
+
+
+def _safe_file(catalog: Catalog, rel_path: str) -> Path:
+    """Resolve a stored relative path to a real file under the library root.
+
+    Load-bearing security guard: join the stored path onto the root, resolve
+    symlinks/``..``, and REQUIRE the result to stay under the resolved root.
+    Anything escaping (symlink target outside, ``..`` traversal) or missing is
+    rejected with 404 and never served. Read-only: the file is only opened for
+    reading by ``FileResponse``.
+    """
+    root_real = catalog.root.resolve()
+    candidate = (catalog.root / rel_path).resolve()
+    if not candidate.is_relative_to(root_real):
+        raise HTTPException(status_code=404, detail="Not found")
+    if not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    return candidate
+
+
+def _to_summary(base: str, comic: ComicEntry) -> ComicSummary:
     return ComicSummary(
         id=comic.id,
         title=comic.title,
-        coverUrl=_cover_url(comic.id),
+        coverUrl=_cover_url(base, comic.id),
         chapterCount=comic.chapter_count,
         lastReadAt=None,
     )
@@ -101,21 +152,23 @@ def healthz() -> dict:
 
 
 @app.get("/comics", response_model=list[ComicSummary])
-def list_comics() -> list[ComicSummary]:
+def list_comics(request: Request) -> list[ComicSummary]:
     catalog = _require_catalog()
-    return [_to_summary(c) for c in catalog.comics]
+    base = _base_url(request)
+    return [_to_summary(base, c) for c in catalog.comics]
 
 
 @app.get("/comics/{comic_id}", response_model=ComicDetail)
-def get_comic(comic_id: str) -> ComicDetail:
+def get_comic(comic_id: str, request: Request) -> ComicDetail:
     catalog = _require_catalog()
     comic = catalog.by_id.get(comic_id)
     if comic is None:
         raise HTTPException(status_code=404, detail="Comic not found")
+    base = _base_url(request)
     return ComicDetail(
         id=comic.id,
         title=comic.title,
-        coverUrl=_cover_url(comic.id),
+        coverUrl=_cover_url(base, comic.id),
         chapters=[
             ChapterSummary(
                 id=ch.id,
@@ -127,6 +180,82 @@ def get_comic(comic_id: str) -> ComicDetail:
             for ch in comic.chapters
         ],
     )
+
+
+@app.get(
+    "/comics/{comic_id}/chapters/{chapter_id}",
+    response_model=ChapterDetail,
+)
+def get_chapter(comic_id: str, chapter_id: str, request: Request) -> ChapterDetail:
+    """Reader endpoint: ordered absolute page URLs for one chapter.
+
+    404 if the comic id is unknown, or if the chapter id is unknown / does not
+    belong to that comic. Page URLs use a 1-based index selector so the client
+    fetches exactly the array it receives.
+    """
+    catalog = _require_catalog()
+    comic = catalog.by_id.get(comic_id)
+    if comic is None:
+        raise HTTPException(status_code=404, detail="Comic not found")
+    chapter = catalog.chapters_by_id.get(chapter_id)
+    if chapter is None or chapter not in comic.chapters:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    base = _base_url(request)
+    pages = [
+        _page_url(base, comic_id, chapter_id, i + 1)
+        for i in range(chapter.page_count)
+    ]
+    return ChapterDetail(
+        id=chapter.id,
+        number=chapter.number,
+        title=chapter.title,
+        pages=pages,
+    )
+
+
+@app.get("/media/{comic_id}/{chapter_id}/{page}")
+def get_page_image(comic_id: str, chapter_id: str, page: str) -> FileResponse:
+    """Stream one page image by 1-based index.
+
+    ``page`` is a 1-based index into the chapter's ordered ``page_paths`` (the
+    same order as the reader endpoint's ``pages`` array). Non-integer or
+    out-of-range selectors, and unknown ids, return 404. The resolved file path
+    is re-validated to stay under the library root before streaming.
+    """
+    catalog = _require_catalog()
+    comic = catalog.by_id.get(comic_id)
+    if comic is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    chapter = catalog.chapters_by_id.get(chapter_id)
+    if chapter is None or chapter not in comic.chapters:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    try:
+        index_1based = int(page)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
+    if index_1based < 1 or index_1based > chapter.page_count:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    rel_path = chapter.page_paths[index_1based - 1]
+    file_path = _safe_file(catalog, rel_path)
+    return FileResponse(file_path, media_type=_content_type_for(rel_path))
+
+
+@app.get("/media/{comic_id}/cover")
+def get_cover_image(comic_id: str) -> FileResponse:
+    """Stream a comic's resolved cover (explicit ``cover.*`` or fallback page).
+
+    ``cover_path`` was resolved at scan time to either an explicit ``cover.*``
+    file or the first page of the lowest-numbered chapter; both are handled the
+    same way here. Unknown comic / no resolvable cover returns 404.
+    """
+    catalog = _require_catalog()
+    comic = catalog.by_id.get(comic_id)
+    if comic is None or comic.cover_path is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    file_path = _safe_file(catalog, comic.cover_path)
+    return FileResponse(file_path, media_type=_content_type_for(comic.cover_path))
 
 
 @app.post("/rescan")
