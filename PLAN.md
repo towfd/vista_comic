@@ -1,13 +1,13 @@
 # vista_comic development plan
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 ## Current status
 
-- Milestones M1–M4 are complete; the local UI release goal (library → chapters → reader with sample data) is met.
-- Also shipped: Traditional Chinese localization (localization-ready) and reader pull-past-bottom auto-advance.
-- Current owner: Coordinator
-- Next action: pick the next product area — remembering read position (needs persistence/backend), Dynamic Type support, or content import — none are started.
+- Milestones M1–M4 are complete; the local UI release goal is met (localization + auto-advance also shipped).
+- Active milestone: **M5 — Local backend (folder → app)**, at Slice 0 (contract + folder validation). Backend design of record: `docs/backend-architecture.md`.
+- Current owner: Coordinator (delegates to `backend-implementer`, `frontend-implementer`, `code-reviewer`).
+- Next action: validate the confirmed folder format against the real local library (read-only), then build Slice 1 (in-memory catalog API).
 
 ## Current release goal
 
@@ -38,9 +38,9 @@ The flow must work with sample data and without a backend or network dependency.
 
 - OCR and text-region selection
 - Translation or LLM integration
-- Web scraping and real URL parsing
-- Backend APIs, authentication, and cloud sync
-- Persistence beyond what is necessary for the UI prototype
+- Web scraping and real URL parsing (README §2 URL import remains later work)
+- Authentication and cloud sync (a local, read-only backend for a developer manga folder is now in scope — see M5)
+- Persistence beyond what M5 needs (reading-progress store arrives at M5 Slice 4)
 - Architecture added only for hypothetical future requirements
 
 Future functionality may use simple placeholders only when the current UI flow needs an entry point.
@@ -152,11 +152,35 @@ Acceptance criteria:
 - [x] No confirmed high-severity UI or navigation issue remains. (only the P2 dark-mode issue, now fixed)
 - [x] Verification results and environment limitations are documented.
 
+### M5 — Local backend (folder → app)
+
+- Status: In progress (Slice 0)
+- Owner: Coordinator; implemented by `backend-implementer` (backend) and `frontend-implementer` (iOS)
+- Dependencies: M1–M4
+- Contract of record: `docs/backend-architecture.md` (confirmed decisions + API shape). Scope: a local, read-only "scan-and-serve" backend that makes a developer's manga folder appear in the app. Cloud sync / auth / URL import remain out of scope.
+- Config: the library path lives only in a gitignored `.env` (`MANGA_LIBRARY_PATH`); never commit it.
+
+Slices (each ships only after the prior one has an observable acceptance test):
+
+- [ ] **Slice 0 — contract + folder validation** (Coordinator / `service-explorer`, read-only). Validate the confirmed folder format against the real library; lock the API contract and stable, path-derived IDs.
+  - Acceptance: the real folder structure matches the recorded format, or differences are reconciled into the doc.
+- [ ] **Slice 1 — in-memory catalog API** (`backend-implementer`, new `backend/`). FastAPI scans `MANGA_LIBRARY_PATH` into memory; serves `GET /comics`, `GET /comics/{id}`.
+  - Acceptance: `curl /comics` counts match the folder; a re-run is byte-identical; never writes to the library.
+- [ ] **Slice 2 — page images + reader endpoint** (`backend-implementer`). `GET /comics/{id}/chapters/{cid}` + `GET /media/...`.
+  - Acceptance: opening a page URL in a browser shows the correct image in correct order.
+- [ ] **Slice 3 — iOS consumes it** (`frontend-implementer`; `Shared/Models.swift` URL retype is a coordinator-owned change). Repository + `HomeView` data-source swap + three `Image → AsyncImage` sites + catalog loading/error states.
+  - Acceptance: the app shows the folder's comics, opens a chapter, and scrolls real pages, with loading and failure states.
+- [ ] **Slice 4 — reading-position persistence** (`backend-implementer` + `frontend-implementer`). A small `progress` store (PostgreSQL or SQLite); catalog stays scan-derived; `readState` / `lastReadAt` become live.
+  - Acceptance: read part of a chapter, restart, and resume at the saved position.
+
+Load-bearing: server IDs must be stable across scans/restarts (path-derived hash), because Slice 4 keys progress on them.
+
 ## Known issues and constraints
 
 - Xcode builds may report simulator-service or cache permission limitations in restricted execution environments.
 - `LibraryFlowUITests` and `ReaderFlowUITests` now cover the core flow; the original unit/UITest boilerplate is still unused.
 - Comic and chapter titles in `SampleData` are English placeholders (data, not UI chrome) and are intentionally not localized.
+- The manga library path is machine-specific config kept only in a gitignored `.env` (`MANGA_LIBRARY_PATH`); it must never appear in committed files.
 
 ## Open decisions
 
@@ -170,4 +194,6 @@ Acceptance criteria:
 
 ## Next action
 
-The M1–M4 release goal is complete. Choose the next area from the backlog: (1) remember read position once persistence/backend exists; (2) Dynamic Type support (move off fixed font sizes); (3) dark-appearance colour variants; or (4) begin content import (Roadmap §2). No option is started yet.
+M5 is active at Slice 0: validate the confirmed folder format in `docs/backend-architecture.md` against the real local library (read-only), then dispatch `backend-implementer` for Slice 1 (in-memory catalog API). Each slice gets a coordinator-approved plan before implementation.
+
+Backlog (unstarted): Dynamic Type support (move off fixed font sizes); dark-appearance colour variants; README §2 URL import.
