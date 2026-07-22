@@ -213,24 +213,30 @@ private struct ReaderPage: View {
     @State private var reloadToken = 0
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-            case .empty:
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 220)
-            case .failure:
-                failurePlaceholder
-            @unknown default:
-                failurePlaceholder
+        // Wrap the page so `.id(reloadToken)` re-keys only the inner AsyncImage.
+        // If `.id` were applied to this view's body root, every ReaderPage would
+        // expose the same id (0) to the enclosing LazyVStack — a collision that
+        // makes SwiftUI unable to tell the pages apart and breaks scrolling.
+        VStack(spacing: 0) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                case .empty:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 220)
+                case .failure:
+                    failurePlaceholder
+                @unknown default:
+                    failurePlaceholder
+                }
             }
+            // Re-issue the request when the retry token changes.
+            .id(reloadToken)
         }
-        // Re-issue the request when the retry token changes.
-        .id(reloadToken)
     }
 
     private var failurePlaceholder: some View {
