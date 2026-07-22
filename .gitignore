@@ -20,3 +20,7 @@ build/
 
 # Claude Code local settings (per-user, not shared)
 .claude/settings.local.json
+
+# Local machine-specific config (e.g. MANGA_LIBRARY_PATH) — never commit
+.env
+.env.*
