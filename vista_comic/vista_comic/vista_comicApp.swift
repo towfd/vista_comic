@@ -11,7 +11,10 @@ import SwiftUI
 struct vista_comicApp: App {
     var body: some Scene {
         WindowGroup {
+            // Inject the live backend repository. Previews and the canvas fall
+            // back to `PreviewComicRepository` via the environment default.
             HomeView()
+                .environment(\.comicRepository, APIComicRepository())
         }
     }
 }
