@@ -1,0 +1,21 @@
+# Keep the build context (./backend) minimal and free of secrets/dev artefacts.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Tests are dev-only; the runtime image does not need them.
+tests/
+requirements-dev.txt
+
+# Never bake machine-specific config or secrets into the image.
+.env
+.env.*
+
+# Docs / meta that do not belong in the image.
+README.md
+Dockerfile
+.dockerignore
+.gitignore

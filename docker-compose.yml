@@ -1,0 +1,33 @@
+# Local one-command stack for the vista_comic backend (M5 Slice 4, sub-step A).
+#
+# This step containerises ONLY the existing FastAPI API. Postgres and the
+# reading-progress store are the NEXT sub-step and are intentionally absent.
+#
+# ${MANGA_LIBRARY_PATH} is interpolated at parse time from the gitignored
+# repo-root .env (auto-discovered because this file sits at the repo root).
+# That HOST path is bind-mounted read-only at /library; the process INSIDE the
+# container sees MANGA_LIBRARY_PATH=/library (set below), which is the path it
+# actually scans. Same variable name, two scopes — intentional.
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MANGA_LIBRARY_PATH=/library
+    volumes:
+      - "${MANGA_LIBRARY_PATH}:/library:ro"
+    restart: unless-stopped
+    healthcheck:
+      # curl is not in the slim base image; probe with the bundled Python.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

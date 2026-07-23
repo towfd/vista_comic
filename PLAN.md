@@ -1,13 +1,13 @@
 # vista_comic development plan
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 ## Current status
 
 - Milestones M1–M4 are complete; the local UI release goal is met (localization + auto-advance also shipped).
-- Active milestone: **M5 — Local backend (folder → app)**, at Slice 0 (contract + folder validation). Backend design of record: `docs/backend-architecture.md`.
+- Active milestone: **M5 — Local backend (folder → app)**. Slices 0–3 are complete and merged (scan-and-serve catalog + media + iOS client). **Slice 4 (reading-progress persistence) is planned; contract + docs updated 2026-07-23, implementation about to start.** Backend design of record: `docs/backend-architecture.md`.
 - Current owner: Coordinator (delegates to `backend-implementer`, `frontend-implementer`, `code-reviewer`).
-- Next action: validate the confirmed folder format against the real local library (read-only), then build Slice 1 (in-memory catalog API).
+- Next action: `backend-implementer` builds Slice 4 backend (Docker Compose api+postgres, `progress` table, `PUT .../progress`, live `readState`/`lastReadAt`, tests); then `frontend-implementer` wires the iOS reader (`saveProgress`, page tracking, `ScrollViewReader` resume).
 
 ## Current release goal
 
@@ -154,7 +154,7 @@ Acceptance criteria:
 
 ### M5 — Local backend (folder → app)
 
-- Status: In progress (Slice 0)
+- Status: In progress (Slices 0–3 complete/merged; Slice 4 planned, about to start)
 - Owner: Coordinator; implemented by `backend-implementer` (backend) and `frontend-implementer` (iOS)
 - Dependencies: M1–M4
 - Contract of record: `docs/backend-architecture.md` (confirmed decisions + API shape). Scope: a local, read-only "scan-and-serve" backend that makes a developer's manga folder appear in the app. Cloud sync / auth / URL import remain out of scope.
@@ -173,10 +173,16 @@ Slices (each ships only after the prior one has an observable acceptance test):
   - Review fixes applied: P2 cover clipping, P2 `LazyVStack` for reader pages, P3 lenient `readState` decode, P3 hide "Continue" when unavailable.
   - Follow-ups: base URL is now resolved from the `VISTA_BASE_URL` env var (set per Xcode scheme) with a compiled default of `127.0.0.1` — no machine-specific IP in tracked source; production HTTPS via xcconfig is deferred. Reader pages that fail to load now show a tap-to-retry placeholder (`AsyncImage` re-keyed to re-request just that page).
   - Residual (to confirm on-device): reader `LazyVStack` scroll + pull-past-bottom auto-advance and per-page retry on a real many-page chapter. Backlog: error-message granularity, URL-string decode tolerance, per-chapter thumbnail (no contract URL yet), production base-URL/ATS story.
-- [ ] **Slice 4 — reading-position persistence** (`backend-implementer` + `frontend-implementer`). A small `progress` store (PostgreSQL or SQLite); catalog stays scan-derived; `readState` / `lastReadAt` become live.
-  - Acceptance: read part of a chapter, restart, and resume at the saved position.
+- [ ] **Slice 4 — reading-position persistence** (`backend-implementer` then `frontend-implementer`, sequential — not concurrent). Decisions locked 2026-07-23:
+  - **PostgreSQL** (not SQLite), via SQLAlchemy 2.0 + psycopg (sync); a single `progress` table `(comic_id, chapter_id)` → `last_page, page_count, updated_at`; `CREATE TABLE IF NOT EXISTS`, no Alembic.
+  - **Docker Compose, two services** (`api` + `postgres`); manga folder read-only bind-mounted into `api`; `DATABASE_URL` in the gitignored `.env`. **Redis deferred** with a written trigger (multi-worker shared catalog cache / measured slowness) — see `docs/backend-architecture.md`.
+  - **Page-level** resume: new `PUT /comics/{id}/chapters/{cid}/progress`; GET endpoints derive live `readState` / `lastReadAt`; reader response adds `lastReadPage`. iOS gains `saveProgress(...)`, debounced visible-page reporting, and `ScrollViewReader` resume.
+  - Catalog stays scan-derived; progress is the only DB-held (folder-external) state.
+  - Acceptance: read to page K of a chapter, restart app/backend, resume at ~page K with the chapter shown as `reading`.
 
 Load-bearing: server IDs must be stable across scans/restarts (path-derived hash), because Slice 4 keys progress on them.
+
+Connectivity (does not affect the API contract): all infra runs locally on the dev Mac — nothing hosted in the cloud. For a stable public API endpoint, use a Cloudflare Tunnel (named tunnel + own domain, no Access policy for now); HTTPS terminates at the edge so no ATS exception is needed. Same-Wi-Fi LAN IP and Tailscale remain the other options.
 
 ## Known issues and constraints
 
@@ -197,6 +203,6 @@ Load-bearing: server IDs must be stable across scans/restarts (path-derived hash
 
 ## Next action
 
-M5 is active at Slice 0: validate the confirmed folder format in `docs/backend-architecture.md` against the real local library (read-only), then dispatch `backend-implementer` for Slice 1 (in-memory catalog API). Each slice gets a coordinator-approved plan before implementation.
+M5 Slices 0–3 are merged. Slice 4 is planned and approved (decisions recorded 2026-07-23): dispatch `backend-implementer` for the PostgreSQL `progress` store in Docker Compose (api+postgres), the `PUT .../progress` endpoint, and live `readState`/`lastReadAt`; then `frontend-implementer` for the iOS reader resume. Sequential, not concurrent; `code-reviewer` after each increment. Each slice keeps a coordinator-approved plan before implementation.
 
 Backlog (unstarted): Dynamic Type support (move off fixed font sizes); dark-appearance colour variants; README §2 URL import.
