@@ -71,6 +71,10 @@ class ComicSummary(BaseModel):
     coverUrl: str
     chapterCount: int
     lastReadAt: Optional[str] = None  # null in v1 (folder has no such value)
+    # The chapter the reader should open for "Continue" — always present (every
+    # comic has >= 1 chapter). Selection is derived live from the progress store;
+    # see docs/backend-architecture.md and progress_store.continue_chapter_id.
+    continueChapterId: str
 
 
 class ComicDetail(BaseModel):

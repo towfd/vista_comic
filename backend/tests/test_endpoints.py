@@ -29,12 +29,21 @@ def test_list_comics_shape_and_counts(client):
     assert [c["title"] for c in comics] == ["Alpha", "Beta"]
 
     alpha = comics[0]
-    assert set(alpha) == {"id", "title", "coverUrl", "chapterCount", "lastReadAt"}
+    assert set(alpha) == {
+        "id",
+        "title",
+        "coverUrl",
+        "chapterCount",
+        "lastReadAt",
+        "continueChapterId",
+    }
     assert alpha["id"] == stable_id("Alpha")
     assert alpha["chapterCount"] == 2
     # coverUrl is now an absolute URL derived from the request origin.
     assert alpha["coverUrl"] == f"http://testserver/media/{stable_id('Alpha')}/cover"
     assert alpha["lastReadAt"] is None
+    # No progress yet -> Continue points at the first chapter (reading order).
+    assert alpha["continueChapterId"] == stable_id("Alpha/01 - The Journey")
 
 
 def test_get_comic_detail_shape_and_counts(client):
