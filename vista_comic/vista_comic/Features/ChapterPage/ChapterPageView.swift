@@ -63,7 +63,7 @@ struct ChapterPageView: View {
     NavigationStack {
         ChapterPageView(comic: SampleData.comics[0])
             .navigationDestination(for: ReaderRoute.self) { route in
-                ComicView(comic: route.comic, chapter: route.chapter)
+                ComicView(comicID: route.comicID, chapterID: route.chapterID)
             }
     }
 }

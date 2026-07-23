@@ -4,14 +4,63 @@
 //
 //  Created by 林鈺峯 on 2026/7/12.
 //
-//  Vertical reader. Chapters arrive without their pages (the `/comics/{id}`
-//  summary), so the reader fetches each chapter's ordered page URLs lazily from
+//  Vertical reader. Entered by id only (see `ReaderRoute`), because entry points
+//  like the library card have no chapters loaded. `ComicView` fetches the comic
+//  detail (`/comics/{id}`) to resolve the chapter list, then hands off to the
+//  inner `ReaderView`, which fetches each chapter's ordered page URLs lazily from
 //  `/comics/{id}/chapters/{cid}` when it opens or when the chapter changes, and
 //  renders them with `AsyncImage` (loading → placeholder, failure → placeholder).
 //
 import SwiftUI
 
-struct ComicView: View{
+/// Ids-based entry to the reader. Loads the comic detail so the reader can offer
+/// prev/next navigation and the chapter-list sheet even when the caller (e.g. the
+/// library card) only knows the comic and chapter ids.
+struct ComicView: View {
+    let comicID: String
+    let chapterID: String
+
+    @Environment(\.comicRepository) private var repository
+    @State private var comicState: LoadState<Comic> = .loading
+
+    var body: some View {
+        content
+            .task { await loadComic() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch comicState {
+        case .loading:
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .loaded(let comic):
+            // Resolve the requested chapter, falling back to the first one when
+            // the id is unknown (e.g. an empty/best-effort Continue target).
+            if let initial = comic.chapters.first(where: { $0.id == chapterID })
+                ?? comic.chapters.first {
+                ReaderView(comic: comic, initialChapter: initial)
+            } else {
+                // Detail with no chapters: nothing to read, offer a retry.
+                ErrorStateView { Task { await loadComic() } }
+            }
+        case .failed:
+            ErrorStateView { Task { await loadComic() } }
+        }
+    }
+
+    private func loadComic() async {
+        comicState = .loading
+        do {
+            comicState = .loaded(try await repository.comic(id: comicID))
+        } catch {
+            comicState = .failed(error)
+        }
+    }
+}
+
+/// The reader itself, now working from a fully-loaded comic and a starting chapter.
+private struct ReaderView: View {
     let comic: Comic
     @State private var currentChapter: Chapter
     @State private var showControls = true
@@ -34,6 +83,11 @@ struct ComicView: View{
     /// Debounce for progress writes: replaced on every scroll change, flushed on
     /// leave. Kept as state so we can cancel it across renders.
     @State private var saveTask: Task<Void, Never>?
+    /// One-shot flag consumed by `loadPages`: when the reader auto-advances past
+    /// the bottom, the incoming chapter restarts at page 1 (ignoring its saved
+    /// resume position) and overwrites the store to page 1. Explicit jumps
+    /// (chevrons / chapter list) leave it false and resume as usual.
+    @State private var forceRestart = false
     @Environment(\.comicRepository) private var repository
     @Environment(\.dismiss) private var dismiss
 
@@ -44,9 +98,9 @@ struct ComicView: View{
     /// How long scrolling must settle before a progress write is sent.
     private let saveDebounce: Duration = .seconds(0.9)
 
-    init(comic: Comic, chapter: Chapter) {
+    init(comic: Comic, initialChapter: Chapter) {
         self.comic = comic
-        _currentChapter = State(initialValue: chapter)
+        _currentChapter = State(initialValue: initialChapter)
     }
 
     var body: some View{
@@ -116,7 +170,9 @@ struct ComicView: View{
             return geometry.contentOffset.y >= maxScroll + pullThreshold
         } action: { wasPulledPastEnd, isPulledPastEnd in
             if isPulledPastEnd && !wasPulledPastEnd {
-                goTo(nextChapter)
+                // Auto-advance restarts the next chapter from the top, unlike an
+                // explicit jump which resumes at its saved position.
+                goTo(nextChapter, restart: true)
             }
         }
         // Reaching the *actual* bottom (not the pull-past threshold) means the
@@ -227,17 +283,25 @@ struct ComicView: View{
         currentIndex < comic.chapters.count - 1 ? comic.chapters[currentIndex + 1] : nil
     }
 
-    private func goTo(_ chapter: Chapter?) {
+    /// Switches chapters. `restart: true` (auto-advance) makes the incoming
+    /// chapter start at page 1 and overwrite its saved progress; `false`
+    /// (chevrons / chapter list) resumes it at its saved position.
+    private func goTo(_ chapter: Chapter?, restart: Bool = false) {
         guard let chapter else { return }
         // Persist the outgoing chapter's position before switching, since the
         // scroll view (and `topPage`) is rebuilt for the incoming chapter.
         flushProgress()
+        forceRestart = restart
         currentChapter = chapter
     }
 
     // MARK: - Loading
 
     private func loadPages() async {
+        // Consume the one-shot restart flag for this chapter open.
+        let restart = forceRestart
+        forceRestart = false
+
         pagesState = .loading
         do {
             let chapter = try await repository.readerChapter(
@@ -247,17 +311,36 @@ struct ComicView: View{
             let urls = chapter.pageURLs
             // Resume: map the 1-based `lastReadPage` to a 0-based index, clamped
             // in case the chapter shrank since progress was saved. `nil` starts
-            // at the top. Setting `topPage` in the same update that flips to
-            // `.loaded` positions the freshly built scroll view at the resume
-            // page. Seed `lastSentPage` so the resume position is not re-sent.
-            let resumeIndex: Int? = chapter.lastReadPage.flatMap { page in
-                urls.isEmpty ? nil : min(max(page - 1, 0), urls.count - 1)
+            // at the top. On a restart (auto-advance) we ignore the saved page
+            // and force the top. Setting `topPage` in the same update that flips
+            // to `.loaded` positions the freshly built scroll view accordingly.
+            let resumeIndex: Int?
+            if restart {
+                resumeIndex = urls.isEmpty ? nil : 0
+            } else {
+                resumeIndex = chapter.lastReadPage.flatMap { page in
+                    urls.isEmpty ? nil : min(max(page - 1, 0), urls.count - 1)
+                }
             }
             pagesState = .loaded(urls)
             topPage = resumeIndex
-            lastSentPage = resumeIndex.map { $0 + 1 }
             pageCount = urls.count
             reachedEnd = false
+
+            if restart {
+                // Overwrite the store to page 1 for the incoming chapter, even if
+                // it was previously `read`. Clear `lastSentPage` first so the
+                // write is not de-duped against the outgoing chapter's value.
+                lastSentPage = nil
+                sendProgress(
+                    page: urls.isEmpty ? nil : 1,
+                    comicID: comic.id,
+                    chapterID: currentChapter.id
+                )
+            } else {
+                // Seed `lastSentPage` so the resume position is not re-sent.
+                lastSentPage = resumeIndex.map { $0 + 1 }
+            }
         } catch {
             pagesState = .failed(error)
         }
@@ -371,13 +454,19 @@ private struct ReaderPage: View {
 
 #Preview("Reader") {
     NavigationStack {
-        ComicView(comic: SampleData.comics[0], chapter: SampleData.comics[0].chapters[1])
+        ComicView(
+            comicID: SampleData.comics[0].id,
+            chapterID: SampleData.comics[0].chapters[1].id
+        )
     }
 }
 
-#Preview("Reader — pages failed") {
+#Preview("Reader — load failed") {
     NavigationStack {
-        ComicView(comic: SampleData.comics[0], chapter: SampleData.comics[0].chapters[0])
-            .environment(\.comicRepository, FailingPreviewRepository())
+        ComicView(
+            comicID: SampleData.comics[0].id,
+            chapterID: SampleData.comics[0].chapters[0].id
+        )
+        .environment(\.comicRepository, FailingPreviewRepository())
     }
 }
