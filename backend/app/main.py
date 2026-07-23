@@ -23,9 +23,19 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import SQLAlchemyError
 
+from . import progress_store
 from .config import get_library_root
-from .models import ChapterDetail, ChapterSummary, ComicDetail, ComicSummary
+from .db import init_engine, new_session
+from .models import (
+    ChapterDetail,
+    ChapterSummary,
+    ComicDetail,
+    ComicSummary,
+    ProgressResponse,
+    ProgressUpdate,
+)
 from .scanner import Catalog, ComicEntry, scan_library
 
 # Map a file extension (lowercased, with dot) to the Content-Type we serve.
@@ -69,6 +79,21 @@ def _rescan() -> Catalog:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Connect to Postgres and ensure the progress table exists (CREATE TABLE IF
+    # NOT EXISTS) before serving. The catalog stays scan-derived; the DB holds
+    # only folder-external reading progress. A DB outage must NOT take down
+    # catalog browsing, so a failed init is logged and the app still starts —
+    # progress reads degrade to "no progress" until the DB is reachable and the
+    # API is restarted.
+    try:
+        init_engine()
+    except Exception:  # noqa: BLE001 — degrade gracefully; the catalog is independent
+        logger.warning(
+            "Progress store unavailable at startup; serving the catalog without "
+            "reading progress until the database is reachable and the API is "
+            "restarted.",
+            exc_info=True,
+        )
     _rescan()
     yield
 
@@ -131,13 +156,15 @@ def _safe_file(catalog: Catalog, rel_path: str) -> Path:
     return candidate
 
 
-def _to_summary(base: str, comic: ComicEntry) -> ComicSummary:
+def _to_summary(
+    base: str, comic: ComicEntry, last_read_at: str | None
+) -> ComicSummary:
     return ComicSummary(
         id=comic.id,
         title=comic.title,
         coverUrl=_cover_url(base, comic.id),
         chapterCount=comic.chapter_count,
-        lastReadAt=None,
+        lastReadAt=last_read_at,
     )
 
 
@@ -155,7 +182,16 @@ def healthz() -> dict:
 def list_comics(request: Request) -> list[ComicSummary]:
     catalog = _require_catalog()
     base = _base_url(request)
-    return [_to_summary(base, c) for c in catalog.comics]
+    # One grouped query for the whole list: comic_id -> max updated_at.
+    # Degrades to {} (all lastReadAt null) if the progress store is unavailable.
+    last_read = progress_store.safe_last_read_at_by_comic()
+    result = []
+    for c in catalog.comics:
+        dt = last_read.get(c.id)
+        result.append(
+            _to_summary(base, c, progress_store.iso_utc(dt) if dt else None)
+        )
+    return result
 
 
 @app.get("/comics/{comic_id}", response_model=ComicDetail)
@@ -165,6 +201,9 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
     if comic is None:
         raise HTTPException(status_code=404, detail="Comic not found")
     base = _base_url(request)
+    # One query for this comic's rows; derive per-chapter readState.
+    # Degrades to {} (all readState "unread") if the progress store is unavailable.
+    rows = progress_store.safe_progress_by_chapter(comic_id)
     return ComicDetail(
         id=comic.id,
         title=comic.title,
@@ -175,7 +214,10 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
                 number=ch.number,
                 title=ch.title,
                 pageCount=ch.page_count,
-                readState="unread",
+                readState=progress_store.read_state(
+                    rows[ch.id].last_page if ch.id in rows else None,
+                    ch.page_count,
+                ),
             )
             for ch in comic.chapters
         ],
@@ -185,13 +227,19 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
 @app.get(
     "/comics/{comic_id}/chapters/{chapter_id}",
     response_model=ChapterDetail,
+    response_model_exclude_none=True,  # omit lastReadPage when there is no row
 )
-def get_chapter(comic_id: str, chapter_id: str, request: Request) -> ChapterDetail:
+def get_chapter(
+    comic_id: str,
+    chapter_id: str,
+    request: Request,
+) -> ChapterDetail:
     """Reader endpoint: ordered absolute page URLs for one chapter.
 
     404 if the comic id is unknown, or if the chapter id is unknown / does not
     belong to that comic. Page URLs use a 1-based index selector so the client
-    fetches exactly the array it receives.
+    fetches exactly the array it receives. ``lastReadPage`` is the stored resume
+    position, omitted when there is no progress row.
     """
     catalog = _require_catalog()
     comic = catalog.by_id.get(comic_id)
@@ -205,11 +253,70 @@ def get_chapter(comic_id: str, chapter_id: str, request: Request) -> ChapterDeta
         _page_url(base, comic_id, chapter_id, i + 1)
         for i in range(chapter.page_count)
     ]
+    # Degrades to None (lastReadPage omitted) if the progress store is unavailable.
+    row = progress_store.safe_get(comic_id, chapter_id)
     return ChapterDetail(
         id=chapter.id,
         number=chapter.number,
         title=chapter.title,
         pages=pages,
+        lastReadPage=row.last_page if row is not None else None,
+    )
+
+
+@app.put(
+    "/comics/{comic_id}/chapters/{chapter_id}/progress",
+    response_model=ProgressResponse,
+)
+def save_progress(
+    comic_id: str,
+    chapter_id: str,
+    body: ProgressUpdate,
+) -> ProgressResponse:
+    """Save a 1-based reading position for one chapter.
+
+    404 if the comic/chapter is unknown or the chapter does not belong to the
+    comic; 422 if ``lastPage`` is out of ``[1, pageCount]`` (pageCount comes from
+    the catalog chapter); 503 if the progress store is unavailable. Upserts and
+    echoes the saved state. Unlike the read paths, a write has no fallback — the
+    caller is told the save did not happen.
+    """
+    catalog = _require_catalog()
+    comic = catalog.by_id.get(comic_id)
+    if comic is None:
+        raise HTTPException(status_code=404, detail="Comic not found")
+    chapter = catalog.chapters_by_id.get(chapter_id)
+    if chapter is None or chapter not in comic.chapters:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    page_count = chapter.page_count
+    if body.lastPage < 1 or body.lastPage > page_count:
+        raise HTTPException(
+            status_code=422,
+            detail=f"lastPage must be in [1, {page_count}]",
+        )
+
+    try:
+        session = new_session()
+    except RuntimeError:
+        # Engine never initialised (Postgres was down at startup).
+        raise HTTPException(status_code=503, detail="Progress store unavailable")
+    try:
+        updated_at = progress_store.upsert(
+            session, comic_id, chapter_id, body.lastPage, page_count
+        )
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Progress store write failed.", exc_info=True)
+        raise HTTPException(status_code=503, detail="Progress store unavailable")
+    finally:
+        session.close()
+    return ProgressResponse(
+        comicId=comic_id,
+        chapterId=chapter_id,
+        lastPage=body.lastPage,
+        pageCount=page_count,
+        updatedAt=progress_store.iso_utc(updated_at),
     )
 
 

@@ -59,7 +59,8 @@ class ChapterSummary(BaseModel):
     number: int
     title: str
     pageCount: int
-    readState: str  # always "unread" in v1 (no progress store yet)
+    # Derived live from the progress store (Slice 4): "unread" | "reading" | "read".
+    readState: str
 
 
 class ComicSummary(BaseModel):
@@ -92,3 +93,27 @@ class ChapterDetail(BaseModel):
     number: int
     title: str
     pages: List[str]
+    # 1-based resume position from the progress store; omitted when no progress
+    # (the route uses response_model_exclude_none). See Slice 4 contract.
+    lastReadPage: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Reading-progress endpoint models (Slice 4).
+# ---------------------------------------------------------------------------
+
+
+class ProgressUpdate(BaseModel):
+    """Request body for ``PUT .../progress``: a 1-based page position."""
+
+    lastPage: int
+
+
+class ProgressResponse(BaseModel):
+    """Response for ``PUT .../progress`` (echoes the saved state)."""
+
+    comicId: str
+    chapterId: str
+    lastPage: int
+    pageCount: int
+    updatedAt: str  # ISO-8601 UTC

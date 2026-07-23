@@ -1,13 +1,19 @@
-# Local one-command stack for the vista_comic backend (M5 Slice 4, sub-step A).
+# Local one-command stack for the vista_comic backend (M5 Slice 4, sub-step B).
 #
-# This step containerises ONLY the existing FastAPI API. Postgres and the
-# reading-progress store are the NEXT sub-step and are intentionally absent.
+# Two services: the FastAPI `api` and a `postgres` reading-progress store.
+# The catalog stays scan-derived in memory; Postgres holds ONLY folder-external
+# reading progress (a single `progress` table).
 #
 # ${MANGA_LIBRARY_PATH} is interpolated at parse time from the gitignored
 # repo-root .env (auto-discovered because this file sits at the repo root).
 # That HOST path is bind-mounted read-only at /library; the process INSIDE the
 # container sees MANGA_LIBRARY_PATH=/library (set below), which is the path it
 # actually scans. Same variable name, two scopes — intentional.
+#
+# Secret discipline: POSTGRES_PASSWORD and DATABASE_URL come from the same
+# gitignored repo-root .env. Non-secret local defaults (:-...) keep one-command
+# dev working; real credentials are never committed. The in-container
+# DATABASE_URL uses host `postgres`; local uvicorn/tests use `localhost:5432`.
 services:
   api:
     build:
@@ -17,8 +23,13 @@ services:
       - "8000:8000"
     environment:
       - MANGA_LIBRARY_PATH=/library
+      # Inside the compose network the DB host is the `postgres` service name.
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-vista}:${POSTGRES_PASSWORD:-vista}@postgres:5432/${POSTGRES_DB:-vista}
     volumes:
       - "${MANGA_LIBRARY_PATH}:/library:ro"
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       # curl is not in the slim base image; probe with the bundled Python.
@@ -31,3 +42,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-vista}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vista}
+      - POSTGRES_DB=${POSTGRES_DB:-vista}
+    ports:
+      # Published so local uvicorn/tests can reach the DB at localhost:5432.
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vista} -d ${POSTGRES_DB:-vista}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pg_data:

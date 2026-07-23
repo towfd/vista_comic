@@ -20,6 +20,26 @@ _ENV_PATH = _REPO_ROOT / ".env"
 load_dotenv(dotenv_path=_ENV_PATH)
 
 _ENV_KEY = "MANGA_LIBRARY_PATH"
+_DB_ENV_KEY = "DATABASE_URL"
+
+# Non-secret local default used when DATABASE_URL is unset (e.g. a local
+# uvicorn dev run after ``docker compose up`` published Postgres on localhost).
+# The real URL / password live only in the gitignored repo-root ``.env`` (or,
+# for the container, in the compose ``environment:``) and are never committed.
+_DEFAULT_DATABASE_URL = "postgresql+psycopg://vista:vista@localhost:5432/vista"
+
+
+def get_database_url() -> str:
+    """Return the SQLAlchemy URL for the reading-progress Postgres store.
+
+    Read from the ``DATABASE_URL`` environment variable (loaded from the
+    gitignored repo-root ``.env`` or injected by Docker Compose). Falls back to
+    a non-secret localhost default so a local dev run works once the compose
+    Postgres is up. Same variable, two scopes: the container uses host
+    ``postgres`` (set via compose ``environment:``); local dev/tests use
+    ``localhost``.
+    """
+    return os.environ.get(_DB_ENV_KEY) or _DEFAULT_DATABASE_URL
 
 
 def get_library_root() -> Path:
