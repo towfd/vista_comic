@@ -1,6 +1,6 @@
 # Backend architecture baseline
 
-Status: **planning / ideas draft for discussion** — no backend service is implemented. Values marked _(proposed)_ are defaults to confirm or change. Milestone status and ownership remain in `PLAN.md`.
+Status: **Slices 1–3 implemented** (scan-and-serve catalog + media + iOS client, all merged); **Slice 4 (reading-progress persistence on PostgreSQL, in Docker Compose) is planned and about to start** (decisions recorded 2026-07-23). Values still marked _(proposed)_ are pre-Slice-4 defaults. Milestone status and ownership remain in `PLAN.md`.
 
 ## Goal
 
@@ -18,14 +18,14 @@ A single small HTTP service that, on startup and on a manual re-scan, walks the 
 - No schema, migrations, cache invalidation, or container orchestration to design for v1.
 - Re-scan on boot is O(folder) and trivially correct/idempotent.
 
-### Deferred components and their triggers
+### Components and their triggers
 
-| Component | Deferred because | Add when |
+| Component | Status | Trigger / rationale |
 | --- | --- | --- |
-| PostgreSQL | Folder is source of truth; nothing to persist yet | You must remember state the folder can't reconstruct: reading progress / last-read position, favourites, user-edited metadata |
-| Redis | Scan/query is cheap for one user | Measured slowness on large libraries or many clients |
-| Auth | Single developer, own device | More than the developer's device consumes it, or content becomes private |
-| Docker | Runs directly on the dev Mac | The backend leaves the dev machine / needs reproducible deploy |
+| PostgreSQL | **Adopted at Slice 4** | Reading progress / last-read position is state the folder cannot reconstruct. A single `progress` table; the catalog stays scan-derived. |
+| Docker (Compose) | **Adopted at Slice 4** | Postgres pulls in a container anyway; containerising `api` + `postgres` together buys a reproducible, one-command local stack. Two services: `api`, `postgres`. |
+| Redis | **Deferred** | The catalog is already in-memory in the API process, so for one user / one worker a Redis cache is a slower network hop with no job to do. Add it only when there is a concrete job: **multiple uvicorn workers/processes must share one cached catalog** (rescan not repeated per worker), or measured slowness on large libraries / many clients. Then it slots in behind the API's catalog seam as a third Compose service. |
+| Auth | **Deferred** | Single developer, own device. Add when more than the developer's device consumes it, or content becomes private (e.g. Cloudflare Access in front of the tunnel). |
 
 ### Storage: why not build the database first?
 
@@ -79,18 +79,24 @@ GET /comics/{comicId}
 # Reader          → ComicView(chapter:)
 GET /comics/{comicId}/chapters/{chapterId}
 → { id, number, title,
-    pages: [ "<baseUrl>/media/{comicId}/{chapterId}/001.jpg", ... ] }
+    pages: [ "<baseUrl>/media/{comicId}/{chapterId}/001.jpg", ... ],
+    lastReadPage? }              # 1-based resume position; omitted when no progress (Slice 4)
 
 # Page image bytes (same origin)
 GET /media/{comicId}/{chapterId}/{page}
 → image bytes (Content-Type: image/jpeg | image/png | image/webp)
+
+# Save reading progress (Slice 4)
+PUT /comics/{comicId}/chapters/{chapterId}/progress
+   body: { "lastPage": N }       # 1-based; validated within [1, pageCount]
+→ { comicId, chapterId, lastPage, pageCount, updatedAt }   # 404 unknown chapter, 422 out of range
 ```
 
 Contract notes:
 
 - **Images travel as URL strings the app fetches**, never embedded bytes in JSON. This mirrors today's model: `pageImageNames: [String]` stays an array of strings — only the string's meaning changes from asset name → URL, and the resolver from `Image(name)` → `AsyncImage(url:)`.
-- **IDs are server-generated and stable across scans and restarts** — a hash of the item's relative path. **Load-bearing:** future reading-progress persistence (Slice 4) keys on these IDs, so instability would silently break saved progress. Path segments in `/media/...` use these opaque IDs, not raw folder names (avoids path-encoding / traversal).
-- **v1 field values**: `readState` is `unread` for all (no progress store yet); `lastReadAt` is null/omitted (folder has no such value).
+- **IDs are server-generated and stable across scans and restarts** — a hash of the item's relative path. **Load-bearing:** reading-progress persistence (Slice 4) keys the `progress` rows on these IDs, so instability would silently orphan saved progress. Path segments in `/media/...` use these opaque IDs, not raw folder names (avoids path-encoding / traversal).
+- **Field values by slice**: through Slice 3, `readState` is `unread` for all and `lastReadAt` is null/omitted (no progress store yet). **From Slice 4** both are derived live from the `progress` store: per chapter, no row → `unread`, `lastPage >= pageCount` → `read`, else `reading`; `Comic.lastReadAt` is the max `updatedAt` across that comic's chapters; the reader response adds `lastReadPage`.
 - One origin serves both JSON and media, so the app configures a single base URL.
 
 ## Data flow
@@ -122,8 +128,12 @@ Model **shapes barely change**; the source and the image resolver change.
 
 Does not affect the API contract — only which base URL the app points at.
 
-- **Same Wi-Fi:** phone/simulator → the Mac's LAN IP `http://192.168.x.x:PORT` (+ ATS exception). Simulator can use `http://localhost:PORT`.
-- **Remote (phone off the LAN):** a tunnel / mesh VPN, not a different framework. Options: **Tailscale** (private WireGuard mesh — recommended for reaching your own machine), or **Cloudflare Tunnel** / **ngrok** (public HTTPS URL, no ATS exception needed). Uvicorn must bind `0.0.0.0`.
+Everything runs **on the dev Mac — nothing is hosted in the cloud**. Only the base URL the app points at changes with the access method (`VISTA_BASE_URL`).
+
+- **Same Wi-Fi:** phone/simulator → the Mac's LAN IP `http://192.168.x.x:PORT` (+ ATS exception). Simulator can use `http://127.0.0.1:PORT`.
+- **Stable public URL (recommended when you want a fixed API endpoint): Cloudflare Tunnel** (the `cloudflared` daemon under Cloudflare Zero Trust). It makes an **outbound** connection from the Mac to Cloudflare's edge and maps a hostname to local `localhost:8000` — **no port-forwarding, no static public IP**. A *stable* hostname requires a domain on Cloudflare (free tier works) bound to a **named tunnel** (e.g. `api.yourdomain.com`); the throwaway `trycloudflare.com` URL changes each run and is not stable. **HTTPS terminates at the edge**, so the app needs **no ATS exception**. Keep it a plain tunnel with **no Zero Trust Access policy** for now (an Access login would block the app unless a service token is added — auth stays deferred).
+- **Private mesh alternative: Tailscale** (WireGuard) gives the Mac a stable name/IP reachable from the phone within your tailnet — good if you don't want a public URL or a domain.
+- In every case uvicorn/the `api` container binds `0.0.0.0`; the base URL is the only moving part.
 
 ## Delivery slices (revised — thinner than a DB-first plan)
 
@@ -137,10 +147,20 @@ Each slice ships only when the prior one has an observable acceptance test.
    _Acceptance:_ opening a page URL in a browser shows the correct image in correct order.
 4. **Slice 3 — iOS consumes it end-to-end.** Repository fetches `/comics`; swap the `HomeView` data source; three `Image → AsyncImage` sites; catalog loading/error states.
    _Acceptance:_ launch the app against the backend, see the folder's comics, open a chapter, scroll real page images, with a visible loading state and the failure placeholder when the server is down.
-5. **Slice 4 — reading-position persistence (the DB's real trigger).** Introduce a small store (PostgreSQL or SQLite — decided here) for a `progress` table only; the catalog stays scan-derived; the contract's `readState` / `lastReadAt` become live, keyed on the stable IDs.
-   _Acceptance:_ read part of a chapter, restart the app/backend, and resume at the saved position.
+5. **Slice 4 — reading-position persistence (the DB's real trigger).** Introduce **PostgreSQL** (decided 2026-07-23) for a single `progress` table only; the catalog stays scan-derived; the contract's `readState` / `lastReadAt` become live and the reader gains `lastReadPage`, all keyed on the stable IDs. The stack becomes a **Docker Compose** of two services (`api`, `postgres`); the iOS reader tracks the visible page and reports it (debounced) via `PUT .../progress`, and resumes with `ScrollViewReader`.
+   _Acceptance:_ read part of a chapter (page K), restart the app/backend, and resume at ~page K with the chapter shown as `reading`.
 
-Redis is considered only after this, if scans/queries are measured to be slow — behind the unchanged API contract.
+Redis is considered only after this, if there is a real job for it (multiple workers sharing a cached catalog, or measured slowness) — behind the unchanged API contract, as a third Compose service.
+
+### Slice 4 storage detail
+
+- **Engine: PostgreSQL** (not SQLite). A single `progress` table, keyed on the stable path-hash IDs:
+  `(comic_id, chapter_id)` primary key, `last_page INT`, `page_count INT`, `updated_at TIMESTAMPTZ`.
+- **Access: SQLAlchemy 2.0 + psycopg (sync)** to match the existing sync FastAPI handlers. Table created with `CREATE TABLE IF NOT EXISTS` at startup — **no Alembic** for one table (minimum architecture).
+- **Config: `DATABASE_URL`** lives only in the gitignored `.env`, alongside `MANGA_LIBRARY_PATH`; never committed.
+- **Container topology:** `docker-compose.yml` runs `api` (FastAPI/uvicorn; the manga folder **read-only bind-mounted** into the container, e.g. host `$MANGA_LIBRARY_PATH` → `/library`; port 8000 published) and `postgres` (named volume for data). `/media` URLs still derive from `request.base_url`, so a published port needs no code change.
+- **Catalog stays scan-derived.** The DB stores only folder-external state (progress). Because the IDs are path-derived and stable, a rescan/restart preserves the join between catalog and progress.
+- **Tests** run against a throwaway database/schema (not the dev progress DB): upsert idempotency, the three `readState` boundaries (no row / partial / `last_page == page_count`), `lastReadAt` aggregation, unknown chapter → 404, out-of-range page → 422, and progress surviving a rescan.
 
 ## Decisions
 
@@ -152,13 +172,18 @@ Confirmed (2026-07-22):
 - API framework — FastAPI + uvicorn (Python).
 - ID scheme — stable hash of the item's relative path (load-bearing).
 - `Models.swift` image fields (`coverImageName`, `pageImageNames`) — retype to `URL`.
-- Storage ordering — scan-and-serve in-memory first; **not** DB-first (see "Storage: why not build the database first?"). PostgreSQL/SQLite arrives at Slice 4 for reading progress.
+- Storage ordering — scan-and-serve in-memory first; **not** DB-first (see "Storage: why not build the database first?"). PostgreSQL arrives at Slice 4 for reading progress.
+
+Confirmed (2026-07-23):
+
+- Slice-4 persistence engine — **PostgreSQL** (not SQLite), accessed via SQLAlchemy 2.0 + psycopg (sync), single `progress` table, `CREATE TABLE IF NOT EXISTS` (no Alembic).
+- Reading-progress granularity — **page-level** (resume at the saved page within a chapter), keyed on the stable IDs.
+- Container topology — **Docker Compose, two services (`api` + `postgres`)**; manga folder read-only bind-mounted into `api`. **Redis deferred** with a written trigger (see the components table): only when multiple workers must share a cached catalog, or measured slowness.
+- Connectivity for a stable public endpoint — **Cloudflare Tunnel** (named tunnel + own domain), no Access policy for now; all infra stays local, nothing hosted in the cloud.
 
 Open:
 
-- Host path of the local manga library — needed before Slice 1.
-- One real sample folder with ≥2 comics to validate the format — Slice 0.
-- Slice-4 persistence engine (PostgreSQL vs SQLite) — decided when progress work starts.
+- (none blocking Slice 4)
 
 ## Scope notes
 

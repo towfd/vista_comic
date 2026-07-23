@@ -52,6 +52,36 @@ To reach the API from a device/simulator on the same Wi-Fi, bind all
 interfaces: `uvicorn app.main:app --host 0.0.0.0 --port 8000` and point the app
 at the Mac's LAN IP (a dev ATS exception is needed for cleartext HTTP).
 
+## Run it with Docker (one command)
+
+The repo-root `docker-compose.yml` packages this same API in a container. It
+reads the gitignored repo-root `.env` for `${MANGA_LIBRARY_PATH}` and bind-mounts
+that host folder **read-only** at `/library`; the process inside the container
+scans `/library` (set via the service's `environment:`). Nothing about the API's
+behaviour or contract changes — only how it is packaged.
+
+From the repository root:
+
+```bash
+# Sanity-check that ${MANGA_LIBRARY_PATH} resolves (no unresolved variables):
+docker compose config
+
+# Build and start in the background:
+docker compose up --build -d
+
+# Health + catalog counts (should match local uvicorn):
+curl -s http://127.0.0.1:8000/healthz | python3 -m json.tool
+curl -s http://127.0.0.1:8000/comics | python3 -m json.tool
+
+# Stop and remove the container:
+docker compose down
+```
+
+The manga library is mounted read-only, so the container cannot modify the host
+folder (the folder stays the source of truth). Only the `api` service exists at
+this step; PostgreSQL and reading-progress persistence arrive in the next
+sub-step.
+
 ## Design notes
 
 - **Stable IDs (load-bearing).** `comicId` / `chapterId` are a SHA-1 of the

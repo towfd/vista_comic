@@ -26,9 +26,10 @@ enum ReadState: String, Decodable {
 /// - In a comic's detail (`GET /comics/{id}`) a chapter carries `number`, `title`,
 ///   `pageCount`, and `readState`, but **no** page URLs.
 /// - The reader endpoint (`GET /comics/{id}/chapters/{cid}`) carries the ordered
-///   `pageURLs`, but no read state.
+///   `pageURLs` and the resume position `lastReadPage`, but no read state.
 /// Decoding tolerates either: missing pages default to `[]`, a missing count is
-/// derived from the pages, and a missing read state defaults to `.unread`.
+/// derived from the pages, a missing read state defaults to `.unread`, and a
+/// missing `lastReadPage` (no progress yet) defaults to `nil`.
 struct Chapter: Identifiable, Hashable, Decodable {
     /// Server-generated, stable across scans/restarts (path-derived hash).
     let id: String
@@ -41,6 +42,10 @@ struct Chapter: Identifiable, Hashable, Decodable {
     /// Number of pages, from the chapter summary; falls back to `pageURLs.count`.
     let pageCount: Int
     var readState: ReadState
+    /// The 1-based page the reader should resume at, from the progress store
+    /// (M5 Slice 4). `nil` when the chapter has no saved progress, or when only
+    /// a chapter summary (not the reader endpoint) is known.
+    let lastReadPage: Int?
 
     init(
         id: String,
@@ -48,7 +53,8 @@ struct Chapter: Identifiable, Hashable, Decodable {
         title: String,
         pageURLs: [URL] = [],
         pageCount: Int? = nil,
-        readState: ReadState = .unread
+        readState: ReadState = .unread,
+        lastReadPage: Int? = nil
     ) {
         self.id = id
         self.number = number
@@ -56,10 +62,11 @@ struct Chapter: Identifiable, Hashable, Decodable {
         self.pageURLs = pageURLs
         self.pageCount = pageCount ?? pageURLs.count
         self.readState = readState
+        self.lastReadPage = lastReadPage
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, number, title, pageCount, readState
+        case id, number, title, pageCount, readState, lastReadPage
         case pageURLs = "pages"
     }
 
@@ -74,13 +81,15 @@ struct Chapter: Identifiable, Hashable, Decodable {
         // rather than throwing and blanking the whole screen.
         let rawReadState = try container.decodeIfPresent(String.self, forKey: .readState)
         let readState = rawReadState.flatMap(ReadState.init(rawValue:)) ?? .unread
+        let lastReadPage = try container.decodeIfPresent(Int.self, forKey: .lastReadPage)
         self.init(
             id: id,
             number: number,
             title: title,
             pageURLs: pageURLs,
             pageCount: pageCount,
-            readState: readState
+            readState: readState,
+            lastReadPage: lastReadPage
         )
     }
 }
