@@ -23,7 +23,7 @@ BASE = "http://testserver"
 
 
 @pytest.fixture
-def client(sample_library):
+def client(sample_library, progress_db):
     catalog = main.load_catalog(sample_library)
     assert catalog.comics, "fixture catalog should not be empty"
     return TestClient(main.app)
