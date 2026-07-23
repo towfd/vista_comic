@@ -33,13 +33,18 @@ struct APIComicRepository: ComicRepository {
         try await get(Comic.self, at: "comics/\(id)")
     }
 
-    func pageURLs(comicID: String, chapterID: String) async throws -> [URL] {
-        // The reader endpoint returns a chapter object whose `pages` are the URLs.
-        let chapter = try await get(
+    func readerChapter(comicID: String, chapterID: String) async throws -> Chapter {
+        // The reader endpoint returns a chapter object whose `pages` are the URLs
+        // and whose `lastReadPage` is the resume position.
+        try await get(
             Chapter.self,
             at: "comics/\(comicID)/chapters/\(chapterID)"
         )
-        return chapter.pageURLs
+    }
+
+    func saveProgress(comicID: String, chapterID: String, lastPage: Int) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["lastPage": lastPage])
+        try await put(body: body, at: "comics/\(comicID)/chapters/\(chapterID)/progress")
     }
 
     // MARK: - Request plumbing
@@ -59,6 +64,25 @@ struct APIComicRepository: ComicRepository {
             return try decoder.decode(T.self, from: data)
         } catch {
             throw APIError.decoding(error)
+        }
+    }
+
+    /// Sends a JSON body with `PUT` and treats any non-2xx status as an error.
+    /// The response body is ignored; callers only care whether the write stuck.
+    private func put(body: Data, at path: String) async throws {
+        let url = baseURL.appendingPathComponent(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        let (_, response) = try await session.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.httpStatus(http.statusCode)
         }
     }
 }

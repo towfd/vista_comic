@@ -17,12 +17,32 @@ struct ComicView: View{
     @State private var showControls = true
     @State private var showChapterList = false
     @State private var pagesState: LoadState<[URL]> = .loading
+    /// 0-based index of the top-most visible page, driven by `.scrollPosition`.
+    /// Used both to resume (set on load) and to report progress (as the user
+    /// scrolls). `nil` before the first layout or on an empty chapter.
+    @State private var topPage: Int?
+    /// The last 1-based page sent to the backend for the current chapter, so we
+    /// never re-send an unchanged position (including the resume position).
+    @State private var lastSentPage: Int?
+    /// Page count of the open chapter, used to report the *last* page (→ `read`)
+    /// once the reader reaches the real bottom.
+    @State private var pageCount = 0
+    /// Whether the reader has scrolled to the chapter's actual end. Once true it
+    /// stays true until the chapter changes (seeing the last page means read),
+    /// so progress is reported as `pageCount` even after scrolling back up.
+    @State private var reachedEnd = false
+    /// Debounce for progress writes: replaced on every scroll change, flushed on
+    /// leave. Kept as state so we can cancel it across renders.
+    @State private var saveTask: Task<Void, Never>?
     @Environment(\.comicRepository) private var repository
     @Environment(\.dismiss) private var dismiss
 
     /// How far the reader must be pulled *past* the bottom (points of overscroll)
     /// before advancing to the next chapter.
     private let pullThreshold: CGFloat = 120
+
+    /// How long scrolling must settle before a progress write is sent.
+    private let saveDebounce: Duration = .seconds(0.9)
 
     init(comic: Comic, chapter: Chapter) {
         self.comic = comic
@@ -47,6 +67,8 @@ struct ComicView: View{
         // Load the current chapter's pages on open, and reload whenever the
         // chapter changes (prev / next / chapter list / auto-advance).
         .task(id: currentChapter.id) { await loadPages() }
+        // Save the last position when the reader is dismissed (back button).
+        .onDisappear { flushProgress() }
     }
 
     // MARK: - Pages
@@ -74,7 +96,15 @@ struct ComicView: View{
                     ReaderPage(url: url)
                 }
             }
+            // Marks the pages as scroll targets so `.scrollPosition` can both
+            // resume to a page and report the top-most visible page index.
+            .scrollTargetLayout()
         }
+        // Two-way: resume by setting `topPage` after load (see `loadPages`), and
+        // observe the top page as the user scrolls to report progress.
+        .scrollPosition(id: $topPage, anchor: .top)
+        // Debounced progress reporting whenever the top page changes.
+        .onChange(of: topPage) { _, _ in scheduleProgressSave() }
         // Auto-advance: after reaching the bottom, the user must keep pulling
         // *past* the end (overscroll) to continue into the next chapter — so
         // simply reaching the bottom is not enough. Does nothing on the last
@@ -87,6 +117,20 @@ struct ComicView: View{
         } action: { wasPulledPastEnd, isPulledPastEnd in
             if isPulledPastEnd && !wasPulledPastEnd {
                 goTo(nextChapter)
+            }
+        }
+        // Reaching the *actual* bottom (not the pull-past threshold) means the
+        // last page has been seen. The top-most visible page is never the final
+        // page in a long chapter, so without this the reader could never report
+        // `pageCount` and the backend would never mark the chapter `read`.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            let maxScroll = geometry.contentSize.height - geometry.containerSize.height
+            guard maxScroll > 0 else { return false }
+            return geometry.contentOffset.y >= maxScroll - 1
+        } action: { wasAtEnd, isAtEnd in
+            if isAtEnd && !wasAtEnd && !reachedEnd {
+                reachedEnd = true
+                scheduleProgressSave()
             }
         }
         // Rebuild the scroll view when the chapter changes so a newly opened
@@ -150,7 +194,7 @@ struct ComicView: View{
         NavigationStack {
             List(comic.chapters) { chapter in
                 Button {
-                    currentChapter = chapter
+                    goTo(chapter)
                     showChapterList = false
                 } label: {
                     HStack{
@@ -185,6 +229,9 @@ struct ComicView: View{
 
     private func goTo(_ chapter: Chapter?) {
         guard let chapter else { return }
+        // Persist the outgoing chapter's position before switching, since the
+        // scroll view (and `topPage`) is rebuilt for the incoming chapter.
+        flushProgress()
         currentChapter = chapter
     }
 
@@ -193,13 +240,74 @@ struct ComicView: View{
     private func loadPages() async {
         pagesState = .loading
         do {
-            let urls = try await repository.pageURLs(
+            let chapter = try await repository.readerChapter(
                 comicID: comic.id,
                 chapterID: currentChapter.id
             )
+            let urls = chapter.pageURLs
+            // Resume: map the 1-based `lastReadPage` to a 0-based index, clamped
+            // in case the chapter shrank since progress was saved. `nil` starts
+            // at the top. Setting `topPage` in the same update that flips to
+            // `.loaded` positions the freshly built scroll view at the resume
+            // page. Seed `lastSentPage` so the resume position is not re-sent.
+            let resumeIndex: Int? = chapter.lastReadPage.flatMap { page in
+                urls.isEmpty ? nil : min(max(page - 1, 0), urls.count - 1)
+            }
             pagesState = .loaded(urls)
+            topPage = resumeIndex
+            lastSentPage = resumeIndex.map { $0 + 1 }
+            pageCount = urls.count
+            reachedEnd = false
         } catch {
             pagesState = .failed(error)
+        }
+    }
+
+    // MARK: - Progress reporting
+
+    /// The 1-based page to report: the chapter's last page once the reader has
+    /// reached the real bottom (so the backend can mark it `read`), otherwise
+    /// the top-most visible page.
+    private var reportedPage: Int? {
+        reachedEnd ? pageCount : topPage.map { $0 + 1 }
+    }
+
+    /// Restarts the debounce so a rapid scroll only writes once it settles.
+    /// The debounced task reads `reportedPage` after the sleep, so it reports the
+    /// latest position; it is cancelled by `flushProgress` before any chapter
+    /// change, so it only ever fires for the still-open chapter.
+    private func scheduleProgressSave() {
+        saveTask?.cancel()
+        let comicID = comic.id
+        let chapterID = currentChapter.id
+        saveTask = Task {
+            try? await Task.sleep(for: saveDebounce)
+            guard !Task.isCancelled else { return }
+            sendProgress(page: reportedPage, comicID: comicID, chapterID: chapterID)
+        }
+    }
+
+    /// Sends the current position immediately (e.g. on leave / chapter change),
+    /// cancelling any pending debounce first. Reads `reportedPage` synchronously
+    /// because the caller may reset it (a new chapter) right after.
+    private func flushProgress() {
+        saveTask?.cancel()
+        saveTask = nil
+        sendProgress(page: reportedPage, comicID: comic.id, chapterID: currentChapter.id)
+    }
+
+    /// Writes `page` for `chapterID`, but only when it changed from the last
+    /// value sent. Failures are swallowed: a down progress store must never
+    /// interrupt reading.
+    private func sendProgress(page: Int?, comicID: String, chapterID: String) {
+        guard let page, page != lastSentPage else { return }
+        lastSentPage = page
+        Task {
+            try? await repository.saveProgress(
+                comicID: comicID,
+                chapterID: chapterID,
+                lastPage: page
+            )
         }
     }
 }
