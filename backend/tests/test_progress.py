@@ -13,11 +13,15 @@ Chapter map for the ``sample_library`` fixture:
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import main, progress_store
+from app.db import Progress
 from app.ids import stable_id
+from app.models import ChapterEntry
 
 ALPHA = stable_id("Alpha")
 BETA = stable_id("Beta")
@@ -100,6 +104,108 @@ def test_put_non_integer_page_422(client):
     assert resp.status_code == 422
 
 
+# --- continueChapterId: selection algorithm (pure function) -----------------
+
+_T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def _chapter(rel: str, number: int, pages: int) -> ChapterEntry:
+    return ChapterEntry(
+        id=stable_id(rel),
+        number=number,
+        title=f"Chapter {number}",
+        page_paths=[f"{rel}/{i}.jpg" for i in range(pages)],
+    )
+
+
+def _row(chapter: ChapterEntry, last_page: int, minutes: int) -> Progress:
+    return Progress(
+        comic_id="c",
+        chapter_id=chapter.id,
+        last_page=last_page,
+        page_count=chapter.page_count,
+        updated_at=_T0 + timedelta(minutes=minutes),
+    )
+
+
+def test_continue_picks_latest_reading_chapter():
+    ch1 = _chapter("C/01", 1, 3)
+    ch2 = _chapter("C/02", 2, 3)
+    # Both are "reading" (last_page < page_count); ch2 was read more recently.
+    rows = {
+        ch1.id: _row(ch1, 1, minutes=0),
+        ch2.id: _row(ch2, 1, minutes=5),
+    }
+    assert progress_store.continue_chapter_id([ch1, ch2], rows) == ch2.id
+
+
+def test_continue_ignores_read_chapter_even_when_more_recent():
+    ch1 = _chapter("C/01", 1, 3)
+    ch2 = _chapter("C/02", 2, 3)
+    # ch1 is reading (earlier); ch2 is fully read (later). Read must not win.
+    rows = {
+        ch1.id: _row(ch1, 1, minutes=0),
+        ch2.id: _row(ch2, 3, minutes=5),  # last_page == page_count -> read
+    }
+    assert progress_store.continue_chapter_id([ch1, ch2], rows) == ch1.id
+
+
+def test_continue_first_unread_when_none_reading():
+    ch1 = _chapter("C/01", 1, 3)
+    ch2 = _chapter("C/02", 2, 3)
+    ch3 = _chapter("C/03", 3, 3)
+    # ch1 read; ch2 has no row (first unread) -> ch2 wins over later ch3.
+    rows = {ch1.id: _row(ch1, 3, minutes=0)}
+    assert progress_store.continue_chapter_id([ch1, ch2, ch3], rows) == ch2.id
+
+
+def test_continue_first_chapter_when_all_read():
+    ch1 = _chapter("C/01", 1, 3)
+    ch2 = _chapter("C/02", 2, 3)
+    rows = {
+        ch1.id: _row(ch1, 3, minutes=0),
+        ch2.id: _row(ch2, 3, minutes=5),
+    }
+    assert progress_store.continue_chapter_id([ch1, ch2], rows) == ch1.id
+
+
+def test_continue_first_chapter_when_no_progress():
+    ch1 = _chapter("C/01", 1, 3)
+    ch2 = _chapter("C/02", 2, 3)
+    assert progress_store.continue_chapter_id([ch1, ch2], {}) == ch1.id
+
+
+# --- continueChapterId: over the /comics endpoint ---------------------------
+
+
+def test_comics_continue_present_and_defaults_to_first_chapter(client):
+    comics = {c["id"]: c for c in client.get("/comics").json()}
+    # Always present on every item; brand-new comics point at their first chapter.
+    assert all("continueChapterId" in c for c in comics.values())
+    assert comics[ALPHA]["continueChapterId"] == JOURNEY
+    assert comics[BETA]["continueChapterId"] == INTRO
+
+
+def test_comics_continue_is_the_reading_chapter(client):
+    client.put(_progress_path(ALPHA, JOURNEY), json={"lastPage": 1})
+    comics = {c["id"]: c for c in client.get("/comics").json()}
+    assert comics[ALPHA]["continueChapterId"] == JOURNEY
+
+
+def test_comics_continue_first_unread_when_a_chapter_is_read(client):
+    # JOURNEY fully read; CH_TWO untouched -> Continue jumps to CH_TWO.
+    client.put(_progress_path(ALPHA, JOURNEY), json={"lastPage": 2})
+    comics = {c["id"]: c for c in client.get("/comics").json()}
+    assert comics[ALPHA]["continueChapterId"] == CH_TWO
+
+
+def test_comics_continue_first_chapter_when_all_read(client):
+    client.put(_progress_path(ALPHA, JOURNEY), json={"lastPage": 2})
+    client.put(_progress_path(ALPHA, CH_TWO), json={"lastPage": 1})
+    comics = {c["id"]: c for c in client.get("/comics").json()}
+    assert comics[ALPHA]["continueChapterId"] == JOURNEY
+
+
 # --- endpoint: readState derivation -----------------------------------------
 
 
@@ -170,7 +276,12 @@ def test_catalog_endpoints_degrade_when_store_unavailable(client, monkeypatch):
 
     comics = client.get("/comics")
     assert comics.status_code == 200
-    assert all(c["lastReadAt"] is None for c in comics.json())
+    body = comics.json()
+    assert all(c["lastReadAt"] is None for c in body)
+    # No progress visible -> Continue degrades to each comic's first chapter.
+    by_id = {c["id"]: c for c in body}
+    assert by_id[ALPHA]["continueChapterId"] == JOURNEY
+    assert by_id[BETA]["continueChapterId"] == INTRO
 
     detail = client.get(f"/comics/{ALPHA}")
     assert detail.status_code == 200

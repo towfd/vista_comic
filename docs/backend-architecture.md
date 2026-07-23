@@ -69,7 +69,7 @@ Smallest surface that drives the three existing screens. Shapes map 1:1 to `Comi
 ```text
 # Library screen  → FavouriteView(comics:)
 GET /comics
-→ [ { id, title, coverUrl, chapterCount, lastReadAt? } ]
+→ [ { id, title, coverUrl, chapterCount, lastReadAt?, continueChapterId } ]
 
 # Chapter list    → ChapterPageView(comic:)
 GET /comics/{comicId}
@@ -96,7 +96,7 @@ Contract notes:
 
 - **Images travel as URL strings the app fetches**, never embedded bytes in JSON. This mirrors today's model: `pageImageNames: [String]` stays an array of strings — only the string's meaning changes from asset name → URL, and the resolver from `Image(name)` → `AsyncImage(url:)`.
 - **IDs are server-generated and stable across scans and restarts** — a hash of the item's relative path. **Load-bearing:** reading-progress persistence (Slice 4) keys the `progress` rows on these IDs, so instability would silently orphan saved progress. Path segments in `/media/...` use these opaque IDs, not raw folder names (avoids path-encoding / traversal).
-- **Field values by slice**: through Slice 3, `readState` is `unread` for all and `lastReadAt` is null/omitted (no progress store yet). **From Slice 4** both are derived live from the `progress` store: per chapter, no row → `unread`, `lastPage >= pageCount` → `read`, else `reading`; `Comic.lastReadAt` is the max `updatedAt` across that comic's chapters; the reader response adds `lastReadPage`.
+- **Field values by slice**: through Slice 3, `readState` is `unread` for all and `lastReadAt` is null/omitted (no progress store yet). **From Slice 4** both are derived live from the `progress` store: per chapter, no row → `unread`, `lastPage >= pageCount` → `read`, else `reading`; `Comic.lastReadAt` is the max `updatedAt` across that comic's chapters; the reader response adds `lastReadPage`. **`Comic.continueChapterId`** (always present — every comic has ≥1 chapter) is the chapter "Continue" opens: the most-recently-`updatedAt` `reading` chapter, else the first `unread` chapter in reading order, else (all `read`) the first chapter; with the progress store unavailable it degrades to the first chapter. Both `lastReadAt` and `continueChapterId` come from one grouped query over all progress rows (no N+1).
 - One origin serves both JSON and media, so the app configures a single base URL.
 
 ## Data flow

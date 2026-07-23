@@ -157,7 +157,10 @@ def _safe_file(catalog: Catalog, rel_path: str) -> Path:
 
 
 def _to_summary(
-    base: str, comic: ComicEntry, last_read_at: str | None
+    base: str,
+    comic: ComicEntry,
+    last_read_at: str | None,
+    continue_chapter_id: str,
 ) -> ComicSummary:
     return ComicSummary(
         id=comic.id,
@@ -165,6 +168,7 @@ def _to_summary(
         coverUrl=_cover_url(base, comic.id),
         chapterCount=comic.chapter_count,
         lastReadAt=last_read_at,
+        continueChapterId=continue_chapter_id,
     )
 
 
@@ -182,14 +186,22 @@ def healthz() -> dict:
 def list_comics(request: Request) -> list[ComicSummary]:
     catalog = _require_catalog()
     base = _base_url(request)
-    # One grouped query for the whole list: comic_id -> max updated_at.
-    # Degrades to {} (all lastReadAt null) if the progress store is unavailable.
-    last_read = progress_store.safe_last_read_at_by_comic()
+    # One grouped query for the whole list: comic_id -> {chapter_id -> Progress}.
+    # Both lastReadAt (max updated_at per comic) and continueChapterId are
+    # derived from it — no N+1, no second query. Degrades to {} if the progress
+    # store is unavailable: lastReadAt null, continueChapterId -> first chapter.
+    progress = progress_store.safe_all_progress()
     result = []
     for c in catalog.comics:
-        dt = last_read.get(c.id)
+        rows = progress.get(c.id, {})
+        last_dt = max((r.updated_at for r in rows.values()), default=None)
         result.append(
-            _to_summary(base, c, progress_store.iso_utc(dt) if dt else None)
+            _to_summary(
+                base,
+                c,
+                progress_store.iso_utc(last_dt) if last_dt else None,
+                progress_store.continue_chapter_id(c.chapters, rows),
+            )
         )
     return result
 
