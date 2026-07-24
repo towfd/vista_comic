@@ -1,5 +1,7 @@
 # vista_comic development plan
 
+> **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
+
 Last updated: 2026-07-23
 
 ## Current status

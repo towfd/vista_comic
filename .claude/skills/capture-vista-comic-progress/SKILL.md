@@ -15,7 +15,7 @@ If the Notion connector is unavailable, stop and ask the user to connect it. Do 
 
 ## Gather evidence
 
-1. Read repository `README.md`, `AGENTS.md`, and `PLAN.md`.
+1. Read repository `README.md`, `CLAUDE.md`, `PLAN.md`, and the relevant `.scratch/<feature>/` spec/tickets.
 2. Inspect relevant `git status` and diff summaries.
 3. Collect actual build, test, preview, simulator, and code-review results.
 4. Separate completed work from planned work.

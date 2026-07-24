@@ -1,4 +1,0 @@
-interface:
-  display_name: "Coordinate vista_comic"
-  short_description: "Plan milestones and coordinate vista_comic agents"
-  default_prompt: "Use $coordinate-vista-comic to coordinate the next active vista_comic milestone."

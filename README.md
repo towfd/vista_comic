@@ -1,63 +1,63 @@
 # vista_comic
 
-`vista_comic` 是一款以 SwiftUI 開發的原生 iOS 漫畫閱讀 App，目標是讓語言學習者能在閱讀漫畫時，直接理解陌生內容，不必頻繁離開閱讀畫面查詢單字或句子。
+`vista_comic` is a native iOS manga reader built with SwiftUI. Its goal is to let language learners understand unfamiliar content while reading — without constantly leaving the page to look up words or sentences.
 
-## 產品願景
+## Product vision
 
-使用者可以匯入漫畫來源，在 App 中閱讀連續圖片；遇到不理解的文字時，能在原本的閱讀位置進行辨識、翻譯與收藏，讓漫畫閱讀同時成為自然的語言學習流程。
+Users import a manga source and read continuous images in the app. When they hit text they don't understand, they can recognize, translate, and save it right where they are — turning manga reading into a natural language-learning flow.
 
-預期的完整體驗：
+The intended end-to-end experience:
 
 ```text
-匯入漫畫來源
-→ 瀏覽漫畫與章節
-→ 閱讀連續漫畫圖片
-→ 選擇不理解的文字區域
-→ OCR 辨識
-→ 翻譯與語意說明
-→ 收藏單字或句子
+Import a manga source
+→ Browse manga and chapters
+→ Read continuous manga images
+→ Select a text region you don't understand
+→ OCR recognition
+→ Translation and meaning explanation
+→ Save the word or sentence
 ```
 
-## 長期 Roadmap
+## Long-term roadmap
 
-### 1. 漫畫閱讀體驗
+### 1. Manga reading experience
 
-- 漫畫書庫
-- 漫畫與章節導覽
-- 垂直圖片閱讀器
-- 閱讀進度與基本控制
+- Manga library
+- Manga and chapter navigation
+- Vertical image reader
+- Reading progress and basic controls
 
-### 2. 內容匯入
+### 2. Content import
 
-- 網址或其他合法來源匯入
-- 漫畫與章節 Metadata
-- 圖片載入、快取與失敗處理
+- Import from a URL or another legitimate source
+- Manga and chapter metadata
+- Image loading, caching, and failure handling
 
 ### 3. OCR
 
-- 漫畫文字區域選取
-- 多語言文字辨識
-- 辨識結果校正
+- Selecting text regions in manga
+- Multi-language text recognition
+- Correcting recognition results
 
-### 4. 翻譯與語言學習
+### 4. Translation and language learning
 
-- 原文與翻譯並列
-- 單字、句子與語境說明
-- LLM 輔助理解
-- 收藏與複習學習內容
+- Original text and translation side by side
+- Word, sentence, and context explanations
+- LLM-assisted comprehension
+- Saving and reviewing learning material
 
-### 5. 個人資料與同步
+### 5. Profile and sync
 
-- 閱讀紀錄
-- 收藏內容
-- 使用者設定
-- 跨裝置同步
+- Reading history
+- Saved content
+- User settings
+- Cross-device sync
 
-## 技術方向
+## Technical direction
 
-- 平台：iOS
-- UI：SwiftUI
-- 開發方式：以小型、可驗證的 Milestone 逐步完成
-- 目前優先保持原生、簡單且容易學習的架構
+- Platform: iOS
+- UI: SwiftUI
+- Approach: progress in small, verifiable milestones
+- Current priority: keep the architecture native, simple, and easy to learn
 
-實際進度、目前範圍與驗收標準請參考 [`PLAN.md`](PLAN.md)。Agent 協作與開發規則請參考 [`AGENTS.md`](AGENTS.md)。
+For the milestone roadmap and history, see [`PLAN.md`](PLAN.md); work currently in progress (specs and tickets) lives under `.scratch/`. For agent collaboration and development rules, see [`CLAUDE.md`](CLAUDE.md).
