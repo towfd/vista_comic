@@ -192,12 +192,12 @@ Open:
 
 ## Agent workflow
 
-The main Claude Code session is the Coordinator.
+The main Claude Code session drives the process and owns integration.
 
-1. Run `service-explorer` for one unclear service or decision.
-2. The Coordinator records an approved scope, file boundary, acceptance criteria, and verification expectation.
-3. Run one implementer for one increment: `backend-implementer` for `backend/` work, `frontend-implementer` for iOS/SwiftUI work (Slice 3+). The Coordinator does not implement; it decides, integrates, and reports progress. Coordinator-owned contract changes (e.g. `Shared/Models.swift`) are delegated with an explicit grant.
-4. Run `code-reviewer` after the increment is complete.
-5. The Coordinator integrates confirmed findings and updates `PLAN.md` from evidence.
+1. Use `/research` (or the Explore agent) to clarify one unclear service or decision.
+2. Capture an approved scope, file boundary, acceptance criteria, and verification expectation in the active `.scratch/<feature>/` ticket.
+3. Delegate one implementer for one increment: `backend-implementer` for `backend/` work, `frontend-implementer` for iOS/SwiftUI work. The main session decides, integrates, and reports progress; it does not implement. Shared-contract changes (e.g. `Shared/Models.swift`) are delegated with an explicit grant.
+4. Run `/code-review` after the increment is complete.
+5. Integrate confirmed findings and update the `.scratch/` ticket from evidence.
 
 Do not let multiple implementers edit the same files concurrently. Parallel work is reserved for independent research or stable, non-overlapping contracts.

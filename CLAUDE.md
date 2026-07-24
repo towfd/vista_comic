@@ -1,24 +1,25 @@
 # vista_comic Claude collaboration guide
 
-This file defines the durable collaboration and engineering rules Claude Code must follow when working in this repository. Product direction lives in `README.md`; active milestones, temporary scope, task status, and acceptance criteria live in `PLAN.md`.
+This file defines the durable collaboration and engineering rules Claude Code must follow when working in this repository. Product direction lives in `README.md`; active work (specs and tickets) lives as local markdown under `.scratch/`; `PLAN.md` is a milestone roadmap/history, not the live task tracker.
 
-Claude is both a development partner and a programming tutor. Implement work within the active milestone, verify it with concrete evidence, and explain the most relevant SwiftUI and architecture concepts after implementation.
+Claude is both a development partner and a programming tutor. Implement work within the active ticket/spec, verify it with concrete evidence, and explain the most relevant SwiftUI and architecture concepts after implementation.
 
 ## Required context
 
 Before planning or implementing work:
 
 1. Read `README.md` for the product vision and long-term direction.
-2. Read `PLAN.md` for the active milestone, current scope, task status, dependencies, and acceptance criteria.
-3. Inspect the working tree and relevant Git diff before editing.
+2. Read the relevant spec/tickets under `.scratch/<feature>/` for current scope, task status, and acceptance criteria (see `docs/agents/issue-tracker.md`).
+3. Consult `PLAN.md` for milestone history and roadmap context only — not for live status.
+4. Inspect the working tree and relevant Git diff before editing.
 
-Do not infer current progress from this file. Treat `PLAN.md` as the source of truth for execution status.
+Do not infer current progress from this file. Treat the active `.scratch/` ticket as the source of truth for execution status.
 
 ## Development rules
 
 - Present a short plan before implementation.
-- Before starting execute, ask me the plan if I approve to execute
-- Work only within the active milestone unless the user explicitly expands the scope.
+- Before starting to execute, share the plan and get my approval first.
+- Work only within the active ticket/spec unless I explicitly expand the scope.
 - Work in small, reviewable increments and complete shared foundations before dependent feature work.
 - Prefer the minimum architecture that satisfies current acceptance criteria.
 - Extract a component only when it is repeated or gives its parent a clear responsibility.
@@ -26,70 +27,48 @@ Do not infer current progress from this file. Treat `PLAN.md` as the source of t
 - Avoid broad refactors while implementing a focused feature.
 - Preserve uncommitted, unrelated, and user-authored changes.
 - Reuse existing assets and project conventions where practical.
-- Do not commit, push, publish, or deploy unless the user explicitly requests it.
+- Do not commit, push, publish, or deploy unless I explicitly request it.
 
 ## Source-of-truth boundaries
 
 - `README.md`: product purpose, user problem, long-term experience, and roadmap.
 - `CLAUDE.md`: durable collaboration rules Claude Code must follow, ownership boundaries, and verification expectations.
-- `AGENTS.md`: the equivalent durable collaboration contract for Codex and other compatible agents.
-- `PLAN.md`: active milestone, temporary in-scope and out-of-scope items, progress, owners, dependencies, known issues, and next action.
+- `.scratch/<feature>/`: active specs, tickets, task status, acceptance criteria, and next action — the live tracker.
+- `PLAN.md`: milestone roadmap and history (record of what shipped). Not the live task tracker.
+- `docs/agents/`: how skills consume the issue tracker (`issue-tracker.md`) and domain docs (`domain.md`).
 - The current user request: task-specific details that do not need to become durable repository policy.
 
-When these documents disagree, pause implementation, identify the conflict, and ask the coordinator to resolve the source of truth.
+When these documents disagree, pause implementation, identify the conflict, and ask me to resolve the source of truth.
 
-## Agent roles
+## Workflow
 
-### Coordinator
+Process work runs on the installed engineering skills (Matt Pocock's methodology, available in every repo): turn a request into a spec (`/to-spec`), break it into tickets under `.scratch/` (`/to-tickets`, `/wayfinder`), implement, then review (`/code-review`) and QA (`/qa`). Use `/domain-modeling`, `/tdd`, and `/diagnosing-bugs` as the task calls for them.
 
-- Use the `/coordinate-vista-comic` skill for milestone planning, delegation, integration, and evidence-based `PLAN.md` updates.
-- The main Claude Code session acts as the coordinator unless the user explicitly assigns another agent.
-- Own product-level planning, integration, and task boundaries.
-- Confirm that assigned work matches the active milestone in `PLAN.md`.
-- Complete or define shared models, navigation contracts, sample data, and design tokens before dependent agents begin.
-- Assign only independent, non-overlapping work to sub-agents.
-- Integrate changes and protect the visual and architectural consistency of the app.
-- Own cross-feature files and project-wide verification unless explicitly delegated.
+The main Claude Code session drives this process, delegates implementation to the project's sub-agents, and owns integration and cross-feature consistency.
 
-### Feature agent
+### Sub-agents (`.claude/agents/`)
 
-- Modify only the files and directories explicitly assigned by the coordinator.
-- Consume shared models and navigation contracts without changing them unilaterally.
-- Request cross-feature or shared API changes from the coordinator.
-- Report completed work, verification results, assumptions, and remaining issues.
+- `backend-implementer`: implement one approved, reviewable backend (FastAPI / PostgreSQL / Docker / catalog) increment within an explicit file boundary.
+- `frontend-implementer`: implement one approved, reviewable iOS/SwiftUI increment within an explicit file boundary.
 
-### Code reviewer
+A sub-agent modifies only the files it is assigned, consumes shared models and navigation contracts without changing them unilaterally, requests cross-cutting changes from the main session, and reports completed work, verification results, assumptions, and remaining issues.
 
-- Use the `/review-vista-comic-code` skill for independent review and verification.
-- Review after implementation rather than editing concurrently with the implementer.
-- Prioritize correctness, navigation, state coverage, safe areas, compact layouts, Dynamic Type, dark mode, accessibility, and missing tests.
-- Report concrete findings with file and location references.
-- Do not modify code unless explicitly reassigned to implement confirmed fixes.
+### Project skills (`.claude/skills/`)
 
-### Progress writer
+These cover project-specific edges the generic methodology does not:
 
-- Use the `/capture-vista-comic-progress` skill only after progress has been verified and the user authorizes the Notion update.
-- Record completed work, verification evidence, decisions, unresolved issues, and the next action.
-- Do not mark planned or unverified work as complete.
-
-## Project skills
-
-Claude Code project skills live under `.claude/skills/` and are invoked with `/name`. The matching Codex skills live under `.agents/skills/`. Both runtimes should follow the same intended workflow.
-
-- `/coordinate-vista-comic`: coordinate active milestones, sub-agent ownership, integration, and project status.
-- `/review-vista-comic-code`: perform read-only code review and run evidence-based verification.
-- `/capture-vista-comic-progress`: record verified progress under the Notion `vista_comic` date page after the user authorizes the update.
-- `/ship-vista-comic`: after the user has reviewed a change and asked to publish it, verify the build, branch, commit, push, and open a pull request. Never push to the default branch unless explicitly overridden.
+- `/capture-vista-comic-progress`: record verified progress under the Notion `vista_comic` date page — only after progress is verified and I authorize the update. Do not mark planned or unverified work as complete.
+- `/ship-vista-comic`: after I have reviewed a change and asked to publish it, verify the build, branch, commit, push, and open a pull request. Never push to the default branch unless I explicitly override.
 
 ## Delegation rules
 
 - Delegate only work that can proceed independently with clear inputs and outputs.
-- Give each sub-agent an explicit owner, file boundary, acceptance criteria, and verification expectation.
+- Give each sub-agent an explicit file boundary, acceptance criteria, and verification expectation.
 - Use parallel background agents for independent research, inspection, or verification when this materially reduces waiting time.
 - Do not let multiple agents edit the same file concurrently.
-- Do not run a reviewer concurrently with unfinished implementation it is expected to review.
-- Shared contracts are coordinator-owned unless responsibility is explicitly transferred.
-- Update `PLAN.md` when ownership, dependencies, status, or the next action materially changes.
+- Do not review an increment while the implementation it depends on is unfinished.
+- Shared contracts are owned by the main session unless responsibility is explicitly transferred.
+- Update the active `.scratch/` ticket when scope, dependencies, status, or the next action materially changes.
 - Remember that parallel agents increase token usage; do not delegate small tasks that are cheaper and clearer to complete in the main session.
 
 ## Verification
@@ -100,9 +79,19 @@ For every implementation increment:
 2. Build or run relevant SwiftUI previews when the environment supports it.
 3. Exercise the changed navigation path in an iOS simulator when available.
 4. Check at least one compact phone layout and one larger phone layout for UI changes.
-5. Verify relevant empty, loading, failure, and boundary states when required by `PLAN.md`.
+5. Verify relevant empty, loading, failure, and boundary states when the ticket requires them.
 6. Explain any verification that could not be completed because of environment limitations.
 
 ## Learning handoff
 
 After implementation, explain the most relevant SwiftUI and architecture concepts in concise, guided language. Focus on why the chosen structure works, the trade-offs involved, and how the user can verify it rather than narrating every line of code.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` + ADRs under `docs/adr/`. See `docs/agents/domain.md`.
