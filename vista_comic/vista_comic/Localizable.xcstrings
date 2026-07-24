@@ -48,6 +48,17 @@
         }
       }
     },
+    "Check that the server is running and try again." : {
+      "comment" : "Error state: description when a fetch fails",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請確認伺服器正在執行後再試一次。"
+          }
+        }
+      }
+    },
     "Comics you add will appear here." : {
       "comment" : "Empty library description",
       "localizations" : {
@@ -88,28 +99,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法載入此頁"
-          }
-        }
-      }
-    },
-    "Check that the server is running and try again." : {
-      "comment" : "Error state: description when a fetch fails",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請確認伺服器正在執行後再試一次。"
-          }
-        }
-      }
-    },
-    "Retry" : {
-      "comment" : "Error state: retry the failed fetch",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新整理"
           }
         }
       }
@@ -187,6 +176,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閱讀中"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "comment" : "Error state: retry the failed fetch",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新整理"
           }
         }
       }

@@ -13,7 +13,7 @@ struct ChapterListView: View {
 
     var body: some View{
         VStack{
-            NavigationLink(value: ReaderRoute(comic: comic, chapter: chapter)){
+            NavigationLink(value: ReaderRoute(comicID: comic.id, chapterID: chapter.id)){
                 HStack(spacing: 17){
                     Image("Landscape_4")
                         .resizable()

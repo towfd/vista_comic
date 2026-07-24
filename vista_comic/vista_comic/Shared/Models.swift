@@ -113,6 +113,11 @@ struct Comic: Identifiable, Hashable, Decodable {
     /// When the user last opened this comic, or `nil` if never started.
     /// Richer reading-progress presentation is owned by the Library milestone (M2).
     let lastReadAt: Date?
+    /// The chapter "Continue" should open (M5 Slice 4): the most-recent reading
+    /// chapter, else the first unread, else the first chapter — decided by the
+    /// backend. Present on the library list (`GET /comics`), absent on the detail
+    /// endpoint (`nil`), where the reader already knows the chapters.
+    let continueChapterId: String?
 
     init(
         id: String,
@@ -120,7 +125,8 @@ struct Comic: Identifiable, Hashable, Decodable {
         coverURL: URL?,
         chapters: [Chapter] = [],
         chapterCount: Int? = nil,
-        lastReadAt: Date? = nil
+        lastReadAt: Date? = nil,
+        continueChapterId: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -128,10 +134,11 @@ struct Comic: Identifiable, Hashable, Decodable {
         self.chapters = chapters
         self.chapterCount = chapterCount ?? chapters.count
         self.lastReadAt = lastReadAt
+        self.continueChapterId = continueChapterId
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, chapters, chapterCount, lastReadAt
+        case id, title, chapters, chapterCount, lastReadAt, continueChapterId
         case coverURL = "coverUrl"
     }
 
@@ -143,21 +150,26 @@ struct Comic: Identifiable, Hashable, Decodable {
         let chapters = try container.decodeIfPresent([Chapter].self, forKey: .chapters) ?? []
         let chapterCount = try container.decodeIfPresent(Int.self, forKey: .chapterCount)
         let lastReadAt = try container.decodeIfPresent(Date.self, forKey: .lastReadAt)
+        let continueChapterId = try container.decodeIfPresent(String.self, forKey: .continueChapterId)
         self.init(
             id: id,
             title: title,
             coverURL: coverURL,
             chapters: chapters,
             chapterCount: chapterCount,
-            lastReadAt: lastReadAt
+            lastReadAt: lastReadAt,
+            continueChapterId: continueChapterId
         )
     }
 }
 
 /// Navigation value for opening the reader.
-/// Carries the whole comic (not just one chapter) so the reader can offer a
-/// chapter list and previous / next chapter navigation (M3).
+///
+/// Carries only ids (not full models) so entry points that lack a comic's
+/// chapters — e.g. the library card, whose `/comics` summary omits them — can
+/// still open the reader (M5 Slice 4). The reader fetches the comic detail to
+/// resolve the chapter list for prev/next navigation and the chapter-list sheet.
 struct ReaderRoute: Hashable {
-    let comic: Comic
-    let chapter: Chapter
+    let comicID: String
+    let chapterID: String
 }

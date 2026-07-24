@@ -32,14 +32,13 @@ struct ComicListView: View {
             }
 
             HStack(spacing: 30){
-                // Continue Reading opens the in-progress chapter, else the first
-                // unread chapter, else the first chapter. Hidden entirely when no
-                // chapter is known (e.g. the live `/comics` list omits chapters),
-                // so the card never shows a permanently disabled CTA.
-                if let continueChapter {
-                    NavigationLink(value: ReaderRoute(comic: comic, chapter: continueChapter)){
-                        continueLabel
-                    }
+                // Continue Reading always shows: the backend decides which chapter
+                // it opens (`continueChapterId` — most-recent reading chapter, else
+                // first unread, else first) and returns it on the `/comics` list.
+                NavigationLink(
+                    value: ReaderRoute(comicID: comic.id, chapterID: continueChapterID)
+                ){
+                    continueLabel
                 }
 
                 NavigationLink(value: comic){
@@ -63,12 +62,12 @@ struct ComicListView: View {
         return String(localized: "\(when) · last read")
     }
 
-    /// The chapter Continue Reading should open: the in-progress chapter,
-    /// else the first unread chapter, else the first chapter.
-    private var continueChapter: Chapter? {
-        comic.chapters.first { $0.readState == .reading }
-            ?? comic.chapters.first { $0.readState == .unread }
-            ?? comic.chapters.first
+    /// The id Continue opens. The backend-provided `continueChapterId` when the
+    /// card came from `/comics`; otherwise a best-effort fallback to the first
+    /// chapter id (e.g. sample data / previews). An empty id is harmless: the
+    /// reader resolves it to the comic's first chapter after loading the detail.
+    private var continueChapterID: String {
+        comic.continueChapterId ?? comic.chapters.first?.id ?? ""
     }
 
     private var continueLabel: some View {

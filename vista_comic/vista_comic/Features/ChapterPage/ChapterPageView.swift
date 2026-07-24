@@ -15,10 +15,20 @@ struct ChapterPageView: View {
 
     @Environment(\.comicRepository) private var repository
     @State private var state: LoadState<Comic> = .loading
+    /// First load shows the full-screen spinner; later refreshes are silent.
+    @State private var hasLoadedOnce = false
 
     var body: some View {
         content
             .task { await load() }
+            // Re-fetch when this screen is revealed again after the reader is
+            // popped, so per-chapter read badges reflect saved progress. Gated on
+            // `hasLoadedOnce` so it doesn't double-load on first appearance.
+            .onAppear {
+                if hasLoadedOnce {
+                    Task { await load() }
+                }
+            }
     }
 
     @ViewBuilder
@@ -50,11 +60,20 @@ struct ChapterPageView: View {
     }
 
     private func load() async {
-        state = .loading
+        // Only the first load shows the spinner; a refresh-on-return keeps the
+        // current chapter list visible and swaps in fresh data on success.
+        if !hasLoadedOnce {
+            state = .loading
+        }
         do {
             state = .loaded(try await repository.comic(id: comic.id))
+            hasLoadedOnce = true
         } catch {
-            state = .failed(error)
+            // A failed background refresh keeps the stale list; only a failed
+            // first load surfaces the error page.
+            if !hasLoadedOnce {
+                state = .failed(error)
+            }
         }
     }
 }
@@ -63,7 +82,7 @@ struct ChapterPageView: View {
     NavigationStack {
         ChapterPageView(comic: SampleData.comics[0])
             .navigationDestination(for: ReaderRoute.self) { route in
-                ComicView(comic: route.comic, chapter: route.chapter)
+                ComicView(comicID: route.comicID, chapterID: route.chapterID)
             }
     }
 }

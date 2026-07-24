@@ -25,11 +25,16 @@ struct PreviewComicRepository: ComicRepository {
         return SampleData.comics.first { $0.id == id } ?? SampleData.comics[0]
     }
 
-    func pageURLs(comicID: String, chapterID: String) async throws -> [URL] {
+    func readerChapter(comicID: String, chapterID: String) async throws -> Chapter {
         try await waitIfNeeded()
         let comic = SampleData.comics.first { $0.id == comicID }
         let chapter = comic?.chapters.first { $0.id == chapterID }
-        return chapter?.pageURLs ?? []
+        return chapter ?? SampleData.comics[0].chapters[0]
+    }
+
+    /// Progress is not persisted in previews; accept and drop it.
+    func saveProgress(comicID: String, chapterID: String, lastPage: Int) async throws {
+        try await waitIfNeeded()
     }
 
     private func waitIfNeeded() async throws {
@@ -43,7 +48,10 @@ struct PreviewComicRepository: ComicRepository {
 struct FailingPreviewRepository: ComicRepository {
     func library() async throws -> [Comic] { throw APIError.invalidResponse }
     func comic(id: String) async throws -> Comic { throw APIError.invalidResponse }
-    func pageURLs(comicID: String, chapterID: String) async throws -> [URL] {
+    func readerChapter(comicID: String, chapterID: String) async throws -> Chapter {
+        throw APIError.invalidResponse
+    }
+    func saveProgress(comicID: String, chapterID: String, lastPage: Int) async throws {
         throw APIError.invalidResponse
     }
 }

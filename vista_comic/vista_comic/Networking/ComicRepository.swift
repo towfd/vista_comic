@@ -14,10 +14,12 @@ import SwiftUI
 
 /// Fetches the comic library and its contents from a data source.
 ///
-/// Mirrors the three backend endpoints:
+/// Mirrors the backend endpoints:
 /// - `library()`            → `GET /comics`
 /// - `comic(id:)`           → `GET /comics/{id}` (adds the chapter list)
-/// - `pageURLs(comicID:chapterID:)` → `GET /comics/{id}/chapters/{cid}` (page image URLs)
+/// - `readerChapter(comicID:chapterID:)` → `GET /comics/{id}/chapters/{cid}`
+///   (page image URLs + resume position)
+/// - `saveProgress(comicID:chapterID:lastPage:)` → `PUT /comics/{id}/chapters/{cid}/progress`
 protocol ComicRepository {
     /// The whole library. Comics carry a `chapterCount` but no `chapters` yet.
     func library() async throws -> [Comic]
@@ -25,9 +27,15 @@ protocol ComicRepository {
     /// One comic with its `chapters` populated (each chapter still has no pages).
     func comic(id: String) async throws -> Comic
 
-    /// The ordered page image URLs for a single chapter, fetched lazily when the
-    /// reader opens it.
-    func pageURLs(comicID: String, chapterID: String) async throws -> [URL]
+    /// A single chapter fetched lazily when the reader opens it. Carries both the
+    /// ordered `pageURLs` and the 1-based `lastReadPage` resume position (`nil`
+    /// when there is no saved progress).
+    func readerChapter(comicID: String, chapterID: String) async throws -> Chapter
+
+    /// Persist the reader's position for a chapter. `lastPage` is 1-based.
+    /// Best-effort: callers should treat failures as non-fatal so reading is
+    /// never interrupted when the progress store is unavailable.
+    func saveProgress(comicID: String, chapterID: String, lastPage: Int) async throws
 }
 
 /// A screen's async fetch lifecycle: loading, loaded, or failed.
