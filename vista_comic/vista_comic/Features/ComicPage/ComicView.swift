@@ -66,10 +66,15 @@ private struct ReaderView: View {
     @State private var showControls = true
     @State private var showChapterList = false
     @State private var pagesState: LoadState<[URL]> = .loading
-    /// 0-based index of the top-most visible page, driven by `.scrollPosition`.
-    /// Used both to resume (set on load) and to report progress (as the user
-    /// scrolls). `nil` before the first layout or on an empty chapter.
+    /// Resume anchor only: set on load to programmatically scroll to the resume
+    /// page via `.scrollPosition`. The *set* direction is reliable; its reported
+    /// value on a LazyVStack of unknown-height AsyncImages is not, so it is NOT
+    /// used for progress reporting (see `visiblePages`).
     @State private var topPage: Int?
+    /// 0-based indices of the pages currently on screen, maintained by each
+    /// `ReaderPage`'s appear/disappear. `min()` is the top-most visible page and
+    /// the reliable source for mid-chapter progress reporting.
+    @State private var visiblePages: Set<Int> = []
     /// The last 1-based page sent to the backend for the current chapter, so we
     /// never re-send an unchanged position (including the resume position).
     @State private var lastSentPage: Int?
@@ -88,6 +93,9 @@ private struct ReaderView: View {
     /// resume position) and overwrites the store to page 1. Explicit jumps
     /// (chevrons / chapter list) leave it false and resume as usual.
     @State private var forceRestart = false
+    /// Bumped by the reader's reload control; each `ReaderPage` re-requests only
+    /// if it is currently in the failure state (loaded pages stay put).
+    @State private var retryAllToken = 0
     @Environment(\.comicRepository) private var repository
     @Environment(\.dismiss) private var dismiss
 
@@ -146,19 +154,30 @@ private struct ReaderView: View {
             // `AsyncImage` at once; pages load as they scroll into view.
             LazyVStack(spacing: 0){
                 // Renders the current chapter's pages as a continuous vertical read.
-                ForEach(Array(urls.enumerated()), id: \.offset){ _, url in
-                    ReaderPage(url: url)
+                ForEach(Array(urls.enumerated()), id: \.offset){ index, url in
+                    ReaderPage(
+                        url: url,
+                        retryAllToken: retryAllToken,
+                        onRetryAll: { retryAllToken += 1 },
+                        onVisible: { isVisible in
+                            if isVisible {
+                                visiblePages.insert(index)
+                            } else {
+                                visiblePages.remove(index)
+                            }
+                        }
+                    )
                 }
             }
             // Marks the pages as scroll targets so `.scrollPosition` can both
             // resume to a page and report the top-most visible page index.
             .scrollTargetLayout()
         }
-        // Two-way: resume by setting `topPage` after load (see `loadPages`), and
-        // observe the top page as the user scrolls to report progress.
+        // Resume only: setting `topPage` after load (see `loadPages`) scrolls to
+        // the resume page. Its reported value is not used for progress.
         .scrollPosition(id: $topPage, anchor: .top)
-        // Debounced progress reporting whenever the top page changes.
-        .onChange(of: topPage) { _, _ in scheduleProgressSave() }
+        // Debounced progress reporting whenever the top-most visible page changes.
+        .onChange(of: visiblePages) { _, _ in scheduleProgressSave() }
         // Auto-advance: after reaching the bottom, the user must keep pulling
         // *past* the end (overscroll) to continue into the next chapter — so
         // simply reaching the bottom is not enough. Does nothing on the last
@@ -326,6 +345,9 @@ private struct ReaderView: View {
             topPage = resumeIndex
             pageCount = urls.count
             reachedEnd = false
+            // Fresh visibility set for the incoming chapter; the new pages
+            // repopulate it as they appear.
+            visiblePages = []
 
             if restart {
                 // Overwrite the store to page 1 for the incoming chapter, even if
@@ -349,10 +371,11 @@ private struct ReaderView: View {
     // MARK: - Progress reporting
 
     /// The 1-based page to report: the chapter's last page once the reader has
-    /// reached the real bottom (so the backend can mark it `read`), otherwise
-    /// the top-most visible page.
+    /// reached the real bottom (so the backend can mark it `read`), otherwise the
+    /// top-most visible page (`visiblePages.min()`, reliable on a lazy stack).
+    /// `nil` before the first layout (empty set) → `sendProgress` ignores it.
     private var reportedPage: Int? {
-        reachedEnd ? pageCount : topPage.map { $0 + 1 }
+        reachedEnd ? pageCount : visiblePages.min().map { $0 + 1 }
     }
 
     /// Restarts the debounce so a rapid scroll only writes once it settles.
@@ -401,7 +424,19 @@ private struct ReaderView: View {
 /// `reloadToken`, which re-keys the `AsyncImage` so it re-issues the request.
 private struct ReaderPage: View {
     let url: URL
+    /// Shared token from the reader. A change re-requests this page only when it
+    /// is currently failed.
+    let retryAllToken: Int
+    /// Tapping any failed page's retry button reloads every failed page at once
+    /// (bumps the shared `retryAllToken` in the parent).
+    let onRetryAll: () -> Void
+    /// Reports this page entering (`true`) / leaving (`false`) the viewport, so
+    /// the reader can track the top-most visible page for progress reporting.
+    let onVisible: (Bool) -> Void
     @State private var reloadToken = 0
+    /// Whether this page's image is currently in the failure state, so the
+    /// reader-level reload can skip pages that already loaded.
+    @State private var hasFailed = false
 
     var body: some View {
         // Wrap the page so `.id(reloadToken)` re-keys only the inner AsyncImage.
@@ -416,23 +451,35 @@ private struct ReaderPage: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity)
+                        .onAppear { hasFailed = false }
                 case .empty:
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 220)
+                        .onAppear { hasFailed = false }
                 case .failure:
                     failurePlaceholder
+                        .onAppear { hasFailed = true }
                 @unknown default:
                     failurePlaceholder
+                        .onAppear { hasFailed = true }
                 }
             }
             // Re-issue the request when the retry token changes.
             .id(reloadToken)
         }
+        // Reader-level reload: only failed pages re-request; loaded ones stay put.
+        .onChange(of: retryAllToken) { _, _ in
+            if hasFailed { reloadToken += 1 }
+        }
+        // Report viewport membership so the reader can derive the top page.
+        .onAppear { onVisible(true) }
+        .onDisappear { onVisible(false) }
     }
 
     private var failurePlaceholder: some View {
         Button {
-            reloadToken += 1
+            // Retry every currently-failed page at once, not just this one.
+            onRetryAll()
         } label: {
             VStack(spacing: 8) {
                 Image(systemName: "arrow.clockwise")
