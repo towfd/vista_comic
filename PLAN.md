@@ -7,7 +7,7 @@ Last updated: 2026-07-23
 ## Current status
 
 - Milestones M1–M4 are complete; the local UI release goal is met (localization + auto-advance also shipped).
-- Active milestone: **M5 — Local backend (folder → app)**. Slices 0–3 are complete and merged (scan-and-serve catalog + media + iOS client). **Slice 4 (reading-progress persistence) is planned; contract + docs updated 2026-07-23, implementation about to start.** Backend design of record: `docs/backend-architecture.md`.
+- Active milestone: **M5 — Local backend (folder → app)**. Slices 0–3 are complete and merged (scan-and-serve catalog + media + iOS client). **Slice 4 (reading-progress persistence) is planned; contract + docs updated 2026-07-23, implementation about to start.** Backend design of record: `docs/api-contract.md` (contract), `CONTEXT.md` (glossary), `docs/adr/` (decisions).
 - Current owner: Coordinator (delegates to `backend-implementer`, `frontend-implementer`, `code-reviewer`).
 - Next action: `backend-implementer` builds Slice 4 backend (Docker Compose api+postgres, `progress` table, `PUT .../progress`, live `readState`/`lastReadAt`, tests); then `frontend-implementer` wires the iOS reader (`saveProgress`, page tracking, `ScrollViewReader` resume).
 
@@ -159,7 +159,7 @@ Acceptance criteria:
 - Status: In progress (Slices 0–3 complete/merged; Slice 4 planned, about to start)
 - Owner: Coordinator; implemented by `backend-implementer` (backend) and `frontend-implementer` (iOS)
 - Dependencies: M1–M4
-- Contract of record: `docs/backend-architecture.md` (confirmed decisions + API shape). Scope: a local, read-only "scan-and-serve" backend that makes a developer's manga folder appear in the app. Cloud sync / auth / URL import remain out of scope.
+- Contract of record: `docs/api-contract.md` (API shape + folder format), `docs/adr/` (confirmed decisions). Scope: a local, read-only "scan-and-serve" backend that makes a developer's manga folder appear in the app. Cloud sync / auth / URL import remain out of scope.
 - Config: the library path lives only in a gitignored `.env` (`MANGA_LIBRARY_PATH`); never commit it.
 
 Slices (each ships only after the prior one has an observable acceptance test):
@@ -177,7 +177,7 @@ Slices (each ships only after the prior one has an observable acceptance test):
   - Residual (to confirm on-device): reader `LazyVStack` scroll + pull-past-bottom auto-advance and per-page retry on a real many-page chapter. Backlog: error-message granularity, URL-string decode tolerance, per-chapter thumbnail (no contract URL yet), production base-URL/ATS story.
 - [ ] **Slice 4 — reading-position persistence** (`backend-implementer` then `frontend-implementer`, sequential — not concurrent). Decisions locked 2026-07-23:
   - **PostgreSQL** (not SQLite), via SQLAlchemy 2.0 + psycopg (sync); a single `progress` table `(comic_id, chapter_id)` → `last_page, page_count, updated_at`; `CREATE TABLE IF NOT EXISTS`, no Alembic.
-  - **Docker Compose, two services** (`api` + `postgres`); manga folder read-only bind-mounted into `api`; `DATABASE_URL` in the gitignored `.env`. **Redis deferred** with a written trigger (multi-worker shared catalog cache / measured slowness) — see `docs/backend-architecture.md`.
+  - **Docker Compose, two services** (`api` + `postgres`); manga folder read-only bind-mounted into `api`; `DATABASE_URL` in the gitignored `.env`. **Redis deferred** with a written trigger (multi-worker shared catalog cache / measured slowness) — see `docs/adr/0004-docker-compose-topology.md`.
   - **Page-level** resume: new `PUT /comics/{id}/chapters/{cid}/progress`; GET endpoints derive live `readState` / `lastReadAt`; reader response adds `lastReadPage`. iOS gains `saveProgress(...)`, debounced visible-page reporting, and `ScrollViewReader` resume.
   - Catalog stays scan-derived; progress is the only DB-held (folder-external) state.
   - Acceptance: read to page K of a chapter, restart app/backend, resume at ~page K with the chapter shown as `reading`.

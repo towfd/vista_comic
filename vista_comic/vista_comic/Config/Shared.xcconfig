@@ -1,0 +1,20 @@
+// Backend connectivity defaults, baked into the app at build time (not
+// launch time) so they survive however the app is started — Xcode, or
+// tapping the icon directly with no debugger attached.
+//
+// These three keys are read by APIConfig via Bundle.main.infoDictionary
+// (see Info.plist and Networking/ComicRepository.swift).
+//
+// The "//" in URLs must be written as "/$()/" — xcconfig treats a bare "//"
+// as the start of a comment.
+
+VISTA_BASE_URL = http:/$()/127.0.0.1:8000
+CF_ACCESS_CLIENT_ID =
+CF_ACCESS_CLIENT_SECRET =
+
+// Machine-specific overrides (e.g. the public tunnel hostname + your real
+// Cloudflare Access Service Token) live in Secrets.xcconfig, which is
+// gitignored and never committed. Copy Secrets.xcconfig.example to
+// Secrets.xcconfig and fill in real values there — this optional include
+// silently does nothing if that file doesn't exist yet.
+#include? "Secrets.xcconfig"

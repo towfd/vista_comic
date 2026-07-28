@@ -1,0 +1,23 @@
+# Template for the named Cloudflare Tunnel that fronts the `api` service
+# (see docs/adr/0005-cloudflare-tunnel-for-public-connectivity.md).
+#
+# This file is committed with placeholders only. Fill in the two values
+# below after running `cloudflared tunnel create` (see the setup steps in
+# .scratch/remote-access/issues/01-public-tunnel-and-access-gate.md), then
+# keep the filled-in version local — do not commit real tunnel IDs/hostnames
+# if you'd rather keep them private; at minimum, never commit the
+# credentials JSON file referenced below (it is gitignored).
+#
+# <TUNNEL_ID> — the UUID printed by `cloudflared tunnel create vista-comic-api`
+# <PUBLIC_HOSTNAME> — the subdomain routed to this tunnel, e.g. api.example.com
+
+tunnel: 689fa4a3-7d1f-444b-93a0-84a093b429d2
+credentials-file: /etc/cloudflared/689fa4a3-7d1f-444b-93a0-84a093b429d2.json
+
+ingress:
+  # Only `api` is routed. `postgres` has no ingress rule here and stays
+  # reachable only over the internal Compose network / LAN localhost — never
+  # through the tunnel.
+  - hostname: api.vistabanana.com
+    service: http://api:8000
+  - service: http_status:404
