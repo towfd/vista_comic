@@ -4,15 +4,15 @@
 
 **Blocked by:** 01 (needs the live tunnel hostname and real Service Token values to configure the scheme and run the full device-level check)
 
-**Status:** in progress — core auth + image-loading gap fixed and unit-tested; on-device manual check still pending
+**Status:** done (2026-07-28)
 
 - [x] `APIConfig` provides `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`, defaulting to unset/empty for local dev. Superseded from the original "environment variable" plan: both this and `VISTA_BASE_URL` now come from `Bundle.main.infoDictionary` (build-time `Config/Shared.xcconfig` + gitignored `Config/Secrets.xcconfig`), not `ProcessInfo.environment` — see the `## Comments` entry below.
 - [x] `APIComicRepository`'s `get` and `put` both route through a single shared request-construction point (`APIConfig.authorizedRequest`, also shared with `AuthorizedAsyncImage` — see below).
 - [x] When both credential values are present, every outgoing request carries `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers with the configured values. **This was false as originally shipped** — see `## Comments`; now true for JSON requests and image requests alike.
 - [x] When the credential values are unset, no Access headers are added and requests are unchanged from current behavior.
 - [x] Unit tests using a stubbed `URLProtocol`-backed `URLSession` assert both the "headers present when configured" and "headers absent when unconfigured" cases, for `get`, `put`, and (added after the gap below was found) image fetches.
-- [ ] On-device build with `VISTA_BASE_URL` set to the public tunnel hostname and both `CF_ACCESS_*` values set successfully loads the library and reader while the phone is off the home Wi-Fi. **Still needs to be run by the developer.**
-- [ ] Simulator build with `VISTA_BASE_URL` unset/`127.0.0.1` and no `CF_ACCESS_*` values set continues to work exactly as before. Confirmed structurally (full local `xcodebuild build`/`test` pass against the unset-credential path) but not yet visually confirmed in a running simulator.
+- [x] On-device build with `VISTA_BASE_URL` set to the public tunnel hostname and both `CF_ACCESS_*` values set successfully loads the library and reader while the phone is off the home Wi-Fi. **Confirmed by the developer on a physical device.**
+- [x] Simulator build with `VISTA_BASE_URL` unset/`127.0.0.1` and no `CF_ACCESS_*` values set continues to work exactly as before. Confirmed structurally (full local `xcodebuild build`/`test` pass against the unset-credential path) and confirmed by the developer.
 
 ## Comments
 
