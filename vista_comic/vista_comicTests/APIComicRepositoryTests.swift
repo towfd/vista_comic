@@ -15,7 +15,15 @@ import Foundation
 /// A stub `URLProtocol` that never touches the network: it records the last
 /// request it saw and returns a canned response/body so the repository's
 /// decode step succeeds.
-private final class StubURLProtocol: URLProtocol {
+///
+/// File-private and not shared with `AuthorizedAsyncImageTests` on purpose:
+/// an earlier version extracted this into a common file, but its static
+/// `lastRequest`/`responseBody`/`statusCode` state is global, and Swift
+/// Testing may run different `@Suite`s in parallel with each other even
+/// though `.serialized` keeps tests *within* one suite sequential — the two
+/// suites raced and corrupted each other's stubbed state. A dedicated class
+/// per suite has its own static storage, so there's nothing to race.
+private final class RepositoryStubURLProtocol: URLProtocol {
     /// Set by the test before making a call; read back to assert on headers.
     static var lastRequest: URLRequest?
     /// The response body served to every request. Defaults to an empty JSON
@@ -29,16 +37,16 @@ private final class StubURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        StubURLProtocol.lastRequest = request
+        RepositoryStubURLProtocol.lastRequest = request
 
         let response = HTTPURLResponse(
             url: request.url!,
-            statusCode: StubURLProtocol.statusCode,
+            statusCode: RepositoryStubURLProtocol.statusCode,
             httpVersion: "HTTP/1.1",
             headerFields: nil
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: StubURLProtocol.responseBody)
+        client?.urlProtocol(self, didLoad: RepositoryStubURLProtocol.responseBody)
         client?.urlProtocolDidFinishLoading(self)
     }
 
@@ -49,7 +57,7 @@ private final class StubURLProtocol: URLProtocol {
 struct APIComicRepositoryTests {
     private func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [StubURLProtocol.self]
+        configuration.protocolClasses = [RepositoryStubURLProtocol.self]
         return URLSession(configuration: configuration)
     }
 
@@ -68,25 +76,25 @@ struct APIComicRepositoryTests {
     // MARK: - Headers present when configured
 
     @Test func libraryAttachesHeadersWhenConfigured() async throws {
-        StubURLProtocol.responseBody = Data("[]".utf8)
-        StubURLProtocol.statusCode = 200
+        RepositoryStubURLProtocol.responseBody = Data("[]".utf8)
+        RepositoryStubURLProtocol.statusCode = 200
 
         let repository = makeRepository(clientID: "test-client-id", clientSecret: "test-client-secret")
         _ = try await repository.library()
 
-        let request = try #require(StubURLProtocol.lastRequest)
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == "test-client-id")
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == "test-client-secret")
     }
 
     @Test func saveProgressAttachesHeadersWhenConfigured() async throws {
-        StubURLProtocol.responseBody = Data()
-        StubURLProtocol.statusCode = 204
+        RepositoryStubURLProtocol.responseBody = Data()
+        RepositoryStubURLProtocol.statusCode = 204
 
         let repository = makeRepository(clientID: "test-client-id", clientSecret: "test-client-secret")
         try await repository.saveProgress(comicID: "comic-1", chapterID: "chapter-1", lastPage: 5)
 
-        let request = try #require(StubURLProtocol.lastRequest)
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
         #expect(request.httpMethod == "PUT")
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == "test-client-id")
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == "test-client-secret")
@@ -95,37 +103,37 @@ struct APIComicRepositoryTests {
     // MARK: - Headers absent when unconfigured
 
     @Test func libraryOmitsHeadersWhenUnconfigured() async throws {
-        StubURLProtocol.responseBody = Data("[]".utf8)
-        StubURLProtocol.statusCode = 200
+        RepositoryStubURLProtocol.responseBody = Data("[]".utf8)
+        RepositoryStubURLProtocol.statusCode = 200
 
         let repository = makeRepository(clientID: nil, clientSecret: nil)
         _ = try await repository.library()
 
-        let request = try #require(StubURLProtocol.lastRequest)
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == nil)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == nil)
     }
 
     @Test func saveProgressOmitsHeadersWhenUnconfigured() async throws {
-        StubURLProtocol.responseBody = Data()
-        StubURLProtocol.statusCode = 204
+        RepositoryStubURLProtocol.responseBody = Data()
+        RepositoryStubURLProtocol.statusCode = 204
 
         let repository = makeRepository(clientID: nil, clientSecret: nil)
         try await repository.saveProgress(comicID: "comic-1", chapterID: "chapter-1", lastPage: 5)
 
-        let request = try #require(StubURLProtocol.lastRequest)
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == nil)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == nil)
     }
 
     @Test func headersOmittedWhenOnlyOneCredentialIsPresent() async throws {
-        StubURLProtocol.responseBody = Data("[]".utf8)
-        StubURLProtocol.statusCode = 200
+        RepositoryStubURLProtocol.responseBody = Data("[]".utf8)
+        RepositoryStubURLProtocol.statusCode = 200
 
         let repository = makeRepository(clientID: "test-client-id", clientSecret: nil)
         _ = try await repository.library()
 
-        let request = try #require(StubURLProtocol.lastRequest)
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == nil)
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == nil)
     }

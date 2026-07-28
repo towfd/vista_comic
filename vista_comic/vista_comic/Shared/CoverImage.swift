@@ -3,8 +3,10 @@
 //  vista_comic
 //
 //  Shared cover renderer for the library card and the chapter screen (M5 Slice 3).
-//  Loads a cover URL with `AsyncImage`, showing a neutral placeholder while
-//  loading and on failure so covers degrade gracefully when the backend is down.
+//  Loads a cover URL with `AuthorizedAsyncImage` (see that file — a stand-in
+//  for `AsyncImage` that attaches Cloudflare Access headers), showing a
+//  neutral placeholder while loading and on failure so covers degrade
+//  gracefully when the backend is down.
 //
 
 import SwiftUI
@@ -13,7 +15,7 @@ struct CoverImage: View {
     let url: URL?
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        AuthorizedAsyncImage(url: url) { phase in
             switch phase {
             case .success(let image):
                 // Let the caller's `.frame(...)` impose the size: `Color.clear`

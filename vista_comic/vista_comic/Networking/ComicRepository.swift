@@ -85,6 +85,32 @@ enum APIConfig {
         else { return nil }
         return value
     }
+
+    /// Builds a request for an arbitrary absolute URL, attaching the
+    /// Cloudflare Access Service Token headers when both credentials are
+    /// present. Shared by `APIComicRepository` (JSON endpoints) and
+    /// `AuthorizedAsyncImage` (media bytes) so every backend request
+    /// authenticates the same way — `AsyncImage(url:)` has no API for custom
+    /// headers, which is what let image loads slip through unauthenticated
+    /// after Access was added in front of the tunnel.
+    ///
+    /// Takes credentials as parameters rather than reading `cfAccessClientID`/
+    /// `cfAccessClientSecret` directly, so callers can inject test values
+    /// without touching process-wide state.
+    static func authorizedRequest(
+        url: URL,
+        method: String = "GET",
+        clientID: String?,
+        clientSecret: String?
+    ) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        if let clientID, let clientSecret {
+            request.setValue(clientID, forHTTPHeaderField: "CF-Access-Client-Id")
+            request.setValue(clientSecret, forHTTPHeaderField: "CF-Access-Client-Secret")
+        }
+        return request
+    }
 }
 
 // MARK: - Environment injection
