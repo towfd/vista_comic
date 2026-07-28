@@ -6,7 +6,7 @@ into an **in-memory catalog** and serves JSON that maps 1:1 to the iOS `Comic` /
 (the folder is the source of truth); the only writable state is reading progress,
 kept in a small PostgreSQL `progress` table.
 
-Contract of record: [`../docs/backend-architecture.md`](../docs/backend-architecture.md).
+Contract of record: [`../docs/api-contract.md`](../docs/api-contract.md). Domain glossary: [`../CONTEXT.md`](../CONTEXT.md). Architectural decisions: [`../docs/adr/`](../docs/adr/).
 
 ## What the API does (through M5 Slice 4)
 
