@@ -62,5 +62,30 @@ services:
       retries: 5
       start_period: 10s
 
+  # Public HTTPS endpoint for `api` via a Cloudflare named Tunnel (ADR-0005) —
+  # `cloudflared` makes an outbound-only connection to Cloudflare's edge, so no
+  # port-forwarding or static public IP is needed. Access control (Cloudflare
+  # Access + Service Token) is enforced at the edge, in front of this tunnel —
+  # this container and the `api` service stay unaware of it.
+  #
+  # Setup is manual (interactive `cloudflared` CLI login + Cloudflare Zero
+  # Trust dashboard) and is NOT part of this compose file — see the numbered
+  # instructions in .scratch/remote-access/issues/01-public-tunnel-and-access-gate.md
+  # for exactly what to run once, by hand, before this service comes up.
+  #
+  # ./cloudflared/config.yml is a committed template (placeholders only).
+  # The real tunnel credentials JSON (written by `cloudflared tunnel create`)
+  # must be dropped into ./cloudflared/ alongside it and is gitignored —
+  # never commit it.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - "./cloudflared:/etc/cloudflared:ro"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pg_data:

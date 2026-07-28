@@ -19,4 +19,11 @@ EXPOSE 8000
 
 # One uvicorn worker for now (single developer / single client). The manga
 # library path is injected by compose as MANGA_LIBRARY_PATH=/library.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+#
+# --proxy-headers (+ trusting all forwarded-for IPs, since the only caller on
+# this container's network is the `cloudflared` sidecar) makes uvicorn honor
+# the X-Forwarded-Proto Cloudflare's edge sets on tunneled requests. Without
+# it, request.base_url always reports the scheme cloudflared used internally
+# (plain http), so every media URL comes back http:// even over the public
+# https:// tunnel — which iOS's App Transport Security then blocks.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

@@ -24,3 +24,13 @@ build/
 # Local machine-specific config (e.g. MANGA_LIBRARY_PATH) — never commit
 .env
 .env.*
+
+# Cloudflare Tunnel credentials (written by `cloudflared tunnel create`) —
+# secret, machine-specific, never commit. cloudflared/config.yml is a
+# committed template and is NOT covered by this pattern.
+cloudflared/*.json
+
+# iOS build-time secrets (VISTA_BASE_URL override, Cloudflare Access Service
+# Token) — machine-specific, never commit. Secrets.xcconfig.example is a
+# committed template and is NOT covered by this pattern.
+vista_comic/vista_comic/Config/Secrets.xcconfig
