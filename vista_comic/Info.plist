@@ -23,5 +23,18 @@
 			</dict>
 		</dict>
 	</dict>
+
+	<!--
+	  Backend connectivity, baked in at build time from Config/Shared.xcconfig
+	  (+ the gitignored Config/Secrets.xcconfig override) rather than read from
+	  ProcessInfo.environment, so it survives launches with no Xcode attached.
+	  See Networking/ComicRepository.swift (APIConfig).
+	-->
+	<key>VistaBaseURL</key>
+	<string>$(VISTA_BASE_URL)</string>
+	<key>CFAccessClientID</key>
+	<string>$(CF_ACCESS_CLIENT_ID)</string>
+	<key>CFAccessClientSecret</key>
+	<string>$(CF_ACCESS_CLIENT_SECRET)</string>
 </dict>
 </plist>

@@ -27,6 +27,7 @@
 		1669FF7D2FF78C350029D4F3 /* vista_comic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = vista_comic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1669FF8D2FF78C380029D4F3 /* vista_comicTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = vista_comicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1669FF972FF78C380029D4F3 /* vista_comicUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = vista_comicUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1669FFB02FF78C380029D4F3 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Shared.xcconfig; path = vista_comic/Config/Shared.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +80,7 @@
 				1669FF902FF78C380029D4F3 /* vista_comicTests */,
 				1669FF9A2FF78C380029D4F3 /* vista_comicUITests */,
 				1669FF7E2FF78C350029D4F3 /* Products */,
+				1669FFB02FF78C380029D4F3 /* Shared.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -391,6 +393,7 @@
 		};
 		1669FFA22FF78C380029D4F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1669FFB02FF78C380029D4F3 /* Shared.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -421,6 +424,7 @@
 		};
 		1669FFA32FF78C380029D4F3 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1669FFB02FF78C380029D4F3 /* Shared.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

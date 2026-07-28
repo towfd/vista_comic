@@ -7,7 +7,7 @@
 //  can swap the live backend (`APIComicRepository`) for an in-memory mock
 //  (`PreviewComicRepository`) in `#Preview`s and stay buildable offline.
 //
-//  API contract of record: `docs/backend-architecture.md`.
+//  API contract of record: `docs/api-contract.md`.
 //
 
 import SwiftUI
@@ -49,22 +49,42 @@ enum LoadState<Value> {
 
 /// Where the app looks for the backend.
 ///
-/// The developer overrides the host at runtime with the `VISTA_BASE_URL`
-/// environment variable (set it in the Xcode scheme, e.g. a LAN IP or tunnel
-/// host) so no machine-specific address lives in tracked source. When it is
-/// unset or not a valid URL, it falls back to the compiled default.
+/// Values are baked into the compiled app at **build time** — via
+/// `Config/Shared.xcconfig` (+ the gitignored `Config/Secrets.xcconfig`
+/// override) flowing through `Info.plist` — rather than read from
+/// `ProcessInfo.environment`. Scheme-level environment variables only exist
+/// while Xcode launches the process; a build-time value survives launching
+/// the app directly from the home screen with no debugger attached, which is
+/// required once the base URL is the public tunnel hostname (`remote-access`).
 ///
-/// The default uses the explicit IPv4 loopback rather than `localhost`, which
-/// macOS resolves to IPv6 `::1` first — anything else on `::1:8000` (e.g. a
-/// Docker port proxy) would otherwise shadow the IPv4 uvicorn dev server.
+/// The compiled fallback (`http://127.0.0.1:8000`) uses the explicit IPv4
+/// loopback rather than `localhost`, which macOS resolves to IPv6 `::1`
+/// first — anything else on `::1:8000` (e.g. a Docker port proxy) would
+/// otherwise shadow the IPv4 uvicorn dev server.
 enum APIConfig {
     static let baseURL: URL = {
-        if let override = ProcessInfo.processInfo.environment["VISTA_BASE_URL"],
-           let url = URL(string: override) {
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "VistaBaseURL") as? String,
+           !raw.isEmpty,
+           let url = URL(string: raw) {
             return url
         }
         return URL(string: "http://127.0.0.1:8000")!
     }()
+
+    /// Cloudflare Access Service Token credentials for the public tunnel
+    /// hostname, set in the gitignored `Config/Secrets.xcconfig`. `nil` (no
+    /// default) when unset, since local/simulator dev against `127.0.0.1`
+    /// sits behind no Access policy and needs no credentials.
+    static let cfAccessClientID: String? = nonEmptyInfoValue(forKey: "CFAccessClientID")
+
+    static let cfAccessClientSecret: String? = nonEmptyInfoValue(forKey: "CFAccessClientSecret")
+
+    private static func nonEmptyInfoValue(forKey key: String) -> String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !value.isEmpty
+        else { return nil }
+        return value
+    }
 }
 
 // MARK: - Environment injection

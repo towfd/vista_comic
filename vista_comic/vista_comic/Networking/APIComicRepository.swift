@@ -3,7 +3,7 @@
 //  vista_comic
 //
 //  Live `ComicRepository` backed by the local FastAPI service over `URLSession`
-//  with `Codable` decoding. See `docs/backend-architecture.md` for the contract.
+//  with `Codable` decoding. See `docs/api-contract.md` for the contract.
 //
 
 import Foundation
@@ -12,10 +12,19 @@ import Foundation
 struct APIComicRepository: ComicRepository {
     private let baseURL: URL
     private let session: URLSession
+    private let cfAccessClientID: String?
+    private let cfAccessClientSecret: String?
 
-    init(baseURL: URL = APIConfig.baseURL, session: URLSession = .shared) {
+    init(
+        baseURL: URL = APIConfig.baseURL,
+        session: URLSession = .shared,
+        cfAccessClientID: String? = APIConfig.cfAccessClientID,
+        cfAccessClientSecret: String? = APIConfig.cfAccessClientSecret
+    ) {
         self.baseURL = baseURL
         self.session = session
+        self.cfAccessClientID = cfAccessClientID
+        self.cfAccessClientSecret = cfAccessClientSecret
     }
 
     /// Shared decoder: the backend emits ISO-8601 dates (e.g. `lastReadAt`).
@@ -49,9 +58,29 @@ struct APIComicRepository: ComicRepository {
 
     // MARK: - Request plumbing
 
-    private func get<T: Decodable>(_ type: T.Type, at path: String) async throws -> T {
+    /// Builds a `URLRequest` for `path` and attaches the Cloudflare Access
+    /// Service Token headers when both credential values are present. This
+    /// is the single construction point both `get` and `put` route through,
+    /// so on-device requests through the public tunnel carry the headers
+    /// while local/simulator requests against `127.0.0.1` (no credentials
+    /// configured) are unaffected.
+    private func makeRequest(method: String, at path: String) -> URLRequest {
         let url = baseURL.appendingPathComponent(path)
-        let (data, response) = try await session.data(from: url)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+
+        if let clientID = cfAccessClientID, !clientID.isEmpty,
+           let clientSecret = cfAccessClientSecret, !clientSecret.isEmpty {
+            request.setValue(clientID, forHTTPHeaderField: "CF-Access-Client-Id")
+            request.setValue(clientSecret, forHTTPHeaderField: "CF-Access-Client-Secret")
+        }
+
+        return request
+    }
+
+    private func get<T: Decodable>(_ type: T.Type, at path: String) async throws -> T {
+        let request = makeRequest(method: "GET", at: path)
+        let (data, response) = try await session.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
@@ -70,9 +99,7 @@ struct APIComicRepository: ComicRepository {
     /// Sends a JSON body with `PUT` and treats any non-2xx status as an error.
     /// The response body is ignored; callers only care whether the write stuck.
     private func put(body: Data, at path: String) async throws {
-        let url = baseURL.appendingPathComponent(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = makeRequest(method: "PUT", at: path)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
 
