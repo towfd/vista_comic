@@ -58,24 +58,20 @@ struct APIComicRepository: ComicRepository {
 
     // MARK: - Request plumbing
 
-    /// Builds a `URLRequest` for `path` and attaches the Cloudflare Access
-    /// Service Token headers when both credential values are present. This
-    /// is the single construction point both `get` and `put` route through,
-    /// so on-device requests through the public tunnel carry the headers
-    /// while local/simulator requests against `127.0.0.1` (no credentials
+    /// Builds a `URLRequest` for `path`, routed through `APIConfig.authorizedRequest`
+    /// so it attaches the Cloudflare Access Service Token headers exactly the
+    /// way `AuthorizedAsyncImage` does for media bytes. This is the single
+    /// construction point both `get` and `put` route through, so on-device
+    /// requests through the public tunnel carry the headers while
+    /// local/simulator requests against `127.0.0.1` (no credentials
     /// configured) are unaffected.
     private func makeRequest(method: String, at path: String) -> URLRequest {
-        let url = baseURL.appendingPathComponent(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-
-        if let clientID = cfAccessClientID, !clientID.isEmpty,
-           let clientSecret = cfAccessClientSecret, !clientSecret.isEmpty {
-            request.setValue(clientID, forHTTPHeaderField: "CF-Access-Client-Id")
-            request.setValue(clientSecret, forHTTPHeaderField: "CF-Access-Client-Secret")
-        }
-
-        return request
+        APIConfig.authorizedRequest(
+            url: baseURL.appendingPathComponent(path),
+            method: method,
+            clientID: cfAccessClientID,
+            clientSecret: cfAccessClientSecret
+        )
     }
 
     private func get<T: Decodable>(_ type: T.Type, at path: String) async throws -> T {

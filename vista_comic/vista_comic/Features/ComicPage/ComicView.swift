@@ -418,10 +418,12 @@ private struct ReaderView: View {
     }
 }
 
-/// A single reading page. `AsyncImage` provides the real loading state deferred
-/// in M3. Because `AsyncImage` has no built-in retry, a failed page would stay
-/// failed forever, so the failure placeholder is tappable: tapping bumps
-/// `reloadToken`, which re-keys the `AsyncImage` so it re-issues the request.
+/// A single reading page. `AuthorizedAsyncImage` (see `Shared/AuthorizedAsyncImage.swift`
+/// — a stand-in for `AsyncImage` that attaches Cloudflare Access headers)
+/// provides the real loading state deferred in M3. Because it has no
+/// built-in retry, a failed page would stay failed forever, so the failure
+/// placeholder is tappable: tapping bumps `reloadToken`, which re-keys the
+/// view so it re-issues the request.
 private struct ReaderPage: View {
     let url: URL
     /// Shared token from the reader. A change re-requests this page only when it
@@ -439,12 +441,12 @@ private struct ReaderPage: View {
     @State private var hasFailed = false
 
     var body: some View {
-        // Wrap the page so `.id(reloadToken)` re-keys only the inner AsyncImage.
+        // Wrap the page so `.id(reloadToken)` re-keys only the inner image view.
         // If `.id` were applied to this view's body root, every ReaderPage would
         // expose the same id (0) to the enclosing LazyVStack — a collision that
         // makes SwiftUI unable to tell the pages apart and breaks scrolling.
         VStack(spacing: 0) {
-            AsyncImage(url: url) { phase in
+            AuthorizedAsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image
