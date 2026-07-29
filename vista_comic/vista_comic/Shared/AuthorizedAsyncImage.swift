@@ -22,6 +22,14 @@ struct AuthorizedAsyncImage<Content: View>: View {
     let clientID: String?
     let clientSecret: String?
     @ViewBuilder let content: (AsyncImagePhase) -> Content
+    /// Fired alongside a successful `.success` phase with the decoded source
+    /// `UIImage`, not just the SwiftUI `Image` rendered into `content`.
+    /// `AsyncImagePhase` is a SwiftUI type and can't be extended with a new
+    /// case, so this is a separate, optional escape hatch for callers that
+    /// need pixel-level access to what was actually decoded (e.g. cropping
+    /// a user-drawn selection at full source resolution). Defaults to `nil`
+    /// so existing call sites are unaffected.
+    var onDecoded: ((UIImage) -> Void)?
 
     @State private var phase: AsyncImagePhase = .empty
 
@@ -30,12 +38,14 @@ struct AuthorizedAsyncImage<Content: View>: View {
         session: URLSession = .shared,
         clientID: String? = APIConfig.cfAccessClientID,
         clientSecret: String? = APIConfig.cfAccessClientSecret,
+        onDecoded: ((UIImage) -> Void)? = nil,
         @ViewBuilder content: @escaping (AsyncImagePhase) -> Content
     ) {
         self.url = url
         self.session = session
         self.clientID = clientID
         self.clientSecret = clientSecret
+        self.onDecoded = onDecoded
         self.content = content
     }
 
@@ -45,14 +55,14 @@ struct AuthorizedAsyncImage<Content: View>: View {
                 phase = .empty
                 guard let url else { return }
                 do {
-                    phase = .success(
-                        try await Self.fetchImage(
-                            url: url,
-                            session: session,
-                            clientID: clientID,
-                            clientSecret: clientSecret
-                        )
+                    let fetched = try await Self.fetchImage(
+                        url: url,
+                        session: session,
+                        clientID: clientID,
+                        clientSecret: clientSecret
                     )
+                    phase = .success(fetched.image)
+                    onDecoded?(fetched.decodedImage)
                 } catch {
                     if !Task.isCancelled {
                         phase = .failure(error)
@@ -61,13 +71,21 @@ struct AuthorizedAsyncImage<Content: View>: View {
             }
     }
 
+    /// The result of a fetch: the SwiftUI `Image` used to render `content`,
+    /// and the decoded `UIImage` it was built from, for callers that need
+    /// the original source pixels rather than the rendered SwiftUI value.
+    struct FetchedImage {
+        let image: Image
+        let decodedImage: UIImage
+    }
+
     /// Isolated from view state so it's directly testable without rendering.
     static func fetchImage(
         url: URL,
         session: URLSession,
         clientID: String?,
         clientSecret: String?
-    ) async throws -> Image {
+    ) async throws -> FetchedImage {
         let request = APIConfig.authorizedRequest(url: url, clientID: clientID, clientSecret: clientSecret)
         let (data, response) = try await session.data(for: request)
 
@@ -84,6 +102,6 @@ struct AuthorizedAsyncImage<Content: View>: View {
                 )
             )
         }
-        return Image(uiImage: uiImage)
+        return FetchedImage(image: Image(uiImage: uiImage), decodedImage: uiImage)
     }
 }
