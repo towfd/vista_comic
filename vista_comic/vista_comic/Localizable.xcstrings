@@ -26,6 +26,9 @@
         }
       }
     },
+    "Cancel" : {
+
+    },
     "Chapter list" : {
       "comment" : "Reader: open the chapter list",
       "localizations" : {
@@ -103,6 +106,15 @@
         }
       }
     },
+    "Done" : {
+
+    },
+    "Drag here and release to cancel selection" : {
+
+    },
+    "Exit text selection" : {
+
+    },
     "Library" : {
       "comment" : "Library screen title",
       "localizations" : {
@@ -135,6 +147,9 @@
           }
         }
       }
+    },
+    "No text was found in the selected region. Try selecting a tighter area around the text." : {
+
     },
     "not started yet" : {
       "comment" : "Library card: comic never opened",
@@ -180,6 +195,12 @@
         }
       }
     },
+    "Recognition failed. You can try again." : {
+
+    },
+    "Recognizing text…" : {
+
+    },
     "Retry" : {
       "comment" : "Error state: retry the failed fetch",
       "localizations" : {
@@ -191,6 +212,12 @@
         }
       }
     },
+    "Select text" : {
+
+    },
+    "Selected text" : {
+
+    },
     "Tap to retry" : {
       "comment" : "Reader: retry loading a single page that failed",
       "localizations" : {
@@ -201,6 +228,12 @@
           }
         }
       }
+    },
+    "Text recognition failed unexpectedly." : {
+
+    },
+    "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
+
     },
     "unread" : {
       "comment" : "Chapter read state",
