@@ -31,12 +31,10 @@ struct APITranslationRepository: TranslationRepository {
         self.cfAccessClientSecret = cfAccessClientSecret
     }
 
-    /// Shared decoder: the backend emits ISO-8601 dates (`savedAt`).
-    private var decoder: JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }
+    /// Shared decoder: the backend emits ISO-8601 dates (`savedAt`). See
+    /// `APIConfig.iso8601Decoder`'s doc comment for why this isn't the stock
+    /// `.iso8601` strategy.
+    private var decoder: JSONDecoder { APIConfig.iso8601Decoder }
 
     @discardableResult
     func save(
