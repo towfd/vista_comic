@@ -105,6 +105,9 @@
         }
       }
     },
+    "Couldn't delete this translation. Check your connection and try again." : {
+
+    },
     "Couldn't load this page" : {
       "comment" : "Reader: page failed to load",
       "localizations" : {
@@ -117,6 +120,12 @@
       }
     },
     "Couldn't save this translation. Check your connection and try again." : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete this translation?" : {
 
     },
     "Done" : {
@@ -191,6 +200,9 @@
       }
     },
     "Nothing saved yet" : {
+
+    },
+    "OK" : {
 
     },
     "Original" : {
@@ -282,6 +294,9 @@
 
     },
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
+
+    },
+    "This can't be undone." : {
 
     },
     "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
