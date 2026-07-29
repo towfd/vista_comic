@@ -112,19 +112,20 @@
     "Drag here and release to cancel selection" : {
 
     },
+    "English" : {
+
+    },
     "Exit text selection" : {
 
     },
-    "Vocabulary" : {
-      "comment" : "單字本 tab label",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "單字本"
-          }
-        }
-      }
+    "French" : {
+
+    },
+    "Japanese" : {
+
+    },
+    "Korean" : {
+
     },
     "Library" : {
       "comment" : "Library screen title",
@@ -172,6 +173,12 @@
           }
         }
       }
+    },
+    "Nothing saved yet" : {
+
+    },
+    "Original" : {
+
     },
     "Previous chapter" : {
       "comment" : "Reader: previous chapter",
@@ -229,6 +236,9 @@
     "Selected text" : {
 
     },
+    "Spanish" : {
+
+    },
     "Tap to retry" : {
       "comment" : "Reader: retry loading a single page that failed",
       "localizations" : {
@@ -246,6 +256,30 @@
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
 
     },
+    "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
+
+    },
+    "Traditional Chinese" : {
+
+    },
+    "Translate" : {
+
+    },
+    "Translate to" : {
+
+    },
+    "Translating…" : {
+
+    },
+    "Translation" : {
+
+    },
+    "Translation failed unexpectedly." : {
+
+    },
+    "Translation failed. You can try again." : {
+
+    },
     "unread" : {
       "comment" : "Chapter read state",
       "localizations" : {
@@ -256,6 +290,20 @@
           }
         }
       }
+    },
+    "Vocabulary" : {
+      "comment" : "單字本 tab label",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "單字本"
+          }
+        }
+      }
+    },
+    "Words and sentences you save while reading will appear here." : {
+
     }
   },
   "version" : "1.0"
