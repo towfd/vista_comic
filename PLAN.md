@@ -2,14 +2,15 @@
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
-Last updated: 2026-07-23
+Last updated: 2026-07-30
 
 ## Current status
 
-- Milestones M1–M4 are complete; the local UI release goal is met (localization + auto-advance also shipped).
-- Active milestone: **M5 — Local backend (folder → app)**. Slices 0–3 are complete and merged (scan-and-serve catalog + media + iOS client). **Slice 4 (reading-progress persistence) is planned; contract + docs updated 2026-07-23, implementation about to start.** Backend design of record: `docs/api-contract.md` (contract), `CONTEXT.md` (glossary), `docs/adr/` (decisions).
-- Current owner: Coordinator (delegates to `backend-implementer`, `frontend-implementer`, `code-reviewer`).
-- Next action: `backend-implementer` builds Slice 4 backend (Docker Compose api+postgres, `progress` table, `PUT .../progress`, live `readState`/`lastReadAt`, tests); then `frontend-implementer` wires the iOS reader (`saveProgress`, page tracking, `ScrollViewReader` resume).
+- Milestones M1–M7 are complete; **M8 (OCR-to-translation) is in progress** — all 8 tickets are resolved on `feat/ocr-translation-foundation`, PR [#31](https://github.com/towfd/vista_comic/pull/31) is open and pending review/merge.
+- M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `PLAN.md` slice, per the ticket-driven workflow established in PR #19).
+- Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
+- Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
+- Next action: get PR #31 reviewed and merged; after that, `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap items 4 "Translation and language learning" and 5 "Profile and sync" remain the long-range direction).
 
 ## Current release goal
 
@@ -38,11 +39,13 @@ The flow must work with sample data and without a backend or network dependency.
 
 ## Temporarily out of scope
 
-- OCR and text-region selection
-- Translation or LLM integration
+> This list described the original M1–M4 sample-data-only release goal above. M5–M8 have since shipped a real backend, OCR, and translation — kept here as historical record of that release goal, not current scope. See the Milestones section for what's actually shipped.
+
+- ~~OCR and text-region selection~~ — shipped, M6
+- ~~Translation or LLM integration~~ — on-device translation shipped, M8 (no LLM integration yet)
 - Web scraping and real URL parsing (README §2 URL import remains later work)
-- Authentication and cloud sync (a local, read-only backend for a developer manga folder is now in scope — see M5)
-- Persistence beyond what M5 needs (reading-progress store arrives at M5 Slice 4)
+- ~~Authentication and cloud sync~~ — Cloudflare Access authentication shipped (`.scratch/remote-access/`); cloud *sync* (README roadmap item 5) remains out of scope
+- ~~Persistence beyond what M5 needs~~ — reading-progress (M5 Slice 4) and saved translations (M8) both shipped
 - Architecture added only for hypothetical future requirements
 
 Future functionality may use simple placeholders only when the current UI flow needs an entry point.
@@ -156,7 +159,7 @@ Acceptance criteria:
 
 ### M5 — Local backend (folder → app)
 
-- Status: In progress (Slices 0–3 complete/merged; Slice 4 planned, about to start)
+- Status: Complete (all 5 slices merged)
 - Owner: Coordinator; implemented by `backend-implementer` (backend) and `frontend-implementer` (iOS)
 - Dependencies: M1–M4
 - Contract of record: `docs/api-contract.md` (API shape + folder format), `docs/adr/` (confirmed decisions). Scope: a local, read-only "scan-and-serve" backend that makes a developer's manga folder appear in the app. Cloud sync / auth / URL import remain out of scope.
@@ -175,16 +178,77 @@ Slices (each ships only after the prior one has an observable acceptance test):
   - Review fixes applied: P2 cover clipping, P2 `LazyVStack` for reader pages, P3 lenient `readState` decode, P3 hide "Continue" when unavailable.
   - Follow-ups: base URL is now resolved from the `VISTA_BASE_URL` env var (set per Xcode scheme) with a compiled default of `127.0.0.1` — no machine-specific IP in tracked source; production HTTPS via xcconfig is deferred. Reader pages that fail to load now show a tap-to-retry placeholder (`AsyncImage` re-keyed to re-request just that page).
   - Residual (to confirm on-device): reader `LazyVStack` scroll + pull-past-bottom auto-advance and per-page retry on a real many-page chapter. Backlog: error-message granularity, URL-string decode tolerance, per-chapter thumbnail (no contract URL yet), production base-URL/ATS story.
-- [ ] **Slice 4 — reading-position persistence** (`backend-implementer` then `frontend-implementer`, sequential — not concurrent). Decisions locked 2026-07-23:
+- [x] **Slice 4 — reading-position persistence** (`backend-implementer` then `frontend-implementer`, sequential). Shipped across PRs #14–#17 (2026-07-23 – 2026-07-24).
   - **PostgreSQL** (not SQLite), via SQLAlchemy 2.0 + psycopg (sync); a single `progress` table `(comic_id, chapter_id)` → `last_page, page_count, updated_at`; `CREATE TABLE IF NOT EXISTS`, no Alembic.
-  - **Docker Compose, two services** (`api` + `postgres`); manga folder read-only bind-mounted into `api`; `DATABASE_URL` in the gitignored `.env`. **Redis deferred** with a written trigger (multi-worker shared catalog cache / measured slowness) — see `docs/adr/0004-docker-compose-topology.md`.
-  - **Page-level** resume: new `PUT /comics/{id}/chapters/{cid}/progress`; GET endpoints derive live `readState` / `lastReadAt`; reader response adds `lastReadPage`. iOS gains `saveProgress(...)`, debounced visible-page reporting, and `ScrollViewReader` resume.
-  - Catalog stays scan-derived; progress is the only DB-held (folder-external) state.
-  - Acceptance: read to page K of a chapter, restart app/backend, resume at ~page K with the chapter shown as `reading`.
+  - **Docker Compose, two services** (`api` + `postgres`); manga folder read-only bind-mounted into `api`; `DATABASE_URL` in the gitignored `.env`. Redis was not needed.
+  - **Page-level resume** shipped: `PUT /comics/{id}/chapters/{cid}/progress`; GET endpoints derive live `readState`/`lastReadAt`; reader response carries `lastReadPage`. iOS: reliable mid-chapter tracking via each page's `onAppear`/`onDisappear` (not the unreliable `.scrollPosition` readout on a lazy `AsyncImage` stack), debounced `saveProgress` writes, `.scrollPosition` resume. Progress-write failures are swallowed — a down store never interrupts reading.
+  - `continueChapterId` added to `/comics`; the library's "Continue" button is always visible and opens that chapter directly via an id-based `ReaderRoute` (`ComicView` self-loads the comic detail).
+  - Pull-past-bottom auto-advance restarts the next chapter at page 1 and overwrites its saved progress; explicit jumps still resume.
+  - Library and chapter list silently refresh on return from the reader (no relaunch needed for "last read"/read badges to update).
+  - Verified: device-tested on iPhone against the live backend — Continue targeting, mid-chapter resume, read-on-bottom, auto-advance restart, refresh-on-return, retry-all-failed-pages all confirmed by the developer.
+  - Acceptance met: read to page K of a chapter, restart app/backend, resume at ~page K with the chapter shown as `reading`.
 
 Load-bearing: server IDs must be stable across scans/restarts (path-derived hash), because Slice 4 keys progress on them.
 
-Connectivity (does not affect the API contract): all infra runs locally on the dev Mac — nothing hosted in the cloud. For a stable public API endpoint, use a Cloudflare Tunnel (named tunnel + own domain, no Access policy for now); HTTPS terminates at the edge so no ATS exception is needed. Same-Wi-Fi LAN IP and Tailscale remain the other options.
+Connectivity: a Cloudflare named Tunnel + Cloudflare Access (Service Token, not interactive login) now provides a stable public HTTPS endpoint (`api.vistabanana.com`) — `cloudflared` runs as a third Compose service routed only to `api` (never `postgres`); iOS attaches the Service Token headers via build-time `.xcconfig` → `Info.plist` config (survives launching the app standalone, unlike Xcode-scheme env vars). Shipped and verified end-to-end (PRs #19–#21, 2026-07-28); tracked as `.scratch/remote-access/`, not a separate `PLAN.md` slice, per the ticket-driven workflow those PRs established.
+
+### M6 — OCR text selection + recognition
+
+- Status: Complete (PR #25, #26; merged 2026-07-29)
+- Owner: main session, implemented by `frontend-implementer`
+- Dependencies: M5 (needs the live backend + real page images to select from)
+- Spec of record: `.scratch/ocr-recognition/spec.md`; README roadmap item 3 ("OCR")
+- Realizes README's long-range step: `Select a text region you don't understand → OCR recognition`
+
+Tickets (all resolved):
+
+- [x] **01 — Expose the decoded page image.** `AuthorizedAsyncImage` exposes the decoded source image via an `onDecoded` callback alongside the rendered `Image`, so a selection can crop the *original* pixels, not a screenshot of the scaled-down on-screen rendering.
+- [x] **02 — Selection-to-crop coordinate mapping.** `SelectionCropMapping.cropRect`: a pure function mapping an on-screen selection rectangle to source-pixel space, correctly handling `.fit`-scale letterbox/pillarbox.
+- [x] **03 — Reader selection-mode UI crops the live page image.** New selection mode in `ComicView` (doesn't disturb scroll/tap-to-toggle-controls); drag-to-select crops the live decoded page; a corner "drag here to cancel" zone aborts mid-drag with one continuous touch.
+- [x] **04 — `OCRRecognizer` protocol + `VisionOCRRecognizer`.** Mirrors `ComicRepository`'s seam; `VisionOCRRecognizer` is v1's only implementation (on-device Vision, Vietnamese-only, fixed per the library's content), with three distinguishable error cases (`noTextFound`, `lowConfidence`, `underlying`).
+- [x] **05 — Wire recognition into the selection flow.** Confirming a crop auto-recognizes it (`LoadState`-driven, reusing the project's existing async-fetch pattern); shows editable recognized text; distinct failure messages + retry/cancel per error case. Nothing is ever persisted (that's M8).
+- [x] **06 — Join recognized lines into continuous text** (added 2026-07-30, requested during M8 manual testing). Vision returns one candidate per detected text *line*; `VisionOCRRecognizer.joinRecognizedLines` now joins consecutive lines with a space by default (continuing the same wrapped sentence), only keeping a hard newline where a line already ends in punctuation — fixes fragmented, line-by-line translation of wrapped dialogue.
+
+Verification: 47/47 relevant unit/logic tests pass (tickets 01–05) + 5 new tests for ticket 06's joining logic, all green on a booted iOS 18.1 simulator; `xcodebuild build` succeeds. Explicitly unverified: `VisionOCRRecognizer`'s real-world Vietnamese-diacritic accuracy (`confidenceThreshold = 0.3` is an unmeasured placeholder) and a full manual selection→recognition walkthrough on-device — flagged for the developer to confirm before calling recognition quality production-ready.
+
+### M7 — Tab bar navigation
+
+- Status: Complete (PR #29; merged 2026-07-29)
+- Owner: main session, implemented by `frontend-implementer`
+- Dependencies: None (pure navigational restructuring)
+- Spec of record: `.scratch/tab-bar-navigation/spec.md`
+- Built ahead of M8 specifically because M8 needed an independent top-level screen ("單字本") to review saved learning material, which doesn't fit as a pushed screen off the library flow.
+
+Tickets (all resolved):
+
+- [x] **01 — Introduce tab bar navigation (書庫 + 單字本 placeholder).** `RootTabView` becomes the app's root (`vista_comicApp.swift`'s `WindowGroup` now hosts it instead of `HomeView` directly): 書庫 wraps the existing library/reader flow byte-for-byte unchanged; 單字本 is a new placeholder (`VocabularyView`, later populated by M8's ticket 06). `TabNavigationUITests` proves navigation-stack state survives a tab round-trip.
+
+Verification: full-scheme build succeeds (confirmed independently after merge); `HomeView.swift`/`LibraryFlowUITests.swift`/`ReaderFlowUITests.swift` confirmed unmodified. Live UI-test execution could not be completed in the sandboxed CI-like environment that implemented this (structural accessibility-daemon limitation, not a code defect) — recommended for the developer to re-run on a working simulator/device session, which happened naturally once M8's manual testing began.
+
+### M8 — OCR-to-translation: translate, save, and manage 單字本
+
+- Status: **In progress** — all 8 tickets resolved on `feat/ocr-translation-foundation`; PR [#31](https://github.com/towfd/vista_comic/pull/31) open, pending review/merge
+- Owner: main session, implemented by `frontend-implementer`/`backend-implementer`
+- Dependencies: M5 (backend), M6 (OCR result screen this attaches to), M7 (單字本 tab this populates)
+- Spec of record: `.scratch/ocr-translation/spec.md`
+- Realizes README's long-range steps: `Translation and meaning explanation → Save the word or sentence` (roadmap item 4) plus its own review surface
+
+Tickets (all resolved):
+
+- [x] **01 — `Translator` protocol + `AppleTranslator`.** Mirrors `OCRRecognizer`'s seam; wraps Apple's on-device `Translation` framework (bridged via `.translationTask` since there's no public `TranslationSession` initializer). Source is hard-coded Vietnamese (v1's only caller); target language is a parameter. **Real-device bug found and fixed**: originally bailed on *any* not-yet-installed language pack, including ones Apple could auto-prompt to download — now only genuinely `.unsupported` pairs bail early, letting `.supported` pairs reach the real call and trigger Apple's download-consent UI as designed.
+- [x] **02 — Backend `saved_translation` table + save/list API.** `POST`/`GET /translations`, mirroring the `progress` table's pattern (`CREATE TABLE IF NOT EXISTS`, no migration tooling). 503-on-unavailable, not graceful degradation — there's no independent source of truth to fall back to, unlike the catalog.
+- [x] **03 — `TranslationRepository` + `APITranslationRepository`.** iOS client mirroring `ComicRepository`'s shape; kept as its own domain seam (not bolted onto `ComicRepository`) since "saved learning material" is conceptually distinct from comic/reading-progress.
+- [x] **04 — Translate button + language picker.** On the OCR result screen, on-device via `Translator`, defaulting to the last-used target language (Traditional Chinese first).
+- [x] **05 — Save action.** Persists the original/translated pair + comic/chapter/page source reference to the backend; "Saved" confirmation replaces the button in place.
+- [x] **06 — 單字本 tab shows the real saved-translation list**, replacing M7's placeholder — `LoadState`-driven loading/loaded/failed, each row showing original/translated text + comic/chapter/page/saved-at.
+- [x] **07 — Jump from a saved translation back to its source page.** Each row's button opens the reader directly at the saved comic/chapter/page, as a **read-only preview** (`ReaderRoute.targetPage`/`isPeek` — new optional fields, existing call sites unaffected) that never calls `saveProgress`, so revisiting an old page can't regress real reading progress. 單字本 owns its own `NavigationStack`, independent of 書庫's.
+- [x] **08 — Delete a saved translation.** Trash button per row, confirmed via a destructive `.alert` (irreversible, no undo). Backend `DELETE /translations/{id}` (204/404/503); iOS removes the entry from the displayed list in place on success.
+
+**Two unrelated, pre-existing bugs found and fixed during this feature's manual verification:**
+- The backend's ISO-8601 timestamps include fractional (microsecond) seconds (Python's `datetime.isoformat()`), which `JSONDecoder`'s stock `.iso8601` strategy can't parse — silently broke `Comic.lastReadAt` and `SavedTranslation.savedAt` decoding as soon as real (non-null) data existed, surfacing as a generic "Couldn't connect" on both 書庫 and 單字本. Fixed with a shared `APIConfig.iso8601Decoder`.
+- (M6 follow-up, ticket 06 above) OCR line-fragmentation in translation output.
+
+Verification: `xcodebuild build`/`test` clean (22/22 focused unit tests pass). Manual, against the real backend on booted iOS 18.1 simulators (iPhone SE, iPhone 16 Pro Max): full select → recognize → translate → save → 單字本 list → jump-to-source (peek mode) → delete round trip confirmed, including a real end-to-end delete verified against the live backend. Backend `pytest` for ticket 08 not runnable in the developer's local sandboxed environment (a native Postgres on the Mac shadows docker-compose's published port ahead of the test suite's connection — pre-existing, unrelated) — verified instead via direct curl against the real docker-composed endpoints. This sandboxed environment has no tap/drag-automation tool; interactive UI flows were verified by temporarily forcing navigation/state for a screenshot and reverting immediately after each time (confirmed clean via `git diff`).
 
 ## Known issues and constraints
 
@@ -192,6 +256,8 @@ Connectivity (does not affect the API contract): all infra runs locally on the d
 - `LibraryFlowUITests` and `ReaderFlowUITests` now cover the core flow; the original unit/UITest boilerplate is still unused.
 - Comic and chapter titles in `SampleData` are English placeholders (data, not UI chrome) and are intentionally not localized.
 - The manga library path is machine-specific config kept only in a gitignored `.env` (`MANGA_LIBRARY_PATH`); it must never appear in committed files.
+- This sandboxed development environment has no tap/drag-automation tool for interactive SwiftUI verification (confirmed structurally — an `XCUITest` accessibility-daemon timeout in M7, no windowed Simulator.app process available since — a recurring, not one-off, limitation). The workaround used since M8: temporarily force navigation/state for a screenshot, then revert before finishing, confirmed clean via `git diff` each time.
+- The developer's Mac has a native Postgres process bound to `127.0.0.1:5432`, ahead of docker-compose's published port for the same address — backend `pytest` (which targets `localhost:5432`) cannot reach the docker-compose Postgres from this machine as a result. Verify backend endpoint changes by exercising the live `docker compose`-run `api` service directly (curl/rebuild-and-restart) instead, until this is resolved.
 
 ## Open decisions
 
@@ -205,6 +271,6 @@ Connectivity (does not affect the API contract): all infra runs locally on the d
 
 ## Next action
 
-M5 Slices 0–3 are merged. Slice 4 is planned and approved (decisions recorded 2026-07-23): dispatch `backend-implementer` for the PostgreSQL `progress` store in Docker Compose (api+postgres), the `PUT .../progress` endpoint, and live `readState`/`lastReadAt`; then `frontend-implementer` for the iOS reader resume. Sequential, not concurrent; `code-reviewer` after each increment. Each slice keeps a coordinator-approved plan before implementation.
+M1–M7 are merged; M8 (OCR-to-translation) is code-complete on `feat/ocr-translation-foundation` with PR [#31](https://github.com/towfd/vista_comic/pull/31) open. Next action: get PR #31 reviewed and merged. After that, no feature is currently specced under `.scratch/` — the next scope (likely drawing from README roadmap item 4's remaining pieces — word/sentence/context explanations, LLM-assisted comprehension — or item 5, profile and sync) needs a fresh `/wayfinder` or `/to-spec` pass before implementation starts.
 
-Backlog (unstarted): Dynamic Type support (move off fixed font sizes); dark-appearance colour variants; README §2 URL import.
+Backlog (unstarted): Dynamic Type support (move off fixed font sizes); dark-appearance colour variants; README §2 URL import; `LibraryFlowUITests`/`ReaderFlowUITests` still assert `"Frieren"`, which doesn't match the real backend's actual seeded library (`marrymyhusband`/`marrymyhusband2`) — noted during M7, not yet fixed.
