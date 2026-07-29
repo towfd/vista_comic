@@ -15,6 +15,7 @@
 //
 
 import CoreGraphics
+import SwiftUI
 
 /// Recognizes text within an image region.
 ///
@@ -47,4 +48,22 @@ enum OCRRecognitionError: Error, Equatable {
     /// original error's description rather than the `Error` itself so this
     /// type can stay `Equatable` for tests.
     case underlying(String)
+}
+
+// MARK: - Environment injection
+
+private struct OCRRecognizerKey: EnvironmentKey {
+    /// `VisionOCRRecognizer` runs entirely on-device with no network access,
+    /// so — unlike `ComicRepository`'s network-backed default — it's safe to
+    /// use as the default for production, previews, and the canvas alike.
+    /// No preview-safe mock is needed for the same reason.
+    static let defaultValue: any OCRRecognizer = VisionOCRRecognizer()
+}
+
+extension EnvironmentValues {
+    /// The recognizer the current view tree runs text recognition through.
+    var ocrRecognizer: any OCRRecognizer {
+        get { self[OCRRecognizerKey.self] }
+        set { self[OCRRecognizerKey.self] = newValue }
+    }
 }
