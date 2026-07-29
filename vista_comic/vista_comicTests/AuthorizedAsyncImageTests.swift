@@ -148,4 +148,50 @@ struct AuthorizedAsyncImageTests {
             )
         }
     }
+
+    /// Prefactor for `ocr-recognition`: a later feature needs to crop the
+    /// *original* decoded pixels (not a screenshot of the scaled-down
+    /// on-screen rendering), so `fetchImage` must expose the decoded
+    /// `UIImage` it already produces internally, alongside the SwiftUI
+    /// `Image` it renders. This is the seam that unblocks that work without
+    /// touching any call site.
+    @Test func exposesDecodedUIImageAlongsideRenderedImage() async throws {
+        ImageStubURLProtocol.responseBody = Self.onePixelPNG
+        ImageStubURLProtocol.statusCode = 200
+
+        let result = try await AuthorizedAsyncImage<EmptyView>.fetchImage(
+            url: Self.mediaURL,
+            session: ImageStubURLProtocol.makeSession(),
+            clientID: "test-client-id",
+            clientSecret: "test-client-secret"
+        )
+
+        // The decoded UIImage should carry the same source pixels as what
+        // decoding the response body directly would produce — not a
+        // discarded intermediate value. `pngData()` re-encodes (and isn't
+        // byte-identical to the source file), so compare raw pixel bytes.
+        let expected = try #require(UIImage(data: Self.onePixelPNG))
+        #expect(result.decodedImage.size == expected.size)
+        #expect(Self.rgbaBytes(of: result.decodedImage) == Self.rgbaBytes(of: expected))
+    }
+
+    /// Decodes an image's raw RGBA pixel bytes, for pixel-level equality
+    /// checks that don't depend on a particular re-encoding.
+    private static func rgbaBytes(of image: UIImage) -> [UInt8] {
+        guard let cgImage = image.cgImage else { return [] }
+        let width = cgImage.width
+        let height = cgImage.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let context = CGContext(
+            data: &bytes,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        context?.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return bytes
+    }
 }
