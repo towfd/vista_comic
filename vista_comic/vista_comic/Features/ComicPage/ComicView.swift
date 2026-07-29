@@ -163,6 +163,11 @@ private struct ReaderView: View {
                 ForEach(Array(urls.enumerated()), id: \.offset){ index, url in
                     ReaderPage(
                         url: url,
+                        comicID: comic.id,
+                        chapterID: currentChapter.id,
+                        // 1-based, matching `Progress.lastPage`'s and
+                        // `SavedTranslation.pageNumber`'s convention.
+                        pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
                         onRetryAll: { retryAllToken += 1 },
@@ -452,6 +457,14 @@ private struct ReaderView: View {
 /// view so it re-issues the request.
 private struct ReaderPage: View {
     let url: URL
+    /// The comic/chapter this page belongs to, and this page's 1-based
+    /// position within the chapter — threaded down from `ReaderView` (which
+    /// already carries `comic.id`/`currentChapter.id` for progress-saving)
+    /// so a confirmed selection's "Save" action (`ocr-translation` ticket 05)
+    /// knows which source reference to save against.
+    let comicID: String
+    let chapterID: String
+    let pageNumber: Int
     /// Shared token from the reader. A change re-requests this page only when it
     /// is currently failed.
     let retryAllToken: Int
@@ -492,6 +505,10 @@ private struct ReaderPage: View {
     /// as `ocrRecognizer` above, rather than that view reaching into the
     /// environment itself.
     @Environment(\.translator) private var translator
+    /// The repository `CroppedSelectionPreview`'s "Save" action runs through
+    /// (`ocr-translation` ticket 05). Same reasoning as `ocrRecognizer`/
+    /// `translator` above.
+    @Environment(\.translationRepository) private var translationRepository
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -554,7 +571,15 @@ private struct ReaderPage: View {
         .onAppear { onVisible(true) }
         .onDisappear { onVisible(false) }
         .sheet(item: $croppedSelection) { selection in
-            CroppedSelectionPreview(image: selection.image, recognizer: ocrRecognizer, translator: translator)
+            CroppedSelectionPreview(
+                image: selection.image,
+                comicID: comicID,
+                chapterID: chapterID,
+                pageNumber: pageNumber,
+                recognizer: ocrRecognizer,
+                translator: translator,
+                translationRepository: translationRepository
+            )
         }
     }
 
@@ -722,18 +747,57 @@ func translateSelection(
     }
 }
 
+/// Persists an original/translated text pair and its source reference
+/// through a `TranslationRepository`, mapped onto `LoadState` — the same
+/// reasoning as `recognizeSelection`/`translateSelection` above: kept as its
+/// own free function so `CroppedSelectionPreview`'s "Save" action is
+/// unit-testable against a stub `TranslationRepository` independent of any
+/// SwiftUI rendering or the real backend.
+func saveSelection(
+    originalText: String,
+    translatedText: String,
+    targetLanguage: String,
+    comicID: String,
+    chapterID: String,
+    pageNumber: Int,
+    using repository: any TranslationRepository
+) async -> LoadState<SavedTranslation> {
+    do {
+        let saved = try await repository.save(
+            originalText: originalText,
+            translatedText: translatedText,
+            targetLanguage: targetLanguage,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber
+        )
+        return .loaded(saved)
+    } catch {
+        return .failed(error)
+    }
+}
+
 /// Recognition result for a confirmed text selection (Ticket 05 of
 /// `ocr-recognition`; extended additively by `ocr-translation` ticket 04):
 /// recognizes the crop on appear, then shows the text pre-filled in an
 /// editable field so the user can correct misreads. Once recognition has
 /// succeeded, a "Translate" action becomes available to translate the
 /// current (possibly user-corrected) text into a picked target language.
-/// Dismissing — with or without edits, translated or not — discards
-/// everything: there is nothing here to write to yet (saving is
-/// `ocr-translation` ticket 05), and no state survives past this sheet, so a
-/// fresh selection always starts clean.
+/// Once a translation is showing, a "Save" action persists the
+/// original/translated pair and its source reference to the backend
+/// (`ocr-translation` ticket 05). Dismissing — with or without edits,
+/// translated or saved or not — only discards in-memory state; a
+/// successfully saved pair already exists in the backend by that point, which
+/// is the whole point of saving.
 private struct CroppedSelectionPreview: View {
     let image: UIImage
+    /// The comic/chapter/page this crop was selected from, threaded down
+    /// from `ReaderPage` — needed so "Save" can attach the correct source
+    /// reference, mirroring `ComicRepository.saveProgress`'s use of the same
+    /// three values elsewhere in this file.
+    let comicID: String
+    let chapterID: String
+    let pageNumber: Int
     /// Passed in explicitly by `ReaderPage` rather than read from the
     /// environment here, so this view stays a plain consumer of the
     /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
@@ -741,6 +805,9 @@ private struct CroppedSelectionPreview: View {
     let recognizer: any OCRRecognizer
     /// Same reasoning as `recognizer` above, for the "Translate" action.
     let translator: any Translator
+    /// Same reasoning as `recognizer`/`translator` above, for the "Save"
+    /// action.
+    let translationRepository: any TranslationRepository
     @Environment(\.dismiss) private var dismiss
     @State private var recognitionState: LoadState<String> = .loading
     /// User-editable text, seeded from a successful recognition. Purely for
@@ -752,6 +819,14 @@ private struct CroppedSelectionPreview: View {
     /// or a further-edited text without disturbing the recognition result.
     /// `nil` until the user taps "Translate" for the first time.
     @State private var translationState: LoadState<String>?
+    /// Save state, deliberately separate from `translationState` for the same
+    /// reason translation is separate from recognition: saving is a further
+    /// on-demand step (tapping "Save"), not something that runs
+    /// automatically once a translation appears. `nil` until the user taps
+    /// "Save" for the first time; reset back to `nil` whenever a fresh
+    /// translation replaces the one it was saved from, so a stale "Saved"
+    /// indicator never sticks to a different translation.
+    @State private var saveState: LoadState<SavedTranslation>?
     /// The target language, defaulting to the last-used one (or Traditional
     /// Chinese on first use — see `LastUsedTargetLanguage`). Persisted back
     /// to `UserDefaults` whenever the user changes the picker.
@@ -923,13 +998,19 @@ private struct CroppedSelectionPreview: View {
                 }
                 .frame(minHeight: 80)
             case .loaded(let translated):
-                // Original and translated text side by side, so the user
-                // can compare them directly without scrolling between two
-                // screens.
-                HStack(alignment: .top, spacing: 12) {
-                    translationColumn(titleKey: "Original", text: editedText)
-                    Divider()
-                    translationColumn(titleKey: "Translation", text: translated)
+                VStack(alignment: .leading, spacing: 12) {
+                    // Original and translated text side by side, so the user
+                    // can compare them directly without scrolling between two
+                    // screens.
+                    HStack(alignment: .top, spacing: 12) {
+                        translationColumn(titleKey: "Original", text: editedText)
+                        Divider()
+                        translationColumn(titleKey: "Translation", text: translated)
+                    }
+
+                    // "Save" is available as soon as a translation is
+                    // showing (`ocr-translation` ticket 05's AC).
+                    saveControl(translatedText: translated)
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
@@ -981,7 +1062,82 @@ private struct CroppedSelectionPreview: View {
 
     private func translate() async {
         translationState = .loading
+        // A fresh translation invalidates any prior save (it was saved from
+        // the previous translated text), so start "Save" clean again.
+        saveState = nil
         translationState = await translateSelection(editedText, to: selectedLanguage, using: translator)
+    }
+
+    // MARK: - Save
+
+    /// Persists `translatedText` (the current translation result) alongside
+    /// the current edited original text, target language, and source
+    /// reference.
+    private func save(translatedText: String) async {
+        saveState = .loading
+        saveState = await saveSelection(
+            originalText: editedText,
+            translatedText: translatedText,
+            targetLanguage: selectedLanguageID,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber,
+            using: translationRepository
+        )
+    }
+
+    @ViewBuilder
+    private func saveControl(translatedText: String) -> some View {
+        if let saveState {
+            switch saveState {
+            case .loading:
+                HStack {
+                    Spacer()
+                    ProgressView("Saving…")
+                    Spacer()
+                }
+            case .loaded:
+                HStack {
+                    Spacer()
+                    Label("Saved", systemImage: "checkmark.circle.fill")
+                        .font(AppFont.caption)
+                        .foregroundStyle(.primaryRed)
+                    Spacer()
+                }
+            case .failed:
+                saveFailureContent(translatedText: translatedText)
+            }
+        } else {
+            // Available as soon as a translation is showing (the AC's whole
+            // requirement) — no extra gating beyond that. Once tapped,
+            // `saveState` becomes non-nil and this branch (along with the
+            // button) is replaced by the loading/loaded/failed state above,
+            // so there's no double-tap window to guard against separately.
+            Button("Save") { Task { await save(translatedText: translatedText) } }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryRed)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// A clear, non-silent failure message (the AC's explicit requirement),
+    /// mirroring `failureContent(for:)`/`translationFailureContent(for:)`'s
+    /// retry pattern above. Not broken out per distinguishable error case
+    /// like OCR/translation failures are — `TranslationRepository.save`
+    /// throws generic networking errors (`APIError`), not a save-specific
+    /// enum, so one clear message covers it.
+    private func saveFailureContent(translatedText: String) -> some View {
+        VStack(spacing: 12) {
+            Text("Couldn't save this translation. Check your connection and try again.")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") { Task { await save(translatedText: translatedText) } }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryRed)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
