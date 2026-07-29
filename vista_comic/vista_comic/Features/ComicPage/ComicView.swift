@@ -482,6 +482,11 @@ private struct ReaderPage: View {
     @State private var isHoveringCancelZone = false
     /// The most recently produced crop, shown in a confirmation sheet.
     @State private var croppedSelection: CroppedSelection?
+    /// The recognizer `CroppedSelectionPreview` runs the confirmed crop
+    /// through (Ticket 05). Read here — the owner of `croppedSelection` — and
+    /// passed down explicitly rather than having that view reach into the
+    /// environment itself (CLAUDE.md: pass data/actions into reusable views).
+    @Environment(\.ocrRecognizer) private var ocrRecognizer
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -544,7 +549,7 @@ private struct ReaderPage: View {
         .onAppear { onVisible(true) }
         .onDisappear { onVisible(false) }
         .sheet(item: $croppedSelection) { selection in
-            CroppedSelectionPreview(image: selection.image)
+            CroppedSelectionPreview(image: selection.image, recognizer: ocrRecognizer)
         }
     }
 
@@ -668,20 +673,61 @@ private struct CroppedSelection: Identifiable {
     let image: UIImage
 }
 
-/// Read-only confirmation of a text selection's crop: "the crop shown is
-/// visibly the right region, at full source quality" (Ticket 03). Dismissing
-/// discards it — nothing here is persisted or sent anywhere.
+/// Runs OCR recognition for a confirmed crop and maps the outcome onto
+/// `LoadState` (`ComicRepository.swift`'s established async-fetch pattern),
+/// so `CroppedSelectionPreview` only has to render three cases instead of
+/// re-deriving success/failure handling itself.
+///
+/// A free function rather than logic embedded directly in the view's
+/// `.task`, specifically so the selection → recognize step is unit-testable
+/// against a stub `OCRRecognizer` independent of any SwiftUI rendering —
+/// mirroring why `SelectionCropMapping` (Ticket 02) and `OCRRecognizer`
+/// (Ticket 04) both stayed pure.
+func recognizeSelection(_ image: UIImage, using recognizer: any OCRRecognizer) async -> LoadState<String> {
+    guard let cgImage = image.cgImage else {
+        // Defensive boundary case: every crop produced by `produceCrop` comes
+        // from `CGImage.cropping(to:)`, so this should be unreachable in
+        // practice, but a `UIImage` isn't guaranteed to carry `cgImage`.
+        return .failed(OCRRecognitionError.underlying("Selected image has no pixel data"))
+    }
+    do {
+        let text = try await recognizer.recognizeText(in: cgImage)
+        return .loaded(text)
+    } catch {
+        return .failed(error)
+    }
+}
+
+/// Recognition result for a confirmed text selection (Ticket 05): recognizes
+/// the crop on appear, then shows the text pre-filled in an editable field so
+/// the user can correct misreads. Dismissing — with or without edits —
+/// discards everything: there is nothing here to write to, and no state
+/// survives past this sheet, so a fresh selection always starts clean.
 private struct CroppedSelectionPreview: View {
     let image: UIImage
+    /// Passed in explicitly by `ReaderPage` rather than read from the
+    /// environment here, so this view stays a plain consumer of the
+    /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
+    /// views instead of hard-coding production behavior inside them).
+    let recognizer: any OCRRecognizer
     @Environment(\.dismiss) private var dismiss
+    @State private var recognitionState: LoadState<String> = .loading
+    /// User-editable text, seeded from a successful recognition. Purely for
+    /// on-screen display/correction — never written anywhere.
+    @State private var editedText = ""
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding()
+                VStack(alignment: .leading, spacing: 16) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: 180)
+
+                    resultContent
+                }
+                .padding()
             }
             .navigationTitle("Selected text")
             .navigationBarTitleDisplayMode(.inline)
@@ -690,6 +736,78 @@ private struct CroppedSelectionPreview: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+        .task { await recognize() }
+    }
+
+    @ViewBuilder
+    private var resultContent: some View {
+        switch recognitionState {
+        case .loading:
+            HStack {
+                Spacer()
+                ProgressView("Recognizing text…")
+                Spacer()
+            }
+            .frame(minHeight: 120)
+        case .loaded:
+            // Editable, not read-only: the whole point of showing recognized
+            // text is letting the user fix a misread in place.
+            TextEditor(text: $editedText)
+                .font(AppFont.caption)
+                .frame(minHeight: 120)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.3))
+                }
+        case .failed(let error):
+            failureContent(for: error)
+        }
+    }
+
+    private func failureContent(for error: Error) -> some View {
+        VStack(spacing: 12) {
+            failureMessage(for: error)
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 12) {
+                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Retry") { Task { await recognize() } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.primaryRed)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 120)
+    }
+
+    /// Distinct, localization-ready messages per `OCRRecognitionError` case
+    /// (Ticket 04's whole point in making them distinguishable — never
+    /// collapsed into one generic "recognition failed" message), plus a
+    /// fallback for a conformer that throws something else.
+    @ViewBuilder
+    private func failureMessage(for error: Error) -> some View {
+        if let ocrError = error as? OCRRecognitionError {
+            switch ocrError {
+            case .noTextFound:
+                Text("No text was found in the selected region. Try selecting a tighter area around the text.")
+            case .lowConfidence:
+                Text("The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection.")
+            case .underlying:
+                Text("Text recognition failed unexpectedly.")
+            }
+        } else {
+            Text("Recognition failed. You can try again.")
+        }
+    }
+
+    private func recognize() async {
+        recognitionState = .loading
+        let result = await recognizeSelection(image, using: recognizer)
+        recognitionState = result
+        if case .loaded(let text) = result {
+            editedText = text
         }
     }
 }
