@@ -13,7 +13,9 @@ struct vista_comicApp: App {
         WindowGroup {
             // Inject the live backend repository. Previews and the canvas fall
             // back to `PreviewComicRepository` via the environment default.
-            HomeView()
+            // RootTabView hosts the tab bar; HomeView (書庫) is nested one
+            // level deeper but still depends on this environment value.
+            RootTabView()
                 .environment(\.comicRepository, APIComicRepository())
         }
     }
