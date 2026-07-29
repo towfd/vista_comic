@@ -79,4 +79,56 @@ struct VisionOCRRecognizerTests {
             #expect(error == .noTextFound)
         }
     }
+
+    // MARK: - joinRecognizedLines (ocr-recognition ticket 06)
+
+    /// Wrapped dialogue with no ending punctuation on the first two lines
+    /// joins into one continuous sentence, not three fragments.
+    @Test func joinsLinesWithoutPunctuationUsingASpace() {
+        let joined = VisionOCRRecognizer.joinRecognizedLines([
+            "Giờ cậu ta",
+            "còn không thèm",
+            "xem tin nhắn",
+        ])
+
+        #expect(joined == "Giờ cậu ta còn không thèm xem tin nhắn")
+    }
+
+    /// A line ending in punctuation is a real sentence/clause boundary, so
+    /// the next line starts on a new line instead of continuing with a space.
+    @Test func keepsANewlineAfterALineEndingInPunctuation() {
+        let joined = VisionOCRRecognizer.joinRecognizedLines([
+            "Xin chào.",
+            "Cảm ơn bạn",
+        ])
+
+        #expect(joined == "Xin chào.\nCảm ơn bạn")
+    }
+
+    @Test func singleLinePassesThroughUnchanged() {
+        let joined = VisionOCRRecognizer.joinRecognizedLines(["Xin chào"])
+
+        #expect(joined == "Xin chào")
+    }
+
+    @Test func skipsEmptyOrWhitespaceOnlyLinesWithoutStrayBreaks() {
+        let joined = VisionOCRRecognizer.joinRecognizedLines([
+            "Xin chào",
+            "   ",
+            "",
+            "bạn",
+        ])
+
+        #expect(joined == "Xin chào bạn")
+    }
+
+    @Test func mixOfPunctuatedAndUnpunctuatedLines() {
+        let joined = VisionOCRRecognizer.joinRecognizedLines([
+            "Giờ cậu ta",
+            "còn không thèm xem tin nhắn của mình sao?",
+            "Mình chờ mãi",
+        ])
+
+        #expect(joined == "Giờ cậu ta còn không thèm xem tin nhắn của mình sao?\nMình chờ mãi")
+    }
 }

@@ -51,6 +51,37 @@ struct VisionOCRRecognizer: OCRRecognizer {
             throw OCRRecognitionError.lowConfidence
         }
 
-        return candidates.map(\.string).joined(separator: "\n")
+        return Self.joinRecognizedLines(candidates.map(\.string))
+    }
+
+    /// Vision returns one candidate per detected text *line*, not per
+    /// sentence — a single sentence wrapped across multiple lines in a
+    /// speech bubble (the common case for scanlated dialogue) used to come
+    /// back as several hard-newline-separated fragments, which then
+    /// translated line-by-line instead of as one continuous sentence.
+    ///
+    /// Joins consecutive lines with a space by default (continuing the same
+    /// sentence/clause). Only keeps a line break where a line already ends
+    /// in punctuation — a real clause/sentence boundary, not just where the
+    /// original image happened to wrap.
+    ///
+    /// `internal` (not `private`) so `@testable import vista_comic` can
+    /// exercise this pure joining logic directly with plain string arrays,
+    /// without a synthetic image / real Vision recognition round trip.
+    static func joinRecognizedLines(_ lines: [String]) -> String {
+        let terminators = CharacterSet(charactersIn: ".,!?:;…")
+        var result = ""
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+            if result.isEmpty {
+                result = trimmed
+            } else if let last = result.unicodeScalars.last, terminators.contains(last) {
+                result += "\n" + trimmed
+            } else {
+                result += " " + trimmed
+            }
+        }
+        return result
     }
 }
