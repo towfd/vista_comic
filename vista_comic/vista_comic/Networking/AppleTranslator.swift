@@ -39,12 +39,19 @@ struct AppleTranslator: Translator {
     private static let sourceLanguage = Locale.Language(languageCode: "vi")
 
     func translate(_ text: String, to targetLanguage: Locale.Language) async throws -> String {
-        // Checking availability first, rather than only reacting to a thrown
-        // error, gives a caller a distinguishable "not available yet" reason
-        // (`LanguageAvailability.Status`) instead of guessing at what a
-        // generic `Translation` framework error meant.
+        // `LanguageAvailability.Status` has three cases: `.installed`,
+        // `.supported` (downloadable, just not downloaded yet), and
+        // `.unsupported` (genuinely not offered for this pair, no download
+        // will ever fix it). Only `.unsupported` is a real dead end — a
+        // `.supported` pair must fall through to the real `.translationTask`
+        // call below, not bail out here: that call is what triggers Apple's
+        // own automatic system download-consent UI. Bailing on `.supported`
+        // (an earlier version of this code did) meant the system prompt
+        // never got a chance to appear at all — confirmed on a real device,
+        // where the user saw only this file's own fallback message instead
+        // of anything actionable.
         let status = await LanguageAvailability().status(from: Self.sourceLanguage, to: targetLanguage)
-        guard status == .installed else {
+        guard status != .unsupported else {
             throw TranslationError.languagePackUnavailable
         }
 
