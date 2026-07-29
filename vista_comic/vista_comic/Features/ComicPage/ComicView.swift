@@ -20,6 +20,11 @@ import UIKit
 struct ComicView: View {
     let comicID: String
     let chapterID: String
+    /// 1-based page to scroll to on open, overriding the chapter's saved
+    /// resume position. See `ReaderRoute.targetPage`.
+    var targetPage: Int? = nil
+    /// Read-only preview: never writes progress. See `ReaderRoute.isPeek`.
+    var isPeek: Bool = false
 
     @Environment(\.comicRepository) private var repository
     @State private var comicState: LoadState<Comic> = .loading
@@ -40,7 +45,7 @@ struct ComicView: View {
             // the id is unknown (e.g. an empty/best-effort Continue target).
             if let initial = comic.chapters.first(where: { $0.id == chapterID })
                 ?? comic.chapters.first {
-                ReaderView(comic: comic, initialChapter: initial)
+                ReaderView(comic: comic, initialChapter: initial, initialTargetPage: targetPage, isPeek: isPeek)
             } else {
                 // Detail with no chapters: nothing to read, offer a retry.
                 ErrorStateView { Task { await loadComic() } }
@@ -63,6 +68,14 @@ struct ComicView: View {
 /// The reader itself, now working from a fully-loaded comic and a starting chapter.
 private struct ReaderView: View {
     let comic: Comic
+    /// One-shot: consumed by the first `loadPages()` call, then cleared, so
+    /// prev/next chapter navigation within the same session resumes normally
+    /// instead of re-applying the originally requested page.
+    @State private var initialTargetPage: Int?
+    /// Sticky for the lifetime of this `ReaderView` instance — once opened as
+    /// a preview, no navigation within it (prev/next chapter, chapter list,
+    /// auto-advance) ever writes progress. See `ReaderRoute.isPeek`.
+    let isPeek: Bool
     @State private var currentChapter: Chapter
     @State private var showControls = true
     @State private var showChapterList = false
@@ -112,9 +125,11 @@ private struct ReaderView: View {
     /// How long scrolling must settle before a progress write is sent.
     private let saveDebounce: Duration = .seconds(0.9)
 
-    init(comic: Comic, initialChapter: Chapter) {
+    init(comic: Comic, initialChapter: Chapter, initialTargetPage: Int? = nil, isPeek: Bool = false) {
         self.comic = comic
         _currentChapter = State(initialValue: initialChapter)
+        _initialTargetPage = State(initialValue: initialTargetPage)
+        self.isPeek = isPeek
     }
 
     var body: some View{
@@ -163,6 +178,11 @@ private struct ReaderView: View {
                 ForEach(Array(urls.enumerated()), id: \.offset){ index, url in
                     ReaderPage(
                         url: url,
+                        comicID: comic.id,
+                        chapterID: currentChapter.id,
+                        // 1-based, matching `Progress.lastPage`'s and
+                        // `SavedTranslation.pageNumber`'s convention.
+                        pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
                         onRetryAll: { retryAllToken += 1 },
@@ -273,8 +293,19 @@ private struct ReaderView: View {
 
                 Spacer()
 
-                Text(currentChapter.title)
-                    .font(AppFont.rowTitle)
+                VStack(spacing: 2) {
+                    Text(currentChapter.title)
+                        .font(AppFont.rowTitle)
+                    // Sets expectation up front that this session won't
+                    // advance "last read" — otherwise a preview reader looks
+                    // identical to a normal one and the missing progress
+                    // update would look like a bug.
+                    if isPeek {
+                        Text("Preview — progress won't be saved")
+                            .font(AppFont.caption)
+                            .foregroundStyle(.grayFont)
+                    }
+                }
 
                 Spacer()
 
@@ -346,6 +377,10 @@ private struct ReaderView: View {
         // Consume the one-shot restart flag for this chapter open.
         let restart = forceRestart
         forceRestart = false
+        // Consume the one-shot initial target page (set only by the route
+        // that opened this reader) so later chapter changes resume normally.
+        let targetPage = initialTargetPage
+        initialTargetPage = nil
 
         pagesState = .loading
         do {
@@ -354,14 +389,18 @@ private struct ReaderView: View {
                 chapterID: currentChapter.id
             )
             let urls = chapter.pageURLs
-            // Resume: map the 1-based `lastReadPage` to a 0-based index, clamped
-            // in case the chapter shrank since progress was saved. `nil` starts
-            // at the top. On a restart (auto-advance) we ignore the saved page
-            // and force the top. Setting `topPage` in the same update that flips
-            // to `.loaded` positions the freshly built scroll view accordingly.
+            // Resume: map the 1-based `lastReadPage` (or, on first open, an
+            // explicit `targetPage` override — see `ReaderRoute.targetPage`)
+            // to a 0-based index, clamped in case the chapter shrank since
+            // that page number was recorded. `nil` starts at the top. On a
+            // restart (auto-advance) we ignore both and force the top.
+            // Setting `topPage` in the same update that flips to `.loaded`
+            // positions the freshly built scroll view accordingly.
             let resumeIndex: Int?
             if restart {
                 resumeIndex = urls.isEmpty ? nil : 0
+            } else if let targetPage {
+                resumeIndex = urls.isEmpty ? nil : min(max(targetPage - 1, 0), urls.count - 1)
             } else {
                 resumeIndex = chapter.lastReadPage.flatMap { page in
                     urls.isEmpty ? nil : min(max(page - 1, 0), urls.count - 1)
@@ -430,8 +469,11 @@ private struct ReaderView: View {
 
     /// Writes `page` for `chapterID`, but only when it changed from the last
     /// value sent. Failures are swallowed: a down progress store must never
-    /// interrupt reading.
+    /// interrupt reading. A no-op in `isPeek` mode — the single gate every
+    /// progress write (scroll debounce, flush-on-leave, restart-on-advance)
+    /// funnels through, so a preview reader never touches saved progress.
     private func sendProgress(page: Int?, comicID: String, chapterID: String) {
+        guard !isPeek else { return }
         guard let page, page != lastSentPage else { return }
         lastSentPage = page
         Task {
@@ -452,6 +494,14 @@ private struct ReaderView: View {
 /// view so it re-issues the request.
 private struct ReaderPage: View {
     let url: URL
+    /// The comic/chapter this page belongs to, and this page's 1-based
+    /// position within the chapter — threaded down from `ReaderView` (which
+    /// already carries `comic.id`/`currentChapter.id` for progress-saving)
+    /// so a confirmed selection's "Save" action (`ocr-translation` ticket 05)
+    /// knows which source reference to save against.
+    let comicID: String
+    let chapterID: String
+    let pageNumber: Int
     /// Shared token from the reader. A change re-requests this page only when it
     /// is currently failed.
     let retryAllToken: Int
@@ -487,6 +537,15 @@ private struct ReaderPage: View {
     /// passed down explicitly rather than having that view reach into the
     /// environment itself (CLAUDE.md: pass data/actions into reusable views).
     @Environment(\.ocrRecognizer) private var ocrRecognizer
+    /// The translator `CroppedSelectionPreview`'s "Translate" action runs
+    /// through (`ocr-translation` ticket 04). Read here for the same reason
+    /// as `ocrRecognizer` above, rather than that view reaching into the
+    /// environment itself.
+    @Environment(\.translator) private var translator
+    /// The repository `CroppedSelectionPreview`'s "Save" action runs through
+    /// (`ocr-translation` ticket 05). Same reasoning as `ocrRecognizer`/
+    /// `translator` above.
+    @Environment(\.translationRepository) private var translationRepository
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -549,7 +608,15 @@ private struct ReaderPage: View {
         .onAppear { onVisible(true) }
         .onDisappear { onVisible(false) }
         .sheet(item: $croppedSelection) { selection in
-            CroppedSelectionPreview(image: selection.image, recognizer: ocrRecognizer)
+            CroppedSelectionPreview(
+                image: selection.image,
+                comicID: comicID,
+                chapterID: chapterID,
+                pageNumber: pageNumber,
+                recognizer: ocrRecognizer,
+                translator: translator,
+                translationRepository: translationRepository
+            )
         }
     }
 
@@ -698,23 +765,109 @@ func recognizeSelection(_ image: UIImage, using recognizer: any OCRRecognizer) a
     }
 }
 
-/// Recognition result for a confirmed text selection (Ticket 05): recognizes
-/// the crop on appear, then shows the text pre-filled in an editable field so
-/// the user can correct misreads. Dismissing — with or without edits —
-/// discards everything: there is nothing here to write to, and no state
-/// survives past this sheet, so a fresh selection always starts clean.
+/// Runs translation for `text` into `targetLanguage` through a `Translator`,
+/// mapped onto `LoadState` — the same reasoning as `recognizeSelection`
+/// above, kept as its own free function (not folded into recognition) since
+/// translation is a separate, on-demand lifecycle rather than something that
+/// runs automatically on appear. Unit-testable against a stub `Translator`
+/// independent of any SwiftUI rendering or the real `Translation` framework.
+func translateSelection(
+    _ text: String,
+    to targetLanguage: Locale.Language,
+    using translator: any Translator
+) async -> LoadState<String> {
+    do {
+        let translated = try await translator.translate(text, to: targetLanguage)
+        return .loaded(translated)
+    } catch {
+        return .failed(error)
+    }
+}
+
+/// Persists an original/translated text pair and its source reference
+/// through a `TranslationRepository`, mapped onto `LoadState` — the same
+/// reasoning as `recognizeSelection`/`translateSelection` above: kept as its
+/// own free function so `CroppedSelectionPreview`'s "Save" action is
+/// unit-testable against a stub `TranslationRepository` independent of any
+/// SwiftUI rendering or the real backend.
+func saveSelection(
+    originalText: String,
+    translatedText: String,
+    targetLanguage: String,
+    comicID: String,
+    chapterID: String,
+    pageNumber: Int,
+    using repository: any TranslationRepository
+) async -> LoadState<SavedTranslation> {
+    do {
+        let saved = try await repository.save(
+            originalText: originalText,
+            translatedText: translatedText,
+            targetLanguage: targetLanguage,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber
+        )
+        return .loaded(saved)
+    } catch {
+        return .failed(error)
+    }
+}
+
+/// Recognition result for a confirmed text selection (Ticket 05 of
+/// `ocr-recognition`; extended additively by `ocr-translation` ticket 04):
+/// recognizes the crop on appear, then shows the text pre-filled in an
+/// editable field so the user can correct misreads. Once recognition has
+/// succeeded, a "Translate" action becomes available to translate the
+/// current (possibly user-corrected) text into a picked target language.
+/// Once a translation is showing, a "Save" action persists the
+/// original/translated pair and its source reference to the backend
+/// (`ocr-translation` ticket 05). Dismissing — with or without edits,
+/// translated or saved or not — only discards in-memory state; a
+/// successfully saved pair already exists in the backend by that point, which
+/// is the whole point of saving.
 private struct CroppedSelectionPreview: View {
     let image: UIImage
+    /// The comic/chapter/page this crop was selected from, threaded down
+    /// from `ReaderPage` — needed so "Save" can attach the correct source
+    /// reference, mirroring `ComicRepository.saveProgress`'s use of the same
+    /// three values elsewhere in this file.
+    let comicID: String
+    let chapterID: String
+    let pageNumber: Int
     /// Passed in explicitly by `ReaderPage` rather than read from the
     /// environment here, so this view stays a plain consumer of the
     /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
     /// views instead of hard-coding production behavior inside them).
     let recognizer: any OCRRecognizer
+    /// Same reasoning as `recognizer` above, for the "Translate" action.
+    let translator: any Translator
+    /// Same reasoning as `recognizer`/`translator` above, for the "Save"
+    /// action.
+    let translationRepository: any TranslationRepository
     @Environment(\.dismiss) private var dismiss
     @State private var recognitionState: LoadState<String> = .loading
     /// User-editable text, seeded from a successful recognition. Purely for
     /// on-screen display/correction — never written anywhere.
     @State private var editedText = ""
+    /// Translation state, deliberately separate from `recognitionState`:
+    /// recognition runs automatically on appear, translation runs on demand
+    /// (tapping "Translate") and can be re-run against a different language
+    /// or a further-edited text without disturbing the recognition result.
+    /// `nil` until the user taps "Translate" for the first time.
+    @State private var translationState: LoadState<String>?
+    /// Save state, deliberately separate from `translationState` for the same
+    /// reason translation is separate from recognition: saving is a further
+    /// on-demand step (tapping "Save"), not something that runs
+    /// automatically once a translation appears. `nil` until the user taps
+    /// "Save" for the first time; reset back to `nil` whenever a fresh
+    /// translation replaces the one it was saved from, so a stale "Saved"
+    /// indicator never sticks to a different translation.
+    @State private var saveState: LoadState<SavedTranslation>?
+    /// The target language, defaulting to the last-used one (or Traditional
+    /// Chinese on first use — see `LastUsedTargetLanguage`). Persisted back
+    /// to `UserDefaults` whenever the user changes the picker.
+    @State private var selectedLanguageID = LastUsedTargetLanguage.id
 
     var body: some View {
         NavigationStack {
@@ -726,6 +879,11 @@ private struct CroppedSelectionPreview: View {
                         .frame(maxWidth: .infinity, maxHeight: 180)
 
                     resultContent
+
+                    if canTranslate {
+                        Divider()
+                        translateSection
+                    }
                 }
                 .padding()
             }
@@ -810,6 +968,252 @@ private struct CroppedSelectionPreview: View {
             editedText = text
         }
     }
+
+    // MARK: - Translation
+
+    /// The "Translate" action (and the language picker alongside it) only
+    /// makes sense once there is recognized — possibly user-corrected — text
+    /// to translate; recognition failing or still running leaves nothing to
+    /// act on.
+    private var canTranslate: Bool {
+        guard case .loaded = recognitionState else { return false }
+        return !editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isTranslating: Bool {
+        if case .loading = translationState { return true }
+        return false
+    }
+
+    private var selectedLanguage: Locale.Language {
+        Locale.Language(identifier: selectedLanguageID)
+    }
+
+    private var translateSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Translate to")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+                Picker("Translate to", selection: $selectedLanguageID) {
+                    ForEach(TargetLanguageOption.options) { option in
+                        Text(option.nameKey).tag(option.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onChange(of: selectedLanguageID) { _, newValue in
+                    LastUsedTargetLanguage.id = newValue
+                }
+                Spacer()
+            }
+
+            Button("Translate") {
+                Task { await translate() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primaryRed)
+            .disabled(isTranslating)
+            .frame(maxWidth: .infinity)
+
+            translationResultContent
+        }
+    }
+
+    @ViewBuilder
+    private var translationResultContent: some View {
+        // `translationState` is `nil` until "Translate" is tapped once;
+        // unwrap explicitly rather than relying on optional/enum pattern
+        // sugar, so each case below is unambiguous.
+        if let translationState {
+            switch translationState {
+            case .loading:
+                HStack {
+                    Spacer()
+                    ProgressView("Translating…")
+                    Spacer()
+                }
+                .frame(minHeight: 80)
+            case .loaded(let translated):
+                VStack(alignment: .leading, spacing: 12) {
+                    // Original and translated text side by side, so the user
+                    // can compare them directly without scrolling between two
+                    // screens.
+                    HStack(alignment: .top, spacing: 12) {
+                        translationColumn(titleKey: "Original", text: editedText)
+                        Divider()
+                        translationColumn(titleKey: "Translation", text: translated)
+                    }
+
+                    // "Save" is available as soon as a translation is
+                    // showing (`ocr-translation` ticket 05's AC).
+                    saveControl(translatedText: translated)
+                }
+            case .failed(let error):
+                translationFailureContent(for: error)
+            }
+        }
+    }
+
+    private func translationColumn(titleKey: LocalizedStringKey, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(titleKey)
+                .font(AppFont.rowTitle)
+            Text(text)
+                .font(AppFont.caption)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func translationFailureContent(for error: Error) -> some View {
+        VStack(spacing: 12) {
+            translationFailureMessage(for: error)
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") { Task { await translate() } }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryRed)
+        }
+        .frame(maxWidth: .infinity, minHeight: 80)
+    }
+
+    /// Distinct, localization-ready messages per `TranslationError` case,
+    /// mirroring `failureMessage(for:)` above for `OCRRecognitionError` —
+    /// same reasoning: never collapse distinguishable failures into one
+    /// generic message.
+    @ViewBuilder
+    private func translationFailureMessage(for error: Error) -> some View {
+        if let translationError = error as? TranslationError {
+            switch translationError {
+            case .languagePackUnavailable:
+                Text("This language isn't downloaded for on-device translation yet. Download it in Settings, then try again.")
+            case .underlying:
+                Text("Translation failed unexpectedly.")
+            }
+        } else {
+            Text("Translation failed. You can try again.")
+        }
+    }
+
+    private func translate() async {
+        translationState = .loading
+        // A fresh translation invalidates any prior save (it was saved from
+        // the previous translated text), so start "Save" clean again.
+        saveState = nil
+        translationState = await translateSelection(editedText, to: selectedLanguage, using: translator)
+    }
+
+    // MARK: - Save
+
+    /// Persists `translatedText` (the current translation result) alongside
+    /// the current edited original text, target language, and source
+    /// reference.
+    private func save(translatedText: String) async {
+        saveState = .loading
+        saveState = await saveSelection(
+            originalText: editedText,
+            translatedText: translatedText,
+            targetLanguage: selectedLanguageID,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber,
+            using: translationRepository
+        )
+    }
+
+    @ViewBuilder
+    private func saveControl(translatedText: String) -> some View {
+        if let saveState {
+            switch saveState {
+            case .loading:
+                HStack {
+                    Spacer()
+                    ProgressView("Saving…")
+                    Spacer()
+                }
+            case .loaded:
+                HStack {
+                    Spacer()
+                    Label("Saved", systemImage: "checkmark.circle.fill")
+                        .font(AppFont.caption)
+                        .foregroundStyle(.primaryRed)
+                    Spacer()
+                }
+            case .failed:
+                saveFailureContent(translatedText: translatedText)
+            }
+        } else {
+            // Available as soon as a translation is showing (the AC's whole
+            // requirement) — no extra gating beyond that. Once tapped,
+            // `saveState` becomes non-nil and this branch (along with the
+            // button) is replaced by the loading/loaded/failed state above,
+            // so there's no double-tap window to guard against separately.
+            Button("Save") { Task { await save(translatedText: translatedText) } }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryRed)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// A clear, non-silent failure message (the AC's explicit requirement),
+    /// mirroring `failureContent(for:)`/`translationFailureContent(for:)`'s
+    /// retry pattern above. Not broken out per distinguishable error case
+    /// like OCR/translation failures are — `TranslationRepository.save`
+    /// throws generic networking errors (`APIError`), not a save-specific
+    /// enum, so one clear message covers it.
+    private func saveFailureContent(translatedText: String) -> some View {
+        VStack(spacing: 12) {
+            Text("Couldn't save this translation. Check your connection and try again.")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") { Task { await save(translatedText: translatedText) } }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryRed)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// Persists the OCR result screen's last-used translation target language
+/// locally (`UserDefaults`) — a lightweight per-device UI preference, not
+/// learning material, so it doesn't need backend storage (see the
+/// `ocr-translation` spec's rationale). First-ever default is Traditional
+/// Chinese, per Ticket 04.
+private enum LastUsedTargetLanguage {
+    private static let defaultsKey = "ocrTranslation.lastTargetLanguageID"
+    static let defaultID = "zh-Hant"
+
+    static var id: String {
+        get { UserDefaults.standard.string(forKey: defaultsKey) ?? defaultID }
+        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
+    }
+}
+
+/// A curated, non-exhaustive set of target languages offered by the
+/// translate picker (Ticket 04) — not every language Apple's `Translation`
+/// framework supports, since that would clutter a picker meant for a
+/// specific reading-comprehension flow; a short, sensible list is enough.
+/// Traditional Chinese is first, matching the default-language decision.
+/// `id` doubles as the value persisted via `LastUsedTargetLanguage` and as a
+/// `Locale.Language(identifier:)` string (e.g. `Locale.Language(identifier:
+/// "zh-Hant")` resolves to the same language as `AppleTranslator`'s own
+/// `Locale.Language(languageCode: "zh", script: "Hant")` construction).
+private struct TargetLanguageOption: Identifiable {
+    let id: String
+    let nameKey: LocalizedStringKey
+
+    static let options: [TargetLanguageOption] = [
+        TargetLanguageOption(id: "zh-Hant", nameKey: "Traditional Chinese"),
+        TargetLanguageOption(id: "en", nameKey: "English"),
+        TargetLanguageOption(id: "ja", nameKey: "Japanese"),
+        TargetLanguageOption(id: "ko", nameKey: "Korean"),
+        TargetLanguageOption(id: "fr", nameKey: "French"),
+        TargetLanguageOption(id: "es", nameKey: "Spanish"),
+    ]
 }
 
 #Preview("Reader") {
@@ -828,5 +1232,16 @@ private struct CroppedSelectionPreview: View {
             chapterID: SampleData.comics[0].chapters[0].id
         )
         .environment(\.comicRepository, FailingPreviewRepository())
+    }
+}
+
+#Preview("Reader — peek from 單字本") {
+    NavigationStack {
+        ComicView(
+            comicID: SampleData.comics[0].id,
+            chapterID: SampleData.comics[0].chapters[1].id,
+            targetPage: 3,
+            isPeek: true
+        )
     }
 }

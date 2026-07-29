@@ -111,6 +111,44 @@ enum APIConfig {
         }
         return request
     }
+
+    /// A decoder for the backend's ISO-8601 timestamps. The backend emits
+    /// them via Python's `datetime.isoformat()` (see `progress_store.iso_utc`),
+    /// which includes fractional (microsecond) seconds whenever they're
+    /// non-zero — e.g. `2026-07-29T22:20:10.081902+00:00`. `JSONDecoder`'s
+    /// stock `.iso8601` strategy uses an `ISO8601DateFormatter` that does
+    /// NOT accept fractional seconds and throws on that shape, so every
+    /// timestamp field (`Comic.lastReadAt`, `SavedTranslation.savedAt`, ...)
+    /// silently failed to decode as soon as real (not exactly-on-the-second)
+    /// data existed — the whole response then failed with a generic
+    /// "Couldn't connect" (`ErrorStateView` doesn't distinguish a decoding
+    /// failure from a network one). Tries the fractional-seconds format
+    /// first, then falls back to the plain format, so both shapes decode.
+    static var iso8601Decoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { fieldDecoder in
+            let container = try fieldDecoder.singleValueContainer()
+            let string = try container.decode(String.self)
+
+            let withFractionalSeconds = ISO8601DateFormatter()
+            withFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = withFractionalSeconds.date(from: string) {
+                return date
+            }
+
+            let withoutFractionalSeconds = ISO8601DateFormatter()
+            withoutFractionalSeconds.formatOptions = [.withInternetDateTime]
+            if let date = withoutFractionalSeconds.date(from: string) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected an ISO-8601 date string, got \"\(string)\""
+            )
+        }
+        return decoder
+    }
 }
 
 // MARK: - Environment injection

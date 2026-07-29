@@ -28,11 +28,9 @@ struct APIComicRepository: ComicRepository {
     }
 
     /// Shared decoder: the backend emits ISO-8601 dates (e.g. `lastReadAt`).
-    private var decoder: JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }
+    /// See `APIConfig.iso8601Decoder`'s doc comment for why this isn't the
+    /// stock `.iso8601` strategy.
+    private var decoder: JSONDecoder { APIConfig.iso8601Decoder }
 
     func library() async throws -> [Comic] {
         try await get([Comic].self, at: "comics")

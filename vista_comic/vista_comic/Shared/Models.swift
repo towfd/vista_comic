@@ -172,4 +172,13 @@ struct Comic: Identifiable, Hashable, Decodable {
 struct ReaderRoute: Hashable {
     let comicID: String
     let chapterID: String
+    /// 1-based page to scroll to on open, overriding the chapter's saved
+    /// resume position. `nil` (the default) keeps the normal resume
+    /// behavior, so existing call sites are unaffected.
+    var targetPage: Int? = nil
+    /// Opens a read-only preview: still honors `targetPage`, but never calls
+    /// `saveProgress`, however the user navigates once inside — so jumping
+    /// back to an old page (e.g. from a saved translation in 單字本) can
+    /// never regress the chapter's real reading progress.
+    var isPeek: Bool = false
 }

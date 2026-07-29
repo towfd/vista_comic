@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # Internal in-memory catalog (source of truth held in memory after a scan).
@@ -121,3 +121,38 @@ class ProgressResponse(BaseModel):
     lastPage: int
     pageCount: int
     updatedAt: str  # ISO-8601 UTC
+
+
+# ---------------------------------------------------------------------------
+# Saved-translation endpoint models (ocr-translation ticket 02, "單字本").
+# ---------------------------------------------------------------------------
+
+
+class SavedTranslationCreate(BaseModel):
+    """Request body for ``POST /translations``.
+
+    ``comicId`` / ``chapterId`` are the catalog's stable IDs; ``pageNumber`` is
+    the same 1-based Page index used by the reader and ``Progress.lastPage``.
+    """
+
+    originalText: str
+    translatedText: str
+    targetLanguage: str
+    comicId: str
+    chapterId: str
+    pageNumber: int = Field(ge=1)
+
+
+class SavedTranslationResponse(BaseModel):
+    """One saved translation: the response for ``POST /translations`` (echoes
+    the saved state) and each item of ``GET /translations``.
+    """
+
+    id: int
+    originalText: str
+    translatedText: str
+    targetLanguage: str
+    comicId: str
+    chapterId: str
+    pageNumber: int
+    savedAt: str  # ISO-8601 UTC

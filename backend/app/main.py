@@ -6,6 +6,9 @@ Endpoints (see docs/backend-architecture.md):
     GET  /comics/{comicId}/chapters/{chapterId}-> { id, number, title, pages }
     GET  /media/{comicId}/{chapterId}/{page}   -> image bytes (1-based page index)
     GET  /media/{comicId}/cover                -> cover image bytes
+    POST   /translations                       -> save one original/translation pair
+    GET    /translations                       -> list all saved pairs ("單字本")
+    DELETE /translations/{id}                  -> delete one saved pair
 
 Also provides:
     GET  /healthz           -> liveness + catalog size
@@ -25,9 +28,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from . import progress_store
+from . import progress_store, translation_store
 from .config import get_library_root
-from .db import init_engine, new_session
+from .db import SavedTranslation, init_engine, new_session
 from .models import (
     ChapterDetail,
     ChapterSummary,
@@ -35,6 +38,8 @@ from .models import (
     ComicSummary,
     ProgressResponse,
     ProgressUpdate,
+    SavedTranslationCreate,
+    SavedTranslationResponse,
 )
 from .scanner import Catalog, ComicEntry, scan_library
 
@@ -330,6 +335,101 @@ def save_progress(
         pageCount=page_count,
         updatedAt=progress_store.iso_utc(updated_at),
     )
+
+
+def _to_translation_response(row: SavedTranslation) -> SavedTranslationResponse:
+    return SavedTranslationResponse(
+        id=row.id,
+        originalText=row.original_text,
+        translatedText=row.translated_text,
+        targetLanguage=row.target_language,
+        comicId=row.comic_id,
+        chapterId=row.chapter_id,
+        pageNumber=row.page_number,
+        savedAt=progress_store.iso_utc(row.saved_at),
+    )
+
+
+@app.post("/translations", response_model=SavedTranslationResponse)
+def save_translation(body: SavedTranslationCreate) -> SavedTranslationResponse:
+    """Save one original/translated text pair with its source reference.
+
+    503 if the store is unavailable. Unlike ``Progress``, there is no
+    non-DB-backed origin for saved translations to fall back to (the catalog
+    cannot reconstruct them), so this mirrors ``save_progress``'s "no
+    fallback, surface the failure" behavior rather than ``progress_store``'s
+    read-side degrade-to-default helpers.
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        # Engine never initialised (Postgres was down at startup).
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    try:
+        row = translation_store.insert_translation(
+            session,
+            original_text=body.originalText,
+            translated_text=body.translatedText,
+            target_language=body.targetLanguage,
+            comic_id=body.comicId,
+            chapter_id=body.chapterId,
+            page_number=body.pageNumber,
+        )
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Translation store write failed.", exc_info=True)
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    finally:
+        session.close()
+    return _to_translation_response(row)
+
+
+@app.get("/translations", response_model=list[SavedTranslationResponse])
+def list_translations() -> list[SavedTranslationResponse]:
+    """List every saved translation, most recently saved first ("單字本").
+
+    503 if the store is unavailable, rather than degrading to an empty list:
+    unlike the catalog (which is independently scan-derived and must survive a
+    DB outage), saved translations have no origin other than this table, so an
+    empty response would misrepresent "the store is down" as "nothing has
+    been saved".
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    try:
+        rows = translation_store.list_all(session)
+    except SQLAlchemyError:
+        logger.warning("Translation store read failed.", exc_info=True)
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    finally:
+        session.close()
+    return [_to_translation_response(row) for row in rows]
+
+
+@app.delete("/translations/{translation_id}", status_code=204, response_model=None)
+def delete_translation(translation_id: int) -> None:
+    """Delete one saved translation by id.
+
+    404 if no row with that id exists, 503 if the store is unavailable —
+    mirrors ``save_translation``'s "no fallback, surface the failure"
+    handling.
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    try:
+        deleted = translation_store.delete_translation(session, translation_id)
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Translation store delete failed.", exc_info=True)
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    finally:
+        session.close()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Translation not found")
 
 
 @app.get("/media/{comic_id}/{chapter_id}/{page}")

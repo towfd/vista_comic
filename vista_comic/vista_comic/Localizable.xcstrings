@@ -4,6 +4,16 @@
     "#%lld" : {
 
     },
+    "%@ · %@ · page %lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · page %3$lld · %4$@"
+          }
+        }
+      }
+    },
     "%@ · last read" : {
       "comment" : "Library card: last read timestamp",
       "localizations" : {
@@ -95,6 +105,9 @@
         }
       }
     },
+    "Couldn't delete this translation. Check your connection and try again." : {
+
+    },
     "Couldn't load this page" : {
       "comment" : "Reader: page failed to load",
       "localizations" : {
@@ -106,25 +119,38 @@
         }
       }
     },
+    "Couldn't save this translation. Check your connection and try again." : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete this translation?" : {
+
+    },
     "Done" : {
 
     },
     "Drag here and release to cancel selection" : {
 
     },
+    "English" : {
+
+    },
     "Exit text selection" : {
 
     },
-    "Vocabulary" : {
-      "comment" : "單字本 tab label",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "單字本"
-          }
-        }
-      }
+    "French" : {
+
+    },
+    "Japanese" : {
+
+    },
+    "Jump to source page" : {
+
+    },
+    "Korean" : {
+
     },
     "Library" : {
       "comment" : "Library screen title",
@@ -172,6 +198,18 @@
           }
         }
       }
+    },
+    "Nothing saved yet" : {
+
+    },
+    "OK" : {
+
+    },
+    "Original" : {
+
+    },
+    "Preview — progress won't be saved" : {
+
     },
     "Previous chapter" : {
       "comment" : "Reader: previous chapter",
@@ -223,10 +261,22 @@
         }
       }
     },
+    "Save" : {
+
+    },
+    "Saved" : {
+
+    },
+    "Saving…" : {
+
+    },
     "Select text" : {
 
     },
     "Selected text" : {
+
+    },
+    "Spanish" : {
 
     },
     "Tap to retry" : {
@@ -246,6 +296,33 @@
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
 
     },
+    "This can't be undone." : {
+
+    },
+    "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
+
+    },
+    "Traditional Chinese" : {
+
+    },
+    "Translate" : {
+
+    },
+    "Translate to" : {
+
+    },
+    "Translating…" : {
+
+    },
+    "Translation" : {
+
+    },
+    "Translation failed unexpectedly." : {
+
+    },
+    "Translation failed. You can try again." : {
+
+    },
     "unread" : {
       "comment" : "Chapter read state",
       "localizations" : {
@@ -256,6 +333,20 @@
           }
         }
       }
+    },
+    "Vocabulary" : {
+      "comment" : "單字本 tab label",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "單字本"
+          }
+        }
+      }
+    },
+    "Words and sentences you save while reading will appear here." : {
+
     }
   },
   "version" : "1.0"
