@@ -104,6 +104,26 @@ def db_session(progress_db):
         session.close()
 
 
+@pytest.fixture
+def translation_db(_progress_engine):
+    """Truncate the ``saved_translation`` table before each test that uses it."""
+    with _progress_engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE saved_translation"))
+    return _progress_engine
+
+
+@pytest.fixture
+def translation_session(translation_db):
+    """A standalone session against the truncated ``saved_translation`` table."""
+    from app import db
+
+    session = db.new_session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
 def _write_page(path: Path, data: bytes = _IMG) -> Path:
     """Create a fake page/cover file (metadata-only; contents are irrelevant)."""
     path.parent.mkdir(parents=True, exist_ok=True)

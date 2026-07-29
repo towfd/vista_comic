@@ -51,6 +51,33 @@ class Progress(Base):
     )
 
 
+class SavedTranslation(Base):
+    """One saved original/translation pair, with the source Page it came from.
+
+    Unlike ``Progress`` (natural key ``(comic_id, chapter_id)``, upserted in
+    place), each save is a distinct event -- a reader may save more than one
+    pair from the same chapter or page -- so this table uses a surrogate
+    autoincrement ``id`` instead. ``comic_id`` / ``chapter_id`` are the same
+    stable, path-hash IDs the catalog and ``Progress`` use; ``page_number`` is
+    the same 1-based Page index the reader/``Progress`` use within a Chapter
+    (see ``docs/api-contract.md``). ``saved_at`` is a creation timestamp (set
+    once, never updated), unlike ``Progress.updated_at``.
+    """
+
+    __tablename__ = "saved_translation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    original_text: Mapped[str] = mapped_column(String, nullable=False)
+    translated_text: Mapped[str] = mapped_column(String, nullable=False)
+    target_language: Mapped[str] = mapped_column(String, nullable=False)
+    comic_id: Mapped[str] = mapped_column(String, nullable=False)
+    chapter_id: Mapped[str] = mapped_column(String, nullable=False)
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    saved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
 # Module-level engine/session factory, installed by ``init_engine`` at startup
 # (or by the test harness against a throwaway database).
 _engine: Optional[Engine] = None
