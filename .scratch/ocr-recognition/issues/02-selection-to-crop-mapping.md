@@ -4,8 +4,12 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved (commit `1841557` on `feat/ocr-recognition-foundation`)
 
-- [ ] A pure function/type with no SwiftUI `View` dependency, directly callable from a unit test
-- [ ] Unit tests cover: a fully in-bounds selection, a selection partially outside the image bounds (clamped to the image), a selection spanning off the image entirely (e.g. into an adjacent page), and a degenerate/zero-size selection
-- [ ] The output is documented as a pixel-space `CGRect` matching what a `CGImage`/`UIImage` crop operation expects
+- [x] A pure function/type with no SwiftUI `View` dependency, directly callable from a unit test
+- [x] Unit tests cover: a fully in-bounds selection, a selection partially outside the image bounds (clamped to the image), a selection spanning off the image entirely (e.g. into an adjacent page), and a degenerate/zero-size selection
+- [x] The output is documented as a pixel-space `CGRect` matching what a `CGImage`/`UIImage` crop operation expects
+
+## Comments
+
+Landed as `SelectionCropMapping.cropRect(for:displayFrameSize:imagePixelSize:)`, an `enum` namespace (matching the project's `AppFont` pattern). Reviewed clean by `/code-review` on both axes — no findings.
