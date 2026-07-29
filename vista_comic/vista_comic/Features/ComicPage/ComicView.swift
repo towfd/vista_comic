@@ -12,6 +12,7 @@
 //  renders them with `AsyncImage` (loading → placeholder, failure → placeholder).
 //
 import SwiftUI
+import UIKit
 
 /// Ids-based entry to the reader. Loads the comic detail so the reader can offer
 /// prev/next navigation and the chapter-list sheet even when the caller (e.g. the
@@ -65,6 +66,11 @@ private struct ReaderView: View {
     @State private var currentChapter: Chapter
     @State private var showControls = true
     @State private var showChapterList = false
+    /// Whether the Reader is in text-selection mode (Ticket 03 of
+    /// `ocr-recognition`). While true, the pages `ScrollView` is disabled and
+    /// the tap-to-toggle-controls gesture is suppressed so a drag over a page
+    /// draws a selection rectangle instead of scrolling or hiding controls.
+    @State private var isSelecting = false
     @State private var pagesState: LoadState<[URL]> = .loading
     /// Resume anchor only: set on load to programmatically scroll to the resume
     /// page via `.scrollPosition`. The *set* direction is reliable; its reported
@@ -158,6 +164,7 @@ private struct ReaderView: View {
                     ReaderPage(
                         url: url,
                         retryAllToken: retryAllToken,
+                        isSelecting: isSelecting,
                         onRetryAll: { retryAllToken += 1 },
                         onVisible: { isVisible in
                             if isVisible {
@@ -173,6 +180,10 @@ private struct ReaderView: View {
             // resume to a page and report the top-most visible page index.
             .scrollTargetLayout()
         }
+        // Selection mode owns the drag gesture on the current page instead;
+        // disabling scroll while selecting stops the ScrollView from fighting
+        // that drag for the touch.
+        .scrollDisabled(isSelecting)
         // Resume only: setting `topPage` after load (see `loadPages`) scrolls to
         // the resume page. Its reported value is not used for progress.
         .scrollPosition(id: $topPage, anchor: .top)
@@ -213,6 +224,9 @@ private struct ReaderView: View {
         // previous chapter's scroll offset.
         .id(currentChapter.id)
         .onTapGesture {
+            // A tap while selecting shouldn't hide the very controls (the
+            // selection-mode toggle) needed to exit selection mode.
+            guard !isSelecting else { return }
             withAnimation { showControls.toggle() }
         }
     }
@@ -227,6 +241,18 @@ private struct ReaderView: View {
                 }
                 .accessibilityLabel("Back")
                 Spacer()
+                Button {
+                    withAnimation {
+                        isSelecting.toggle()
+                        // Selecting requires the controls (this very button)
+                        // to stay reachable, so force them visible on entry.
+                        if isSelecting { showControls = true }
+                    }
+                } label: {
+                    Image(systemName: isSelecting ? "text.viewfinder" : "character.cursor.ibeam")
+                        .foregroundStyle(isSelecting ? Color.primaryRed : Color.primary)
+                }
+                .accessibilityLabel(isSelecting ? "Exit text selection" : "Select text")
                 Button { showChapterList = true } label: {
                     Image(systemName: "list.bullet")
                 }
@@ -429,6 +455,9 @@ private struct ReaderPage: View {
     /// Shared token from the reader. A change re-requests this page only when it
     /// is currently failed.
     let retryAllToken: Int
+    /// Whether the Reader is in text-selection mode. Drives whether this page
+    /// installs the drag-to-select overlay/gesture over its rendered image.
+    let isSelecting: Bool
     /// Tapping any failed page's retry button reloads every failed page at once
     /// (bumps the shared `retryAllToken` in the parent).
     let onRetryAll: () -> Void
@@ -439,6 +468,31 @@ private struct ReaderPage: View {
     /// Whether this page's image is currently in the failure state, so the
     /// reader-level reload can skip pages that already loaded.
     @State private var hasFailed = false
+    /// The decoded source `UIImage` behind the rendered `Image`, captured via
+    /// `AuthorizedAsyncImage`'s `onDecoded` callback (Ticket 01). Cropping
+    /// reads pixels from this, not from the scaled-down on-screen rendering.
+    @State private var decodedImage: UIImage?
+    /// The in-progress selection rectangle, in the image's display-frame
+    /// coordinate space (see `SelectionCropMapping`'s doc comment). `nil`
+    /// when no drag is active.
+    @State private var selectionRect: CGRect?
+    /// Whether the drag's current location is inside the cancel zone (see
+    /// `cancelZoneFrame`), so the badge can visually confirm "release here to
+    /// cancel" before the finger lifts.
+    @State private var isHoveringCancelZone = false
+    /// The most recently produced crop, shown in a confirmation sheet.
+    @State private var croppedSelection: CroppedSelection?
+    /// The recognizer `CroppedSelectionPreview` runs the confirmed crop
+    /// through (Ticket 05). Read here — the owner of `croppedSelection` — and
+    /// passed down explicitly rather than having that view reach into the
+    /// environment itself (CLAUDE.md: pass data/actions into reusable views).
+    @Environment(\.ocrRecognizer) private var ocrRecognizer
+
+    /// Fixed-size "release here to cancel" zone anchored to a corner of the
+    /// displayed image, so cancelling is possible mid-drag with a single
+    /// continuous touch: drag into the badge and lift, instead of drawing a
+    /// selection and confirming it. See Ticket 03's cancel requirement.
+    private let cancelZoneDiameter: CGFloat = 44
 
     var body: some View {
         // Wrap the page so `.id(reloadToken)` re-keys only the inner image view.
@@ -446,7 +500,7 @@ private struct ReaderPage: View {
         // expose the same id (0) to the enclosing LazyVStack — a collision that
         // makes SwiftUI unable to tell the pages apart and breaks scrolling.
         VStack(spacing: 0) {
-            AuthorizedAsyncImage(url: url) { phase in
+            AuthorizedAsyncImage(url: url, onDecoded: { decodedImage = $0 }) { phase in
                 switch phase {
                 case .success(let image):
                     image
@@ -454,6 +508,16 @@ private struct ReaderPage: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .onAppear { hasFailed = false }
+                        .overlay {
+                            // Only installed while selecting, so normal
+                            // reading gestures are completely unaffected
+                            // otherwise.
+                            if isSelecting {
+                                GeometryReader { proxy in
+                                    selectionOverlay(displayFrameSize: proxy.size)
+                                }
+                            }
+                        }
                 case .empty:
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 220)
@@ -473,9 +537,108 @@ private struct ReaderPage: View {
         .onChange(of: retryAllToken) { _, _ in
             if hasFailed { reloadToken += 1 }
         }
+        // Leaving selection mode (or scrolling away) mid-drag discards any
+        // partial selection rather than leaving a stale rectangle on screen.
+        .onChange(of: isSelecting) { _, stillSelecting in
+            if !stillSelecting {
+                selectionRect = nil
+                isHoveringCancelZone = false
+            }
+        }
         // Report viewport membership so the reader can derive the top page.
         .onAppear { onVisible(true) }
         .onDisappear { onVisible(false) }
+        .sheet(item: $croppedSelection) { selection in
+            CroppedSelectionPreview(image: selection.image, recognizer: ocrRecognizer)
+        }
+    }
+
+    // MARK: - Selection
+
+    private func cancelZoneFrame(in displayFrameSize: CGSize) -> CGRect {
+        CGRect(
+            x: displayFrameSize.width - cancelZoneDiameter - 12,
+            y: 12,
+            width: cancelZoneDiameter,
+            height: cancelZoneDiameter
+        )
+    }
+
+    private func dragRect(_ value: DragGesture.Value) -> CGRect {
+        CGRect(
+            x: value.startLocation.x,
+            y: value.startLocation.y,
+            width: value.translation.width,
+            height: value.translation.height
+        ).standardized
+    }
+
+    private func selectionOverlay(displayFrameSize: CGSize) -> some View {
+        let cancelZone = cancelZoneFrame(in: displayFrameSize)
+        return ZStack(alignment: .topLeading) {
+            // Transparent, but shaped so it still receives the drag — this is
+            // the hit-testable surface the gesture is attached to.
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 4)
+                        .onChanged { value in
+                            selectionRect = dragRect(value)
+                            isHoveringCancelZone = cancelZone.contains(value.location)
+                        }
+                        .onEnded { value in
+                            let cancelled = cancelZone.contains(value.location)
+                            let rect = dragRect(value)
+                            selectionRect = nil
+                            isHoveringCancelZone = false
+                            guard !cancelled else { return }
+                            produceCrop(from: rect, displayFrameSize: displayFrameSize)
+                        }
+                )
+
+            if let selectionRect {
+                Rectangle()
+                    .strokeBorder(Color.primaryRed, lineWidth: 2)
+                    .background(Rectangle().fill(Color.primaryRed.opacity(0.15)))
+                    .frame(width: selectionRect.width, height: selectionRect.height)
+                    .position(x: selectionRect.midX, y: selectionRect.midY)
+                    .allowsHitTesting(false)
+
+                cancelZoneBadge
+                    .frame(width: cancelZoneDiameter, height: cancelZoneDiameter)
+                    .position(x: cancelZone.midX, y: cancelZone.midY)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var cancelZoneBadge: some View {
+        Image(systemName: "xmark.circle.fill")
+            .font(.title2)
+            .foregroundStyle(isHoveringCancelZone ? Color.white : Color.primaryRed)
+            .padding(6)
+            .background(
+                Circle().fill(isHoveringCancelZone ? Color.primaryRed : Color.white.opacity(0.9))
+            )
+            .scaleEffect(isHoveringCancelZone ? 1.2 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: isHoveringCancelZone)
+            .accessibilityLabel("Drag here and release to cancel selection")
+    }
+
+    /// Maps `rect` (drawn in `displayFrameSize`'s coordinate space) to source
+    /// pixels via `SelectionCropMapping` and crops the decoded image — never
+    /// a screenshot of the scaled on-screen rendering. A `.zero` mapping (the
+    /// selection didn't overlap the displayed image at all) is a no-op.
+    private func produceCrop(from rect: CGRect, displayFrameSize: CGSize) {
+        guard let cgImage = decodedImage?.cgImage else { return }
+        let imagePixelSize = CGSize(width: cgImage.width, height: cgImage.height)
+        let cropRect = SelectionCropMapping.cropRect(
+            for: rect,
+            displayFrameSize: displayFrameSize,
+            imagePixelSize: imagePixelSize
+        )
+        guard cropRect != .zero, let croppedCGImage = cgImage.cropping(to: cropRect) else { return }
+        croppedSelection = CroppedSelection(image: UIImage(cgImage: croppedCGImage))
     }
 
     private var failurePlaceholder: some View {
@@ -498,6 +661,154 @@ private struct ReaderPage: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Tap to retry")
+    }
+}
+
+/// One completed selection crop, shown for confirmation. `Identifiable` so it
+/// can drive `.sheet(item:)` directly — a fresh selection always presents a
+/// fresh sheet instance, even if a prior one was dismissed without change.
+/// No recognition, no editing, no persistence yet: that is Ticket 05.
+private struct CroppedSelection: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
+/// Runs OCR recognition for a confirmed crop and maps the outcome onto
+/// `LoadState` (`ComicRepository.swift`'s established async-fetch pattern),
+/// so `CroppedSelectionPreview` only has to render three cases instead of
+/// re-deriving success/failure handling itself.
+///
+/// A free function rather than logic embedded directly in the view's
+/// `.task`, specifically so the selection → recognize step is unit-testable
+/// against a stub `OCRRecognizer` independent of any SwiftUI rendering —
+/// mirroring why `SelectionCropMapping` (Ticket 02) and `OCRRecognizer`
+/// (Ticket 04) both stayed pure.
+func recognizeSelection(_ image: UIImage, using recognizer: any OCRRecognizer) async -> LoadState<String> {
+    guard let cgImage = image.cgImage else {
+        // Defensive boundary case: every crop produced by `produceCrop` comes
+        // from `CGImage.cropping(to:)`, so this should be unreachable in
+        // practice, but a `UIImage` isn't guaranteed to carry `cgImage`.
+        return .failed(OCRRecognitionError.underlying("Selected image has no pixel data"))
+    }
+    do {
+        let text = try await recognizer.recognizeText(in: cgImage)
+        return .loaded(text)
+    } catch {
+        return .failed(error)
+    }
+}
+
+/// Recognition result for a confirmed text selection (Ticket 05): recognizes
+/// the crop on appear, then shows the text pre-filled in an editable field so
+/// the user can correct misreads. Dismissing — with or without edits —
+/// discards everything: there is nothing here to write to, and no state
+/// survives past this sheet, so a fresh selection always starts clean.
+private struct CroppedSelectionPreview: View {
+    let image: UIImage
+    /// Passed in explicitly by `ReaderPage` rather than read from the
+    /// environment here, so this view stays a plain consumer of the
+    /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
+    /// views instead of hard-coding production behavior inside them).
+    let recognizer: any OCRRecognizer
+    @Environment(\.dismiss) private var dismiss
+    @State private var recognitionState: LoadState<String> = .loading
+    /// User-editable text, seeded from a successful recognition. Purely for
+    /// on-screen display/correction — never written anywhere.
+    @State private var editedText = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: 180)
+
+                    resultContent
+                }
+                .padding()
+            }
+            .navigationTitle("Selected text")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .task { await recognize() }
+    }
+
+    @ViewBuilder
+    private var resultContent: some View {
+        switch recognitionState {
+        case .loading:
+            HStack {
+                Spacer()
+                ProgressView("Recognizing text…")
+                Spacer()
+            }
+            .frame(minHeight: 120)
+        case .loaded:
+            // Editable, not read-only: the whole point of showing recognized
+            // text is letting the user fix a misread in place.
+            TextEditor(text: $editedText)
+                .font(AppFont.caption)
+                .frame(minHeight: 120)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.3))
+                }
+        case .failed(let error):
+            failureContent(for: error)
+        }
+    }
+
+    private func failureContent(for error: Error) -> some View {
+        VStack(spacing: 12) {
+            failureMessage(for: error)
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 12) {
+                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Retry") { Task { await recognize() } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.primaryRed)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 120)
+    }
+
+    /// Distinct, localization-ready messages per `OCRRecognitionError` case
+    /// (Ticket 04's whole point in making them distinguishable — never
+    /// collapsed into one generic "recognition failed" message), plus a
+    /// fallback for a conformer that throws something else.
+    @ViewBuilder
+    private func failureMessage(for error: Error) -> some View {
+        if let ocrError = error as? OCRRecognitionError {
+            switch ocrError {
+            case .noTextFound:
+                Text("No text was found in the selected region. Try selecting a tighter area around the text.")
+            case .lowConfidence:
+                Text("The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection.")
+            case .underlying:
+                Text("Text recognition failed unexpectedly.")
+            }
+        } else {
+            Text("Recognition failed. You can try again.")
+        }
+    }
+
+    private func recognize() async {
+        recognitionState = .loading
+        let result = await recognizeSelection(image, using: recognizer)
+        recognitionState = result
+        if case .loaded(let text) = result {
+            editedText = text
+        }
     }
 }
 

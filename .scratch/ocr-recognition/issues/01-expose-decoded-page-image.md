@@ -4,8 +4,12 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved (commit `906497a` on `feat/ocr-recognition-foundation`)
 
-- [ ] Reader pages load, scroll, retry-on-failure, and resume exactly as before (no regression)
-- [ ] The decoded image is available at the point a page is rendered, in a form usable for pixel-level cropping later (e.g. alongside or instead of discarding the `UIImage` currently converted straight to `Image` in `AuthorizedAsyncImage.fetchImage`)
-- [ ] `AuthorizedAsyncImageTests` (or an equivalent unit test) covers the newly exposed value
+- [x] Reader pages load, scroll, retry-on-failure, and resume exactly as before (no regression)
+- [x] The decoded image is available at the point a page is rendered, in a form usable for pixel-level cropping later (e.g. alongside or instead of discarding the `UIImage` currently converted straight to `Image` in `AuthorizedAsyncImage.fetchImage`)
+- [x] `AuthorizedAsyncImageTests` (or an equivalent unit test) covers the newly exposed value
+
+## Comments
+
+`ReaderPage` in `ComicView.swift` was deliberately left untouched — the coordinator's implementation dispatch scoped this ticket to `AuthorizedAsyncImage.swift` only (a new `onDecoded: ((UIImage) -> Void)?` callback + `FetchedImage`), and reserved wiring `ReaderPage` to consume it for Ticket 03, which touches that file anyway to add the selection gesture. The parenthetical "(and the `ReaderPage` that uses it)" in this ticket's "What to build" overstated scope relative to its actual acceptance criteria; flagged by `/code-review`'s Spec axis and judged not a defect for that reason.
