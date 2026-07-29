@@ -6,8 +6,9 @@ Endpoints (see docs/backend-architecture.md):
     GET  /comics/{comicId}/chapters/{chapterId}-> { id, number, title, pages }
     GET  /media/{comicId}/{chapterId}/{page}   -> image bytes (1-based page index)
     GET  /media/{comicId}/cover                -> cover image bytes
-    POST /translations                         -> save one original/translation pair
-    GET  /translations                         -> list all saved pairs ("單字本")
+    POST   /translations                       -> save one original/translation pair
+    GET    /translations                       -> list all saved pairs ("單字本")
+    DELETE /translations/{id}                  -> delete one saved pair
 
 Also provides:
     GET  /healthz           -> liveness + catalog size
@@ -405,6 +406,30 @@ def list_translations() -> list[SavedTranslationResponse]:
     finally:
         session.close()
     return [_to_translation_response(row) for row in rows]
+
+
+@app.delete("/translations/{translation_id}", status_code=204, response_model=None)
+def delete_translation(translation_id: int) -> None:
+    """Delete one saved translation by id.
+
+    404 if no row with that id exists, 503 if the store is unavailable —
+    mirrors ``save_translation``'s "no fallback, surface the failure"
+    handling.
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    try:
+        deleted = translation_store.delete_translation(session, translation_id)
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Translation store delete failed.", exc_info=True)
+        raise HTTPException(status_code=503, detail="Translation store unavailable")
+    finally:
+        session.close()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Translation not found")
 
 
 @app.get("/media/{comic_id}/{chapter_id}/{page}")

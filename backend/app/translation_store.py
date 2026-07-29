@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import List
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.orm import Session
 
 from .db import SavedTranslation
@@ -74,3 +74,17 @@ def list_all(session: Session) -> List[SavedTranslation]:
         select(SavedTranslation).order_by(SavedTranslation.saved_at.desc())
     ).scalars()
     return list(rows)
+
+
+def delete_translation(session: Session, translation_id: int) -> bool:
+    """Delete one saved-translation row by id.
+
+    Returns whether a row was actually deleted, so the endpoint can
+    distinguish "deleted" from "already gone" (404) without a separate
+    existence check.
+    """
+    result = session.execute(
+        delete(SavedTranslation).where(SavedTranslation.id == translation_id)
+    )
+    session.commit()
+    return result.rowcount > 0

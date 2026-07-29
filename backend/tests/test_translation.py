@@ -155,3 +155,42 @@ def test_get_translations_503_when_store_unavailable(client, monkeypatch):
     monkeypatch.setattr(db, "_SessionLocal", None)
     resp = client.get("/translations")
     assert resp.status_code == 503
+
+
+# --- endpoint: DELETE -----------------------------------------------------------
+
+
+def test_delete_translation_returns_204_and_removes_it(client):
+    saved = client.post("/translations", json=_SAMPLE_BODY).json()
+
+    resp = client.delete(f"/translations/{saved['id']}")
+    assert resp.status_code == 204
+
+    listed = client.get("/translations").json()
+    assert listed == []
+
+
+def test_delete_translation_only_removes_the_targeted_row(client):
+    first = client.post("/translations", json=_SAMPLE_BODY).json()
+    second = client.post(
+        "/translations", json={**_SAMPLE_BODY, "originalText": "Cảm ơn"}
+    ).json()
+
+    resp = client.delete(f"/translations/{first['id']}")
+    assert resp.status_code == 204
+
+    listed = client.get("/translations").json()
+    assert [row["id"] for row in listed] == [second["id"]]
+
+
+def test_delete_unknown_translation_404(client):
+    resp = client.delete("/translations/999999")
+    assert resp.status_code == 404
+
+
+def test_delete_translation_503_when_store_unavailable(client, monkeypatch):
+    from app import db
+
+    monkeypatch.setattr(db, "_SessionLocal", None)
+    resp = client.delete("/translations/1")
+    assert resp.status_code == 503

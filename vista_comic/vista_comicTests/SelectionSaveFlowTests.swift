@@ -35,6 +35,12 @@ final class StubTranslationRepository: TranslationRepository {
     private(set) var lastPageNumber: Int?
     private(set) var saveCallCount = 0
 
+    /// `ocr-translation` ticket 08 (delete): configurable result + call
+    /// tracking, mirroring `save`'s shape above.
+    var deleteResult: Result<Void, StubSaveError> = .success(())
+    private(set) var lastDeletedID: Int?
+    private(set) var deleteCallCount = 0
+
     func save(
         originalText: String,
         translatedText: String,
@@ -60,6 +66,17 @@ final class StubTranslationRepository: TranslationRepository {
 
     func list() async throws -> [SavedTranslation] {
         []
+    }
+
+    func delete(id: Int) async throws {
+        deleteCallCount += 1
+        lastDeletedID = id
+        switch deleteResult {
+        case .success:
+            return
+        case .failure(let error):
+            throw error
+        }
     }
 }
 

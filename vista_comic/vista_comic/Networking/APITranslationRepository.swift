@@ -60,6 +60,10 @@ struct APITranslationRepository: TranslationRepository {
         try await get([SavedTranslation].self, at: "translations")
     }
 
+    func delete(id: Int) async throws {
+        try await delete(at: "translations/\(id)")
+    }
+
     // MARK: - Request plumbing
 
     /// Builds a `URLRequest` for `path`, routed through `APIConfig.authorizedRequest`
@@ -114,6 +118,21 @@ struct APITranslationRepository: TranslationRepository {
             return try decoder.decode(T.self, from: data)
         } catch {
             throw APIError.decoding(error)
+        }
+    }
+
+    /// Sends `DELETE` and treats any non-2xx status as an error. The
+    /// response body is ignored (the backend returns 204 with none) —
+    /// mirrors `APIComicRepository.put`'s ignored-body shape.
+    private func delete(at path: String) async throws {
+        let request = makeRequest(method: "DELETE", at: path)
+        let (_, response) = try await session.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.httpStatus(http.statusCode)
         }
     }
 }

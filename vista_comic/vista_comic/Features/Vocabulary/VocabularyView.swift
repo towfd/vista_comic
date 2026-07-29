@@ -18,6 +18,10 @@ import SwiftUI
 struct VocabularyView: View {
     @Environment(\.translationRepository) private var repository
     @State private var state: LoadState<[SavedTranslation]> = .loading
+    /// Set on a failed delete (ticket 08) to drive a one-shot alert — the
+    /// entry stays in the list since nothing was actually deleted, mirroring
+    /// ticket 05's save-failure precedent of one generic, non-silent message.
+    @State private var deleteError: String?
 
     var body: some View {
         NavigationStack {
@@ -32,6 +36,12 @@ struct VocabularyView: View {
                 }
         }
         .task { await load() }
+        .alert(
+            "Couldn't delete this translation. Check your connection and try again.",
+            isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        }
     }
 
     @ViewBuilder
@@ -59,7 +69,9 @@ struct VocabularyView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 ForEach(translations) { translation in
-                    SavedTranslationRow(translation: translation)
+                    SavedTranslationRow(translation: translation) {
+                        await delete(translation)
+                    }
                 }
             }
             .padding()
@@ -83,6 +95,40 @@ struct VocabularyView: View {
         } catch {
             state = .failed(error)
         }
+    }
+
+    /// Deletes `translation` and, on success, removes it from the displayed
+    /// list in place — no full `load()` reload needed (ticket 08's AC).
+    private func delete(_ translation: SavedTranslation) async {
+        switch await deleteSavedTranslation(id: translation.id, using: repository) {
+        case .loaded:
+            if case .loaded(var translations) = state {
+                translations.removeAll { $0.id == translation.id }
+                state = .loaded(translations)
+            }
+        case .failed:
+            deleteError = "Couldn't delete this translation. Check your connection and try again."
+        case .loading:
+            break
+        }
+    }
+}
+
+/// Deletes a saved translation through a `TranslationRepository`, mapped
+/// onto `LoadState<Void>` — mirrors `saveSelection`'s reasoning (see
+/// `ComicPage/ComicView.swift`): kept as its own free function so
+/// `VocabularyView`'s delete action is unit-testable against a stub
+/// `TranslationRepository` independent of any SwiftUI rendering or the real
+/// backend.
+func deleteSavedTranslation(
+    id: Int,
+    using repository: any TranslationRepository
+) async -> LoadState<Void> {
+    do {
+        try await repository.delete(id: id)
+        return .loaded(())
+    } catch {
+        return .failed(error)
     }
 }
 
@@ -117,6 +163,8 @@ private struct PreviewTranslationRepository: TranslationRepository {
             throw error
         }
     }
+
+    func delete(id: Int) async throws {}
 }
 
 extension SavedTranslation {

@@ -20,11 +20,25 @@
 //  the exact saved page, instead of resuming (and overwriting) normal
 //  reading progress.
 //
+//  Ticket 08 adds the trailing delete button, confirmed via `.alert` since
+//  deleting is irreversible. Stays a "dumb" reusable row per CLAUDE.md: the
+//  actual delete call against `TranslationRepository` happens in
+//  `VocabularyView` (`onDelete`), not here — this row only asks for
+//  confirmation and reports the decision back up.
+//
 
 import SwiftUI
 
 struct SavedTranslationRow: View {
     let translation: SavedTranslation
+    /// Called once the user confirms deletion. Awaited so the row can show a
+    /// spinner while the parent's `TranslationRepository.delete(id:)` call
+    /// is in flight — the row is removed from the list by the parent on
+    /// success, so nothing further happens here after `onDelete` returns.
+    let onDelete: () async -> Void
+
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -42,16 +56,43 @@ struct SavedTranslationRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            NavigationLink(value: jumpRoute) {
-                Image(systemName: "location.circle")
-                    .font(.title2)
-                    .foregroundStyle(.primaryRed)
+            if isDeleting {
+                ProgressView()
+            } else {
+                VStack(spacing: 16) {
+                    NavigationLink(value: jumpRoute) {
+                        Image(systemName: "location.circle")
+                            .font(.title2)
+                            .foregroundStyle(.primaryRed)
+                    }
+                    .accessibilityLabel("Jump to source page")
+
+                    Button {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash.circle")
+                            .font(.title2)
+                            .foregroundStyle(.grayFont)
+                    }
+                    .accessibilityLabel("Delete")
+                }
             }
-            .accessibilityLabel("Jump to source page")
         }
         .padding()
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .alert("Delete this translation?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                isDeleting = true
+                Task {
+                    await onDelete()
+                    isDeleting = false
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 
     private var jumpRoute: ReaderRoute {
@@ -72,6 +113,8 @@ struct SavedTranslationRow: View {
 }
 
 #Preview {
-    SavedTranslationRow(translation: .preview())
-        .padding()
+    NavigationStack {
+        SavedTranslationRow(translation: .preview()) {}
+            .padding()
+    }
 }

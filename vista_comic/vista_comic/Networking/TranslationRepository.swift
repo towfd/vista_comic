@@ -27,6 +27,7 @@ import SwiftUI
 /// Mirrors the backend endpoints:
 /// - `save(...)` → `POST /translations`
 /// - `list()`    → `GET /translations`
+/// - `delete(id:)` → `DELETE /translations/{id}`
 protocol TranslationRepository {
     /// Persists one original/translated text pair with its source reference.
     /// Returns the saved entry, including the server-generated `id` and
@@ -44,6 +45,9 @@ protocol TranslationRepository {
 
     /// Every saved translation, most recently saved first.
     func list() async throws -> [SavedTranslation]
+
+    /// Deletes one saved translation by its server-generated `id`.
+    func delete(id: Int) async throws
 }
 
 // MARK: - Environment injection
