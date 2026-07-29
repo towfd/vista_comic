@@ -27,7 +27,7 @@ Do not infer current progress from this file. Treat the active `.scratch/` ticke
 - Avoid broad refactors while implementing a focused feature.
 - Preserve uncommitted, unrelated, and user-authored changes.
 - Reuse existing assets and project conventions where practical.
-- Do not commit, push, publish, or deploy unless I explicitly request it.
+- Free to commit and open pull requests without asking first each time — review and approval happen on the PR itself in GitHub. Never push directly to the default branch or deploy without my explicit request.
 
 ## Source-of-truth boundaries
 
@@ -58,7 +58,7 @@ A sub-agent modifies only the files it is assigned, consumes shared models and n
 These cover project-specific edges the generic methodology does not:
 
 - `/capture-vista-comic-progress`: record verified progress under the Notion `vista_comic` date page — only after progress is verified and I authorize the update. Do not mark planned or unverified work as complete.
-- `/ship-vista-comic`: after I have reviewed a change and asked to publish it, verify the build, branch, commit, push, and open a pull request. Never push to the default branch unless I explicitly override.
+- `/ship-vista-comic`: verify the build, branch, commit, push, and open a pull request — no need to wait for me to ask first; I review and approve on the PR. Never push to the default branch unless I explicitly override.
 
 ## Delegation rules
 
