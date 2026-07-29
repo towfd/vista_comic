@@ -15,12 +15,14 @@
 //  (see `AppleTranslator`), not the protocol's. Only the target language is
 //  a parameter, since that one is user-selectable.
 //
-//  No environment injection here yet, deliberately: no consumer exists in
-//  this ticket, mirroring how `OCRRecognizer` didn't gain its
-//  `EnvironmentKey` until the ticket that actually wired a caller to it.
+//  Environment injection added in the `ocr-translation` ticket that wires
+//  the first real consumer (the OCR result screen's "Translate" action),
+//  mirroring `OCRRecognizer`'s own `EnvironmentKey`/`EnvironmentValues`
+//  extension — see the bottom of this file.
 //
 
 import Foundation
+import SwiftUI
 
 /// Translates text into a target language.
 protocol Translator {
@@ -48,4 +50,22 @@ enum TranslationError: Error, Equatable {
     /// than the `Error` itself so this type can stay `Equatable` for tests,
     /// mirroring `OCRRecognitionError.underlying`'s own reasoning.
     case underlying(String)
+}
+
+// MARK: - Environment injection
+
+private struct TranslatorKey: EnvironmentKey {
+    /// `AppleTranslator` runs entirely on-device with no network access, so
+    /// — like `OCRRecognizerKey`'s `VisionOCRRecognizer` default, and unlike
+    /// `ComicRepository`'s network-backed default — it's safe to use as the
+    /// default for production, previews, and the canvas alike.
+    static let defaultValue: any Translator = AppleTranslator()
+}
+
+extension EnvironmentValues {
+    /// The translator the current view tree runs translation through.
+    var translator: any Translator {
+        get { self[TranslatorKey.self] }
+        set { self[TranslatorKey.self] = newValue }
+    }
 }

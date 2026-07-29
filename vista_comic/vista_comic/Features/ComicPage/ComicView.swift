@@ -487,6 +487,11 @@ private struct ReaderPage: View {
     /// passed down explicitly rather than having that view reach into the
     /// environment itself (CLAUDE.md: pass data/actions into reusable views).
     @Environment(\.ocrRecognizer) private var ocrRecognizer
+    /// The translator `CroppedSelectionPreview`'s "Translate" action runs
+    /// through (`ocr-translation` ticket 04). Read here for the same reason
+    /// as `ocrRecognizer` above, rather than that view reaching into the
+    /// environment itself.
+    @Environment(\.translator) private var translator
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -549,7 +554,7 @@ private struct ReaderPage: View {
         .onAppear { onVisible(true) }
         .onDisappear { onVisible(false) }
         .sheet(item: $croppedSelection) { selection in
-            CroppedSelectionPreview(image: selection.image, recognizer: ocrRecognizer)
+            CroppedSelectionPreview(image: selection.image, recognizer: ocrRecognizer, translator: translator)
         }
     }
 
@@ -698,11 +703,35 @@ func recognizeSelection(_ image: UIImage, using recognizer: any OCRRecognizer) a
     }
 }
 
-/// Recognition result for a confirmed text selection (Ticket 05): recognizes
-/// the crop on appear, then shows the text pre-filled in an editable field so
-/// the user can correct misreads. Dismissing — with or without edits —
-/// discards everything: there is nothing here to write to, and no state
-/// survives past this sheet, so a fresh selection always starts clean.
+/// Runs translation for `text` into `targetLanguage` through a `Translator`,
+/// mapped onto `LoadState` — the same reasoning as `recognizeSelection`
+/// above, kept as its own free function (not folded into recognition) since
+/// translation is a separate, on-demand lifecycle rather than something that
+/// runs automatically on appear. Unit-testable against a stub `Translator`
+/// independent of any SwiftUI rendering or the real `Translation` framework.
+func translateSelection(
+    _ text: String,
+    to targetLanguage: Locale.Language,
+    using translator: any Translator
+) async -> LoadState<String> {
+    do {
+        let translated = try await translator.translate(text, to: targetLanguage)
+        return .loaded(translated)
+    } catch {
+        return .failed(error)
+    }
+}
+
+/// Recognition result for a confirmed text selection (Ticket 05 of
+/// `ocr-recognition`; extended additively by `ocr-translation` ticket 04):
+/// recognizes the crop on appear, then shows the text pre-filled in an
+/// editable field so the user can correct misreads. Once recognition has
+/// succeeded, a "Translate" action becomes available to translate the
+/// current (possibly user-corrected) text into a picked target language.
+/// Dismissing — with or without edits, translated or not — discards
+/// everything: there is nothing here to write to yet (saving is
+/// `ocr-translation` ticket 05), and no state survives past this sheet, so a
+/// fresh selection always starts clean.
 private struct CroppedSelectionPreview: View {
     let image: UIImage
     /// Passed in explicitly by `ReaderPage` rather than read from the
@@ -710,11 +739,23 @@ private struct CroppedSelectionPreview: View {
     /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
     /// views instead of hard-coding production behavior inside them).
     let recognizer: any OCRRecognizer
+    /// Same reasoning as `recognizer` above, for the "Translate" action.
+    let translator: any Translator
     @Environment(\.dismiss) private var dismiss
     @State private var recognitionState: LoadState<String> = .loading
     /// User-editable text, seeded from a successful recognition. Purely for
     /// on-screen display/correction — never written anywhere.
     @State private var editedText = ""
+    /// Translation state, deliberately separate from `recognitionState`:
+    /// recognition runs automatically on appear, translation runs on demand
+    /// (tapping "Translate") and can be re-run against a different language
+    /// or a further-edited text without disturbing the recognition result.
+    /// `nil` until the user taps "Translate" for the first time.
+    @State private var translationState: LoadState<String>?
+    /// The target language, defaulting to the last-used one (or Traditional
+    /// Chinese on first use — see `LastUsedTargetLanguage`). Persisted back
+    /// to `UserDefaults` whenever the user changes the picker.
+    @State private var selectedLanguageID = LastUsedTargetLanguage.id
 
     var body: some View {
         NavigationStack {
@@ -726,6 +767,11 @@ private struct CroppedSelectionPreview: View {
                         .frame(maxWidth: .infinity, maxHeight: 180)
 
                     resultContent
+
+                    if canTranslate {
+                        Divider()
+                        translateSection
+                    }
                 }
                 .padding()
             }
@@ -810,6 +856,171 @@ private struct CroppedSelectionPreview: View {
             editedText = text
         }
     }
+
+    // MARK: - Translation
+
+    /// The "Translate" action (and the language picker alongside it) only
+    /// makes sense once there is recognized — possibly user-corrected — text
+    /// to translate; recognition failing or still running leaves nothing to
+    /// act on.
+    private var canTranslate: Bool {
+        guard case .loaded = recognitionState else { return false }
+        return !editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isTranslating: Bool {
+        if case .loading = translationState { return true }
+        return false
+    }
+
+    private var selectedLanguage: Locale.Language {
+        Locale.Language(identifier: selectedLanguageID)
+    }
+
+    private var translateSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Translate to")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+                Picker("Translate to", selection: $selectedLanguageID) {
+                    ForEach(TargetLanguageOption.options) { option in
+                        Text(option.nameKey).tag(option.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .onChange(of: selectedLanguageID) { _, newValue in
+                    LastUsedTargetLanguage.id = newValue
+                }
+                Spacer()
+            }
+
+            Button("Translate") {
+                Task { await translate() }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primaryRed)
+            .disabled(isTranslating)
+            .frame(maxWidth: .infinity)
+
+            translationResultContent
+        }
+    }
+
+    @ViewBuilder
+    private var translationResultContent: some View {
+        // `translationState` is `nil` until "Translate" is tapped once;
+        // unwrap explicitly rather than relying on optional/enum pattern
+        // sugar, so each case below is unambiguous.
+        if let translationState {
+            switch translationState {
+            case .loading:
+                HStack {
+                    Spacer()
+                    ProgressView("Translating…")
+                    Spacer()
+                }
+                .frame(minHeight: 80)
+            case .loaded(let translated):
+                // Original and translated text side by side, so the user
+                // can compare them directly without scrolling between two
+                // screens.
+                HStack(alignment: .top, spacing: 12) {
+                    translationColumn(titleKey: "Original", text: editedText)
+                    Divider()
+                    translationColumn(titleKey: "Translation", text: translated)
+                }
+            case .failed(let error):
+                translationFailureContent(for: error)
+            }
+        }
+    }
+
+    private func translationColumn(titleKey: LocalizedStringKey, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(titleKey)
+                .font(AppFont.rowTitle)
+            Text(text)
+                .font(AppFont.caption)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func translationFailureContent(for error: Error) -> some View {
+        VStack(spacing: 12) {
+            translationFailureMessage(for: error)
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") { Task { await translate() } }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryRed)
+        }
+        .frame(maxWidth: .infinity, minHeight: 80)
+    }
+
+    /// Distinct, localization-ready messages per `TranslationError` case,
+    /// mirroring `failureMessage(for:)` above for `OCRRecognitionError` —
+    /// same reasoning: never collapse distinguishable failures into one
+    /// generic message.
+    @ViewBuilder
+    private func translationFailureMessage(for error: Error) -> some View {
+        if let translationError = error as? TranslationError {
+            switch translationError {
+            case .languagePackUnavailable:
+                Text("This language isn't downloaded for on-device translation yet. Download it in Settings, then try again.")
+            case .underlying:
+                Text("Translation failed unexpectedly.")
+            }
+        } else {
+            Text("Translation failed. You can try again.")
+        }
+    }
+
+    private func translate() async {
+        translationState = .loading
+        translationState = await translateSelection(editedText, to: selectedLanguage, using: translator)
+    }
+}
+
+/// Persists the OCR result screen's last-used translation target language
+/// locally (`UserDefaults`) — a lightweight per-device UI preference, not
+/// learning material, so it doesn't need backend storage (see the
+/// `ocr-translation` spec's rationale). First-ever default is Traditional
+/// Chinese, per Ticket 04.
+private enum LastUsedTargetLanguage {
+    private static let defaultsKey = "ocrTranslation.lastTargetLanguageID"
+    static let defaultID = "zh-Hant"
+
+    static var id: String {
+        get { UserDefaults.standard.string(forKey: defaultsKey) ?? defaultID }
+        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
+    }
+}
+
+/// A curated, non-exhaustive set of target languages offered by the
+/// translate picker (Ticket 04) — not every language Apple's `Translation`
+/// framework supports, since that would clutter a picker meant for a
+/// specific reading-comprehension flow; a short, sensible list is enough.
+/// Traditional Chinese is first, matching the default-language decision.
+/// `id` doubles as the value persisted via `LastUsedTargetLanguage` and as a
+/// `Locale.Language(identifier:)` string (e.g. `Locale.Language(identifier:
+/// "zh-Hant")` resolves to the same language as `AppleTranslator`'s own
+/// `Locale.Language(languageCode: "zh", script: "Hant")` construction).
+private struct TargetLanguageOption: Identifiable {
+    let id: String
+    let nameKey: LocalizedStringKey
+
+    static let options: [TargetLanguageOption] = [
+        TargetLanguageOption(id: "zh-Hant", nameKey: "Traditional Chinese"),
+        TargetLanguageOption(id: "en", nameKey: "English"),
+        TargetLanguageOption(id: "ja", nameKey: "Japanese"),
+        TargetLanguageOption(id: "ko", nameKey: "Korean"),
+        TargetLanguageOption(id: "fr", nameKey: "French"),
+        TargetLanguageOption(id: "es", nameKey: "Spanish"),
+    ]
 }
 
 #Preview("Reader") {
