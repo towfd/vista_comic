@@ -17,8 +17,7 @@ Do not infer current progress from this file. Treat the active `.scratch/` ticke
 
 ## Development rules
 
-- Present a short plan before implementation.
-- Before starting to execute, share the plan and get my approval first.
+- Planning and approval happen up front via `/wayfinder`, `/grilling`, or the `/to-spec` → `/to-tickets` pipeline — once a spec or ticket exists from that process, proceed straight to implementation without a separate pre-implementation approval step.
 - Work only within the active ticket/spec unless I explicitly expand the scope.
 - Work in small, reviewable increments and complete shared foundations before dependent feature work.
 - Prefer the minimum architecture that satisfies current acceptance criteria.
