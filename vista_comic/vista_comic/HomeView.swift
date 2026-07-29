@@ -26,7 +26,12 @@ struct HomeView: View {
                     ChapterPageView(comic: comic)
                 }
                 .navigationDestination(for: ReaderRoute.self) { route in
-                    ComicView(comicID: route.comicID, chapterID: route.chapterID)
+                    ComicView(
+                        comicID: route.comicID,
+                        chapterID: route.chapterID,
+                        targetPage: route.targetPage,
+                        isPeek: route.isPeek
+                    )
                 }
         }
         .task { await load() }

@@ -4,6 +4,16 @@
     "#%lld" : {
 
     },
+    "%@ · %@ · page %lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · page %3$lld · %4$@"
+          }
+        }
+      }
+    },
     "%@ · last read" : {
       "comment" : "Library card: last read timestamp",
       "localizations" : {
@@ -106,6 +116,9 @@
         }
       }
     },
+    "Couldn't save this translation. Check your connection and try again." : {
+
+    },
     "Done" : {
 
     },
@@ -122,6 +135,9 @@
 
     },
     "Japanese" : {
+
+    },
+    "Jump to source page" : {
 
     },
     "Korean" : {
@@ -180,6 +196,9 @@
     "Original" : {
 
     },
+    "Preview — progress won't be saved" : {
+
+    },
     "Previous chapter" : {
       "comment" : "Reader: previous chapter",
       "localizations" : {
@@ -229,6 +248,15 @@
           }
         }
       }
+    },
+    "Save" : {
+
+    },
+    "Saved" : {
+
+    },
+    "Saving…" : {
+
     },
     "Select text" : {
 

@@ -20,6 +20,11 @@ import UIKit
 struct ComicView: View {
     let comicID: String
     let chapterID: String
+    /// 1-based page to scroll to on open, overriding the chapter's saved
+    /// resume position. See `ReaderRoute.targetPage`.
+    var targetPage: Int? = nil
+    /// Read-only preview: never writes progress. See `ReaderRoute.isPeek`.
+    var isPeek: Bool = false
 
     @Environment(\.comicRepository) private var repository
     @State private var comicState: LoadState<Comic> = .loading
@@ -40,7 +45,7 @@ struct ComicView: View {
             // the id is unknown (e.g. an empty/best-effort Continue target).
             if let initial = comic.chapters.first(where: { $0.id == chapterID })
                 ?? comic.chapters.first {
-                ReaderView(comic: comic, initialChapter: initial)
+                ReaderView(comic: comic, initialChapter: initial, initialTargetPage: targetPage, isPeek: isPeek)
             } else {
                 // Detail with no chapters: nothing to read, offer a retry.
                 ErrorStateView { Task { await loadComic() } }
@@ -63,6 +68,14 @@ struct ComicView: View {
 /// The reader itself, now working from a fully-loaded comic and a starting chapter.
 private struct ReaderView: View {
     let comic: Comic
+    /// One-shot: consumed by the first `loadPages()` call, then cleared, so
+    /// prev/next chapter navigation within the same session resumes normally
+    /// instead of re-applying the originally requested page.
+    @State private var initialTargetPage: Int?
+    /// Sticky for the lifetime of this `ReaderView` instance — once opened as
+    /// a preview, no navigation within it (prev/next chapter, chapter list,
+    /// auto-advance) ever writes progress. See `ReaderRoute.isPeek`.
+    let isPeek: Bool
     @State private var currentChapter: Chapter
     @State private var showControls = true
     @State private var showChapterList = false
@@ -112,9 +125,11 @@ private struct ReaderView: View {
     /// How long scrolling must settle before a progress write is sent.
     private let saveDebounce: Duration = .seconds(0.9)
 
-    init(comic: Comic, initialChapter: Chapter) {
+    init(comic: Comic, initialChapter: Chapter, initialTargetPage: Int? = nil, isPeek: Bool = false) {
         self.comic = comic
         _currentChapter = State(initialValue: initialChapter)
+        _initialTargetPage = State(initialValue: initialTargetPage)
+        self.isPeek = isPeek
     }
 
     var body: some View{
@@ -278,8 +293,19 @@ private struct ReaderView: View {
 
                 Spacer()
 
-                Text(currentChapter.title)
-                    .font(AppFont.rowTitle)
+                VStack(spacing: 2) {
+                    Text(currentChapter.title)
+                        .font(AppFont.rowTitle)
+                    // Sets expectation up front that this session won't
+                    // advance "last read" — otherwise a preview reader looks
+                    // identical to a normal one and the missing progress
+                    // update would look like a bug.
+                    if isPeek {
+                        Text("Preview — progress won't be saved")
+                            .font(AppFont.caption)
+                            .foregroundStyle(.grayFont)
+                    }
+                }
 
                 Spacer()
 
@@ -351,6 +377,10 @@ private struct ReaderView: View {
         // Consume the one-shot restart flag for this chapter open.
         let restart = forceRestart
         forceRestart = false
+        // Consume the one-shot initial target page (set only by the route
+        // that opened this reader) so later chapter changes resume normally.
+        let targetPage = initialTargetPage
+        initialTargetPage = nil
 
         pagesState = .loading
         do {
@@ -359,14 +389,18 @@ private struct ReaderView: View {
                 chapterID: currentChapter.id
             )
             let urls = chapter.pageURLs
-            // Resume: map the 1-based `lastReadPage` to a 0-based index, clamped
-            // in case the chapter shrank since progress was saved. `nil` starts
-            // at the top. On a restart (auto-advance) we ignore the saved page
-            // and force the top. Setting `topPage` in the same update that flips
-            // to `.loaded` positions the freshly built scroll view accordingly.
+            // Resume: map the 1-based `lastReadPage` (or, on first open, an
+            // explicit `targetPage` override — see `ReaderRoute.targetPage`)
+            // to a 0-based index, clamped in case the chapter shrank since
+            // that page number was recorded. `nil` starts at the top. On a
+            // restart (auto-advance) we ignore both and force the top.
+            // Setting `topPage` in the same update that flips to `.loaded`
+            // positions the freshly built scroll view accordingly.
             let resumeIndex: Int?
             if restart {
                 resumeIndex = urls.isEmpty ? nil : 0
+            } else if let targetPage {
+                resumeIndex = urls.isEmpty ? nil : min(max(targetPage - 1, 0), urls.count - 1)
             } else {
                 resumeIndex = chapter.lastReadPage.flatMap { page in
                     urls.isEmpty ? nil : min(max(page - 1, 0), urls.count - 1)
@@ -435,8 +469,11 @@ private struct ReaderView: View {
 
     /// Writes `page` for `chapterID`, but only when it changed from the last
     /// value sent. Failures are swallowed: a down progress store must never
-    /// interrupt reading.
+    /// interrupt reading. A no-op in `isPeek` mode — the single gate every
+    /// progress write (scroll debounce, flush-on-leave, restart-on-advance)
+    /// funnels through, so a preview reader never touches saved progress.
     private func sendProgress(page: Int?, comicID: String, chapterID: String) {
+        guard !isPeek else { return }
         guard let page, page != lastSentPage else { return }
         lastSentPage = page
         Task {
@@ -1195,5 +1232,16 @@ private struct TargetLanguageOption: Identifiable {
             chapterID: SampleData.comics[0].chapters[0].id
         )
         .environment(\.comicRepository, FailingPreviewRepository())
+    }
+}
+
+#Preview("Reader — peek from 單字本") {
+    NavigationStack {
+        ComicView(
+            comicID: SampleData.comics[0].id,
+            chapterID: SampleData.comics[0].chapters[1].id,
+            targetPage: 3,
+            isPeek: true
+        )
     }
 }
