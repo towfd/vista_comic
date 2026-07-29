@@ -13,12 +13,14 @@
 //  API contract of record: Ticket 02's `POST /translations` / `GET /translations`
 //  (see `backend/app/main.py`, `backend/app/models.py`).
 //
-//  No environment injection here yet, deliberately: no consumer exists in
-//  this ticket, mirroring how `Translator` didn't gain an `EnvironmentKey`
-//  until the ticket that actually wired a caller to it.
+//  Environment injection added in the `ocr-translation` ticket that wires
+//  the first real consumer (the OCR result screen's "Save" action),
+//  mirroring `OCRRecognizer`'s/`Translator`'s own `EnvironmentKey`/
+//  `EnvironmentValues` extension — see the bottom of this file.
 //
 
 import Foundation
+import SwiftUI
 
 /// Saves and lists translated text pairs against the backend's "單字本" store.
 ///
@@ -42,4 +44,22 @@ protocol TranslationRepository {
 
     /// Every saved translation, most recently saved first.
     func list() async throws -> [SavedTranslation]
+}
+
+// MARK: - Environment injection
+
+private struct TranslationRepositoryKey: EnvironmentKey {
+    /// `APITranslationRepository`'s defaults (`APIConfig.baseURL`, etc.) mirror
+    /// `APIComicRepository`'s own network-backed default, per `OCRRecognizerKey`/
+    /// `TranslatorKey`'s pattern of defaulting to the concrete production
+    /// conformer directly.
+    static let defaultValue: any TranslationRepository = APITranslationRepository()
+}
+
+extension EnvironmentValues {
+    /// The repository the current view tree saves/lists translations through.
+    var translationRepository: any TranslationRepository {
+        get { self[TranslationRepositoryKey.self] }
+        set { self[TranslationRepositoryKey.self] = newValue }
+    }
 }
