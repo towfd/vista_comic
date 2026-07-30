@@ -64,7 +64,7 @@ This closes the loop the Connectivity section left open ("no Access policy for n
 - Exposing `postgres` for remote administration.
 - Multi-user auth, per-user accounts, or any identity model beyond "this one app, this one developer."
 - Redis (still deferred per ADR-0004, unrelated to this ticket).
-- Updating `PLAN.md` milestone tracking — per the CLAUDE.md source-of-truth rules, this work is tracked here in `.scratch/remote-access/` going forward rather than as a new PLAN.md slice.
+- Updating `ROADMAP.md` milestone tracking — per the CLAUDE.md source-of-truth rules, this work is tracked here in `.scratch/remote-access/` going forward rather than as a new ROADMAP.md slice.
 
 ## Further Notes
 

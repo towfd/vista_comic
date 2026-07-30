@@ -1,4 +1,4 @@
-# vista_comic development plan
+# vista_comic roadmap
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
@@ -7,7 +7,7 @@ Last updated: 2026-07-30
 ## Current status
 
 - Milestones M1–M7 are complete; **M8 (OCR-to-translation) is in progress** — all 8 tickets are resolved on `feat/ocr-translation-foundation`, PR [#31](https://github.com/towfd/vista_comic/pull/31) is open and pending review/merge.
-- M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `PLAN.md` slice, per the ticket-driven workflow established in PR #19).
+- M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
 - Next action: get PR #31 reviewed and merged; after that, `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap items 4 "Translation and language learning" and 5 "Profile and sync" remain the long-range direction).
@@ -190,7 +190,7 @@ Slices (each ships only after the prior one has an observable acceptance test):
 
 Load-bearing: server IDs must be stable across scans/restarts (path-derived hash), because Slice 4 keys progress on them.
 
-Connectivity: a Cloudflare named Tunnel + Cloudflare Access (Service Token, not interactive login) now provides a stable public HTTPS endpoint (`api.vistabanana.com`) — `cloudflared` runs as a third Compose service routed only to `api` (never `postgres`); iOS attaches the Service Token headers via build-time `.xcconfig` → `Info.plist` config (survives launching the app standalone, unlike Xcode-scheme env vars). Shipped and verified end-to-end (PRs #19–#21, 2026-07-28); tracked as `.scratch/remote-access/`, not a separate `PLAN.md` slice, per the ticket-driven workflow those PRs established.
+Connectivity: a Cloudflare named Tunnel + Cloudflare Access (Service Token, not interactive login) now provides a stable public HTTPS endpoint (`api.vistabanana.com`) — `cloudflared` runs as a third Compose service routed only to `api` (never `postgres`); iOS attaches the Service Token headers via build-time `.xcconfig` → `Info.plist` config (survives launching the app standalone, unlike Xcode-scheme env vars). Shipped and verified end-to-end (PRs #19–#21, 2026-07-28); tracked as `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow those PRs established.
 
 ### M6 — OCR text selection + recognition
 

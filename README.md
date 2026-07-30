@@ -60,4 +60,4 @@ Import a manga source
 - Approach: progress in small, verifiable milestones
 - Current priority: keep the architecture native, simple, and easy to learn
 
-For the milestone roadmap and history, see [`PLAN.md`](PLAN.md); work currently in progress (specs and tickets) lives under `.scratch/`. For agent collaboration and development rules, see [`CLAUDE.md`](CLAUDE.md).
+For the milestone roadmap and history, see [`ROADMAP.md`](ROADMAP.md); work currently in progress (specs and tickets) lives under `.scratch/`. For agent collaboration and development rules, see [`CLAUDE.md`](CLAUDE.md).
