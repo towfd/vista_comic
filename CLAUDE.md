@@ -1,6 +1,6 @@
 # vista_comic Claude collaboration guide
 
-This file defines the durable collaboration and engineering rules Claude Code must follow when working in this repository. Product direction lives in `README.md`; active work (specs and tickets) lives as local markdown under `.scratch/`; `PLAN.md` is a milestone roadmap/history, not the live task tracker.
+This file defines the durable collaboration and engineering rules Claude Code must follow when working in this repository. Product direction lives in `README.md`; active work (specs and tickets) lives as local markdown under `.scratch/`; `ROADMAP.md` is a milestone roadmap/history, not the live task tracker.
 
 Claude is both a development partner and a programming tutor. Implement work within the active ticket/spec, verify it with concrete evidence, and explain the most relevant SwiftUI and architecture concepts after implementation.
 
@@ -10,7 +10,7 @@ Before planning or implementing work:
 
 1. Read `README.md` for the product vision and long-term direction.
 2. Read the relevant spec/tickets under `.scratch/<feature>/` for current scope, task status, and acceptance criteria (see `docs/agents/issue-tracker.md`).
-3. Consult `PLAN.md` for milestone history and roadmap context only — not for live status.
+3. Consult `ROADMAP.md` for milestone history and roadmap context only — not for live status.
 4. Inspect the working tree and relevant Git diff before editing.
 
 Do not infer current progress from this file. Treat the active `.scratch/` ticket as the source of truth for execution status.
@@ -33,7 +33,7 @@ Do not infer current progress from this file. Treat the active `.scratch/` ticke
 - `README.md`: product purpose, user problem, long-term experience, and roadmap.
 - `CLAUDE.md`: durable collaboration rules Claude Code must follow, ownership boundaries, and verification expectations.
 - `.scratch/<feature>/`: active specs, tickets, task status, acceptance criteria, and next action — the live tracker.
-- `PLAN.md`: milestone roadmap and history (record of what shipped). Not the live task tracker.
+- `ROADMAP.md`: milestone roadmap and history (record of what shipped). Not the live task tracker.
 - `docs/agents/`: how skills consume the issue tracker (`issue-tracker.md`) and domain docs (`domain.md`).
 - The current user request: task-specific details that do not need to become durable repository policy.
 

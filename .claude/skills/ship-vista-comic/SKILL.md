@@ -21,7 +21,7 @@ If either is missing, stop and ask. Never publish unrequested or unreviewed work
 
 ## Establish state
 
-1. Read `PLAN.md` to name the milestone or change being shipped.
+1. Read `ROADMAP.md` to name the milestone or change being shipped.
 2. Inspect `git status` and the full diff.
 3. Confirm the diff contains only intended work; preserve unrelated and uncommitted user changes.
 4. Identify anything that must not be published (see Exclusions).
