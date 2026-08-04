@@ -137,6 +137,13 @@ class SavedTranslationCreate(BaseModel):
 
     originalText: str
     translatedText: str
+    # Deeper explanation fields (llm-comprehension ticket 15), all optional:
+    # present when saving a full cloud comprehension result, absent/None when
+    # saving a fallback (translation-only) result -- persisted as NULL either
+    # way, never a validation error.
+    grammarNotes: Optional[str] = None
+    contextNotes: Optional[str] = None
+    toneRegister: Optional[str] = None
     targetLanguage: str
     comicId: str
     chapterId: str
@@ -151,6 +158,9 @@ class SavedTranslationResponse(BaseModel):
     id: int
     originalText: str
     translatedText: str
+    grammarNotes: Optional[str] = None
+    contextNotes: Optional[str] = None
+    toneRegister: Optional[str] = None
     targetLanguage: str
     comicId: str
     chapterId: str

@@ -15,7 +15,7 @@ misrepresent "the store is unreachable" as "nothing has been saved".
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import delete, func, insert, select
 from sqlalchemy.orm import Session
@@ -32,6 +32,9 @@ def insert_translation(
     comic_id: str,
     chapter_id: str,
     page_number: int,
+    grammar_notes: Optional[str] = None,
+    context_notes: Optional[str] = None,
+    tone_register: Optional[str] = None,
 ) -> SavedTranslation:
     """Insert one saved-translation row; return it with ``id``/``saved_at`` filled in.
 
@@ -40,12 +43,19 @@ def insert_translation(
     plain (session-detached) ``SavedTranslation`` built from the caller's
     values plus the two DB-generated columns, so the endpoint can echo the
     saved state without a second round trip.
+
+    ``grammar_notes``/``context_notes``/``tone_register`` (llm-comprehension
+    ticket 15) default to ``None`` -- a fallback (translation-only) save
+    persists them as ``NULL`` rather than failing.
     """
     stmt = (
         insert(SavedTranslation)
         .values(
             original_text=original_text,
             translated_text=translated_text,
+            grammar_notes=grammar_notes,
+            context_notes=context_notes,
+            tone_register=tone_register,
             target_language=target_language,
             comic_id=comic_id,
             chapter_id=chapter_id,
@@ -60,6 +70,9 @@ def insert_translation(
         id=generated.id,
         original_text=original_text,
         translated_text=translated_text,
+        grammar_notes=grammar_notes,
+        context_notes=context_notes,
+        tone_register=tone_register,
         target_language=target_language,
         comic_id=comic_id,
         chapter_id=chapter_id,

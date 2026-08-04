@@ -29,6 +29,9 @@ final class StubTranslationRepository: TranslationRepository {
     var saveResult: Result<SavedTranslation, StubSaveError> = .failure(StubSaveError(message: "not configured"))
     private(set) var lastOriginalText: String?
     private(set) var lastTranslatedText: String?
+    private(set) var lastGrammarNotes: String?
+    private(set) var lastContextNotes: String?
+    private(set) var lastToneRegister: String?
     private(set) var lastTargetLanguage: String?
     private(set) var lastComicID: String?
     private(set) var lastChapterID: String?
@@ -44,6 +47,9 @@ final class StubTranslationRepository: TranslationRepository {
     func save(
         originalText: String,
         translatedText: String,
+        grammarNotes: String?,
+        contextNotes: String?,
+        toneRegister: String?,
         targetLanguage: String,
         comicID: String,
         chapterID: String,
@@ -52,6 +58,9 @@ final class StubTranslationRepository: TranslationRepository {
         saveCallCount += 1
         lastOriginalText = originalText
         lastTranslatedText = translatedText
+        lastGrammarNotes = grammarNotes
+        lastContextNotes = contextNotes
+        lastToneRegister = toneRegister
         lastTargetLanguage = targetLanguage
         lastComicID = comicID
         lastChapterID = chapterID
@@ -94,7 +103,9 @@ struct SelectionSaveFlowTests {
         // `SavedTranslation` has no memberwise-friendly initializer exposed
         // beyond `Decodable`, mirroring `APITranslationRepositoryTests`'s own
         // approach: decode a small canned JSON payload instead of
-        // constructing the struct directly.
+        // constructing the struct directly. Explanation fields are omitted —
+        // this flow's tests only assert on what `saveSelection` sends to the
+        // repository, not on what a real save echoes back.
         let json = """
         {
             "id": \(id),
@@ -156,6 +167,57 @@ struct SelectionSaveFlowTests {
         #expect(stub.lastChapterID == "chapter-7")
         #expect(stub.lastPageNumber == 12)
         #expect(stub.saveCallCount == 1)
+    }
+
+    /// `llm-comprehension` ticket 15: a save made from a full cloud
+    /// comprehension result passes its three explanation fields through to
+    /// the repository unchanged.
+    @Test func passesExplanationFieldsToTheRepositoryWhenProvided() async throws {
+        let stub = StubTranslationRepository()
+        stub.saveResult = .success(makeSavedTranslation())
+
+        _ = await saveSelection(
+            originalText: "Xin chào",
+            translatedText: "你好",
+            grammarNotes: "Subject-verb-object order",
+            contextNotes: "Speaker is addressing a peer",
+            toneRegister: "Casual",
+            targetLanguage: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 3,
+            using: stub
+        )
+
+        #expect(stub.lastGrammarNotes == "Subject-verb-object order")
+        #expect(stub.lastContextNotes == "Speaker is addressing a peer")
+        #expect(stub.lastToneRegister == "Casual")
+    }
+
+    /// A save made from a fallback (translation-only) result still succeeds,
+    /// passing `nil` for all three explanation fields — no error, no
+    /// silently-dropped save (ticket 15's AC).
+    @Test func omitsExplanationFieldsWhenNotProvided() async throws {
+        let stub = StubTranslationRepository()
+        stub.saveResult = .success(makeSavedTranslation())
+
+        let state = await saveSelection(
+            originalText: "Xin chào",
+            translatedText: "你好",
+            targetLanguage: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 3,
+            using: stub
+        )
+
+        guard case .loaded = state else {
+            Issue.record("expected .loaded, got \(state)")
+            return
+        }
+        #expect(stub.lastGrammarNotes == nil)
+        #expect(stub.lastContextNotes == nil)
+        #expect(stub.lastToneRegister == nil)
     }
 
     // MARK: - Failure

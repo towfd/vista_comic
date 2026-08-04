@@ -40,19 +40,31 @@ struct APITranslationRepository: TranslationRepository {
     func save(
         originalText: String,
         translatedText: String,
+        grammarNotes: String?,
+        contextNotes: String?,
+        toneRegister: String?,
         targetLanguage: String,
         comicID: String,
         chapterID: String,
         pageNumber: Int
     ) async throws -> SavedTranslation {
-        let body = try JSONSerialization.data(withJSONObject: [
+        var payload: [String: Any] = [
             "originalText": originalText,
             "translatedText": translatedText,
             "targetLanguage": targetLanguage,
             "comicId": comicID,
             "chapterId": chapterID,
             "pageNumber": pageNumber,
-        ])
+        ]
+        // Omitted (rather than sent as JSON `null`) when absent — the
+        // backend's `SavedTranslationCreate` fields all default to `None`,
+        // so an omitted key and an explicit `null` are equivalent on the
+        // wire; omitting keeps a translation-only save's body identical to
+        // what `ocr-translation`'s original `save` always sent.
+        if let grammarNotes { payload["grammarNotes"] = grammarNotes }
+        if let contextNotes { payload["contextNotes"] = contextNotes }
+        if let toneRegister { payload["toneRegister"] = toneRegister }
+        let body = try JSONSerialization.data(withJSONObject: payload)
         return try await post(SavedTranslation.self, body: body, at: "translations")
     }
 

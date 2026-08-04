@@ -883,9 +883,17 @@ func comprehendOrTranslateSelection(
 /// own free function so `CroppedSelectionPreview`'s "Save" action is
 /// unit-testable against a stub `TranslationRepository` independent of any
 /// SwiftUI rendering or the real backend.
+///
+/// `grammarNotes`/`contextNotes`/`toneRegister` default to `nil`
+/// (`llm-comprehension` ticket 15) — the caller passes them only when saving
+/// a full cloud comprehension result; a fallback (translation-only) save
+/// simply omits them, persisting `NULL` on the backend rather than failing.
 func saveSelection(
     originalText: String,
     translatedText: String,
+    grammarNotes: String? = nil,
+    contextNotes: String? = nil,
+    toneRegister: String? = nil,
     targetLanguage: String,
     comicID: String,
     chapterID: String,
@@ -896,6 +904,9 @@ func saveSelection(
         let saved = try await repository.save(
             originalText: originalText,
             translatedText: translatedText,
+            grammarNotes: grammarNotes,
+            contextNotes: contextNotes,
+            toneRegister: toneRegister,
             targetLanguage: targetLanguage,
             comicID: comicID,
             chapterID: chapterID,
@@ -1168,7 +1179,7 @@ private struct CroppedSelectionPreview: View {
 
                     // "Save" is available as soon as a translation is
                     // showing (`ocr-translation` ticket 05's AC).
-                    saveControl(translatedText: outcome.translation)
+                    saveControl(outcome: outcome)
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
@@ -1265,14 +1276,27 @@ private struct CroppedSelectionPreview: View {
 
     // MARK: - Save
 
-    /// Persists `translatedText` (the current translation result) alongside
-    /// the current edited original text, target language, and source
-    /// reference.
-    private func save(translatedText: String) async {
+    /// Persists `outcome`'s translation alongside the current edited
+    /// original text, target language, and source reference. When `outcome`
+    /// is a full cloud comprehension (`llm-comprehension` ticket 15), its
+    /// three explanation fields are saved too; a fallback (translation-only)
+    /// `outcome` saves with all three left `nil`/`NULL`.
+    private func save(outcome: SelectionTranslateOutcome) async {
         saveState = .loading
+        var grammarNotes: String?
+        var contextNotes: String?
+        var toneRegister: String?
+        if case .comprehended(let result) = outcome {
+            grammarNotes = result.grammarNotes
+            contextNotes = result.contextNotes
+            toneRegister = result.toneRegister
+        }
         saveState = await saveSelection(
             originalText: editedText,
-            translatedText: translatedText,
+            translatedText: outcome.translation,
+            grammarNotes: grammarNotes,
+            contextNotes: contextNotes,
+            toneRegister: toneRegister,
             targetLanguage: selectedLanguageID,
             comicID: comicID,
             chapterID: chapterID,
@@ -1282,7 +1306,7 @@ private struct CroppedSelectionPreview: View {
     }
 
     @ViewBuilder
-    private func saveControl(translatedText: String) -> some View {
+    private func saveControl(outcome: SelectionTranslateOutcome) -> some View {
         if let saveState {
             switch saveState {
             case .loading:
@@ -1300,7 +1324,7 @@ private struct CroppedSelectionPreview: View {
                     Spacer()
                 }
             case .failed:
-                saveFailureContent(translatedText: translatedText)
+                saveFailureContent(outcome: outcome)
             }
         } else {
             // Available as soon as a translation is showing (the AC's whole
@@ -1308,7 +1332,7 @@ private struct CroppedSelectionPreview: View {
             // `saveState` becomes non-nil and this branch (along with the
             // button) is replaced by the loading/loaded/failed state above,
             // so there's no double-tap window to guard against separately.
-            Button("Save") { Task { await save(translatedText: translatedText) } }
+            Button("Save") { Task { await save(outcome: outcome) } }
                 .buttonStyle(.borderedProminent)
                 .tint(.primaryRed)
                 .frame(maxWidth: .infinity)
@@ -1321,14 +1345,14 @@ private struct CroppedSelectionPreview: View {
     /// like OCR/translation failures are — `TranslationRepository.save`
     /// throws generic networking errors (`APIError`), not a save-specific
     /// enum, so one clear message covers it.
-    private func saveFailureContent(translatedText: String) -> some View {
+    private func saveFailureContent(outcome: SelectionTranslateOutcome) -> some View {
         VStack(spacing: 12) {
             Text("Couldn't save this translation. Check your connection and try again.")
                 .font(AppFont.caption)
                 .foregroundStyle(.grayFont)
                 .multilineTextAlignment(.center)
 
-            Button("Retry") { Task { await save(translatedText: translatedText) } }
+            Button("Retry") { Task { await save(outcome: outcome) } }
                 .buttonStyle(.borderedProminent)
                 .tint(.primaryRed)
         }

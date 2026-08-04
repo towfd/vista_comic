@@ -64,6 +64,26 @@ def test_list_all_empty_when_nothing_saved(translation_session):
     assert translation_store.list_all(translation_session) == []
 
 
+def test_insert_translation_defaults_explanation_fields_to_none(translation_session):
+    row = translation_store.insert_translation(translation_session, **_SAMPLE)
+    assert row.grammar_notes is None
+    assert row.context_notes is None
+    assert row.tone_register is None
+
+
+def test_insert_translation_persists_explanation_fields_when_given(translation_session):
+    row = translation_store.insert_translation(
+        translation_session,
+        **_SAMPLE,
+        grammar_notes="Subject-verb-object order",
+        context_notes="Speaker is addressing a peer",
+        tone_register="Casual",
+    )
+    assert row.grammar_notes == "Subject-verb-object order"
+    assert row.context_notes == "Speaker is addressing a peer"
+    assert row.tone_register == "Casual"
+
+
 # --- endpoint: POST -----------------------------------------------------------
 
 
@@ -75,6 +95,9 @@ def test_post_translation_returns_saved_entry(client):
         "id",
         "originalText",
         "translatedText",
+        "grammarNotes",
+        "contextNotes",
+        "toneRegister",
         "targetLanguage",
         "comicId",
         "chapterId",
@@ -89,6 +112,32 @@ def test_post_translation_returns_saved_entry(client):
     assert body["pageNumber"] == 1
     assert body["savedAt"].endswith("+00:00")  # ISO-8601 UTC
     assert isinstance(body["id"], int)
+    # No explanation fields sent -> persisted/echoed as NULL, not an error
+    # (llm-comprehension ticket 15's fallback-save AC).
+    assert body["grammarNotes"] is None
+    assert body["contextNotes"] is None
+    assert body["toneRegister"] is None
+
+
+def test_post_translation_with_explanation_fields_round_trips(client):
+    body = {
+        **_SAMPLE_BODY,
+        "grammarNotes": "Subject-verb-object order",
+        "contextNotes": "Speaker is addressing a peer",
+        "toneRegister": "Casual",
+    }
+    resp = client.post("/translations", json=body)
+    assert resp.status_code == 200
+    saved = resp.json()
+    assert saved["grammarNotes"] == "Subject-verb-object order"
+    assert saved["contextNotes"] == "Speaker is addressing a peer"
+    assert saved["toneRegister"] == "Casual"
+
+    listed = client.get("/translations").json()
+    assert len(listed) == 1
+    assert listed[0]["grammarNotes"] == "Subject-verb-object order"
+    assert listed[0]["contextNotes"] == "Speaker is addressing a peer"
+    assert listed[0]["toneRegister"] == "Casual"
 
 
 @pytest.mark.parametrize("bad_page", [0, -1])

@@ -69,6 +69,15 @@ class SavedTranslation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     original_text: Mapped[str] = mapped_column(String, nullable=False)
     translated_text: Mapped[str] = mapped_column(String, nullable=False)
+    # Deeper explanation fields (llm-comprehension ticket 15), all nullable:
+    # present when this was saved from a full cloud comprehension result
+    # (ticket 14's blue banner), NULL when saved from a declined/error
+    # fallback (orange/gray banner) or from a pre-existing ocr-translation-era
+    # row. No separate provenance column -- all three NULL already means
+    # "translation-only", per the spec's decision.
+    grammar_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    context_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tone_register: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     target_language: Mapped[str] = mapped_column(String, nullable=False)
     comic_id: Mapped[str] = mapped_column(String, nullable=False)
     chapter_id: Mapped[str] = mapped_column(String, nullable=False)

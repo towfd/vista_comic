@@ -90,6 +90,27 @@ struct APITranslationRepositoryTests {
     }
     """
 
+    /// `llm-comprehension` ticket 15: a response that carries the three
+    /// explanation fields, for the round-trip tests below. Missing from
+    /// `sampleResponseJSON` above on purpose — that constant covers the
+    /// pre-existing translation-only shape, decoding those three keys as
+    /// `nil` (see `SavedTranslationTests.decodesMissingExplanationKeysAsNil`).
+    private static let sampleResponseJSONWithExplanation = """
+    {
+        "id": 42,
+        "originalText": "Xin chào",
+        "translatedText": "你好",
+        "grammarNotes": "Subject-verb-object order",
+        "contextNotes": "Speaker is addressing a peer",
+        "toneRegister": "Casual",
+        "targetLanguage": "zh-Hant",
+        "comicId": "comic-1",
+        "chapterId": "chapter-1",
+        "pageNumber": 3,
+        "savedAt": "2026-01-15T10:30:00Z"
+    }
+    """
+
     // MARK: - save()
 
     @Test func saveBuildsPostRequestWithEncodedBody() async throws {
@@ -100,6 +121,9 @@ struct APITranslationRepositoryTests {
         _ = try await repository.save(
             originalText: "Xin chào",
             translatedText: "你好",
+            grammarNotes: nil,
+            contextNotes: nil,
+            toneRegister: nil,
             targetLanguage: "zh-Hant",
             comicID: "comic-1",
             chapterID: "chapter-1",
@@ -121,6 +145,63 @@ struct APITranslationRepositoryTests {
         #expect(body["comicId"] as? String == "comic-1")
         #expect(body["chapterId"] as? String == "chapter-1")
         #expect(body["pageNumber"] as? Int == 3)
+        // Omitted, not sent as JSON `null` — see `APITranslationRepository
+        // .save`'s doc comment on why (`llm-comprehension` ticket 15).
+        #expect(body["grammarNotes"] == nil)
+        #expect(body["contextNotes"] == nil)
+        #expect(body["toneRegister"] == nil)
+    }
+
+    /// `llm-comprehension` ticket 15: a save from a full cloud comprehension
+    /// result includes its three explanation fields in the request body.
+    @Test func saveIncludesExplanationFieldsInBodyWhenProvided() async throws {
+        TranslationStubURLProtocol.responseBody = Data(Self.sampleResponseJSONWithExplanation.utf8)
+        TranslationStubURLProtocol.statusCode = 200
+
+        let repository = makeRepository()
+        _ = try await repository.save(
+            originalText: "Xin chào",
+            translatedText: "你好",
+            grammarNotes: "Subject-verb-object order",
+            contextNotes: "Speaker is addressing a peer",
+            toneRegister: "Casual",
+            targetLanguage: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 3
+        )
+
+        let request = try #require(TranslationStubURLProtocol.lastRequest)
+        let bodyData = try #require(request.httpBody ?? bodyStream(from: request))
+        let body = try #require(
+            try JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
+        )
+        #expect(body["grammarNotes"] as? String == "Subject-verb-object order")
+        #expect(body["contextNotes"] as? String == "Speaker is addressing a peer")
+        #expect(body["toneRegister"] as? String == "Casual")
+    }
+
+    @Test func saveDecodesResponseWithExplanationFieldsIntoSavedTranslation() async throws {
+        TranslationStubURLProtocol.responseBody = Data(Self.sampleResponseJSONWithExplanation.utf8)
+        TranslationStubURLProtocol.statusCode = 200
+
+        let repository = makeRepository()
+        let saved = try await repository.save(
+            originalText: "Xin chào",
+            translatedText: "你好",
+            grammarNotes: "Subject-verb-object order",
+            contextNotes: "Speaker is addressing a peer",
+            toneRegister: "Casual",
+            targetLanguage: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 3
+        )
+
+        #expect(saved.grammarNotes == "Subject-verb-object order")
+        #expect(saved.contextNotes == "Speaker is addressing a peer")
+        #expect(saved.toneRegister == "Casual")
+        #expect(saved.hasExplanation == true)
     }
 
     @Test func saveDecodesResponseIntoSavedTranslation() async throws {
@@ -131,6 +212,9 @@ struct APITranslationRepositoryTests {
         let saved = try await repository.save(
             originalText: "Xin chào",
             translatedText: "你好",
+            grammarNotes: nil,
+            contextNotes: nil,
+            toneRegister: nil,
             targetLanguage: "zh-Hant",
             comicID: "comic-1",
             chapterID: "chapter-1",
@@ -159,6 +243,9 @@ struct APITranslationRepositoryTests {
         _ = try await repository.save(
             originalText: "a",
             translatedText: "b",
+            grammarNotes: nil,
+            contextNotes: nil,
+            toneRegister: nil,
             targetLanguage: "zh-Hant",
             comicID: "comic-1",
             chapterID: "chapter-1",
@@ -178,6 +265,9 @@ struct APITranslationRepositoryTests {
         _ = try await repository.save(
             originalText: "a",
             translatedText: "b",
+            grammarNotes: nil,
+            contextNotes: nil,
+            toneRegister: nil,
             targetLanguage: "zh-Hant",
             comicID: "comic-1",
             chapterID: "chapter-1",
@@ -198,6 +288,9 @@ struct APITranslationRepositoryTests {
             try await repository.save(
                 originalText: "a",
                 translatedText: "b",
+                grammarNotes: nil,
+                contextNotes: nil,
+                toneRegister: nil,
                 targetLanguage: "zh-Hant",
                 comicID: "comic-1",
                 chapterID: "chapter-1",
@@ -245,6 +338,25 @@ struct APITranslationRepositoryTests {
         #expect(saved.first?.comicID == "comic-1")
         #expect(saved.first?.chapterID == "chapter-1")
         #expect(saved.first?.pageNumber == 3)
+        // A translation-only entry decodes its explanation fields as `nil`
+        // (`llm-comprehension` ticket 15) — no error, no crash.
+        #expect(saved.first?.grammarNotes == nil)
+        #expect(saved.first?.hasExplanation == false)
+    }
+
+    /// `llm-comprehension` ticket 15: `list()` returns the three explanation
+    /// fields for an entry that has them.
+    @Test func listDecodesEntriesWithExplanationFields() async throws {
+        TranslationStubURLProtocol.responseBody = Data("[\(Self.sampleResponseJSONWithExplanation)]".utf8)
+        TranslationStubURLProtocol.statusCode = 200
+
+        let repository = makeRepository()
+        let saved = try await repository.list()
+
+        #expect(saved.first?.grammarNotes == "Subject-verb-object order")
+        #expect(saved.first?.contextNotes == "Speaker is addressing a peer")
+        #expect(saved.first?.toneRegister == "Casual")
+        #expect(saved.first?.hasExplanation == true)
     }
 
     @Test func listThrowsHTTPStatusErrorOnServerFailure() async throws {

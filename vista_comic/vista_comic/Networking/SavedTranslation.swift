@@ -21,6 +21,15 @@ struct SavedTranslation: Identifiable, Hashable, Decodable {
     let id: Int
     let originalText: String
     let translatedText: String
+    /// The deeper explanation fields (`llm-comprehension` ticket 15) — all
+    /// three present when this was saved from a full cloud comprehension
+    /// result (ticket 14's blue banner), all three `nil` when saved from a
+    /// declined/error fallback (orange/gray banner) or from a pre-existing
+    /// `ocr-translation`-era save. No separate provenance flag: "all three
+    /// `nil`" already means "translation-only", per the spec's decision.
+    let grammarNotes: String?
+    let contextNotes: String?
+    let toneRegister: String?
     /// The target language the translation was made into (e.g. `"zh-Hant"`),
     /// as a plain string — the backend stores and echoes it opaquely, with no
     /// `Locale.Language` decoding on this side.
@@ -36,8 +45,18 @@ struct SavedTranslation: Identifiable, Hashable, Decodable {
     let savedAt: Date
 
     private enum CodingKeys: String, CodingKey {
-        case id, originalText, translatedText, targetLanguage, pageNumber, savedAt
+        case id, originalText, translatedText, grammarNotes, contextNotes, toneRegister
+        case targetLanguage, pageNumber, savedAt
         case comicID = "comicId"
         case chapterID = "chapterId"
+    }
+
+    /// Whether this entry carries explanation content (`llm-comprehension`
+    /// ticket 16) — checks all three rather than assuming they're always
+    /// saved together, so a 單字本 row degrades gracefully (shows whatever
+    /// exists) instead of crashing/hiding everything if a future save path
+    /// ever persists them partially.
+    var hasExplanation: Bool {
+        grammarNotes != nil || contextNotes != nil || toneRegister != nil
     }
 }
