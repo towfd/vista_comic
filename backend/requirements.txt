@@ -4,3 +4,5 @@ python-dotenv==1.0.1
 # Slice 4: reading-progress store on PostgreSQL (sync SQLAlchemy + psycopg 3).
 SQLAlchemy==2.0.36
 psycopg[binary]==3.2.3
+# llm-comprehension ticket 11: POST /comprehend calls Claude via the official SDK.
+anthropic==0.120.2

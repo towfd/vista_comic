@@ -9,6 +9,7 @@ Endpoints (see docs/backend-architecture.md):
     POST   /translations                       -> save one original/translation pair
     GET    /translations                       -> list all saved pairs ("單字本")
     DELETE /translations/{id}                  -> delete one saved pair
+    POST   /comprehend                         -> translate + explain via Claude (see comprehension_client)
 
 Also provides:
     GET  /healthz           -> liveness + catalog size
@@ -24,11 +25,12 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anthropic
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from . import progress_store, translation_store
+from . import comprehension_client, progress_store, translation_store
 from .config import get_library_root
 from .db import SavedTranslation, init_engine, new_session
 from .models import (
@@ -36,6 +38,8 @@ from .models import (
     ChapterSummary,
     ComicDetail,
     ComicSummary,
+    ComprehendRequest,
+    ComprehendResponse,
     ProgressResponse,
     ProgressUpdate,
     SavedTranslationCreate,
@@ -430,6 +434,64 @@ def delete_translation(translation_id: int) -> None:
         session.close()
     if not deleted:
         raise HTTPException(status_code=404, detail="Translation not found")
+
+
+@app.post(
+    "/comprehend",
+    response_model=ComprehendResponse,
+    response_model_exclude_none=True,  # a declined body is exactly {"status": "declined"}
+)
+def comprehend(body: ComprehendRequest) -> ComprehendResponse:
+    """Translate + explain one selection via Claude (see comprehension_client).
+
+    No DB session: this route only talks to the Claude API, not the catalog
+    or Postgres. Two genuine-success-vs-declined outcomes share HTTP 200,
+    discriminated by ``status`` (per the llm-comprehension spec's
+    Implementation Decisions) so the client can pick the right fallback/banner
+    without guessing from a status code:
+
+    - ``{"status": "ok", translation, grammarNotes, contextNotes,
+      toneRegister}`` on a successful tool-use result.
+    - ``{"status": "declined"}`` when Claude's response has no valid tool-use
+      result (see ``comprehension_client.comprehend``'s docstring on why this
+      is not gated on a specific ``stop_reason`` value).
+
+    Any other failure -- a connection/API error from the Anthropic SDK -- is a
+    normal HTTP 4xx/5xx via ``HTTPException``, never this 200 shape. Request
+    validation (missing/malformed fields) is handled by FastAPI/Pydantic
+    before this function runs (422).
+    """
+    try:
+        result = comprehension_client.comprehend(
+            crop_image_base64=body.cropImageBase64,
+            page_image_base64=body.pageImageBase64,
+            source_text=body.sourceText,
+            target_language_code=body.targetLanguageCode,
+            use_stronger_model=body.useStrongerModel,
+        )
+    except anthropic.APIStatusError as exc:
+        # The Anthropic SDK guarantees a 4xx/5xx status here; forward it
+        # rather than collapsing every failure to a single code, without
+        # exposing the API key (never present in the SDK's own error body).
+        logger.warning("Claude API returned an error status.", exc_info=True)
+        raise HTTPException(
+            status_code=exc.status_code, detail="Comprehension request failed"
+        )
+    except (anthropic.APIConnectionError, anthropic.AnthropicError):
+        logger.warning("Claude API call failed.", exc_info=True)
+        raise HTTPException(
+            status_code=502, detail="Comprehension service unavailable"
+        )
+
+    if result is None:
+        return ComprehendResponse(status="declined")
+    return ComprehendResponse(
+        status="ok",
+        translation=result.translation,
+        grammarNotes=result.grammar_notes,
+        contextNotes=result.context_notes,
+        toneRegister=result.tone_register,
+    )
 
 
 @app.get("/media/{comic_id}/{chapter_id}/{page}")

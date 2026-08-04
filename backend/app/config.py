@@ -21,6 +21,7 @@ load_dotenv(dotenv_path=_ENV_PATH)
 
 _ENV_KEY = "MANGA_LIBRARY_PATH"
 _DB_ENV_KEY = "DATABASE_URL"
+_CLAUDE_API_KEY_ENV_KEY = "ANTHROPIC_API_KEY"
 
 # Non-secret local default used when DATABASE_URL is unset (e.g. a local
 # uvicorn dev run after ``docker compose up`` published Postgres on localhost).
@@ -40,6 +41,28 @@ def get_database_url() -> str:
     ``localhost``.
     """
     return os.environ.get(_DB_ENV_KEY) or _DEFAULT_DATABASE_URL
+
+
+def get_claude_api_key() -> str:
+    """Return the Claude (Anthropic) API key backing ``POST /comprehend``.
+
+    Read from the ``ANTHROPIC_API_KEY`` environment variable (loaded from the
+    gitignored repo-root ``.env``, same pattern as ``MANGA_LIBRARY_PATH``) --
+    the same name the ``anthropic`` SDK itself resolves by default.
+    Mirrors ``get_library_root()``'s fail-loudly stance rather than
+    ``get_database_url()``'s fallback-default one: unlike Postgres (which has a
+    non-secret local dev default), there is no safe default API key, so a
+    caller that needs it should get a clear error immediately rather than
+    silently failing inside the Anthropic SDK. Never logged, never returned in
+    a response body -- callers use this only to construct the SDK client.
+    """
+    raw = os.environ.get(_CLAUDE_API_KEY_ENV_KEY)
+    if not raw:
+        raise RuntimeError(
+            f"{_CLAUDE_API_KEY_ENV_KEY} is not set. Define it in {_ENV_PATH} "
+            "(gitignored) or export it in the environment."
+        )
+    return raw
 
 
 def get_library_root() -> Path:

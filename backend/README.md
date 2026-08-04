@@ -45,6 +45,10 @@ MANGA_LIBRARY_PATH=/absolute/path/to/your/manga/library
 # Test database (optional). Tests refuse to run unless the DB name ends in
 # `_test`, and never fall back to DATABASE_URL, so they can't touch the dev DB.
 # TEST_DATABASE_URL=postgresql+psycopg://vista:vista@localhost:5432/vista_test
+
+# Claude (Anthropic) API key backing POST /comprehend (required for that
+# endpoint only — the rest of the API works without it).
+# ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## Run it
