@@ -2,15 +2,15 @@
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
-Last updated: 2026-07-30
+Last updated: 2026-08-04
 
 ## Current status
 
-- Milestones M1–M7 are complete; **M8 (OCR-to-translation) is in progress** — all 8 tickets are resolved on `feat/ocr-translation-foundation`, PR [#31](https://github.com/towfd/vista_comic/pull/31) is open and pending review/merge.
+- Milestones M1–M8 are complete; **M9 (LLM-assisted comprehension) is in progress** — all 17 tickets are resolved on `feat/llm-comprehension-foundation`, PR [#35](https://github.com/towfd/vista_comic/pull/35) is open and pending review/merge.
 - M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
-- Next action: get PR #31 reviewed and merged; after that, `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap items 4 "Translation and language learning" and 5 "Profile and sync" remain the long-range direction).
+- Next action: get PR #35 reviewed and merged; after that, `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap item 5 "Profile and sync" remains the long-range direction; item 4 "Translation and language learning" is now fully realized by M8 + M9).
 
 ## Current release goal
 
@@ -42,7 +42,7 @@ The flow must work with sample data and without a backend or network dependency.
 > This list described the original M1–M4 sample-data-only release goal above. M5–M8 have since shipped a real backend, OCR, and translation — kept here as historical record of that release goal, not current scope. See the Milestones section for what's actually shipped.
 
 - ~~OCR and text-region selection~~ — shipped, M6
-- ~~Translation or LLM integration~~ — on-device translation shipped, M8 (no LLM integration yet)
+- ~~Translation or LLM integration~~ — on-device translation shipped, M8; cloud LLM comprehension (translation + grammar/context/tone explanation) shipped, M9
 - Web scraping and real URL parsing (README §2 URL import remains later work)
 - ~~Authentication and cloud sync~~ — Cloudflare Access authentication shipped (`.scratch/remote-access/`); cloud *sync* (README roadmap item 5) remains out of scope
 - ~~Persistence beyond what M5 needs~~ — reading-progress (M5 Slice 4) and saved translations (M8) both shipped
@@ -227,7 +227,7 @@ Verification: full-scheme build succeeds (confirmed independently after merge); 
 
 ### M8 — OCR-to-translation: translate, save, and manage 單字本
 
-- Status: **In progress** — all 8 tickets resolved on `feat/ocr-translation-foundation`; PR [#31](https://github.com/towfd/vista_comic/pull/31) open, pending review/merge
+- Status: Complete (PR [#31](https://github.com/towfd/vista_comic/pull/31); merged 2026-07-29)
 - Owner: main session, implemented by `frontend-implementer`/`backend-implementer`
 - Dependencies: M5 (backend), M6 (OCR result screen this attaches to), M7 (單字本 tab this populates)
 - Spec of record: `.scratch/ocr-translation/spec.md`
@@ -250,6 +250,32 @@ Tickets (all resolved):
 
 Verification: `xcodebuild build`/`test` clean (22/22 focused unit tests pass). Manual, against the real backend on booted iOS 18.1 simulators (iPhone SE, iPhone 16 Pro Max): full select → recognize → translate → save → 單字本 list → jump-to-source (peek mode) → delete round trip confirmed, including a real end-to-end delete verified against the live backend. Backend `pytest` for ticket 08 not runnable in the developer's local sandboxed environment (a native Postgres on the Mac shadows docker-compose's published port ahead of the test suite's connection — pre-existing, unrelated) — verified instead via direct curl against the real docker-composed endpoints. This sandboxed environment has no tap/drag-automation tool; interactive UI flows were verified by temporarily forcing navigation/state for a screenshot and reverting immediately after each time (confirmed clean via `git diff`).
 
+### M9 — LLM-assisted comprehension
+
+- Status: **In progress** — all 17 tickets resolved on `feat/llm-comprehension-foundation`; PR [#35](https://github.com/towfd/vista_comic/pull/35) open, pending review/merge
+- Owner: main session, implemented by `backend-implementer`/`frontend-implementer`
+- Dependencies: M5 (backend), M8 (the OCR result screen's "Translate" action this extends, and the `saved_translation`/單字本 store this adds columns to)
+- Spec of record: `.scratch/llm-comprehension/spec.md`; wayfinder map: `.scratch/llm-comprehension/map.md`
+- Realizes the remainder of README roadmap item 4, explicitly deferred by M8's own spec: "Word/sentence/context explanations and any LLM-assisted comprehension"
+
+M8 shipped a literal, on-device translation. A learner still can't see *why* a sentence translates the way it does — grammar structure, how the surrounding panel resolves an ambiguous pronoun, or tone/register. M9 extends the same select → OCR → translate flow with a cloud Claude call that returns translation + grammar notes + context notes + tone/register, keeping the on-device `Translator` as an automatic fallback rather than a hard failure.
+
+Decision tickets (wayfinder map, all resolved) — destination/timing, model location, translation-merge/fallback design, structured-output/persistence shape, cost safety net, content-policy risk, daily-cap value, schema fields/model tier, result-screen UX, and the backend API contract. See `.scratch/llm-comprehension/map.md`'s Decisions-so-far for each.
+
+Implementation tickets (all resolved):
+
+- [x] **11 — Backend `POST /comprehend`: core contract.** Accepts a selection crop image, downscaled full-page image, source text, and target language; calls the Claude Messages API with a `strict: true` tool-use schema (`translation`, `grammarNotes`, `contextNotes`, `toneRegister`); a `status` field on HTTP 200 discriminates a genuine success from a model-declined outcome, so a decline is never confused with a connectivity/server error.
+- [x] **12 — Backend cost guards.** A lenient per-request image-size ceiling (4xx) and a global daily request cap (300/day, a small `CREATE TABLE IF NOT EXISTS` Postgres counter) as anomaly guards against runaway cost — not real usage-limiting.
+- [x] **13 — iOS `Comprehender` protocol + `APIComprehender`.** Mirrors `OCRRecognizer`/`Translator`'s seam; base64-encodes both images (page image downscaled to a ~1024px long edge in *pixel* space); `ComprehensionError` distinguishes `.declined` from `.underlying`.
+- [x] **14 — Wire `Comprehender` into the Translate flow, with fallback + status banner.** The OCR result screen's "Translate" action now calls `Comprehender` first; a persistent capsule banner (☁️ blue "雲端深度解釋" / ⚠️ orange "內容政策・僅提供翻譯" / 📱 gray "離線模式・僅逐字翻譯") tells the reader at a glance which path a result came from, always shown before any content.
+- [x] **15 — Persist explanation content.** `saved_translation` gains three nullable columns (`grammar_notes`, `context_notes`, `tone_register`); `POST`/`GET /translations` and the iOS "Save" action grow to carry them — a fallback-only save persists NULL, never an error.
+- [x] **16 — 單字本 list shows saved explanation content.** `SavedTranslationRow` gains an expandable grammar/context/tone disclosure, shown only when a saved entry actually has explanation content; fallback-only and pre-existing (M8-era) rows render unchanged.
+- [x] **17 — Manual "request a stronger explanation" action.** A secondary action on a successful (blue-banner) result re-calls `Comprehender` with the Sonnet-tier override, replacing the displayed result on success; absent entirely from the fallback states; a failed upgrade leaves the original result untouched.
+
+**Deployment gap found and fixed during device-testing:** `docker-compose.yml`'s `api` service wasn't forwarding `ANTHROPIC_API_KEY` into the container (the repo-root `.env` is only used by Compose to interpolate `${...}` values, never copied into the container) — every real-device `/comprehend` call was silently 500ing and masked by the ticket 14 fallback, showing the gray "離線模式" banner even though nothing was actually offline. Fixed by forwarding the variable explicitly, the same way `DATABASE_URL` already was; verified live against the real container afterward.
+
+Verification: `xcodebuild build`/`test` clean, full suite passing with no regressions; backend `pytest` (full suite) passing; build-verified on `iPhone SE (3rd generation)` and `iPhone 16 Pro Max`; `/code-review` (Standards + Spec axes) run per ticket, no hard violations. Live device test against the real backend (Claude Haiku 4.5) confirmed the blue-banner success path end-to-end. Interactive tap-through / XCUITest execution not run in this sandboxed environment (see Known issues and constraints) — left for the developer on a real device or normal Xcode session.
+
 ## Known issues and constraints
 
 - Xcode builds may report simulator-service or cache permission limitations in restricted execution environments.
@@ -271,6 +297,6 @@ Verification: `xcodebuild build`/`test` clean (22/22 focused unit tests pass). M
 
 ## Next action
 
-M1–M7 are merged; M8 (OCR-to-translation) is code-complete on `feat/ocr-translation-foundation` with PR [#31](https://github.com/towfd/vista_comic/pull/31) open. Next action: get PR #31 reviewed and merged. After that, no feature is currently specced under `.scratch/` — the next scope (likely drawing from README roadmap item 4's remaining pieces — word/sentence/context explanations, LLM-assisted comprehension — or item 5, profile and sync) needs a fresh `/wayfinder` or `/to-spec` pass before implementation starts.
+M1–M8 are merged; M9 (LLM-assisted comprehension) is code-complete on `feat/llm-comprehension-foundation` with PR [#35](https://github.com/towfd/vista_comic/pull/35) open. Next action: get PR #35 reviewed and merged. After that, no feature is currently specced under `.scratch/` — the next scope (README roadmap item 5, profile and sync, is the only remaining long-range item not yet covered) needs a fresh `/wayfinder` or `/to-spec` pass before implementation starts.
 
 Backlog (unstarted): Dynamic Type support (move off fixed font sizes); dark-appearance colour variants; README §2 URL import; `LibraryFlowUITests`/`ReaderFlowUITests` still assert `"Frieren"`, which doesn't match the real backend's actual seeded library (`marrymyhusband`/`marrymyhusband2`) — noted during M7, not yet fixed.
