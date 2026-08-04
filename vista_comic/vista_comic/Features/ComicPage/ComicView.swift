@@ -546,6 +546,12 @@ private struct ReaderPage: View {
     /// (`ocr-translation` ticket 05). Same reasoning as `ocrRecognizer`/
     /// `translator` above.
     @Environment(\.translationRepository) private var translationRepository
+    /// The comprehender `CroppedSelectionPreview`'s "Translate" action now
+    /// calls first (`llm-comprehension` ticket 14), falling back to
+    /// `translator` above only on a declined/failed cloud call. Same
+    /// reasoning as the other environment reads on this view: read here and
+    /// passed down explicitly.
+    @Environment(\.comprehender) private var comprehender
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -610,10 +616,12 @@ private struct ReaderPage: View {
         .sheet(item: $croppedSelection) { selection in
             CroppedSelectionPreview(
                 image: selection.image,
+                pageImage: selection.pageImage,
                 comicID: comicID,
                 chapterID: chapterID,
                 pageNumber: pageNumber,
                 recognizer: ocrRecognizer,
+                comprehender: comprehender,
                 translator: translator,
                 translationRepository: translationRepository
             )
@@ -697,7 +705,7 @@ private struct ReaderPage: View {
     /// a screenshot of the scaled on-screen rendering. A `.zero` mapping (the
     /// selection didn't overlap the displayed image at all) is a no-op.
     private func produceCrop(from rect: CGRect, displayFrameSize: CGSize) {
-        guard let cgImage = decodedImage?.cgImage else { return }
+        guard let decodedImage, let cgImage = decodedImage.cgImage else { return }
         let imagePixelSize = CGSize(width: cgImage.width, height: cgImage.height)
         let cropRect = SelectionCropMapping.cropRect(
             for: rect,
@@ -705,7 +713,7 @@ private struct ReaderPage: View {
             imagePixelSize: imagePixelSize
         )
         guard cropRect != .zero, let croppedCGImage = cgImage.cropping(to: cropRect) else { return }
-        croppedSelection = CroppedSelection(image: UIImage(cgImage: croppedCGImage))
+        croppedSelection = CroppedSelection(image: UIImage(cgImage: croppedCGImage), pageImage: decodedImage)
     }
 
     private var failurePlaceholder: some View {
@@ -738,6 +746,13 @@ private struct ReaderPage: View {
 private struct CroppedSelection: Identifiable {
     let id = UUID()
     let image: UIImage
+    /// The full decoded page this crop was drawn from, threaded through so
+    /// `CroppedSelectionPreview` can send it to `Comprehender` as scene
+    /// context (`llm-comprehension` ticket 14) — captured here, at crop time,
+    /// rather than read from `ReaderPage`'s `decodedImage` state again later,
+    /// so this selection's page image can never drift from the one it was
+    /// actually cropped out of.
+    let pageImage: UIImage
 }
 
 /// Runs OCR recognition for a confirmed crop and maps the outcome onto
@@ -781,6 +796,84 @@ func translateSelection(
         return .loaded(translated)
     } catch {
         return .failed(error)
+    }
+}
+
+/// The "Translate" action's unified result (`llm-comprehension` ticket 14):
+/// either a full cloud comprehension (`Comprehender`, ticket 13) or a
+/// translation-only result produced by falling back to the existing
+/// on-device `Translator` — either because the cloud call was declined
+/// (content policy) or failed for any other reason (network, backend error).
+/// Kept as one type, rather than a `ComprehensionResult?` and a translation
+/// `String?` as two separate optionals, so the view has exactly one state to
+/// switch on and can't represent the nonsensical "both present"/"neither
+/// present" combinations.
+enum SelectionTranslateOutcome: Equatable {
+    case comprehended(ComprehensionResult)
+    case translatedOnly(translation: String, reason: FallbackReason)
+
+    /// Why the flow fell back to on-device translation — drives which of the
+    /// two distinct fallback banners (orange "declined" vs. gray "error") the
+    /// result screen shows, per the spec's Testing Decisions: a content
+    /// decline must never look like a generic connectivity problem.
+    enum FallbackReason: Equatable {
+        case declined
+        case error
+    }
+
+    /// The translation text, present in every case — read by the
+    /// always-shown translation column and by "Save" regardless of which
+    /// banner is currently showing.
+    var translation: String {
+        switch self {
+        case .comprehended(let result): return result.translation
+        case .translatedOnly(let translation, _): return translation
+        }
+    }
+}
+
+/// Runs the "Translate" action's real end-to-end behavior (`llm-comprehension`
+/// ticket 14): calls `Comprehender` first, and only falls back to the
+/// existing on-device `Translator` (unchanged — `translateSelection` above)
+/// when the cloud call is declined or fails for any other reason. A free
+/// function, mirroring `translateSelection`'s/`recognizeSelection`'s own
+/// reasoning: unit-testable against stub `Comprehender`/`Translator`
+/// conformers independent of any SwiftUI rendering.
+func comprehendOrTranslateSelection(
+    _ text: String,
+    crop cropImage: UIImage,
+    page pageImage: UIImage,
+    to targetLanguage: Locale.Language,
+    targetLanguageCode: String,
+    using comprehender: any Comprehender,
+    fallbackTranslator: any Translator
+) async -> LoadState<SelectionTranslateOutcome> {
+    do {
+        let result = try await comprehender.comprehend(
+            crop: cropImage,
+            page: pageImage,
+            sourceText: text,
+            targetLanguage: targetLanguageCode,
+            useStrongerModel: false
+        )
+        return .loaded(.comprehended(result))
+    } catch {
+        // Any thrown error other than a declined outcome — including a
+        // `ComprehensionError.underlying` or a conformer throwing something
+        // else entirely — falls back the same way, per the AC's "any other
+        // Comprehender failure (network, backend error)" wording.
+        let reason: SelectionTranslateOutcome.FallbackReason =
+            (error as? ComprehensionError) == .declined ? .declined : .error
+        let fallback = await translateSelection(text, to: targetLanguage, using: fallbackTranslator)
+        switch fallback {
+        case .loaded(let translated):
+            return .loaded(.translatedOnly(translation: translated, reason: reason))
+        case .failed(let translationError):
+            return .failed(translationError)
+        case .loading:
+            // Unreachable: `translateSelection` never returns `.loading`.
+            return .loading
+        }
     }
 }
 
@@ -828,6 +921,11 @@ func saveSelection(
 /// is the whole point of saving.
 private struct CroppedSelectionPreview: View {
     let image: UIImage
+    /// The full decoded page `image` was cropped from, needed by
+    /// `Comprehender` as scene/panel context (`llm-comprehension` ticket 14)
+    /// alongside `image` and `editedText` — see `CroppedSelection.pageImage`
+    /// for why it's captured at crop time rather than re-read later.
+    let pageImage: UIImage
     /// The comic/chapter/page this crop was selected from, threaded down
     /// from `ReaderPage` — needed so "Save" can attach the correct source
     /// reference, mirroring `ComicRepository.saveProgress`'s use of the same
@@ -840,7 +938,12 @@ private struct CroppedSelectionPreview: View {
     /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
     /// views instead of hard-coding production behavior inside them).
     let recognizer: any OCRRecognizer
-    /// Same reasoning as `recognizer` above, for the "Translate" action.
+    /// Same reasoning as `recognizer` above, for the "Translate" action's
+    /// primary cloud call (`llm-comprehension` ticket 14) — tried first,
+    /// with `translator` below as its automatic fallback.
+    let comprehender: any Comprehender
+    /// Same reasoning as `recognizer` above, for the "Translate" action's
+    /// fallback: run automatically when `comprehender` is declined or fails.
     let translator: any Translator
     /// Same reasoning as `recognizer`/`translator` above, for the "Save"
     /// action.
@@ -854,8 +957,11 @@ private struct CroppedSelectionPreview: View {
     /// recognition runs automatically on appear, translation runs on demand
     /// (tapping "Translate") and can be re-run against a different language
     /// or a further-edited text without disturbing the recognition result.
-    /// `nil` until the user taps "Translate" for the first time.
-    @State private var translationState: LoadState<String>?
+    /// `nil` until the user taps "Translate" for the first time. Holds a
+    /// `SelectionTranslateOutcome` (ticket 14), not a bare translated
+    /// `String`, since a successful result may be a full cloud comprehension
+    /// or a translation-only fallback.
+    @State private var translationState: LoadState<SelectionTranslateOutcome>?
     /// Save state, deliberately separate from `translationState` for the same
     /// reason translation is separate from recognition: saving is a further
     /// on-demand step (tapping "Save"), not something that runs
@@ -1034,25 +1140,69 @@ private struct CroppedSelectionPreview: View {
                     Spacer()
                 }
                 .frame(minHeight: 80)
-            case .loaded(let translated):
+            case .loaded(let outcome):
                 VStack(alignment: .leading, spacing: 12) {
+                    // Always the first thing shown once a result exists (the
+                    // AC's explicit ordering requirement) — answers "is this
+                    // the full cloud explanation or a degraded result"
+                    // before the reader looks at any content below it.
+                    comprehensionBanner(for: outcome)
+
                     // Original and translated text side by side, so the user
                     // can compare them directly without scrolling between two
                     // screens.
                     HStack(alignment: .top, spacing: 12) {
                         translationColumn(titleKey: "Original", text: editedText)
                         Divider()
-                        translationColumn(titleKey: "Translation", text: translated)
+                        translationColumn(titleKey: "Translation", text: outcome.translation)
+                    }
+
+                    // Grammar/context/tone only render for a full cloud
+                    // success — the declined/error fallback cases only ever
+                    // carry a translation.
+                    if case .comprehended(let result) = outcome {
+                        translationColumn(titleKey: "Grammar notes", text: result.grammarNotes)
+                        translationColumn(titleKey: "Context notes", text: result.contextNotes)
+                        translationColumn(titleKey: "Tone & register", text: result.toneRegister)
                     }
 
                     // "Save" is available as soon as a translation is
                     // showing (`ocr-translation` ticket 05's AC).
-                    saveControl(translatedText: translated)
+                    saveControl(translatedText: outcome.translation)
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
             }
         }
+    }
+
+    /// The persistent status banner (`llm-comprehension` ticket 08's Variant
+    /// C decision): always the first thing shown, so the reader knows at a
+    /// glance whether they're looking at a full cloud explanation or one of
+    /// the two distinct fallback states, before reading any content below.
+    @ViewBuilder
+    private func comprehensionBanner(for outcome: SelectionTranslateOutcome) -> some View {
+        switch outcome {
+        case .comprehended:
+            banner(icon: "cloud.fill", text: "雲端深度解釋", tint: .blue)
+        case .translatedOnly(_, .declined):
+            // Orange, not gray — deliberately distinct from the generic
+            // offline/error banner below, so a content-policy decline is
+            // never mistaken for a connectivity problem (ticket 07/08's
+            // whole point).
+            banner(icon: "exclamationmark.triangle.fill", text: "內容政策・僅提供翻譯", tint: .orange)
+        case .translatedOnly(_, .error):
+            banner(icon: "iphone", text: "離線模式・僅逐字翻譯", tint: .gray)
+        }
+    }
+
+    private func banner(icon: String, text: String, tint: Color) -> some View {
+        Label(text, systemImage: icon)
+            .font(AppFont.caption)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(tint))
     }
 
     private func translationColumn(titleKey: LocalizedStringKey, text: String) -> some View {
@@ -1102,7 +1252,15 @@ private struct CroppedSelectionPreview: View {
         // A fresh translation invalidates any prior save (it was saved from
         // the previous translated text), so start "Save" clean again.
         saveState = nil
-        translationState = await translateSelection(editedText, to: selectedLanguage, using: translator)
+        translationState = await comprehendOrTranslateSelection(
+            editedText,
+            crop: image,
+            page: pageImage,
+            to: selectedLanguage,
+            targetLanguageCode: selectedLanguageID,
+            using: comprehender,
+            fallbackTranslator: translator
+        )
     }
 
     // MARK: - Save
