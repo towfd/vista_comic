@@ -13,10 +13,10 @@ dependency yielding a short-lived session per request.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Iterator, Optional
 
-from sqlalchemy import Engine, Integer, String, create_engine
+from sqlalchemy import Date, Engine, Integer, String, create_engine
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -76,6 +76,25 @@ class SavedTranslation(Base):
     saved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class ComprehendUsage(Base):
+    """Global daily request counter backing ``/comprehend``'s cost guard.
+
+    Not per-user -- this backend has no per-user identity (a single shared
+    Cloudflare Access Service Token gates every request, see ADR-0005), so the
+    cap is one counter for the whole deployment, keyed on calendar date.
+    ``usage_date`` is the primary key (one row per day, like ``Progress``'s
+    natural-key upsert), which is also how the cap resets automatically: a new
+    date simply has no row yet, so no manual reset job is needed. Purely an
+    anomaly guard against runaway cost (e.g. a retry-loop bug), not real
+    usage-limiting -- see ``comprehend_usage_store.py``.
+    """
+
+    __tablename__ = "comprehend_usage"
+
+    usage_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 # Module-level engine/session factory, installed by ``init_engine`` at startup
