@@ -263,4 +263,93 @@ struct SelectionComprehensionFlowTests {
         let outcome = SelectionTranslateOutcome.translatedOnly(translation: "你好", reason: .declined)
         #expect(outcome.translation == "你好")
     }
+
+    // MARK: - upgradeComprehension (`llm-comprehension` ticket 17)
+
+    @Test func upgradeRequestsTheStrongerModelTier() async throws {
+        let comprehender = StubComprehender()
+        comprehender.result = .success(
+            ComprehensionResult(translation: "ignored", grammarNotes: "", contextNotes: "", toneRegister: "")
+        )
+
+        _ = await upgradeComprehension(
+            "Hello there",
+            crop: cropImage,
+            page: pageImage,
+            targetLanguageCode: "zh-Hant",
+            using: comprehender
+        )
+
+        #expect(comprehender.lastUseStrongerModel == true)
+        #expect(comprehender.lastSourceText == "Hello there")
+        #expect(comprehender.lastTargetLanguage == "zh-Hant")
+    }
+
+    @Test func successfulUpgradeYieldsTheNewComprehensionResult() async throws {
+        let comprehender = StubComprehender()
+        let expected = ComprehensionResult(
+            translation: "Xin chào bạn",
+            grammarNotes: "A deeper grammar note",
+            contextNotes: "A deeper context note",
+            toneRegister: "A deeper tone note"
+        )
+        comprehender.result = .success(expected)
+
+        let state = await upgradeComprehension(
+            "Hello there",
+            crop: cropImage,
+            page: pageImage,
+            targetLanguageCode: "zh-Hant",
+            using: comprehender
+        )
+
+        guard case .loaded(let result) = state else {
+            Issue.record("expected .loaded, got \(state)")
+            return
+        }
+        #expect(result == expected)
+    }
+
+    /// The AC's explicit requirement: a failed upgrade attempt surfaces as
+    /// `.failed` rather than silently substituting a fallback — the caller
+    /// (`CroppedSelectionPreview.upgrade()`) is responsible for leaving the
+    /// original result visible, which only works if this function never
+    /// itself reaches for `Translator`.
+    @Test func failedUpgradeSurfacesAsFailedWithoutFallingBack() async throws {
+        let comprehender = StubComprehender()
+        comprehender.result = .failure(.underlying("HTTP 502"))
+
+        let state = await upgradeComprehension(
+            "Hello there",
+            crop: cropImage,
+            page: pageImage,
+            targetLanguageCode: "zh-Hant",
+            using: comprehender
+        )
+
+        guard case .failed(let error) = state else {
+            Issue.record("expected .failed, got \(state)")
+            return
+        }
+        #expect(error as? ComprehensionError == .underlying("HTTP 502"))
+    }
+
+    @Test func declinedUpgradeSurfacesAsFailed() async throws {
+        let comprehender = StubComprehender()
+        comprehender.result = .failure(.declined)
+
+        let state = await upgradeComprehension(
+            "Hello there",
+            crop: cropImage,
+            page: pageImage,
+            targetLanguageCode: "zh-Hant",
+            using: comprehender
+        )
+
+        guard case .failed(let error) = state else {
+            Issue.record("expected .failed, got \(state)")
+            return
+        }
+        #expect(error as? ComprehensionError == .declined)
+    }
 }

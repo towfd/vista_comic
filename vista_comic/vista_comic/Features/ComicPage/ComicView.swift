@@ -877,6 +877,36 @@ func comprehendOrTranslateSelection(
     }
 }
 
+/// Re-requests a stronger-tier (Sonnet 5, via `useStrongerModel: true`)
+/// comprehension for `text` (`llm-comprehension` ticket 17's manual upgrade
+/// action), calling `Comprehender` directly. Deliberately does **not** fall
+/// back to `Translator` on failure, unlike `comprehendOrTranslateSelection`
+/// above: this is only ever called while a valid (Haiku-tier) comprehended
+/// result is already showing, and the AC requires a failed upgrade to leave
+/// that original result exactly as it was — falling back here would replace
+/// it with a translation-only result instead, which is strictly less than
+/// what the reader already had.
+func upgradeComprehension(
+    _ text: String,
+    crop cropImage: UIImage,
+    page pageImage: UIImage,
+    targetLanguageCode: String,
+    using comprehender: any Comprehender
+) async -> LoadState<ComprehensionResult> {
+    do {
+        let result = try await comprehender.comprehend(
+            crop: cropImage,
+            page: pageImage,
+            sourceText: text,
+            targetLanguage: targetLanguageCode,
+            useStrongerModel: true
+        )
+        return .loaded(result)
+    } catch {
+        return .failed(error)
+    }
+}
+
 /// Persists an original/translated text pair and its source reference
 /// through a `TranslationRepository`, mapped onto `LoadState` — the same
 /// reasoning as `recognizeSelection`/`translateSelection` above: kept as its
@@ -985,6 +1015,19 @@ private struct CroppedSelectionPreview: View {
     /// Chinese on first use — see `LastUsedTargetLanguage`). Persisted back
     /// to `UserDefaults` whenever the user changes the picker.
     @State private var selectedLanguageID = LastUsedTargetLanguage.id
+    /// Whether the manual "request a stronger explanation" action
+    /// (`llm-comprehension` ticket 17) is in flight. Deliberately not folded
+    /// into `translationState`'s `LoadState`: the whole point of this action
+    /// is that the currently-showing (Haiku-tier) result stays visible and
+    /// interactive while the upgraded request runs, and stays visible if it
+    /// fails — a `.loading`/`.failed` `translationState` would hide it.
+    @State private var isUpgrading = false
+    /// Set on a failed upgrade attempt to drive a one-shot alert, mirroring
+    /// `VocabularyView`'s `deleteError` precedent: the failure is surfaced
+    /// without disturbing `translationState`, so the reader never ends up
+    /// with less than they had before tapping upgrade (the AC's explicit
+    /// requirement).
+    @State private var upgradeError: String?
 
     var body: some View {
         NavigationStack {
@@ -1013,6 +1056,12 @@ private struct CroppedSelectionPreview: View {
             }
         }
         .task { await recognize() }
+        .alert(
+            "Couldn't get a stronger explanation. Check your connection and try again.",
+            isPresented: Binding(get: { upgradeError != nil }, set: { if !$0 { upgradeError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        }
     }
 
     @ViewBuilder
@@ -1168,13 +1217,16 @@ private struct CroppedSelectionPreview: View {
                         translationColumn(titleKey: "Translation", text: outcome.translation)
                     }
 
-                    // Grammar/context/tone only render for a full cloud
-                    // success — the declined/error fallback cases only ever
-                    // carry a translation.
+                    // Grammar/context/tone — and the manual upgrade action
+                    // below them — only render for a full cloud success; the
+                    // declined/error fallback cases only ever carry a
+                    // translation, with no explanation to upgrade
+                    // (`llm-comprehension` ticket 17's AC).
                     if case .comprehended(let result) = outcome {
                         translationColumn(titleKey: "Grammar notes", text: result.grammarNotes)
                         translationColumn(titleKey: "Context notes", text: result.contextNotes)
                         translationColumn(titleKey: "Tone & register", text: result.toneRegister)
+                        upgradeButton
                     }
 
                     // "Save" is available as soon as a translation is
@@ -1272,6 +1324,64 @@ private struct CroppedSelectionPreview: View {
             using: comprehender,
             fallbackTranslator: translator
         )
+    }
+
+    // MARK: - Upgrade (`llm-comprehension` ticket 17)
+
+    /// Re-requests a stronger-tier comprehension for the same text/images/
+    /// target language, replacing the displayed (Haiku-tier) result on
+    /// success. Only reachable while a `.comprehended` result is already
+    /// showing (see `upgradeButton`'s placement) — there's no explanation to
+    /// upgrade from a fallback state.
+    private func upgrade() async {
+        isUpgrading = true
+        let result = await upgradeComprehension(
+            editedText,
+            crop: image,
+            page: pageImage,
+            targetLanguageCode: selectedLanguageID,
+            using: comprehender
+        )
+        isUpgrading = false
+        switch result {
+        case .loaded(let comprehensionResult):
+            translationState = .loaded(.comprehended(comprehensionResult))
+            // A fresh result invalidates any prior save, same reasoning as
+            // `translate()` above.
+            saveState = nil
+        case .failed:
+            // The AC's explicit requirement: a failed upgrade leaves the
+            // original result exactly as it was — `translationState` is
+            // untouched — with the failure surfaced as a one-shot alert
+            // instead.
+            upgradeError = "Couldn't get a stronger explanation. Check your connection and try again."
+        case .loading:
+            break
+        }
+    }
+
+    private var upgradeButton: some View {
+        Button {
+            Task { await upgrade() }
+        } label: {
+            if isUpgrading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Text("Requesting deeper explanation…")
+                    Spacer()
+                }
+            } else {
+                HStack {
+                    Spacer()
+                    Label("Request deeper explanation", systemImage: "sparkles")
+                    Spacer()
+                }
+            }
+        }
+        .buttonStyle(.bordered)
+        .tint(.primaryRed)
+        .disabled(isUpgrading)
     }
 
     // MARK: - Save
