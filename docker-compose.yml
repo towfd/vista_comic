@@ -25,6 +25,11 @@ services:
       - MANGA_LIBRARY_PATH=/library
       # Inside the compose network the DB host is the `postgres` service name.
       - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-vista}:${POSTGRES_PASSWORD:-vista}@postgres:5432/${POSTGRES_DB:-vista}
+      # llm-comprehension ticket 11: backs POST /comprehend. The repo-root
+      # .env is only used by Compose itself to interpolate ${...} here -- it
+      # is never copied into the container -- so this must be forwarded
+      # explicitly, the same as DATABASE_URL above.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     volumes:
       - "${MANGA_LIBRARY_PATH}:/library:ro"
     depends_on:
