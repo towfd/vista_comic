@@ -15,7 +15,10 @@ model's own reading of the crop).
 
 Uses a ``strict: true`` tool-use schema (``additionalProperties: false``, all
 four fields ``required``) and forces the tool call via ``tool_choice``, so a
-successful response's ``input`` is guaranteed to have exactly these fields.
+successful response's ``input`` is guaranteed to have exactly these fields. The
+schema is built per request (``_tool_schema``) rather than being a constant,
+because the three explanation fields' descriptions name the language they must
+be written in.
 """
 
 from __future__ import annotations
@@ -40,43 +43,58 @@ _MAX_OUTPUT_TOKENS = 1024
 
 _TOOL_NAME = "record_comprehension"
 
-# strict: true + additionalProperties: false + all four fields required,
-# per the spec's Implementation Decisions and ticket 06's validated schema.
-_TOOL_SCHEMA: dict[str, Any] = {
-    "name": _TOOL_NAME,
-    "description": (
-        "Record the translation and explanation of the given source text, "
-        "using the two images only for visual context (speaker, panel, "
-        "tone) -- never as the source of the text itself."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "translation": {
-                "type": "string",
-                "description": "Translation of sourceText into the target language.",
-            },
-            "grammarNotes": {
-                "type": "string",
-                "description": "Notes on the sentence's grammar/structure.",
-            },
-            "contextNotes": {
-                "type": "string",
-                "description": (
+
+def _tool_schema(target_language_code: str) -> dict[str, Any]:
+    """Build the forced-tool schema for one request's target language.
+
+    The three explanation fields must state the language to write them in.
+    Without that, nothing in the request tells the model -- only
+    ``translation``'s description names the target -- so it follows the
+    prompt's own language and returns English notes regardless of what the
+    reader picked (`comprehension-response-ux` ticket 14).
+
+    The instruction carries the **bare BCP-47 code**, not the language spelled
+    out by name: a live spike against real Claude calls found the code as
+    reliable as the name, and it needs no language-name table kept in sync with
+    the app's picker, so a new picker language needs no change here.
+
+    Otherwise identical to ticket 06's validated schema: strict: true +
+    additionalProperties: false + all four fields required.
+    """
+
+    def note(description: str) -> dict[str, str]:
+        return {
+            "type": "string",
+            "description": f"{description} Write this field in {target_language_code}.",
+        }
+
+    return {
+        "name": _TOOL_NAME,
+        "description": (
+            "Record the translation and explanation of the given source text, "
+            "using the two images only for visual context (speaker, panel, "
+            "tone) -- never as the source of the text itself."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                # No note() suffix: this one already names the target language.
+                "translation": {
+                    "type": "string",
+                    "description": "Translation of sourceText into the target language.",
+                },
+                "grammarNotes": note("Notes on the sentence's grammar/structure."),
+                "contextNotes": note(
                     "How the surrounding panel/page (visible in the images) "
                     "resolves ambiguity in the text (e.g. pronouns)."
                 ),
+                "toneRegister": note("The line's tone/register/formality."),
             },
-            "toneRegister": {
-                "type": "string",
-                "description": "The line's tone/register/formality.",
-            },
+            "required": ["translation", "grammarNotes", "contextNotes", "toneRegister"],
+            "additionalProperties": False,
         },
-        "required": ["translation", "grammarNotes", "contextNotes", "toneRegister"],
-        "additionalProperties": False,
-    },
-    "strict": True,
-}
+        "strict": True,
+    }
 
 
 @dataclass(frozen=True)
@@ -158,7 +176,7 @@ def comprehend(
     message = client.messages.create(
         model=model,
         max_tokens=_MAX_OUTPUT_TOKENS,
-        tools=[_TOOL_SCHEMA],
+        tools=[_tool_schema(target_language_code)],
         tool_choice={"type": "tool", "name": _TOOL_NAME},
         messages=[
             {
