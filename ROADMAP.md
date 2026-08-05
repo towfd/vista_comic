@@ -10,7 +10,7 @@ Last updated: 2026-08-05
 - M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
-- Next action: `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap item 5 "Profile and sync" remains the long-range direction; item 4 "Translation and language learning" is now fully realized by M8 + M9).
+- Next action: **M10 (comprehension response UX) is specced and ticketed, implementation not started** — spec and tickets 13–21 under `.scratch/comprehension-response-ux/`. Tickets 13, 14 and 15 are unblocked and touch no shared files, so they can start in parallel.
 
 ## Current release goal
 
@@ -276,6 +276,17 @@ Implementation tickets (all resolved):
 
 Verification: `xcodebuild build`/`test` clean, full suite passing with no regressions; backend `pytest` (full suite) passing; build-verified on `iPhone SE (3rd generation)` and `iPhone 16 Pro Max`; `/code-review` (Standards + Spec axes) run per ticket, no hard violations. Live device test against the real backend (Claude Haiku 4.5) confirmed the blue-banner success path end-to-end. Interactive tap-through / XCUITest execution not run in this sandboxed environment (see Known issues and constraints) — left for the developer on a real device or normal Xcode session.
 
+### M10 — Comprehension response UX
+
+- Status: **Specced, not started** — 12 wayfinder decisions resolved, spec written, 9 implementation tickets (13–21) ready under `.scratch/comprehension-response-ux/`
+- Owner: main session; tickets 13 (iOS), 14 and 15 (backend) are unblocked and file-disjoint, so they can run in parallel
+
+Reshapes M9's comprehension flow around the two complaints that surfaced from using it: the reader waits tens of seconds for anything at all, and the explanation comes back in an unpredictable language. The on-device translator is promoted from failure fallback to always-first, so a literal translation is immediate; the cloud explanation is enqueued on the **backend**, which owns it from then on and completes it across sheet dismissal, app backgrounding and container restarts. Every translate auto-creates a record — the manual Save is removed — and 單字本 becomes a **歷史紀錄** tab with an unread badge. The language problem is fixed at its root: the tool schema's three explanation fields now name the target language, verified against real Claude calls (18/18 note fields compliant on the default tier).
+
+This deliberately **supersedes several of M9's own locked decisions** — the single merged call, the client-owned lifecycle, the manual save model, the one-shot verdict banner, the per-result stronger-model upgrade, and the "all note columns NULL means translation-only" convention. The spec's Further Notes carries the full list.
+
+Also decided and deliberately deferred out of this milestone: adopting a migration tool (triggered by this schema landing), converting the backend to async (buys almost nothing at this scale), and history pagination/retention (no data yet on where the threshold is).
+
 ## Known issues and constraints
 
 - Xcode builds may report simulator-service or cache permission limitations in restricted execution environments.
@@ -297,6 +308,10 @@ Verification: `xcodebuild build`/`test` clean, full suite passing with no regres
 
 ## Next action
 
-M1–M8 are merged; M9 (LLM-assisted comprehension) is code-complete on `feat/llm-comprehension-foundation` with PR [#35](https://github.com/towfd/vista_comic/pull/35) open. Next action: get PR #35 reviewed and merged. After that, no feature is currently specced under `.scratch/` — the next scope (README roadmap item 5, profile and sync, is the only remaining long-range item not yet covered) needs a fresh `/wayfinder` or `/to-spec` pass before implementation starts.
+M1–M9 are merged. **M10 (comprehension response UX) is specced and ticketed but not started** — the wayfinder map, spec and tickets 13–21 live under `.scratch/comprehension-response-ux/`, which is the source of truth for its status, not this file.
+
+Next action: implement tickets 13, 14 and 15. All three are unblocked and touch disjoint files (13 is an iOS behaviour-preserving extraction, 14 is a backend prompt-schema fix, 15 is the new backend record table and endpoints), so they can be delegated in parallel. Ticket 14 is worth doing first regardless of the rest: it fixes one of the two original complaints and is verifiable against the app as it exists today.
+
+Longer range, README roadmap item 5 ("Profile and sync") remains the only major direction not yet covered by a milestone.
 
 Backlog (unstarted): Dynamic Type support (move off fixed font sizes); dark-appearance colour variants; README §2 URL import; `LibraryFlowUITests`/`ReaderFlowUITests` still assert `"Frieren"`, which doesn't match the real backend's actual seeded library (`marrymyhusband`/`marrymyhusband2`) — noted during M7, not yet fixed.
