@@ -2,15 +2,15 @@
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 ## Current status
 
-- Milestones M1–M8 are complete; **M9 (LLM-assisted comprehension) is in progress** — all 17 tickets are resolved on `feat/llm-comprehension-foundation`, PR [#35](https://github.com/towfd/vista_comic/pull/35) is open and pending review/merge.
+- Milestones M1–M9 are complete; **M9 (LLM-assisted comprehension) is merged** — all 17 tickets resolved, PR [#35](https://github.com/towfd/vista_comic/pull/35) merged into `main` on 2026-08-04.
 - M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
-- Next action: get PR #35 reviewed and merged; after that, `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap item 5 "Profile and sync" remains the long-range direction; item 4 "Translation and language learning" is now fully realized by M8 + M9).
+- Next action: `.scratch/` has no other feature specced yet — next scope is undetermined (README's roadmap item 5 "Profile and sync" remains the long-range direction; item 4 "Translation and language learning" is now fully realized by M8 + M9).
 
 ## Current release goal
 
@@ -252,7 +252,7 @@ Verification: `xcodebuild build`/`test` clean (22/22 focused unit tests pass). M
 
 ### M9 — LLM-assisted comprehension
 
-- Status: **In progress** — all 17 tickets resolved on `feat/llm-comprehension-foundation`; PR [#35](https://github.com/towfd/vista_comic/pull/35) open, pending review/merge
+- Status: **Merged** — all 17 tickets resolved; PR [#35](https://github.com/towfd/vista_comic/pull/35) merged into `main` on 2026-08-04
 - Owner: main session, implemented by `backend-implementer`/`frontend-implementer`
 - Dependencies: M5 (backend), M8 (the OCR result screen's "Translate" action this extends, and the `saved_translation`/單字本 store this adds columns to)
 - Spec of record: `.scratch/llm-comprehension/spec.md`; wayfinder map: `.scratch/llm-comprehension/map.md`
