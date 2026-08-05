@@ -236,3 +236,61 @@ def test_comprehend_missing_field_never_reaches_claude(client, monkeypatch):
 
     assert resp.status_code == 422
     assert fake.messages.calls == []
+
+
+# --- explanation language (comprehension-response-ux ticket 14) ---------------
+
+
+_NOTE_FIELDS = ("grammarNotes", "contextNotes", "toneRegister")
+
+
+def _schema_properties(fake) -> dict:
+    return fake.messages.calls[0]["tools"][0]["input_schema"]["properties"]
+
+
+def _ok_block():
+    return _tool_use_block(
+        translation="t", grammarNotes="g", contextNotes="c", toneRegister="r"
+    )
+
+
+def test_note_fields_are_told_to_write_in_the_target_language(client, monkeypatch):
+    fake = _stub_client(monkeypatch, blocks=[_ok_block()])
+
+    resp = client.post("/comprehend", json=_BODY)
+
+    assert resp.status_code == 200
+    # Asserted on the schema sent to the model, not on generated prose, so this
+    # stays deterministic and needs no API key. The full suffix is pinned, not
+    # just the code, so the instruction can't silently lose its sentence.
+    properties = _schema_properties(fake)
+    for field in _NOTE_FIELDS:
+        assert properties[field]["description"].endswith(
+            "Write this field in zh-Hant."
+        ), field
+
+
+def test_translation_field_is_not_given_the_language_suffix(client, monkeypatch):
+    fake = _stub_client(monkeypatch, blocks=[_ok_block()])
+
+    resp = client.post("/comprehend", json=_BODY)
+
+    assert resp.status_code == 200
+    # Deliberate: `translation` already names the target language and was never
+    # part of the drift, so it must stay exactly as ticket 06 validated it.
+    assert (
+        _schema_properties(fake)["translation"]["description"]
+        == "Translation of sourceText into the target language."
+    )
+
+
+def test_note_language_follows_the_requested_target(client, monkeypatch):
+    fake = _stub_client(monkeypatch, blocks=[_ok_block()])
+
+    resp = client.post("/comprehend", json={**_BODY, "targetLanguageCode": "ja"})
+
+    assert resp.status_code == 200
+    # Threaded through per request, not hardcoded to one target.
+    properties = _schema_properties(fake)
+    for field in _NOTE_FIELDS:
+        assert properties[field]["description"].endswith("Write this field in ja."), field
