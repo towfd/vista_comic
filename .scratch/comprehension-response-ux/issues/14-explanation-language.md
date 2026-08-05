@@ -21,10 +21,10 @@ The **bare BCP-47 code is deliberate** — it proved as reliable as spelling the
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done — merged in PR #38
 
-- [ ] The tool schema is built per request from the target language code rather than being a module-level constant.
-- [ ] All three explanation field descriptions instruct the model to write in that language; the translation field's description is unchanged.
-- [ ] The prompt text is unchanged.
-- [ ] A test asserts the schema handed to the model carries the requested language code in all three explanation field descriptions, using the existing client-construction stub seam — no live API call in the test suite.
-- [ ] Manually verified against a real call: with a Vietnamese source and Traditional Chinese target, the three notes are Chinese prose that quotes the Vietnamese, and the translation is unaffected.
+- [x] The tool schema is built per request from the target language code rather than being a module-level constant.
+- [x] All three explanation field descriptions instruct the model to write in that language; the translation field's description is unchanged.
+- [x] The prompt text is unchanged.
+- [x] A test asserts the schema handed to the model carries the requested language code in all three explanation field descriptions, using the existing client-construction stub seam — no live API call in the test suite.
+- [x] Manually verified against a real call: with a Vietnamese source and Traditional Chinese target, the three notes are Chinese prose that quotes the Vietnamese, and the translation is unaffected.
