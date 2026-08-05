@@ -113,6 +113,32 @@ def translation_db(_progress_engine):
 
 
 @pytest.fixture
+def comprehension_db(_progress_engine):
+    """Truncate the comprehension record + usage tables before each test.
+
+    Both, because the daily cap is *reserved* when a record is enqueued: a
+    leftover count from a previous test would make cap assertions depend on
+    execution order.
+    """
+    with _progress_engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE comprehension_record"))
+        conn.execute(text("TRUNCATE TABLE comprehend_usage"))
+    return _progress_engine
+
+
+@pytest.fixture
+def comprehension_session(comprehension_db):
+    """A standalone session against the truncated comprehension tables."""
+    from app import db
+
+    session = db.new_session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
 def translation_session(translation_db):
     """A standalone session against the truncated ``saved_translation`` table."""
     from app import db

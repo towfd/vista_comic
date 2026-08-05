@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
+from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -31,7 +32,7 @@ from .db import ComprehendUsage
 DAILY_CAP = 300
 
 
-def _today_utc() -> date:
+def today_utc() -> date:
     # UTC, not local server time, so the cap resets at a consistent moment
     # regardless of the host's timezone -- matches this codebase's existing
     # UTC convention for stored timestamps (see progress_store.iso_utc).
@@ -67,7 +68,7 @@ def check_and_increment(
     counts independently without waiting for a real calendar day to roll over
     (proving the natural-reset behavior); it defaults to the current UTC date.
     """
-    usage_date = today if today is not None else _today_utc()
+    usage_date = today if today is not None else today_utc()
     stmt = (
         pg_insert(ComprehendUsage)
         .values(usage_date=usage_date, request_count=1)
@@ -83,8 +84,44 @@ def check_and_increment(
     return result is not None
 
 
+def refund(session: Session, *, usage_date: date) -> None:
+    """Give one reserved request back to ``usage_date``'s count.
+
+    The cap is *reserved* when work is enqueued, not when Claude is actually
+    called, so that a full cap can be reported to the reader immediately and the
+    queue can never grow longer than the remaining budget. This is the settle
+    half: it runs only when the request will never reach Claude at all (the row
+    was deleted while still pending, or the worker failed before issuing the
+    call). Anything that reached Claude keeps its count -- including a declined
+    result, which produced billable tokens.
+
+    ``usage_date`` is required and comes from the row's own stored reservation
+    date rather than defaulting to today. A row reserved at 23:59 and released
+    at 00:00 must refund to the day it drew from; refunding to "today" would
+    silently hand the new day an extra request.
+
+    Never drops below zero: this is an anomaly guard, and a stray double-refund
+    should not manufacture budget. Missing row is a no-op for the same reason.
+
+    One atomic ``UPDATE ... WHERE request_count > 0``, matching
+    ``check_and_increment``'s single-statement shape rather than a
+    read-then-write: a refund racing an enqueue on the same date would otherwise
+    lose one of the two updates, and this counter is the only thing standing
+    between a bug and unbounded spend.
+    """
+    session.execute(
+        update(ComprehendUsage)
+        .where(
+            ComprehendUsage.usage_date == usage_date,
+            ComprehendUsage.request_count > 0,
+        )
+        .values(request_count=ComprehendUsage.request_count - 1)
+    )
+    session.commit()
+
+
 def get_count(session: Session, *, today: Optional[date] = None) -> int:
     """Return today's stored count, or 0 if no row exists yet (test/debug helper)."""
-    usage_date = today if today is not None else _today_utc()
+    usage_date = today if today is not None else today_utc()
     row = session.get(ComprehendUsage, usage_date)
     return row.request_count if row is not None else 0

@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Iterator, Optional
 
-from sqlalchemy import Date, Engine, Integer, String, create_engine
+from sqlalchemy import Boolean, Date, Engine, Integer, String, create_engine
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -83,6 +83,66 @@ class SavedTranslation(Base):
     chapter_id: Mapped[str] = mapped_column(String, nullable=False)
     page_number: Mapped[int] = mapped_column(Integer, nullable=False)
     saved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class ComprehensionRecord(Base):
+    """One auto-created comprehension record; the row is also the work queue.
+
+    Replaces ``SavedTranslation`` (``comprehension-response-ux``): every
+    translate now creates a row automatically rather than the reader choosing to
+    save one, so this is a history of what was read, not a curated vocabulary
+    book. Both tables exist during the migration -- the shipped app still calls
+    ``/translations`` until the client is cut over -- and ``saved_translation``
+    is dropped in the removal ticket. That drop is manual: this project has no
+    Alembic (see ``init_engine``), so ``create_all`` adds this table for free but
+    would never have added columns to the old one.
+
+    ``status`` is the single discriminator for the row's whole lifecycle and
+    doubles as the queue state a worker claims on:
+
+    - ``pending``  -- enqueued, not yet claimed
+    - ``running``  -- claimed by the worker
+    - ``ok``       -- Claude returned an explanation
+    - ``declined`` -- Claude declined to explain this selection
+    - ``failed``   -- network/server/API error
+
+    The old "all three note columns are NULL means translation-only" convention
+    is deliberately gone: it cannot distinguish "still being produced" from
+    "failed", which is the whole reason this table exists.
+
+    ``translated_text`` is the on-device translation, written at enqueue and
+    never modified afterwards; ``cloud_translation`` is Claude's own, filled only
+    on ``ok``. Both are kept so display precedence stays a UI choice.
+
+    ``usage_date`` records which UTC day this row's daily-cap reservation was
+    drawn from, so a refund goes back to *that* day rather than to "today" -- a
+    row enqueued at 23:59 and resolved at 00:00 would otherwise hand the new day
+    a free request (see ``comprehend_usage_store``).
+
+    No image column, by design: the page is always re-derivable from
+    ``comic_id``/``chapter_id``/``page_number`` via the library on disk.
+    """
+
+    __tablename__ = "comprehension_record"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_text: Mapped[str] = mapped_column(String, nullable=False)
+    translated_text: Mapped[str] = mapped_column(String, nullable=False)
+    cloud_translation: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    grammar_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    context_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tone_register: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    target_language: Mapped[str] = mapped_column(String, nullable=False)
+    comic_id: Mapped[str] = mapped_column(String, nullable=False)
+    chapter_id: Mapped[str] = mapped_column(String, nullable=False)
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    use_stronger_model: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    usage_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
 
