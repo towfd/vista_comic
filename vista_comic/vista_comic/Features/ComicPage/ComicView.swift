@@ -547,16 +547,10 @@ private struct ReaderPage: View {
     /// as `ocrRecognizer` above, rather than that view reaching into the
     /// environment itself.
     @Environment(\.translator) private var translator
-    /// The repository `CroppedSelectionPreview`'s "Save" action runs through
-    /// (`ocr-translation` ticket 05). Same reasoning as `ocrRecognizer`/
-    /// `translator` above.
-    @Environment(\.translationRepository) private var translationRepository
-    /// The comprehender `CroppedSelectionPreview`'s "Translate" action now
-    /// calls first (`llm-comprehension` ticket 14), falling back to
-    /// `translator` above only on a declined/failed cloud call. Same
-    /// reasoning as the other environment reads on this view: read here and
-    /// passed down explicitly.
-    @Environment(\.comprehender) private var comprehender
+    /// The repository `CroppedSelectionPreview`'s "Translate" action enqueues
+    /// through. Same reasoning as `ocrRecognizer`/`translator` above: read
+    /// here, at the owner of `croppedSelection`, and passed down explicitly.
+    @Environment(\.comprehensionRepository) private var comprehensionRepository
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -621,14 +615,12 @@ private struct ReaderPage: View {
         .sheet(item: $croppedSelection) { selection in
             CroppedSelectionPreview(
                 image: selection.image,
-                pageImage: selection.pageImage,
                 comicID: comicID,
                 chapterID: chapterID,
                 pageNumber: pageNumber,
                 recognizer: ocrRecognizer,
-                comprehender: comprehender,
                 translator: translator,
-                translationRepository: translationRepository
+                comprehensionRepository: comprehensionRepository
             )
         }
     }
