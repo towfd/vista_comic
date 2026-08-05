@@ -41,6 +41,14 @@ _STRONGER_MODEL = "claude-sonnet-5"
 
 _MAX_OUTPUT_TOKENS = 1024
 
+# Per-attempt ceiling on one Claude call. The SDK's own default is 600s, which
+# a background worker cannot afford: a hung call would hold one of its few
+# concurrency slots for ten minutes (`comprehension-response-ux` ticket 16). A
+# real call takes ten to thirty seconds, so 120s already means something has
+# gone wrong. Note this is per *attempt* -- the SDK's automatic retries are left
+# in place, so a worst-case job still occupies its slot for several minutes.
+_REQUEST_TIMEOUT_SECONDS = 120.0
+
 _TOOL_NAME = "record_comprehension"
 
 
@@ -72,8 +80,8 @@ def _tool_schema(target_language_code: str) -> dict[str, Any]:
         "name": _TOOL_NAME,
         "description": (
             "Record the translation and explanation of the given source text, "
-            "using the two images only for visual context (speaker, panel, "
-            "tone) -- never as the source of the text itself."
+            "using the supplied image(s) only for visual context (speaker, "
+            "panel, tone) -- never as the source of the text itself."
         ),
         "input_schema": {
             "type": "object",
@@ -114,7 +122,9 @@ def _client() -> anthropic.Anthropic:
     role for the DB-backed stores) -- monkeypatch this function rather than
     calling the real Anthropic API in the test suite.
     """
-    return anthropic.Anthropic(api_key=get_claude_api_key())
+    return anthropic.Anthropic(
+        api_key=get_claude_api_key(), timeout=_REQUEST_TIMEOUT_SECONDS
+    )
 
 
 def _image_block(base64_data: str) -> dict[str, Any]:
@@ -138,11 +148,10 @@ def _prompt_text(source_text: str, target_language_code: str) -> str:
         "The source text below is the ground truth for the selected speech "
         "bubble -- it may be a user's correction of the OCR reading, so "
         "translate and explain exactly this text; do not re-read or "
-        "re-derive the text from the images. Use the two images (the "
-        "selection crop, then the full page) only for visual context "
-        "(who is speaking, what is happening in the panel, tone) to inform "
-        "grammarNotes/contextNotes/toneRegister and to resolve ambiguity "
-        "(e.g. pronouns) in the translation.\n\n"
+        "re-derive the text from the images. Use the image(s) only for visual "
+        "context (who is speaking, what is happening in the panel, tone) to "
+        "inform grammarNotes/contextNotes/toneRegister and to resolve "
+        "ambiguity (e.g. pronouns) in the translation.\n\n"
         f"Source text: {source_text}\n"
         f"Target language code: {target_language_code}"
     )
@@ -150,8 +159,8 @@ def _prompt_text(source_text: str, target_language_code: str) -> str:
 
 def comprehend(
     *,
-    crop_image_base64: str,
     page_image_base64: str,
+    crop_image_base64: Optional[str] = None,
     source_text: str,
     target_language_code: str,
     use_stronger_model: bool = False,
@@ -182,7 +191,11 @@ def comprehend(
             {
                 "role": "user",
                 "content": [
-                    _image_block(crop_image_base64),
+                    *(
+                        [_image_block(crop_image_base64)]
+                        if crop_image_base64 is not None
+                        else []
+                    ),
                     _image_block(page_image_base64),
                     {
                         "type": "text",

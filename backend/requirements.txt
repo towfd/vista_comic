@@ -6,3 +6,6 @@ SQLAlchemy==2.0.36
 psycopg[binary]==3.2.3
 # llm-comprehension ticket 11: POST /comprehend calls Claude via the official SDK.
 anthropic==0.120.2
+# comprehension-response-ux ticket 16: the worker reads pages from the library
+# itself, so downscaling moved off the client and needs an image library here.
+Pillow==11.0.0

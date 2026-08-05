@@ -48,6 +48,7 @@ from . import (
     progress_store,
     translation_store,
 )
+from .comprehension_worker import ComprehensionWorker
 from .config import get_library_root
 from .db import ComprehensionRecord, SavedTranslation, init_engine, new_session
 from .models import (
@@ -124,7 +125,16 @@ async def lifespan(_: FastAPI):
             exc_info=True,
         )
     _rescan()
-    yield
+    # Start draining the comprehension queue. Started after the scan so the
+    # worker can always resolve a record's page, and after `init_engine` so it
+    # has a store to claim from. Releasing orphaned claims happens inside
+    # `start()`, before the loop begins.
+    worker = ComprehensionWorker(page_path_for=page_file_path)
+    worker.start()
+    try:
+        yield
+    finally:
+        worker.stop()
 
 
 app = FastAPI(title="vista_comic backend", version="0.1.0", lifespan=lifespan)
@@ -183,6 +193,33 @@ def _safe_file(catalog: Catalog, rel_path: str) -> Path:
     if not candidate.is_file():
         raise HTTPException(status_code=404, detail="Not found")
     return candidate
+
+
+def page_file_path(comic_id: str, chapter_id: str, page_number: int) -> Optional[Path]:
+    """Resolve one page to a real file under the library root, or ``None``.
+
+    The non-HTTP half of what the media route does, so the comprehension worker
+    can re-read a page minutes after it was enqueued using only the ids stored
+    on the record. That re-derivability is why no image is ever stored: the
+    library is the only copy.
+
+    Returns ``None`` rather than raising for "not in the catalog" (unknown ids,
+    a page index past the end) so the caller can treat a vanished comic as an
+    ordinary outcome. ``_safe_file``'s containment check still applies, and it
+    still raises -- a path escaping the library root is not an ordinary outcome.
+    """
+    catalog = state.catalog
+    if catalog is None:
+        return None
+    comic = catalog.by_id.get(comic_id)
+    if comic is None:
+        return None
+    chapter = catalog.chapters_by_id.get(chapter_id)
+    if chapter is None or chapter not in comic.chapters:
+        return None
+    if page_number < 1 or page_number > chapter.page_count:
+        return None
+    return _safe_file(catalog, chapter.page_paths[page_number - 1])
 
 
 def _to_summary(
