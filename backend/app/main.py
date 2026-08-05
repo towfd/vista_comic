@@ -10,6 +10,15 @@ Endpoints (see docs/backend-architecture.md):
     GET    /translations                       -> list all saved pairs ("單字本")
     DELETE /translations/{id}                  -> delete one saved pair
     POST   /comprehend                         -> translate + explain via Claude (see comprehension_client)
+    POST   /comprehensions                     -> enqueue one record, returned as "pending"
+    GET    /comprehensions                     -> list every record, newest first ("歷史紀錄")
+    GET    /comprehensions/{id}                -> one record (the result screen polls this)
+    PATCH  /comprehensions/{id}                -> set one record's read flag
+    POST   /comprehensions/{id}/retry          -> re-enqueue a failed record
+    DELETE /comprehensions/{id}                -> delete one record
+
+/translations and /comprehend are superseded by /comprehensions and are removed
+once the shipped client has been cut over (see docs/manual-migrations.md).
 
 Also provides:
     GET  /healthz           -> liveness + catalog size
@@ -22,8 +31,10 @@ and requires it to stay under the library root before streaming (see _safe_file)
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
+from datetime import date
 from pathlib import Path
+from typing import Optional
 
 import anthropic
 from fastapi import FastAPI, HTTPException, Request
@@ -33,11 +44,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import (
     comprehend_usage_store,
     comprehension_client,
+    comprehension_store,
     progress_store,
     translation_store,
 )
 from .config import get_library_root
-from .db import SavedTranslation, init_engine, new_session
+from .db import ComprehensionRecord, SavedTranslation, init_engine, new_session
 from .models import (
     ChapterDetail,
     ChapterSummary,
@@ -45,6 +57,9 @@ from .models import (
     ComicSummary,
     ComprehendRequest,
     ComprehendResponse,
+    ComprehensionRecordCreate,
+    ComprehensionRecordReadUpdate,
+    ComprehensionRecordResponse,
     ProgressResponse,
     ProgressUpdate,
     SavedTranslationCreate,
@@ -447,6 +462,225 @@ def delete_translation(translation_id: int) -> None:
         raise HTTPException(status_code=404, detail="Translation not found")
 
 
+# ---------------------------------------------------------------------------
+# Comprehension records (comprehension-response-ux): the 歷史紀錄 store, whose
+# rows double as the work queue a worker drains. This resource replaces
+# /translations and /comprehend; both are still served while the shipped client
+# is cut over, and are removed -- along with a manual
+# `DROP TABLE saved_translation` -- in the removal ticket.
+# ---------------------------------------------------------------------------
+
+
+_COMPREHENSION_STORE_UNAVAILABLE = "Comprehension store unavailable"
+
+
+@contextmanager
+def _comprehension_session():
+    """Yield a session for one comprehension-store operation, or 503.
+
+    Extracted because six routes need the identical open/rollback/close dance;
+    ``/translations`` established the shape inline at three repeats, which does
+    not survive doubling. Behaviour is unchanged from those routes: a store that
+    was never initialised and one that fails mid-request both surface as 503,
+    because these rows have no independent origin to fall back on -- reporting
+    "unreachable" as "you have no history" would be a lie the reader cannot
+    detect.
+
+    Only ``SQLAlchemyError`` is converted; an ``HTTPException`` raised by the
+    body (a 404, say) passes through untouched.
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail=_COMPREHENSION_STORE_UNAVAILABLE)
+    try:
+        yield session
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Comprehension store operation failed.", exc_info=True)
+        raise HTTPException(status_code=503, detail=_COMPREHENSION_STORE_UNAVAILABLE)
+    finally:
+        session.close()
+
+
+def _titles_for(comic_id: str, chapter_id: str) -> tuple[Optional[str], Optional[str]]:
+    """Resolve display titles for a record's source, or ``(None, None)``.
+
+    Joined from the in-memory catalog at read time rather than stored on the
+    row: the record holds path-hash ids, which are correct as keys and useless
+    as labels (see ``ids.stable_id``). Joining also means a renamed comic shows
+    its new title everywhere, with nothing to migrate.
+
+    Reads ``state.catalog`` directly instead of ``_require_catalog`` on purpose.
+    Titles are decoration; the records are the data. A reader must still be able
+    to browse their history when the library scan is unavailable, so a missing
+    catalog degrades the labels rather than failing the request. ``None`` is also
+    the client's cue that jumping to the source page would fail.
+    """
+    catalog = state.catalog
+    if catalog is None:
+        return None, None
+    comic = catalog.by_id.get(comic_id)
+    if comic is None:
+        return None, None
+    chapter = next((ch for ch in comic.chapters if ch.id == chapter_id), None)
+    return comic.title, (chapter.title if chapter is not None else None)
+
+
+def _to_comprehension_response(row: ComprehensionRecord) -> ComprehensionRecordResponse:
+    comic_title, chapter_title = _titles_for(row.comic_id, row.chapter_id)
+    return ComprehensionRecordResponse(
+        id=row.id,
+        sourceText=row.source_text,
+        translatedText=row.translated_text,
+        cloudTranslation=row.cloud_translation,
+        grammarNotes=row.grammar_notes,
+        contextNotes=row.context_notes,
+        toneRegister=row.tone_register,
+        targetLanguage=row.target_language,
+        comicId=row.comic_id,
+        chapterId=row.chapter_id,
+        pageNumber=row.page_number,
+        comicTitle=comic_title,
+        chapterTitle=chapter_title,
+        status=row.status,
+        isRead=row.is_read,
+        useStrongerModel=row.use_stronger_model,
+        createdAt=progress_store.iso_utc(row.created_at),
+    )
+
+
+@app.post("/comprehensions", response_model=ComprehensionRecordResponse, status_code=201)
+def create_comprehension(body: ComprehensionRecordCreate) -> ComprehensionRecordResponse:
+    """Enqueue one comprehension record and return it immediately as ``pending``.
+
+    Returns without waiting for Claude: the reader already has the on-device
+    translation in ``translatedText`` and the explanation arrives later, which
+    is the entire point of this resource.
+
+    The daily cap is **reserved here**, not when the worker actually calls
+    Claude, for two reasons: an exhausted cap can be reported to the reader at
+    the moment they act (429, and no row is created, so nothing appears in their
+    history that will never complete), and the queue can never grow longer than
+    the remaining budget. The reserved date is stored on the row (see
+    ``comprehend_usage_store.refund``).
+
+    The reservation is given back if the row is not actually created -- a
+    reserved-but-unspent request must not silently burn budget just because the
+    store was unreachable.
+    """
+    usage_date = _reserve_daily_cap()
+    try:
+        with _comprehension_session() as session:
+            row = comprehension_store.insert_record(
+                session,
+                source_text=body.sourceText,
+                translated_text=body.translatedText,
+                target_language=body.targetLanguage,
+                comic_id=body.comicId,
+                chapter_id=body.chapterId,
+                page_number=body.pageNumber,
+                use_stronger_model=body.useStrongerModel,
+                usage_date=usage_date,
+            )
+    except HTTPException:
+        _refund_daily_cap(usage_date)
+        raise
+    return _to_comprehension_response(row)
+
+
+@app.get("/comprehensions", response_model=list[ComprehensionRecordResponse])
+def list_comprehensions() -> list[ComprehensionRecordResponse]:
+    """Every record, newest first -- the 歷史紀錄 list and its unread badge."""
+    with _comprehension_session() as session:
+        rows = comprehension_store.list_all(session)
+    return [_to_comprehension_response(row) for row in rows]
+
+
+@app.get("/comprehensions/{record_id}", response_model=ComprehensionRecordResponse)
+def get_comprehension(record_id: int) -> ComprehensionRecordResponse:
+    """One record -- the result screen polls this while its record is unfinished."""
+    with _comprehension_session() as session:
+        row = comprehension_store.get(session, record_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Comprehension record not found")
+    return _to_comprehension_response(row)
+
+
+@app.patch("/comprehensions/{record_id}", response_model=ComprehensionRecordResponse)
+def update_comprehension(
+    record_id: int, body: ComprehensionRecordReadUpdate
+) -> ComprehensionRecordResponse:
+    """Set one record's read flag -- opening it in 歷史紀錄 marks it read.
+
+    Only the read flag is patchable; status transitions are not client-driven,
+    so re-running a record is its own endpoint with its own precondition. Both
+    boolean values are honoured rather than only ``true``: the reader clears the
+    badge by opening an entry, and a boolean field that silently refuses one of
+    its two values is a worse contract than one that simply works.
+    """
+    with _comprehension_session() as session:
+        found = comprehension_store.set_read(session, record_id, is_read=body.isRead)
+        row = comprehension_store.get(session, record_id) if found else None
+    if row is None:
+        raise HTTPException(status_code=404, detail="Comprehension record not found")
+    return _to_comprehension_response(row)
+
+
+@app.post(
+    "/comprehensions/{record_id}/retry", response_model=ComprehensionRecordResponse
+)
+def retry_comprehension(record_id: int) -> ComprehensionRecordResponse:
+    """Re-enqueue a ``failed`` record for another attempt.
+
+    Its own endpoint rather than a status-setting PATCH: re-running is a domain
+    action with a precondition (only ``failed`` qualifies) and a cost (another
+    cap reservation), and exposing arbitrary status transitions would leak the
+    state machine to the client.
+
+    409 rather than 404 when the record exists but is not ``failed`` -- retrying
+    something still being produced, already explained, or declined is a
+    different mistake from retrying something that isn't there, and only the
+    former means "look again in a moment".
+
+    Every path that does not actually re-enqueue gives the reservation back.
+    """
+    usage_date = _reserve_daily_cap()
+    try:
+        with _comprehension_session() as session:
+            row = comprehension_store.requeue_failed(
+                session, record_id, usage_date=usage_date
+            )
+            existed = row is not None or comprehension_store.get(session, record_id) is not None
+    except HTTPException:
+        _refund_daily_cap(usage_date)
+        raise
+    if row is None:
+        _refund_daily_cap(usage_date)
+        if existed:
+            raise HTTPException(
+                status_code=409, detail="Only a failed record can be retried"
+            )
+        raise HTTPException(status_code=404, detail="Comprehension record not found")
+    return _to_comprehension_response(row)
+
+
+@app.delete("/comprehensions/{record_id}", status_code=204, response_model=None)
+def delete_comprehension(record_id: int) -> None:
+    """Delete one record, refunding its reservation if it never reached Claude.
+
+    A ``pending`` row has been paid for but not spent, so deleting it returns
+    the request to the day it was reserved against. A row that has already run
+    keeps its count -- including a declined one, which produced billable tokens.
+    """
+    with _comprehension_session() as session:
+        deleted = comprehension_store.delete_record(session, record_id)
+    if deleted is None:
+        raise HTTPException(status_code=404, detail="Comprehension record not found")
+    if deleted.status == comprehension_store.STATUS_PENDING:
+        _refund_daily_cap(deleted.usage_date)
+
+
 # Generous but bounded per-image ceiling on the base64 request payload,
 # checked before any Claude call. Checking the base64 string length (rather
 # than fully decoding to measure the actual image) is a fine, simpler proxy
@@ -469,8 +703,33 @@ def _guard_image_size(crop_base64: str, page_base64: str) -> None:
         raise HTTPException(status_code=413, detail="Image payload too large")
 
 
-def _guard_daily_cap() -> None:
-    """Reject once the global daily ``/comprehend`` request cap is reached (429).
+def _refund_daily_cap(usage_date: date) -> None:
+    """Return one reserved-but-unspent request to ``usage_date``'s count.
+
+    Best-effort by design: a failed refund is logged and swallowed. The refund
+    exists to keep an anomaly guard honest, and letting a bookkeeping problem
+    turn an otherwise-successful delete into an error for the reader would trade
+    a real failure for a cosmetic one.
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        return
+    try:
+        comprehend_usage_store.refund(session, usage_date=usage_date)
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Comprehension usage refund failed.", exc_info=True)
+    finally:
+        session.close()
+
+
+def _reserve_daily_cap() -> date:
+    """Reserve one request against the global daily cap; 429 once it's reached.
+
+    Returns the UTC date the reservation was taken against, so the caller can
+    store it on the row it creates and any later refund goes back to *that* day
+    rather than to whatever day it happens to be when the refund runs.
 
     Global, not per-user -- this backend has no per-user identity (a single
     shared Cloudflare Access Service Token gates every request, see
@@ -500,6 +759,7 @@ def _guard_daily_cap() -> None:
     never initialized", rather than rejecting every comprehension request
     over a codepath that cannot occur once the app has actually started.
     """
+    usage_date = comprehend_usage_store.today_utc()
     try:
         session = new_session()
     except RuntimeError:
@@ -507,10 +767,10 @@ def _guard_daily_cap() -> None:
             "Comprehension usage store not initialized; allowing the request "
             "without a daily-cap check."
         )
-        return
+        return usage_date
     try:
         allowed = comprehend_usage_store.check_and_increment(
-            session, cap=comprehend_usage_store.DAILY_CAP
+            session, cap=comprehend_usage_store.DAILY_CAP, today=usage_date
         )
     except SQLAlchemyError:
         session.rollback()
@@ -524,6 +784,7 @@ def _guard_daily_cap() -> None:
         raise HTTPException(
             status_code=429, detail="Daily comprehension request cap reached"
         )
+    return usage_date
 
 
 @app.post(
@@ -536,7 +797,7 @@ def comprehend(body: ComprehendRequest) -> ComprehendResponse:
 
     Two anomaly guards run first, before any DB/Claude call for the size
     check and before any Claude call for the cap check (see
-    ``_guard_image_size``/``_guard_daily_cap``): an oversized crop/page image
+    ``_guard_image_size``/``_reserve_daily_cap``): an oversized crop/page image
     is rejected 413, and the global daily request cap is rejected 429. Both
     exist only to bound accidental cost (e.g. a retry loop or an oversized
     payload), not as real per-user usage-limiting.
@@ -558,7 +819,7 @@ def comprehend(body: ComprehendRequest) -> ComprehendResponse:
     before this function runs (422).
     """
     _guard_image_size(body.cropImageBase64, body.pageImageBase64)
-    _guard_daily_cap()
+    _reserve_daily_cap()
     try:
         result = comprehension_client.comprehend(
             crop_image_base64=body.cropImageBase64,

@@ -169,6 +169,77 @@ class SavedTranslationResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Comprehension record models (comprehension-response-ux, the 歷史紀錄 store).
+# ---------------------------------------------------------------------------
+
+
+class ComprehensionRecordCreate(BaseModel):
+    """Request body for ``POST /comprehensions``.
+
+    Carries no images. The worker re-reads the page from the library on disk
+    using ``comicId``/``chapterId``/``pageNumber``, so nothing image-shaped has
+    to be uploaded or stored -- and this request stays small enough to return
+    instantly, which is its whole purpose.
+
+    ``translatedText`` is the *on-device* translation the reader is already
+    looking at by the time this is sent; the cloud's own translation arrives
+    later on the record.
+    """
+
+    sourceText: str
+    translatedText: str
+    targetLanguage: str
+    comicId: str
+    chapterId: str
+    pageNumber: int = Field(ge=1)
+    useStrongerModel: bool = False
+
+
+class ComprehensionRecordResponse(BaseModel):
+    """One comprehension record, as returned by every ``/comprehensions`` route.
+
+    ``status`` is the single discriminator (``pending``/``running``/``ok``/
+    ``declined``/``failed``) -- clients must not infer state from which
+    explanation fields happen to be null.
+
+    ``comicTitle``/``chapterTitle`` are joined from the in-memory catalog at
+    read time rather than stored: the record only holds path-hash ids, which are
+    fine as keys and unusable as labels on a browsable list. They are ``None``
+    when the comic is no longer in the library, which is also the client's cue
+    to disable jump-to-source for that row.
+    """
+
+    id: int
+    sourceText: str
+    translatedText: str
+    cloudTranslation: Optional[str] = None
+    grammarNotes: Optional[str] = None
+    contextNotes: Optional[str] = None
+    toneRegister: Optional[str] = None
+    targetLanguage: str
+    comicId: str
+    chapterId: str
+    pageNumber: int
+    comicTitle: Optional[str] = None
+    chapterTitle: Optional[str] = None
+    status: str
+    isRead: bool
+    useStrongerModel: bool
+    createdAt: str  # ISO-8601 UTC
+
+
+class ComprehensionRecordReadUpdate(BaseModel):
+    """Request body for ``PATCH /comprehensions/{id}``.
+
+    Only the read flag is patchable. Status transitions are deliberately not
+    exposed -- re-running a record is its own endpoint with its own precondition
+    and its own cap reservation, so the state machine stays server-side.
+    """
+
+    isRead: bool
+
+
+# ---------------------------------------------------------------------------
 # Comprehension endpoint models (llm-comprehension ticket 11).
 # ---------------------------------------------------------------------------
 

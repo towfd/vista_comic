@@ -116,8 +116,8 @@ def test_image_within_ceiling_is_not_rejected_by_size_guard(client, monkeypatch)
     monkeypatch.setattr(main, "_MAX_IMAGE_BASE64_CHARS", 100)
     monkeypatch.setattr(
         main,
-        "_guard_daily_cap",
-        lambda: None,  # isolate: only the size guard is under test here
+        "_reserve_daily_cap",
+        lambda: comprehend_usage_store.today_utc(),  # isolate: only the size guard is under test
     )
     fake = _stub_client(monkeypatch, blocks=[_ok_block()])
     within_ceiling = "A" * 100
@@ -281,7 +281,7 @@ def test_comprehend_daily_cap_fails_open_when_engine_never_initialized(monkeypat
     run in, since they build TestClient(app) without the startup lifespan --
     the cap guard degrades to "allow" rather than rejecting every
     comprehension request over a codepath that cannot occur once the app has
-    actually started (see main._guard_daily_cap's docstring).
+    actually started (see main._reserve_daily_cap's docstring).
 
     ``_SessionLocal`` is forced to ``None`` (mirrors
     ``test_translation.py``'s ``..._503_when_store_unavailable`` tests)
