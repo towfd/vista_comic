@@ -137,6 +137,13 @@ class SavedTranslationCreate(BaseModel):
 
     originalText: str
     translatedText: str
+    # Deeper explanation fields (llm-comprehension ticket 15), all optional:
+    # present when saving a full cloud comprehension result, absent/None when
+    # saving a fallback (translation-only) result -- persisted as NULL either
+    # way, never a validation error.
+    grammarNotes: Optional[str] = None
+    contextNotes: Optional[str] = None
+    toneRegister: Optional[str] = None
     targetLanguage: str
     comicId: str
     chapterId: str
@@ -151,8 +158,52 @@ class SavedTranslationResponse(BaseModel):
     id: int
     originalText: str
     translatedText: str
+    grammarNotes: Optional[str] = None
+    contextNotes: Optional[str] = None
+    toneRegister: Optional[str] = None
     targetLanguage: str
     comicId: str
     chapterId: str
     pageNumber: int
     savedAt: str  # ISO-8601 UTC
+
+
+# ---------------------------------------------------------------------------
+# Comprehension endpoint models (llm-comprehension ticket 11).
+# ---------------------------------------------------------------------------
+
+
+class ComprehendRequest(BaseModel):
+    """Request body for ``POST /comprehend``.
+
+    ``sourceText`` is the (possibly user-corrected) OCR reading shown on
+    screen -- ground truth sent explicitly so Claude translates/explains it
+    rather than re-deriving its own reading from the images; the images are
+    for visual context only. ``useStrongerModel`` selects Claude Sonnet 5
+    instead of the default Claude Haiku 4.5 (the manual-upgrade path wired up
+    end-to-end in a later ticket; the field must exist now).
+    """
+
+    cropImageBase64: str
+    pageImageBase64: str
+    sourceText: str
+    targetLanguageCode: str
+    useStrongerModel: bool = False
+
+
+class ComprehendResponse(BaseModel):
+    """Response for ``POST /comprehend``.
+
+    Always HTTP 200; ``status`` discriminates a genuine success (``"ok"``,
+    all four explanation fields present) from a model-declined outcome
+    (``"declined"``, fields omitted). The route uses
+    ``response_model_exclude_none`` so a declined response body is exactly
+    ``{"status": "declined"}``. Any other failure (network/API error,
+    malformed request) is a normal HTTP 4xx/5xx, never this 200 shape.
+    """
+
+    status: str  # "ok" | "declined"
+    translation: Optional[str] = None
+    grammarNotes: Optional[str] = None
+    contextNotes: Optional[str] = None
+    toneRegister: Optional[str] = None

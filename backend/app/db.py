@@ -13,10 +13,10 @@ dependency yielding a short-lived session per request.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Iterator, Optional
 
-from sqlalchemy import Engine, Integer, String, create_engine
+from sqlalchemy import Date, Engine, Integer, String, create_engine
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -69,6 +69,15 @@ class SavedTranslation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     original_text: Mapped[str] = mapped_column(String, nullable=False)
     translated_text: Mapped[str] = mapped_column(String, nullable=False)
+    # Deeper explanation fields (llm-comprehension ticket 15), all nullable:
+    # present when this was saved from a full cloud comprehension result
+    # (ticket 14's blue banner), NULL when saved from a declined/error
+    # fallback (orange/gray banner) or from a pre-existing ocr-translation-era
+    # row. No separate provenance column -- all three NULL already means
+    # "translation-only", per the spec's decision.
+    grammar_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    context_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tone_register: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     target_language: Mapped[str] = mapped_column(String, nullable=False)
     comic_id: Mapped[str] = mapped_column(String, nullable=False)
     chapter_id: Mapped[str] = mapped_column(String, nullable=False)
@@ -76,6 +85,25 @@ class SavedTranslation(Base):
     saved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class ComprehendUsage(Base):
+    """Global daily request counter backing ``/comprehend``'s cost guard.
+
+    Not per-user -- this backend has no per-user identity (a single shared
+    Cloudflare Access Service Token gates every request, see ADR-0005), so the
+    cap is one counter for the whole deployment, keyed on calendar date.
+    ``usage_date`` is the primary key (one row per day, like ``Progress``'s
+    natural-key upsert), which is also how the cap resets automatically: a new
+    date simply has no row yet, so no manual reset job is needed. Purely an
+    anomaly guard against runaway cost (e.g. a retry-loop bug), not real
+    usage-limiting -- see ``comprehend_usage_store.py``.
+    """
+
+    __tablename__ = "comprehend_usage"
+
+    usage_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 # Module-level engine/session factory, installed by ``init_engine`` at startup

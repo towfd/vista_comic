@@ -9,6 +9,7 @@ Endpoints (see docs/backend-architecture.md):
     POST   /translations                       -> save one original/translation pair
     GET    /translations                       -> list all saved pairs ("單字本")
     DELETE /translations/{id}                  -> delete one saved pair
+    POST   /comprehend                         -> translate + explain via Claude (see comprehension_client)
 
 Also provides:
     GET  /healthz           -> liveness + catalog size
@@ -24,11 +25,17 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anthropic
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from . import progress_store, translation_store
+from . import (
+    comprehend_usage_store,
+    comprehension_client,
+    progress_store,
+    translation_store,
+)
 from .config import get_library_root
 from .db import SavedTranslation, init_engine, new_session
 from .models import (
@@ -36,6 +43,8 @@ from .models import (
     ChapterSummary,
     ComicDetail,
     ComicSummary,
+    ComprehendRequest,
+    ComprehendResponse,
     ProgressResponse,
     ProgressUpdate,
     SavedTranslationCreate,
@@ -342,6 +351,9 @@ def _to_translation_response(row: SavedTranslation) -> SavedTranslationResponse:
         id=row.id,
         originalText=row.original_text,
         translatedText=row.translated_text,
+        grammarNotes=row.grammar_notes,
+        contextNotes=row.context_notes,
+        toneRegister=row.tone_register,
         targetLanguage=row.target_language,
         comicId=row.comic_id,
         chapterId=row.chapter_id,
@@ -370,6 +382,9 @@ def save_translation(body: SavedTranslationCreate) -> SavedTranslationResponse:
             session,
             original_text=body.originalText,
             translated_text=body.translatedText,
+            grammar_notes=body.grammarNotes,
+            context_notes=body.contextNotes,
+            tone_register=body.toneRegister,
             target_language=body.targetLanguage,
             comic_id=body.comicId,
             chapter_id=body.chapterId,
@@ -430,6 +445,151 @@ def delete_translation(translation_id: int) -> None:
         session.close()
     if not deleted:
         raise HTTPException(status_code=404, detail="Translation not found")
+
+
+# Generous but bounded per-image ceiling on the base64 request payload,
+# checked before any Claude call. Checking the base64 string length (rather
+# than fully decoding to measure the actual image) is a fine, simpler proxy
+# here -- this is a pure anomaly guard against a bug (e.g. a client sending an
+# un-downscaled, full-resolution page) generating outsized cost, not a real
+# validation of image content/dimensions. 8 MiB of base64 text (~6 MB
+# decoded) is comfortably above a downscaled-to-~1024px page or a selection
+# crop -- both are typically well under 1 MB as JPEG per the spec's
+# Implementation Decisions -- while still catching a clearly wrong-sized
+# payload before it reaches Claude.
+_MAX_IMAGE_BASE64_CHARS = 8 * 1024 * 1024
+
+
+def _guard_image_size(crop_base64: str, page_base64: str) -> None:
+    """Reject an oversized crop/page image before any Claude call (413)."""
+    if (
+        len(crop_base64) > _MAX_IMAGE_BASE64_CHARS
+        or len(page_base64) > _MAX_IMAGE_BASE64_CHARS
+    ):
+        raise HTTPException(status_code=413, detail="Image payload too large")
+
+
+def _guard_daily_cap() -> None:
+    """Reject once the global daily ``/comprehend`` request cap is reached (429).
+
+    Global, not per-user -- this backend has no per-user identity (a single
+    shared Cloudflare Access Service Token gates every request, see
+    ADR-0005) -- purely an anomaly guard (e.g. against a retry-loop bug)
+    against runaway Claude spend, not real usage-limiting.
+
+    Fails CLOSED (503) on a genuine store failure once a session was
+    obtained (``SQLAlchemyError`` -- e.g. the DB connection drops mid-request):
+    this guard exists specifically for cost protection, so "can't verify the
+    cap" must not silently become "allow anyway", unlike the read-side
+    catalog/progress helpers (``progress_store.safe_*``) that intentionally
+    degrade for availability.
+
+    Fails OPEN only when the engine was never initialized at all
+    (``new_session()``'s ``RuntimeError``). In the real deployed app this
+    cannot happen once serving has started: the lifespan handler always calls
+    ``init_engine()``, which assigns the module-level engine/session-factory
+    globals even when the subsequent ``CREATE TABLE`` probe fails against a
+    genuinely-down Postgres (see ``db.init_engine`` -- ``_engine``/
+    ``_SessionLocal`` are set before ``create_all`` runs). A live-but-
+    unreachable DB therefore surfaces as ``SQLAlchemyError``, handled by the
+    fail-closed branch above, not as ``RuntimeError``. The ``RuntimeError``
+    branch is reachable only through a test harness that builds
+    ``TestClient(app)`` without running the startup lifespan (as
+    ``test_comprehension.py``'s ticket-11 tests already do), so it degrades
+    the same way ``progress_store``'s read-side helpers already do for "store
+    never initialized", rather than rejecting every comprehension request
+    over a codepath that cannot occur once the app has actually started.
+    """
+    try:
+        session = new_session()
+    except RuntimeError:
+        logger.warning(
+            "Comprehension usage store not initialized; allowing the request "
+            "without a daily-cap check."
+        )
+        return
+    try:
+        allowed = comprehend_usage_store.check_and_increment(
+            session, cap=comprehend_usage_store.DAILY_CAP
+        )
+    except SQLAlchemyError:
+        session.rollback()
+        logger.warning("Comprehension usage store unavailable.", exc_info=True)
+        raise HTTPException(
+            status_code=503, detail="Comprehension usage store unavailable"
+        )
+    finally:
+        session.close()
+    if not allowed:
+        raise HTTPException(
+            status_code=429, detail="Daily comprehension request cap reached"
+        )
+
+
+@app.post(
+    "/comprehend",
+    response_model=ComprehendResponse,
+    response_model_exclude_none=True,  # a declined body is exactly {"status": "declined"}
+)
+def comprehend(body: ComprehendRequest) -> ComprehendResponse:
+    """Translate + explain one selection via Claude (see comprehension_client).
+
+    Two anomaly guards run first, before any DB/Claude call for the size
+    check and before any Claude call for the cap check (see
+    ``_guard_image_size``/``_guard_daily_cap``): an oversized crop/page image
+    is rejected 413, and the global daily request cap is rejected 429. Both
+    exist only to bound accidental cost (e.g. a retry loop or an oversized
+    payload), not as real per-user usage-limiting.
+
+    Two genuine-success-vs-declined outcomes share HTTP 200,
+    discriminated by ``status`` (per the llm-comprehension spec's
+    Implementation Decisions) so the client can pick the right fallback/banner
+    without guessing from a status code:
+
+    - ``{"status": "ok", translation, grammarNotes, contextNotes,
+      toneRegister}`` on a successful tool-use result.
+    - ``{"status": "declined"}`` when Claude's response has no valid tool-use
+      result (see ``comprehension_client.comprehend``'s docstring on why this
+      is not gated on a specific ``stop_reason`` value).
+
+    Any other failure -- a connection/API error from the Anthropic SDK -- is a
+    normal HTTP 4xx/5xx via ``HTTPException``, never this 200 shape. Request
+    validation (missing/malformed fields) is handled by FastAPI/Pydantic
+    before this function runs (422).
+    """
+    _guard_image_size(body.cropImageBase64, body.pageImageBase64)
+    _guard_daily_cap()
+    try:
+        result = comprehension_client.comprehend(
+            crop_image_base64=body.cropImageBase64,
+            page_image_base64=body.pageImageBase64,
+            source_text=body.sourceText,
+            target_language_code=body.targetLanguageCode,
+            use_stronger_model=body.useStrongerModel,
+        )
+    except anthropic.APIStatusError as exc:
+        # The Anthropic SDK guarantees a 4xx/5xx status here; forward it
+        # rather than collapsing every failure to a single code, without
+        # exposing the API key (never present in the SDK's own error body).
+        logger.warning("Claude API returned an error status.", exc_info=True)
+        raise HTTPException(
+            status_code=exc.status_code, detail="Comprehension request failed"
+        )
+    except (anthropic.APIConnectionError, anthropic.AnthropicError):
+        logger.warning("Claude API call failed.", exc_info=True)
+        raise HTTPException(
+            status_code=502, detail="Comprehension service unavailable"
+        )
+
+    if result is None:
+        return ComprehendResponse(status="declined")
+    return ComprehendResponse(
+        status="ok",
+        translation=result.translation,
+        grammarNotes=result.grammar_notes,
+        contextNotes=result.context_notes,
+        toneRegister=result.tone_register,
+    )
 
 
 @app.get("/media/{comic_id}/{chapter_id}/{page}")

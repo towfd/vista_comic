@@ -147,6 +147,9 @@ private struct PreviewTranslationRepository: TranslationRepository {
     func save(
         originalText: String,
         translatedText: String,
+        grammarNotes: String?,
+        contextNotes: String?,
+        toneRegister: String?,
         targetLanguage: String,
         comicID: String,
         chapterID: String,
@@ -177,16 +180,30 @@ extension SavedTranslation {
         id: Int = 1,
         originalText: String = "Xin chào",
         translatedText: String = "你好",
+        grammarNotes: String? = nil,
+        contextNotes: String? = nil,
+        toneRegister: String? = nil,
         comicID: String = "comic-1",
         chapterID: String = "chapter-1",
         pageNumber: Int = 3,
         savedAt: String = "2026-01-15T10:30:00Z"
     ) -> SavedTranslation {
+        // Explanation fields are nullable on the wire (`llm-comprehension`
+        // ticket 15) — encode absent ones as JSON `null`, not an omitted key,
+        // so this factory can produce both a full-explanation and a
+        // fallback-only (NULL) row for ticket 16's two demoable states.
+        func jsonStringOrNull(_ value: String?) -> String {
+            guard let value else { return "null" }
+            return "\"\(value)\""
+        }
         let json = """
         {
             "id": \(id),
             "originalText": "\(originalText)",
             "translatedText": "\(translatedText)",
+            "grammarNotes": \(jsonStringOrNull(grammarNotes)),
+            "contextNotes": \(jsonStringOrNull(contextNotes)),
+            "toneRegister": \(jsonStringOrNull(toneRegister)),
             "targetLanguage": "zh-Hant",
             "comicId": "\(comicID)",
             "chapterId": "\(chapterID)",
@@ -205,6 +222,9 @@ extension SavedTranslation {
         .environment(
             \.translationRepository,
             PreviewTranslationRepository(listResult: .success([
+                // A fallback-only entry (`llm-comprehension` ticket 16):
+                // no explanation fields, renders exactly as before that
+                // ticket.
                 .preview(
                     id: 1,
                     originalText: "Xin chào",
@@ -213,10 +233,15 @@ extension SavedTranslation {
                     chapterID: "chapter-1",
                     pageNumber: 3
                 ),
+                // A full-explanation entry: expandable grammar/context/tone
+                // notes.
                 .preview(
                     id: 2,
                     originalText: "Cảm ơn bạn",
                     translatedText: "謝謝你",
+                    grammarNotes: "Subject-verb-object order; \"cảm ơn\" is a set greeting phrase.",
+                    contextNotes: "The speaker is thanking a friend shown in the same panel.",
+                    toneRegister: "Warm, informal register.",
                     comicID: "comic-2",
                     chapterID: "chapter-4",
                     pageNumber: 12,

@@ -33,10 +33,19 @@ protocol TranslationRepository {
     /// Returns the saved entry, including the server-generated `id` and
     /// `savedAt` timestamp, so a caller can display it immediately without a
     /// second round trip.
+    ///
+    /// `grammarNotes`/`contextNotes`/`toneRegister` (`llm-comprehension`
+    /// ticket 15) are `nil` when saving a fallback (translation-only)
+    /// result — the protocol's shape is otherwise unchanged from
+    /// `ocr-translation`'s original `save`, per the ticket's Implementation
+    /// Decision: one growing payload, not a new protocol.
     @discardableResult
     func save(
         originalText: String,
         translatedText: String,
+        grammarNotes: String?,
+        contextNotes: String?,
+        toneRegister: String?,
         targetLanguage: String,
         comicID: String,
         chapterID: String,

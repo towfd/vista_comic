@@ -83,6 +83,9 @@
         }
       }
     },
+    "Context notes" : {
+
+    },
     "continue" : {
       "comment" : "Library card: continue reading",
       "localizations" : {
@@ -106,6 +109,9 @@
       }
     },
     "Couldn't delete this translation. Check your connection and try again." : {
+
+    },
+    "Couldn't get a stronger explanation. Check your connection and try again." : {
 
     },
     "Couldn't load this page" : {
@@ -141,6 +147,12 @@
 
     },
     "French" : {
+
+    },
+    "Grammar notes" : {
+
+    },
+    "Hide explanation" : {
 
     },
     "Japanese" : {
@@ -250,6 +262,12 @@
     "Recognizing text…" : {
 
     },
+    "Request deeper explanation" : {
+
+    },
+    "Requesting deeper explanation…" : {
+
+    },
     "Retry" : {
       "comment" : "Error state: retry the failed fetch",
       "localizations" : {
@@ -276,6 +294,9 @@
     "Selected text" : {
 
     },
+    "Show explanation" : {
+
+    },
     "Spanish" : {
 
     },
@@ -300,6 +321,9 @@
 
     },
     "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
+
+    },
+    "Tone & register" : {
 
     },
     "Traditional Chinese" : {
