@@ -12,14 +12,14 @@ The daily cap guard moves off the old comprehend endpoint onto enqueue: an exhau
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done — merged in PR #40
 
-- [ ] The saved-translation table is replaced by the comprehension record table with the columns above; the deployment step that drops the old table is documented in the repo.
-- [ ] Enqueue returns a `pending` record immediately, echoing its server-generated id and timestamp.
-- [ ] Enqueue reserves one unit of the daily cap and records the UTC date of that reservation on the row; when the cap is spent it returns 429 and no row is created.
-- [ ] Deleting a `pending` record refunds its reservation against that row's stored date, not today's.
-- [ ] List returns records newest-first; list and fetch-one both carry comic and chapter titles, null for a comic no longer in the catalog.
-- [ ] Mark-read sets the read flag; retry is accepted only for a `failed` record, returns it to `pending`, and takes a fresh reservation.
-- [ ] Retry on a record in any other status is rejected rather than silently accepted.
-- [ ] A store-level failure surfaces as an error rather than degrading into an empty list, matching the existing convention for this kind of store.
-- [ ] Endpoint tests cover all six through the existing test-client harness; store tests run against the throwaway database using the existing engine fixture.
+- [x] The saved-translation table is replaced by the comprehension record table with the columns above; the deployment step that drops the old table is documented in the repo.
+- [x] Enqueue returns a `pending` record immediately, echoing its server-generated id and timestamp.
+- [x] Enqueue reserves one unit of the daily cap and records the UTC date of that reservation on the row; when the cap is spent it returns 429 and no row is created.
+- [x] Deleting a `pending` record refunds its reservation against that row's stored date, not today's.
+- [x] List returns records newest-first; list and fetch-one both carry comic and chapter titles, null for a comic no longer in the catalog.
+- [x] Mark-read sets the read flag; retry is accepted only for a `failed` record, returns it to `pending`, and takes a fresh reservation.
+- [x] Retry on a record in any other status is rejected rather than silently accepted.
+- [x] A store-level failure surfaces as an error rather than degrading into an empty list, matching the existing convention for this kind of store.
+- [x] Endpoint tests cover all six through the existing test-client harness; store tests run against the throwaway database using the existing engine fixture.

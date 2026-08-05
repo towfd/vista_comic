@@ -16,6 +16,9 @@ Roughly a thousand lines of tests are **deleted rather than migrated**, because 
 
 - [ ] The listed iOS types, files and the 單字本 feature directory are gone, and nothing references them.
 - [ ] The synchronous comprehend endpoint and its image-size guard are gone from the backend; the comprehension client module remains as the worker's seam.
+- [ ] **The backend's `/translations` routes are gone**, along with the saved-translation store module, its Pydantic models and its DB model. Ticket 15 deliberately left these live (expand-then-contract: the shipped app still called them until the client was cut over), so this ticket owns removing them.
+- [ ] **`DROP TABLE saved_translation` is run against the deployed database**, as documented in `docs/manual-migrations.md`. This was the one step with no owning checkbox — added after a spec review of ticket 15 noticed the deferred drop had nowhere to land.
+- [ ] `docs/manual-migrations.md` records the drop as executed, and states that adopting a migration tool is now triggered (see the map's Out of scope).
 - [ ] Tests asserting removed behaviour are deleted, not skipped or commented out.
 - [ ] The string catalog contains no orphaned entries for removed UI and all new strings are registered.
 - [ ] The on-device translator, OCR family, jump-back route and target-language preference are all still present and working.

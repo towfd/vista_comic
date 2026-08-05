@@ -6,7 +6,7 @@ This is a prefactor: make the change easy, then make the easy change. It is deli
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** in review — PR #39 open
 
 - [ ] The result sheet view and the selection free functions it calls live in their own file(s) under the reader feature, with the reader file retaining only the reader, page and progress code.
 - [ ] No behaviour changes: no renamed types, no changed signatures, no altered view bodies beyond what the move mechanically requires.
