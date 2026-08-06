@@ -68,25 +68,19 @@ struct HistoryView: View {
             if phase == .active { Task { await load() } }
         }
         .badge(unreadCount)
-        .alert(
-            "Delete this record?",
-            isPresented: Binding(
+        // Same two alerts the detail screen shows, from one definition — the
+        // two screens must never word an irreversible action differently.
+        .recordDeletionAlerts(
+            isConfirming: Binding(
                 get: { pendingDeletion != nil },
                 set: { if !$0 { pendingDeletion = nil } }
             ),
-            presenting: pendingDeletion
-        ) { record in
-            Button("Delete", role: .destructive) { Task { await delete(record) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("This can't be undone.")
-        }
-        .alert(
-            "Couldn't delete this record. Check your connection and try again.",
-            isPresented: $showDeleteError
-        ) {
-            Button("OK", role: .cancel) {}
-        }
+            isShowingFailure: $showDeleteError,
+            confirm: {
+                guard let record = pendingDeletion else { return }
+                Task { await delete(record) }
+            }
+        )
     }
 
     /// `0` renders no badge, so an empty or failed load simply shows nothing

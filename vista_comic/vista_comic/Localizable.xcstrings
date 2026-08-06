@@ -7,6 +7,9 @@
     "#%lld" : {
 
     },
+    "%@ · %@ · page %lld" : {
+
+    },
     "%@ · %@ · page %lld · %@" : {
       "localizations" : {
         "en" : {
@@ -67,6 +70,9 @@
         }
       }
     },
+    "Check your connection and try again." : {
+
+    },
     "Check that the server is running and try again." : {
       "comment" : "Error state: description when a fetch fails",
       "localizations" : {
@@ -117,6 +123,12 @@
         }
       }
     },
+    "Couldn't ask for this explanation again" : {
+
+    },
+    "Couldn't delete this record. Check your connection and try again." : {
+
+    },
     "Couldn't delete this translation. Check your connection and try again." : {
 
     },
@@ -132,6 +144,9 @@
       }
     },
     "Deeper" : {
+
+    },
+    "Delete this record?" : {
 
     },
     "Deeper explanation" : {
@@ -223,6 +238,9 @@
       }
     },
     "No explanation was written for this selection. Trying again would return the same answer." : {
+
+    },
+    "No longer in your library" : {
 
     },
     "No text was found in the selected region. Try selecting a tighter area around the text." : {
@@ -352,6 +370,9 @@
 
     },
     "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄." : {
+
+    },
+    "Today's explanation limit is used up. The limit resets tomorrow." : {
 
     },
     "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {

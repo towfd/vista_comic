@@ -104,34 +104,57 @@ struct HistoryActionsTests {
         )
     }
 
+    /// A spent daily budget and an unreachable server are different facts about
+    /// the reader's day, and only one of them is worth checking a connection
+    /// over. The seam distinguishes them because a retry spends a request too,
+    /// so the screen must be able to read that back out.
+    @Test func aRetryRefusedByTheDailyCapIsDistinguishable() async throws {
+        let stub = StubComprehensionRepository()
+        stub.retryResult = .failure(ComprehensionEnqueueError.dailyCapReached)
+
+        let state = await retryComprehensionRecord(id: 1, using: stub)
+
+        guard case .failed(let error) = state else {
+            Issue.record("expected .failed, got \(state)")
+            return
+        }
+        #expect(error as? ComprehensionEnqueueError == .dailyCapReached)
+    }
+
     // MARK: - Who may retry at all
 
-    /// The rule the detail screen applies before offering the button, read off
-    /// the section state both it and the reader's result screen share — so the
-    /// two screens can never disagree about what is retryable.
+    /// The rule the detail screen applies before offering the button.
     ///
     /// A `declined` record offers none: retrying would spend quota to receive
     /// the same verdict.
     @Test func onlyAFailedRecordOffersRetry() async throws {
-        #expect(retryIsOffered(for: .preview(status: "failed")))
-        #expect(retryIsOffered(for: .preview(status: "declined")) == false)
-        #expect(retryIsOffered(for: .preview(status: "pending")) == false)
-        #expect(retryIsOffered(for: .preview(status: "running")) == false)
-        #expect(retryIsOffered(for: .preview(status: "ok", notes: "…")) == false)
+        #expect(ComprehensionRecord.preview(status: "failed").offersRetry)
+        #expect(ComprehensionRecord.preview(status: "declined").offersRetry == false)
+        #expect(ComprehensionRecord.preview(status: "pending").offersRetry == false)
+        #expect(ComprehensionRecord.preview(status: "running").offersRetry == false)
+        #expect(ComprehensionRecord.preview(status: "ok", notes: "…").offersRetry == false)
     }
 
-    /// Same reasoning the row's status line uses: an `ok` record carrying no
-    /// notes is a failure, and a failure is retryable — the reader would
-    /// otherwise be stuck looking at a heading with nothing under it.
-    @Test func okWithoutNotesIsRetryableBecauseItIsAFailure() async throws {
-        #expect(retryIsOffered(for: .preview(status: "ok")))
+    /// The one record where "reads as a failure" and "may be retried" come
+    /// apart. An `ok` that arrived with no notes is shown the failure copy —
+    /// a heading with nothing under it would be worse — but the retry endpoint
+    /// answers 409 to anything that is not `failed`, so offering the button
+    /// would promise an error and nothing else.
+    @Test func okWithoutNotesShowsFailureCopyButOffersNoRetry() async throws {
+        let empty = ComprehensionRecord.preview(status: "ok")
+
+        #expect(ComprehensionSectionState(record: empty) == .unavailable(.failed))
+        #expect(empty.offersRetry == false)
     }
 
-    private func retryIsOffered(for record: ComprehensionRecord) -> Bool {
-        guard case .unavailable(let reason) = ComprehensionSectionState(record: record) else {
-            return false
-        }
-        return reason.allowsRetry
+    /// The section's own rule still says a failure *could* be helped by
+    /// retrying — `offersRetry` narrows it by what the backend will accept,
+    /// rather than contradicting it.
+    @Test func theSectionsRetryableReasonsAreUnchanged() async throws {
+        #expect(ComprehensionSectionState.Reason.failed.allowsRetry)
+        #expect(ComprehensionSectionState.Reason.enqueueFailed.allowsRetry)
+        #expect(ComprehensionSectionState.Reason.declined.allowsRetry == false)
+        #expect(ComprehensionSectionState.Reason.quotaExhausted.allowsRetry == false)
     }
 
     // MARK: - Delete
@@ -192,5 +215,17 @@ struct HistoryActionsTests {
     /// backend's `nil` is actually telling us about.
     @Test func aMissingChapterTitleAloneDoesNotDisableTheJump() async throws {
         #expect(ComprehensionRecord.preview(chapterTitle: nil).canJumpToSource)
+    }
+
+    /// The jump opens the record's own page read-only. `isPeek` is what keeps
+    /// re-reading an old scene from moving the reader's real position — the
+    /// same peek 單字本 used, unchanged.
+    @Test func theJumpOpensTheRecordsOwnPageWithoutMovingProgress() async throws {
+        let route = ComprehensionRecord.preview().sourceRoute
+
+        #expect(route.comicID == "comic-1")
+        #expect(route.chapterID == "chapter-1")
+        #expect(route.targetPage == 3)
+        #expect(route.isPeek)
     }
 }

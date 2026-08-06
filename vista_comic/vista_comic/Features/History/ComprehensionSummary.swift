@@ -52,6 +52,40 @@ extension ComprehensionRecord {
         comicTitle != nil
     }
 
+    /// Where jumping back goes: the exact page, read-only.
+    ///
+    /// Lives beside `canJumpToSource` rather than on the screen that pushes it,
+    /// so the route and the rule guarding it cannot drift apart. `isPeek` is
+    /// what keeps re-reading an old scene from moving where the reader actually
+    /// is — the same peek 單字本 used.
+    var sourceRoute: ReaderRoute {
+        ReaderRoute(
+            comicID: comicID,
+            chapterID: chapterID,
+            targetPage: pageNumber,
+            isPeek: true
+        )
+    }
+
+    /// Whether the detail screen offers a retry.
+    ///
+    /// Two things must both hold. The shared section's `allowsRetry` says
+    /// retrying *could* help — which is what withholds it from a `declined`
+    /// record, since that would spend quota to receive the same verdict. The
+    /// status says the backend will actually accept it: `POST /retry` answers
+    /// 409 to anything that is not `failed` (see `backend/app/main.py`).
+    ///
+    /// The two differ for exactly one record: an `ok` that arrived carrying no
+    /// notes. The reader is rightly shown the failure copy for it — a heading
+    /// with nothing under it would be worse — but the endpoint would refuse it,
+    /// so offering the button would promise an error and nothing else.
+    var offersRetry: Bool {
+        guard case .unavailable(let reason) = ComprehensionSectionState(record: self),
+              reason.allowsRetry
+        else { return false }
+        return status == .failed
+    }
+
     /// The one-line status shown on a row, distinguishing the four outcomes
     /// the reader can actually act on differently.
     ///

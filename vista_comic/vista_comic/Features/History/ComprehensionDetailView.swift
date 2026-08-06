@@ -44,13 +44,25 @@ struct ComprehensionDetailView: View {
     @State private var updated: ComprehensionRecord?
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
-    /// One flag per action rather than a shared message string: the String
-    /// Catalog is populated by extracting literals from the call site, so copy
-    /// held in a variable never reaches it. Two `.alert`s each stating their own
-    /// message keeps both translatable, which is the same reason
-    /// `ComprehensionDetailSection` spells its four reasons out separately.
-    @State private var showRetryError = false
     @State private var showDeleteError = false
+    /// Why a retry didn't happen, `nil` when none has failed. A reason rather
+    /// than a message string: the String Catalog is populated by extracting
+    /// literals from the call site, so copy held in a variable never reaches
+    /// it — the alert switches over this and states each message itself.
+    @State private var retryFailure: RetryFailure?
+
+    /// The two ways asking again can fail, kept apart for the same reason the
+    /// section keeps a decline apart from a failure: a reader who has spent
+    /// today's budget must not be sent to go and look at their connection.
+    private enum RetryFailure: Identifiable {
+        /// The backend refused: today's request budget is spent. Permanent
+        /// until tomorrow, so asking again now cannot help.
+        case dailyCapReached
+        /// Network or server trouble. Asking again may well work.
+        case unreachable
+
+        var id: Self { self }
+    }
 
     /// What this screen renders and acts on: the updated record where an action
     /// has produced one, otherwise the one it was pushed with.
@@ -90,23 +102,27 @@ struct ComprehensionDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { actions }
         .task { await markRead() }
-        .alert("Delete this record?", isPresented: $showDeleteConfirmation) {
-            Button("Delete", role: .destructive) { Task { await delete() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This can't be undone.")
-        }
+        .recordDeletionAlerts(
+            isConfirming: $showDeleteConfirmation,
+            isShowingFailure: $showDeleteError,
+            confirm: { Task { await delete() } }
+        )
         .alert(
-            "Couldn't ask for this explanation again. Check your connection and try again.",
-            isPresented: $showRetryError
-        ) {
+            "Couldn't ask for this explanation again",
+            isPresented: Binding(
+                get: { retryFailure != nil },
+                set: { if !$0 { retryFailure = nil } }
+            ),
+            presenting: retryFailure
+        ) { _ in
             Button("OK", role: .cancel) {}
-        }
-        .alert(
-            "Couldn't delete this record. Check your connection and try again.",
-            isPresented: $showDeleteError
-        ) {
-            Button("OK", role: .cancel) {}
+        } message: { failure in
+            switch failure {
+            case .dailyCapReached:
+                Text("Today's explanation limit is used up. The limit resets tomorrow.")
+            case .unreachable:
+                Text("Check your connection and try again.")
+            }
         }
     }
 
@@ -122,7 +138,7 @@ struct ComprehensionDetailView: View {
             // M9's peek-mode jump survives unchanged: `targetPage` opens the
             // exact page, `isPeek` keeps the visit from writing progress, so
             // re-reading an old scene never moves where the reader actually is.
-            NavigationLink(value: jumpRoute) {
+            NavigationLink(value: current.sourceRoute) {
                 Image(systemName: "location.circle")
             }
             // Disabled rather than hidden for a comic that has left the
@@ -148,24 +164,12 @@ struct ComprehensionDetailView: View {
         ComprehensionSectionState(record: current)
     }
 
-    /// Offered for a `failed` record and withheld for a `declined` one — the
-    /// section's own `allowsRetry` rule decides, so this screen and the
-    /// reader's result screen can never disagree about what is retryable.
-    /// Retrying a decline would spend a request to receive the same verdict.
+    /// Offered for a `failed` record and withheld from a `declined` one — see
+    /// `ComprehensionRecord.offersRetry` for both halves of that rule. Returning
+    /// `nil` is what keeps the button from appearing at all.
     private var retryAction: (() -> Void)? {
-        guard case .unavailable(let reason) = sectionState, reason.allowsRetry else {
-            return nil
-        }
+        guard current.offersRetry else { return nil }
         return { Task { await retry() } }
-    }
-
-    private var jumpRoute: ReaderRoute {
-        ReaderRoute(
-            comicID: current.comicID,
-            chapterID: current.chapterID,
-            targetPage: current.pageNumber,
-            isPeek: true
-        )
     }
 
     private var sourceHeader: some View {
@@ -177,12 +181,16 @@ struct ComprehensionDetailView: View {
 
     /// Titles rather than the raw stable ids, and a plain statement when the
     /// comic has left the library — its old records stay readable either way.
+    /// `String(localized:)` rather than bare literals, following
+    /// `SavedTranslationRow.sourceText`: this is assembled into a `String`, and
+    /// `Text(someString)` does not localize — so the words have to be looked up
+    /// here or they never can be.
     private var sourceLabel: String {
         guard let comic = current.comicTitle else {
-            return "No longer in your library"
+            return String(localized: "No longer in your library")
         }
         guard let chapter = current.chapterTitle else { return comic }
-        return "\(comic) · \(chapter) · page \(current.pageNumber)"
+        return String(localized: "\(comic) · \(chapter) · page \(current.pageNumber)")
     }
 
     /// Best-effort: a failed `PATCH` must not cost the reader the record they
@@ -206,8 +214,14 @@ struct ComprehensionDetailView: View {
         case .loaded(let requeued):
             updated = requeued
             onChanged(requeued)
-        case .failed:
-            showRetryError = true
+        case .failed(let error):
+            // The seam already tells these apart (`APIComprehensionRepository`
+            // asks for `.distinguishDailyCap`, since a retry spends a request
+            // too); collapsing them here would throw that away and send a
+            // reader whose budget is spent to go and check their Wi-Fi.
+            retryFailure = (error as? ComprehensionEnqueueError) == .dailyCapReached
+                ? .dailyCapReached
+                : .unreachable
         case .loading:
             break
         }

@@ -13,7 +13,7 @@
 //  *when* to call them and what to show afterwards.
 //
 
-import Foundation
+import SwiftUI
 
 /// Re-enqueues a `failed` record, returning the record as it comes back —
 /// `pending` again, and therefore being produced.
@@ -47,5 +47,41 @@ func deleteComprehensionRecord(
         return .loaded(())
     } catch {
         return .failed(error)
+    }
+}
+
+// MARK: - The deletion's two alerts
+
+extension View {
+    /// The confirmation a deletion must pass, and the message when it fails.
+    ///
+    /// Both 歷史紀錄 screens delete — the list by swipe, the detail by its
+    /// toolbar — and this is the one place either of them words it. Deletion is
+    /// irreversible with no undo, so the two screens promising subtly different
+    /// things about it is the failure worth designing out, not the handful of
+    /// lines saved.
+    ///
+    /// The screens keep what actually differs: which record is being deleted,
+    /// and what to do once it is gone.
+    func recordDeletionAlerts(
+        isConfirming: Binding<Bool>,
+        isShowingFailure: Binding<Bool>,
+        confirm: @escaping () -> Void
+    ) -> some View {
+        self
+            .alert("Delete this record?", isPresented: isConfirming) {
+                Button("Delete", role: .destructive, action: confirm)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This can't be undone.")
+            }
+            // The row stays where it is behind this: nothing was deleted, and a
+            // list that dropped it anyway would lie about what happened.
+            .alert(
+                "Couldn't delete this record. Check your connection and try again.",
+                isPresented: isShowingFailure
+            ) {
+                Button("OK", role: .cancel) {}
+            }
     }
 }
