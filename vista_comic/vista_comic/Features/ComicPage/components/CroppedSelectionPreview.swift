@@ -16,29 +16,25 @@
 import SwiftUI
 import UIKit
 
-/// Recognition result for a confirmed text selection (Ticket 05 of
-/// `ocr-recognition`; extended additively by `ocr-translation` ticket 04):
-/// recognizes the crop on appear, then shows the text pre-filled in an
-/// editable field so the user can correct misreads. Once recognition has
-/// succeeded, a "Translate" action becomes available to translate the
-/// current (possibly user-corrected) text into a picked target language.
-/// Once a translation is showing, a "Save" action persists the
-/// original/translated pair and its source reference to the backend
-/// (`ocr-translation` ticket 05). Dismissing — with or without edits,
-/// translated or saved or not — only discards in-memory state; a
-/// successfully saved pair already exists in the backend by that point, which
-/// is the whole point of saving.
+/// Recognition result for a confirmed text selection: recognizes the crop on
+/// appear, then shows the text pre-filled in an editable field so the user can
+/// correct misreads. Once recognition has succeeded, a "Translate" action
+/// translates the current (possibly user-corrected) text into a picked target
+/// language.
+///
+/// Translation runs **on device and first**, so it appears with no perceptible
+/// wait, and the deeper explanation is enqueued on the backend to be produced
+/// afterwards. There is no "Save": every translate is recorded automatically.
+///
+/// Dismissing therefore loses nothing. The record already exists on the backend
+/// and the explanation arrives whether or not this screen is still open — which
+/// is the whole point of enqueueing rather than waiting.
 struct CroppedSelectionPreview: View {
     let image: UIImage
-    /// The full decoded page `image` was cropped from, needed by
-    /// `Comprehender` as scene/panel context (`llm-comprehension` ticket 14)
-    /// alongside `image` and `editedText` — see `CroppedSelection.pageImage`
-    /// for why it's captured at crop time rather than re-read later.
-    let pageImage: UIImage
-    /// The comic/chapter/page this crop was selected from, threaded down
-    /// from `ReaderPage` — needed so "Save" can attach the correct source
-    /// reference, mirroring `ComicRepository.saveProgress`'s use of the same
-    /// three values elsewhere in this file.
+    /// The comic/chapter/page this crop was selected from, threaded down from
+    /// `ReaderPage`. The enqueued record carries these so the backend can
+    /// re-read the page from the library minutes later — which is exactly why
+    /// no image is ever uploaded or stored.
     let comicID: String
     let chapterID: String
     let pageNumber: Int
@@ -47,55 +43,30 @@ struct CroppedSelectionPreview: View {
     /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
     /// views instead of hard-coding production behavior inside them).
     let recognizer: any OCRRecognizer
-    /// Same reasoning as `recognizer` above, for the "Translate" action's
-    /// primary cloud call (`llm-comprehension` ticket 14) — tried first,
-    /// with `translator` below as its automatic fallback.
-    let comprehender: any Comprehender
-    /// Same reasoning as `recognizer` above, for the "Translate" action's
-    /// fallback: run automatically when `comprehender` is declined or fails.
+    /// Same reasoning as `recognizer` above, for the "Translate" action —
+    /// now the *first* thing that runs, not a fallback, so a literal
+    /// translation appears with no perceptible wait.
     let translator: any Translator
-    /// Same reasoning as `recognizer`/`translator` above, for the "Save"
-    /// action.
-    let translationRepository: any TranslationRepository
+    /// Same reasoning as `recognizer`/`translator` above, for enqueueing the
+    /// record whose explanation the backend produces afterwards.
+    let comprehensionRepository: any ComprehensionRepository
+
     @Environment(\.dismiss) private var dismiss
     @State private var recognitionState: LoadState<String> = .loading
     /// User-editable text, seeded from a successful recognition. Purely for
     /// on-screen display/correction — never written anywhere.
     @State private var editedText = ""
-    /// Translation state, deliberately separate from `recognitionState`:
-    /// recognition runs automatically on appear, translation runs on demand
-    /// (tapping "Translate") and can be re-run against a different language
-    /// or a further-edited text without disturbing the recognition result.
-    /// `nil` until the user taps "Translate" for the first time. Holds a
-    /// `SelectionTranslateOutcome` (ticket 14), not a bare translated
-    /// `String`, since a successful result may be a full cloud comprehension
-    /// or a translation-only fallback.
-    @State private var translationState: LoadState<SelectionTranslateOutcome>?
-    /// Save state, deliberately separate from `translationState` for the same
-    /// reason translation is separate from recognition: saving is a further
-    /// on-demand step (tapping "Save"), not something that runs
-    /// automatically once a translation appears. `nil` until the user taps
-    /// "Save" for the first time; reset back to `nil` whenever a fresh
-    /// translation replaces the one it was saved from, so a stale "Saved"
-    /// indicator never sticks to a different translation.
-    @State private var saveState: LoadState<SavedTranslation>?
-    /// The target language, defaulting to the last-used one (or Traditional
-    /// Chinese on first use — see `LastUsedTargetLanguage`). Persisted back
-    /// to `UserDefaults` whenever the user changes the picker.
+    /// Translation + enqueue state, deliberately separate from
+    /// `recognitionState`: recognition runs automatically on appear, this runs
+    /// on demand (tapping "Translate") and can be re-run against a different
+    /// language or a further-edited text without disturbing the recognition
+    /// result. `nil` until the user taps "Translate" for the first time.
+    ///
+    /// Holds a `SelectionEnqueueOutcome`, so a successful translation that the
+    /// backend refused to record is still a success — the reader has their
+    /// translation either way.
+    @State private var enqueueState: LoadState<SelectionEnqueueOutcome>?
     @State private var selectedLanguageID = LastUsedTargetLanguage.id
-    /// Whether the manual "request a stronger explanation" action
-    /// (`llm-comprehension` ticket 17) is in flight. Deliberately not folded
-    /// into `translationState`'s `LoadState`: the whole point of this action
-    /// is that the currently-showing (Haiku-tier) result stays visible and
-    /// interactive while the upgraded request runs, and stays visible if it
-    /// fails — a `.loading`/`.failed` `translationState` would hide it.
-    @State private var isUpgrading = false
-    /// Set on a failed upgrade attempt to drive a one-shot alert, mirroring
-    /// `VocabularyView`'s `deleteError` precedent: the failure is surfaced
-    /// without disturbing `translationState`, so the reader never ends up
-    /// with less than they had before tapping upgrade (the AC's explicit
-    /// requirement).
-    @State private var upgradeError: String?
 
     var body: some View {
         NavigationStack {
@@ -124,12 +95,6 @@ struct CroppedSelectionPreview: View {
             }
         }
         .task { await recognize() }
-        .alert(
-            "Couldn't get a stronger explanation. Check your connection and try again.",
-            isPresented: Binding(get: { upgradeError != nil }, set: { if !$0 { upgradeError = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        }
     }
 
     @ViewBuilder
@@ -215,7 +180,7 @@ struct CroppedSelectionPreview: View {
     }
 
     private var isTranslating: Bool {
-        if case .loading = translationState { return true }
+        if case .loading = enqueueState { return true }
         return false
     }
 
@@ -256,11 +221,11 @@ struct CroppedSelectionPreview: View {
 
     @ViewBuilder
     private var translationResultContent: some View {
-        // `translationState` is `nil` until "Translate" is tapped once;
+        // `enqueueState` is `nil` until "Translate" is tapped once;
         // unwrap explicitly rather than relying on optional/enum pattern
         // sugar, so each case below is unambiguous.
-        if let translationState {
-            switch translationState {
+        if let enqueueState {
+            switch enqueueState {
             case .loading:
                 HStack {
                     Spacer()
@@ -270,13 +235,7 @@ struct CroppedSelectionPreview: View {
                 .frame(minHeight: 80)
             case .loaded(let outcome):
                 VStack(alignment: .leading, spacing: 12) {
-                    // Always the first thing shown once a result exists (the
-                    // AC's explicit ordering requirement) — answers "is this
-                    // the full cloud explanation or a degraded result"
-                    // before the reader looks at any content below it.
-                    comprehensionBanner(for: outcome)
-
-                    // Original and translated text side by side, so the user
+                    // Original and translated text side by side, so the reader
                     // can compare them directly without scrolling between two
                     // screens.
                     HStack(alignment: .top, spacing: 12) {
@@ -285,21 +244,14 @@ struct CroppedSelectionPreview: View {
                         translationColumn(titleKey: "Translation", text: outcome.translation)
                     }
 
-                    // Grammar/context/tone — and the manual upgrade action
-                    // below them — only render for a full cloud success; the
-                    // declined/error fallback cases only ever carry a
-                    // translation, with no explanation to upgrade
-                    // (`llm-comprehension` ticket 17's AC).
-                    if case .comprehended(let result) = outcome {
-                        translationColumn(titleKey: "Grammar notes", text: result.grammarNotes)
-                        translationColumn(titleKey: "Context notes", text: result.contextNotes)
-                        translationColumn(titleKey: "Tone & register", text: result.toneRegister)
-                        upgradeButton
+                    // M9's verdict banner is gone: there is no verdict to state
+                    // yet, because the explanation is produced in the
+                    // background and this ticket does not display it. What the
+                    // reader must not be left guessing about is the one case
+                    // where nothing was recorded at all.
+                    if case .notRecorded(_, let reason) = outcome {
+                        notRecordedNotice(reason: reason)
                     }
-
-                    // "Save" is available as soon as a translation is
-                    // showing (`ocr-translation` ticket 05's AC).
-                    saveControl(outcome: outcome)
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
@@ -307,33 +259,31 @@ struct CroppedSelectionPreview: View {
         }
     }
 
-    /// The persistent status banner (`llm-comprehension` ticket 08's Variant
-    /// C decision): always the first thing shown, so the reader knows at a
-    /// glance whether they're looking at a full cloud explanation or one of
-    /// the two distinct fallback states, before reading any content below.
+    /// Shown when the translation succeeded but no record exists, so the
+    /// reader is never silently left without the explanation they expect.
+    ///
+    /// Split by whether retrying could help, the same rule applied everywhere
+    /// else in this flow: the daily budget is spent until tomorrow, whereas a
+    /// connection problem is worth another go.
     @ViewBuilder
-    private func comprehensionBanner(for outcome: SelectionTranslateOutcome) -> some View {
-        switch outcome {
-        case .comprehended:
-            banner(icon: "cloud.fill", text: "雲端深度解釋", tint: .blue)
-        case .translatedOnly(_, .declined):
-            // Orange, not gray — deliberately distinct from the generic
-            // offline/error banner below, so a content-policy decline is
-            // never mistaken for a connectivity problem (ticket 07/08's
-            // whole point).
-            banner(icon: "exclamationmark.triangle.fill", text: "內容政策・僅提供翻譯", tint: .orange)
-        case .translatedOnly(_, .error):
-            banner(icon: "iphone", text: "離線模式・僅逐字翻譯", tint: .gray)
+    private func notRecordedNotice(
+        reason: SelectionEnqueueOutcome.NotRecordedReason
+    ) -> some View {
+        switch reason {
+        case .quotaExhausted:
+            Text("Today's cloud explanation limit is used up. This one won't be saved to your history.")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+        case .transient:
+            HStack(spacing: 12) {
+                Text("Couldn't save this to your history.")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+                Button("Retry") { Task { await translate() } }
+                    .font(AppFont.caption)
+                    .foregroundStyle(.primaryRed)
+            }
         }
-    }
-
-    private func banner(icon: String, text: String, tint: Color) -> some View {
-        Label(text, systemImage: icon)
-            .font(AppFont.caption)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(tint))
     }
 
     private func translationColumn(titleKey: LocalizedStringKey, text: String) -> some View {
@@ -379,162 +329,21 @@ struct CroppedSelectionPreview: View {
     }
 
     private func translate() async {
-        translationState = .loading
-        // A fresh translation invalidates any prior save (it was saved from
-        // the previous translated text), so start "Save" clean again.
-        saveState = nil
-        translationState = await comprehendOrTranslateSelection(
+        enqueueState = .loading
+        enqueueState = await translateAndEnqueueSelection(
             editedText,
-            crop: image,
-            page: pageImage,
             to: selectedLanguage,
             targetLanguageCode: selectedLanguageID,
-            using: comprehender,
-            fallbackTranslator: translator
-        )
-    }
-
-    // MARK: - Upgrade (`llm-comprehension` ticket 17)
-
-    /// Re-requests a stronger-tier comprehension for the same text/images/
-    /// target language, replacing the displayed (Haiku-tier) result on
-    /// success. Only reachable while a `.comprehended` result is already
-    /// showing (see `upgradeButton`'s placement) — there's no explanation to
-    /// upgrade from a fallback state.
-    private func upgrade() async {
-        isUpgrading = true
-        let result = await upgradeComprehension(
-            editedText,
-            crop: image,
-            page: pageImage,
-            targetLanguageCode: selectedLanguageID,
-            using: comprehender
-        )
-        isUpgrading = false
-        switch result {
-        case .loaded(let comprehensionResult):
-            translationState = .loaded(.comprehended(comprehensionResult))
-            // A fresh result invalidates any prior save, same reasoning as
-            // `translate()` above.
-            saveState = nil
-        case .failed:
-            // The AC's explicit requirement: a failed upgrade leaves the
-            // original result exactly as it was — `translationState` is
-            // untouched — with the failure surfaced as a one-shot alert
-            // instead.
-            upgradeError = "Couldn't get a stronger explanation. Check your connection and try again."
-        case .loading:
-            break
-        }
-    }
-
-    private var upgradeButton: some View {
-        Button {
-            Task { await upgrade() }
-        } label: {
-            if isUpgrading {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Text("Requesting deeper explanation…")
-                    Spacer()
-                }
-            } else {
-                HStack {
-                    Spacer()
-                    Label("Request deeper explanation", systemImage: "sparkles")
-                    Spacer()
-                }
-            }
-        }
-        .buttonStyle(.bordered)
-        .tint(.primaryRed)
-        .disabled(isUpgrading)
-    }
-
-    // MARK: - Save
-
-    /// Persists `outcome`'s translation alongside the current edited
-    /// original text, target language, and source reference. When `outcome`
-    /// is a full cloud comprehension (`llm-comprehension` ticket 15), its
-    /// three explanation fields are saved too; a fallback (translation-only)
-    /// `outcome` saves with all three left `nil`/`NULL`.
-    private func save(outcome: SelectionTranslateOutcome) async {
-        saveState = .loading
-        var grammarNotes: String?
-        var contextNotes: String?
-        var toneRegister: String?
-        if case .comprehended(let result) = outcome {
-            grammarNotes = result.grammarNotes
-            contextNotes = result.contextNotes
-            toneRegister = result.toneRegister
-        }
-        saveState = await saveSelection(
-            originalText: editedText,
-            translatedText: outcome.translation,
-            grammarNotes: grammarNotes,
-            contextNotes: contextNotes,
-            toneRegister: toneRegister,
-            targetLanguage: selectedLanguageID,
             comicID: comicID,
             chapterID: chapterID,
             pageNumber: pageNumber,
-            using: translationRepository
+            // No tier picker yet — that arrives with the result screen's
+            // states, which is also the first ticket that can show the
+            // difference. Until then every request uses the default tier.
+            useStrongerModel: false,
+            using: translator,
+            repository: comprehensionRepository
         )
-    }
-
-    @ViewBuilder
-    private func saveControl(outcome: SelectionTranslateOutcome) -> some View {
-        if let saveState {
-            switch saveState {
-            case .loading:
-                HStack {
-                    Spacer()
-                    ProgressView("Saving…")
-                    Spacer()
-                }
-            case .loaded:
-                HStack {
-                    Spacer()
-                    Label("Saved", systemImage: "checkmark.circle.fill")
-                        .font(AppFont.caption)
-                        .foregroundStyle(.primaryRed)
-                    Spacer()
-                }
-            case .failed:
-                saveFailureContent(outcome: outcome)
-            }
-        } else {
-            // Available as soon as a translation is showing (the AC's whole
-            // requirement) — no extra gating beyond that. Once tapped,
-            // `saveState` becomes non-nil and this branch (along with the
-            // button) is replaced by the loading/loaded/failed state above,
-            // so there's no double-tap window to guard against separately.
-            Button("Save") { Task { await save(outcome: outcome) } }
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryRed)
-                .frame(maxWidth: .infinity)
-        }
-    }
-
-    /// A clear, non-silent failure message (the AC's explicit requirement),
-    /// mirroring `failureContent(for:)`/`translationFailureContent(for:)`'s
-    /// retry pattern above. Not broken out per distinguishable error case
-    /// like OCR/translation failures are — `TranslationRepository.save`
-    /// throws generic networking errors (`APIError`), not a save-specific
-    /// enum, so one clear message covers it.
-    private func saveFailureContent(outcome: SelectionTranslateOutcome) -> some View {
-        VStack(spacing: 12) {
-            Text("Couldn't save this translation. Check your connection and try again.")
-                .font(AppFont.caption)
-                .foregroundStyle(.grayFont)
-                .multilineTextAlignment(.center)
-
-            Button("Retry") { Task { await save(outcome: outcome) } }
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryRed)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 

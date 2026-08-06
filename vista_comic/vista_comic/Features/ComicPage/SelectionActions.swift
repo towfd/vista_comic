@@ -224,3 +224,112 @@ func saveSelection(
         return .failed(error)
     }
 }
+
+/// The "Translate" action's result under `comprehension-response-ux`: the
+/// reader always gets a translation, and the deeper explanation is enqueued on
+/// the backend to arrive later.
+///
+/// The flow now has **two independently failing steps** where M9 had one, so
+/// this deliberately does not collapse them into success/failure. An enqueue
+/// failure is a variant of *success*: the reader does have their translation,
+/// and modelling it as failure would make the screen throw away something it
+/// actually has. Only the on-device translation failing is a real failure —
+/// see `translateAndEnqueueSelection`.
+enum SelectionEnqueueOutcome: Equatable {
+    /// Translated, and the backend is now producing the explanation.
+    case recorded(translation: String, record: ComprehensionRecord)
+    /// Translated, but nothing was recorded — so no explanation is coming and
+    /// there is nothing in 歷史紀錄 for this selection.
+    case notRecorded(translation: String, reason: NotRecordedReason)
+
+    /// Why no record exists. Split by whether retrying can possibly help,
+    /// which is the same rule the result screen applies to a declined versus a
+    /// failed explanation — and it decides whether a retry is offered at all.
+    enum NotRecordedReason: Equatable {
+        /// Today's request budget is spent. Permanent until tomorrow, so no
+        /// retry. The one case where "every translate is recorded" does not
+        /// hold, and the reader should be told plainly.
+        case quotaExhausted
+        /// A connection or server problem. Worth retrying.
+        case transient
+    }
+
+    /// The translation to show, present in every case — the reader is never
+    /// left with nothing once the on-device step has succeeded.
+    var translation: String {
+        switch self {
+        case .recorded(let translation, _): return translation
+        case .notRecorded(let translation, _): return translation
+        }
+    }
+
+    /// The record to poll for an explanation, if one was created.
+    var record: ComprehensionRecord? {
+        switch self {
+        case .recorded(_, let record): return record
+        case .notRecorded: return nil
+        }
+    }
+}
+
+/// Runs the "Translate" action: translate on device **first**, then enqueue the
+/// deeper explanation on the backend.
+///
+/// This inverts M9's order, where the cloud ran first and the on-device
+/// translator was only a fallback. The reader now sees a literal translation
+/// essentially immediately, and never waits on the cloud at all — the backend
+/// owns that call from the moment this returns, and completes it whether or not
+/// the reader stays on the screen.
+///
+/// **If the on-device translation fails, nothing is enqueued**, the backend is
+/// never called and no request is spent. The fast translation *is* the product
+/// here; when it does not arrive there is nothing immediate to record, and
+/// leaving the reader in front of an empty screen for minutes is the exact
+/// experience this work removes.
+///
+/// A free function, mirroring `translateSelection`'s/`recognizeSelection`'s own
+/// reasoning: unit-testable against stub `Translator`/`ComprehensionRepository`
+/// conformers independent of any SwiftUI rendering.
+func translateAndEnqueueSelection(
+    _ text: String,
+    to targetLanguage: Locale.Language,
+    targetLanguageCode: String,
+    comicID: String,
+    chapterID: String,
+    pageNumber: Int,
+    useStrongerModel: Bool,
+    using translator: any Translator,
+    repository: any ComprehensionRepository
+) async -> LoadState<SelectionEnqueueOutcome> {
+    let translated: String
+    switch await translateSelection(text, to: targetLanguage, using: translator) {
+    case .loaded(let value):
+        translated = value
+    case .failed(let error):
+        // The only genuine failure: without a translation there is nothing to
+        // show and nothing to record.
+        return .failed(error)
+    case .loading:
+        // Unreachable: `translateSelection` never returns `.loading`.
+        return .loading
+    }
+
+    do {
+        let record = try await repository.enqueue(
+            sourceText: text,
+            translatedText: translated,
+            targetLanguage: targetLanguageCode,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber,
+            useStrongerModel: useStrongerModel
+        )
+        return .loaded(.recorded(translation: translated, record: record))
+    } catch ComprehensionEnqueueError.dailyCapReached {
+        return .loaded(.notRecorded(translation: translated, reason: .quotaExhausted))
+    } catch {
+        // Any other enqueue failure is transient — including a conformer
+        // throwing something unexpected — so a retry is worth offering.
+        return .loaded(.notRecorded(translation: translated, reason: .transient))
+    }
+}
