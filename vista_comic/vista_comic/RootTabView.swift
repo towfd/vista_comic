@@ -3,9 +3,15 @@
 //  vista_comic
 //
 //  The app's root navigation shell (tab-bar-navigation M4 kickoff): hosts the
-//  existing library/reader flow (書庫) alongside a placeholder vocabulary tab
-//  (單字本) that the ocr-translation feature will populate. `HomeView` is
+//  existing library/reader flow (書庫) alongside a second tab. `HomeView` is
 //  unchanged — it simply becomes one tab's content instead of the app's root.
+//
+//  `comprehension-response-ux` ticket 19 puts 歷史紀錄 in the slot 單字本 held.
+//  It is a replacement rather than an addition: every translate now records
+//  itself automatically, so the thing worth keeping a tab for is what the
+//  reader actually produced while reading — not the short list of items they
+//  remembered to save. `VocabularyView` stays in the tree, unreferenced, until
+//  the removal ticket takes it out along with the rest of the M9 paths.
 //
 
 import SwiftUI
@@ -18,9 +24,9 @@ struct RootTabView: View {
                     Label("Library", systemImage: "books.vertical")
                 }
 
-            VocabularyView()
+            HistoryView()
                 .tabItem {
-                    Label("Vocabulary", systemImage: "text.book.closed")
+                    Label("History", systemImage: "clock.arrow.circlepath")
                 }
         }
     }
