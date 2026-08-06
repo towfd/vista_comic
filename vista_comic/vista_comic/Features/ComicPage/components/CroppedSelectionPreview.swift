@@ -67,6 +67,19 @@ struct CroppedSelectionPreview: View {
     /// translation either way.
     @State private var enqueueState: LoadState<SelectionEnqueueOutcome>?
     @State private var selectedLanguageID = LastUsedTargetLanguage.id
+    @State private var useStrongerModel = LastUsedModelTier.useStrongerModel
+    /// The latest known state of the record this screen created — replaced
+    /// wholesale each time polling returns a newer one, so the translation
+    /// column and the `深度解釋` section always read from a single source.
+    ///
+    /// Separate from `enqueueState`, which records how the *translate action*
+    /// went and never changes afterwards. This changes for minutes after it.
+    @State private var record: ComprehensionRecord?
+    /// Bumped whenever a record becomes watchable again *without* its id
+    /// changing — which is exactly what a retry does. Without it, `.task(id:)`
+    /// would see the same id and not re-run, and the retried record would sit
+    /// unwatched.
+    @State private var pollGeneration = 0
 
     var body: some View {
         NavigationStack {
@@ -95,6 +108,15 @@ struct CroppedSelectionPreview: View {
             }
         }
         .task { await recognize() }
+        // Tied to the view's lifetime rather than started inside `translate()`,
+        // so dismissing the sheet cancels the poll instead of leaving it
+        // running against a screen nobody is looking at — the one piece of work
+        // here that would otherwise outlive the screen by minutes.
+        //
+        // Keyed on the record plus a generation, so it starts when a record
+        // first exists, re-starts on a translate or a retry, and does *not*
+        // restart merely because polling replaced the record with a newer one.
+        .task(id: pollKey) { await pollForExplanation() }
     }
 
     @ViewBuilder
@@ -190,21 +212,20 @@ struct CroppedSelectionPreview: View {
 
     private var translateSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Translate to")
-                    .font(AppFont.caption)
-                    .foregroundStyle(.grayFont)
-                Picker("Translate to", selection: $selectedLanguageID) {
-                    ForEach(TargetLanguageOption.options) { option in
-                        Text(option.nameKey).tag(option.id)
-                    }
+            // Side by side where the width allows, stacked where it doesn't:
+            // a label plus two menus overflows a compact phone (a language name
+            // like "Traditional Chinese" is wide on its own), and a truncated
+            // picker is worse than a second row.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    languagePicker
+                    Spacer(minLength: 8)
+                    depthPicker
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .onChange(of: selectedLanguageID) { _, newValue in
-                    LastUsedTargetLanguage.id = newValue
+                VStack(alignment: .leading, spacing: 8) {
+                    languagePicker
+                    depthPicker
                 }
-                Spacer()
             }
 
             Button("Translate") {
@@ -217,6 +238,51 @@ struct CroppedSelectionPreview: View {
 
             translationResultContent
         }
+    }
+
+    private var languagePicker: some View {
+        HStack(spacing: 4) {
+            Text("Translate to")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+            Picker("Translate to", selection: $selectedLanguageID) {
+                ForEach(TargetLanguageOption.options) { option in
+                    Text(option.nameKey).tag(option.id)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .onChange(of: selectedLanguageID) { _, newValue in
+                LastUsedTargetLanguage.id = newValue
+            }
+        }
+        .fixedSize()
+    }
+
+    /// Inline beside the language picker rather than behind a settings screen:
+    /// this app has no settings screen and does not gain one here, and depth is
+    /// a judgement the reader makes with the text in front of them.
+    ///
+    /// It replaces M9's "request a stronger explanation" action, which under a
+    /// queue would mean a second multi-minute wait on the very screen this work
+    /// exists to unblock — so the choice moves *before* the request, not after.
+    private var depthPicker: some View {
+        HStack(spacing: 4) {
+            Text("Depth")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+            Picker("Depth", selection: $useStrongerModel) {
+                Text("Standard").tag(false)
+                Text("Deeper").tag(true)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .onChange(of: useStrongerModel) { _, newValue in
+                LastUsedModelTier.useStrongerModel = newValue
+            }
+            .accessibilityIdentifier("depthPicker")
+        }
+        .fixedSize()
     }
 
     @ViewBuilder
@@ -241,17 +307,28 @@ struct CroppedSelectionPreview: View {
                     HStack(alignment: .top, spacing: 12) {
                         translationColumn(titleKey: "Original", text: editedText)
                         Divider()
-                        translationColumn(titleKey: "Translation", text: outcome.translation)
+                        translationColumn(
+                            titleKey: "Translation",
+                            // Where a cloud translation exists it wins; until
+                            // then the on-device one stands. Reading it off the
+                            // record means pending, failed and declined records
+                            // need no special case here — they simply have no
+                            // cloud wording yet, or ever.
+                            text: record?.displayedTranslation ?? outcome.translation,
+                            isCloud: record?.cloudTranslation != nil
+                        )
                     }
 
-                    // M9's verdict banner is gone: there is no verdict to state
-                    // yet, because the explanation is produced in the
-                    // background and this ticket does not display it. What the
-                    // reader must not be left guessing about is the one case
-                    // where nothing was recorded at all.
-                    if case .notRecorded(_, let reason) = outcome {
-                        notRecordedNotice(reason: reason)
-                    }
+                    Divider()
+
+                    // M9's verdict banner is gone, its two jobs split: the chip
+                    // above says which translation this is, and this section
+                    // says whether more is coming — standing exactly where the
+                    // explanation itself will render.
+                    ComprehensionDetailSection(
+                        state: sectionState(for: outcome),
+                        retry: retryAction(for: outcome)
+                    )
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
@@ -259,37 +336,52 @@ struct CroppedSelectionPreview: View {
         }
     }
 
-    /// Shown when the translation succeeded but no record exists, so the
-    /// reader is never silently left without the explanation they expect.
-    ///
-    /// Split by whether retrying could help, the same rule applied everywhere
-    /// else in this flow: the daily budget is spent until tomorrow, whereas a
-    /// connection problem is worth another go.
-    @ViewBuilder
-    private func notRecordedNotice(
-        reason: SelectionEnqueueOutcome.NotRecordedReason
-    ) -> some View {
-        switch reason {
-        case .quotaExhausted:
-            Text("Today's cloud explanation limit is used up. This one won't be saved to your history.")
-                .font(AppFont.caption)
-                .foregroundStyle(.grayFont)
-        case .transient:
-            HStack(spacing: 12) {
-                Text("Couldn't save this to your history.")
-                    .font(AppFont.caption)
-                    .foregroundStyle(.grayFont)
-                Button("Retry") { Task { await translate() } }
-                    .font(AppFont.caption)
-                    .foregroundStyle(.primaryRed)
+    /// Folds the two independent things that can go wrong — the enqueue, and
+    /// the explanation itself — into the section's single vocabulary, so both
+    /// render in the same slot instead of the screen growing a second one.
+    private func sectionState(for outcome: SelectionEnqueueOutcome) -> ComprehensionSectionState {
+        switch outcome {
+        case .recorded(_, let created):
+            // The polled record when one has arrived, otherwise the record as
+            // enqueued (always `pending`).
+            return ComprehensionSectionState(record: record ?? created)
+        case .notRecorded(_, let reason):
+            switch reason {
+            case .quotaExhausted: return .unavailable(.quotaExhausted)
+            case .transient: return .unavailable(.enqueueFailed)
             }
         }
     }
 
-    private func translationColumn(titleKey: LocalizedStringKey, text: String) -> some View {
+    /// What "Retry" means depends on how far the flow got: a record that
+    /// `failed` is re-enqueued on the backend, whereas an enqueue that never
+    /// landed means running the whole translate action again. Returning `nil`
+    /// where retrying cannot help keeps the button from appearing at all.
+    private func retryAction(for outcome: SelectionEnqueueOutcome) -> (() -> Void)? {
+        switch sectionState(for: outcome) {
+        case .unavailable(.failed):
+            guard let id = (record ?? outcome.record)?.id else { return nil }
+            return { Task { await retryRecord(id: id) } }
+        case .unavailable(.enqueueFailed):
+            return { Task { await translate() } }
+        case .inProgress, .explained, .unavailable:
+            return nil
+        }
+    }
+
+    private func translationColumn(
+        titleKey: LocalizedStringKey,
+        text: String,
+        isCloud: Bool? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(titleKey)
-                .font(AppFont.rowTitle)
+            HStack(spacing: 6) {
+                Text(titleKey)
+                    .font(AppFont.rowTitle)
+                if let isCloud {
+                    TranslationProvenanceChip(isCloud: isCloud)
+                }
+            }
             Text(text)
                 .font(AppFont.caption)
         }
@@ -330,20 +422,70 @@ struct CroppedSelectionPreview: View {
 
     private func translate() async {
         enqueueState = .loading
-        enqueueState = await translateAndEnqueueSelection(
+        // Dropped before the new request so a re-translate can't briefly show
+        // the previous selection's explanation under the new translation.
+        record = nil
+        let outcome = await translateAndEnqueueSelection(
             editedText,
             to: selectedLanguage,
             targetLanguageCode: selectedLanguageID,
             comicID: comicID,
             chapterID: chapterID,
             pageNumber: pageNumber,
-            // No tier picker yet — that arrives with the result screen's
-            // states, which is also the first ticket that can show the
-            // difference. Until then every request uses the default tier.
-            useStrongerModel: false,
+            useStrongerModel: useStrongerModel,
             using: translator,
             repository: comprehensionRepository
         )
+        enqueueState = outcome
+        // Setting this is what starts `.task(id:)` polling.
+        if case .loaded(let value) = outcome { record = value.record }
+    }
+
+    /// What `.task(id:)` watches. A record id alone is not enough: a retry puts
+    /// the *same* record back to `pending`, and the poll must start again.
+    private var pollKey: String {
+        "\(record?.id.description ?? "none")#\(pollGeneration)"
+    }
+
+    /// Runs for as long as this screen is open and its record unfinished. Does
+    /// nothing when there is no record, or when the backend already finished —
+    /// including on the re-run `.task(id:)` performs after a second translate.
+    private func pollForExplanation() async {
+        guard let current = record, current.status.isInProgress else { return }
+        if let finished = await awaitExplanation(
+            for: current.id,
+            using: comprehensionRepository
+        ) {
+            record = finished
+        }
+    }
+
+    /// Re-enqueues a record the backend failed on, putting it back to `pending`.
+    ///
+    /// Deliberately does not poll here: bumping the generation hands the watch
+    /// back to `.task(id:)`, so the poll stays owned by the view's lifetime
+    /// instead of by an unstructured task that would outlive dismissal.
+    private func retryRecord(id: Int) async {
+        guard let requeued = try? await comprehensionRepository.retry(id: id) else { return }
+        record = requeued
+        pollGeneration += 1
+    }
+}
+
+/// Persists the reader's explanation-depth choice locally (`UserDefaults`),
+/// copying `LastUsedTargetLanguage` below exactly — same kind of preference
+/// (a per-device UI choice, not learning material), so it gets the same
+/// treatment rather than a new mechanism.
+///
+/// Defaults to the standard tier: `UserDefaults.bool(forKey:)` returns `false`
+/// for a key never written, which is the cheaper model — so a reader who never
+/// touches the picker never silently spends the higher rate.
+private enum LastUsedModelTier {
+    private static let defaultsKey = "comprehension.useStrongerModel"
+
+    static var useStrongerModel: Bool {
+        get { UserDefaults.standard.bool(forKey: defaultsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
     }
 }
 

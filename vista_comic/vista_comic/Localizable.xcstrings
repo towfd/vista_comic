@@ -36,6 +36,9 @@
         }
       }
     },
+    "Being written. You can close this — it'll be waiting in 歷史紀錄." : {
+
+    },
     "Cancel" : {
 
     },
@@ -71,6 +74,9 @@
           }
         }
       }
+    },
+    "Cloud" : {
+
     },
     "Comics you add will appear here." : {
       "comment" : "Empty library description",
@@ -128,10 +134,19 @@
     "Couldn't save this translation. Check your connection and try again." : {
 
     },
+    "Deeper" : {
+
+    },
+    "Deeper explanation" : {
+
+    },
     "Delete" : {
 
     },
     "Delete this translation?" : {
+
+    },
+    "Depth" : {
 
     },
     "Done" : {
@@ -197,6 +212,9 @@
         }
       }
     },
+    "No explanation was written for this selection. Trying again would return the same answer." : {
+
+    },
     "No text was found in the selected region. Try selecting a tighter area around the text." : {
 
     },
@@ -215,6 +233,9 @@
 
     },
     "OK" : {
+
+    },
+    "On device" : {
 
     },
     "Original" : {
@@ -300,6 +321,9 @@
     "Spanish" : {
 
     },
+    "Standard" : {
+
+    },
     "Tap to retry" : {
       "comment" : "Reader: retry loading a single page that failed",
       "localizations" : {
@@ -314,6 +338,9 @@
     "Text recognition failed unexpectedly." : {
 
     },
+    "The explanation couldn't be written. Your translation above is unaffected." : {
+
+    },
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
 
     },
@@ -321,6 +348,12 @@
 
     },
     "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
+
+    },
+    "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄." : {
+
+    },
+    "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
 
     },
     "Tone & register" : {

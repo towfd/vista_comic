@@ -31,6 +31,27 @@ from .db import ComprehendUsage
 # capturing it at import time).
 DAILY_CAP = 300
 
+# What one capped request can cost, recorded here beside the cap because the two
+# only mean something together: the cap bounds the *number* of requests, and the
+# tier bounds what each one costs. Under `comprehension-response-ux` the tier is
+# a reader-facing picker (the per-device "deeper explanation" toggle), so the
+# whole feature's cost profile moves with a setting no deploy touches.
+#
+# Checked against Anthropic's published per-token pricing on 2026-08-06, for the
+# two models `comprehension_client` actually selects between:
+#
+#   claude-haiku-4-5-20251001  $1 / MTok in,  $5 / MTok out   (default tier)
+#   claude-sonnet-5            $3 / MTok in, $15 / MTok out   (stronger tier)
+#
+# So the stronger tier costs **3x** the default, on input and output alike.
+# Sonnet 5 is under introductory pricing ($2/$10) until 2026-08-31, making the
+# ratio 2x until then; 3x is the number to plan against, since it is what the
+# ratio returns to. Re-check when either model is changed.
+#
+# Recorded as prose rather than a constant on purpose: nothing computes against
+# it, and a second copy of the number in code is a copy that can drift from the
+# comment explaining it.
+
 
 def today_utc() -> date:
     # UTC, not local server time, so the cap resets at a consistent moment

@@ -52,12 +52,34 @@ private final class StubComprehensionRepository: ComprehensionRepository, @unche
         return try enqueueResult.get()
     }
 
+    /// Consumed one per `record(id:)` call, so a test can script a poll that
+    /// sees `pending` a few times before the explanation lands. The last entry
+    /// repeats once exhausted, so a poll that over-runs doesn't crash.
+    var recordResults: [Result<ComprehensionRecord, Error>] = []
+    private(set) var recordCallCount = 0
+    private(set) var setReadCallCount = 0
+    private(set) var lastSetReadValue: Bool?
+    private(set) var retryCallCount = 0
+
     func list() async throws -> [ComprehensionRecord] { [] }
-    func record(id: Int) async throws -> ComprehensionRecord { try enqueueResult.get() }
-    func setRead(id: Int, isRead: Bool) async throws -> ComprehensionRecord {
-        try enqueueResult.get()
+
+    func record(id: Int) async throws -> ComprehensionRecord {
+        defer { recordCallCount += 1 }
+        guard !recordResults.isEmpty else { return try enqueueResult.get() }
+        return try recordResults[min(recordCallCount, recordResults.count - 1)].get()
     }
-    func retry(id: Int) async throws -> ComprehensionRecord { try enqueueResult.get() }
+
+    func setRead(id: Int, isRead: Bool) async throws -> ComprehensionRecord {
+        setReadCallCount += 1
+        lastSetReadValue = isRead
+        return try enqueueResult.get()
+    }
+
+    func retry(id: Int) async throws -> ComprehensionRecord {
+        retryCallCount += 1
+        return try enqueueResult.get()
+    }
+
     func delete(id: Int) async throws {}
 }
 
@@ -65,16 +87,24 @@ extension ComprehensionRecord {
     /// Decodes a canned payload, since this type exposes no memberwise
     /// initializer beyond `Decodable` — mirroring `SavedTranslation.preview()`'s
     /// own reasoning.
-    static func stub(id: Int = 1, status: String = "pending") -> ComprehensionRecord {
+    static func stub(
+        id: Int = 1,
+        status: String = "pending",
+        cloudTranslation: String? = nil,
+        notes: String? = nil
+    ) -> ComprehensionRecord {
+        func quoted(_ value: String?) -> String {
+            value.map { "\"\($0)\"" } ?? "null"
+        }
         let json = """
         {
             "id": \(id),
             "sourceText": "Xin chào",
             "translatedText": "你好",
-            "cloudTranslation": null,
-            "grammarNotes": null,
-            "contextNotes": null,
-            "toneRegister": null,
+            "cloudTranslation": \(quoted(cloudTranslation)),
+            "grammarNotes": \(quoted(notes)),
+            "contextNotes": \(quoted(notes)),
+            "toneRegister": \(quoted(notes)),
             "targetLanguage": "zh-Hant",
             "comicId": "comic-1",
             "chapterId": "chapter-1",
@@ -251,5 +281,144 @@ struct SelectionEnqueueFlowTests {
 
         #expect(record.status == .unknown)
         #expect(record.status.isInProgress)
+    }
+}
+
+/// `comprehension-response-ux` ticket 18: what the reader sees while — and
+/// after — the backend produces the explanation.
+@Suite("Explanation arriving while the reader watches")
+struct AwaitExplanationTests {
+    /// Never actually waits, so a poll that would take minutes in production
+    /// takes microseconds here. Injecting this is the whole reason
+    /// `awaitExplanation` takes a `sleep` parameter.
+    private let noWait: (Duration) async throws -> Void = { _ in }
+
+    private func poll(
+        _ repository: StubComprehensionRepository
+    ) async -> ComprehensionRecord? {
+        await awaitExplanation(for: 1, using: repository, sleep: noWait)
+    }
+
+    // MARK: - Polling until the backend is done
+
+    @Test func keepsPollingWhileTheRecordIsUnfinishedAndReturnsTheFinishedOne() async throws {
+        let repository = StubComprehensionRepository()
+        repository.recordResults = [
+            .success(.stub(status: "pending")),
+            .success(.stub(status: "running")),
+            .success(.stub(status: "ok", cloudTranslation: "您好", notes: "…")),
+        ]
+
+        let finished = await poll(repository)
+
+        #expect(finished?.status == .ok)
+        #expect(repository.recordCallCount == 3)
+    }
+
+    /// A dropped connection mid-wait is exactly the case worth surviving: the
+    /// explanation is still coming, and giving up would strand the reader in
+    /// front of a spinner that never resolves.
+    @Test func aTransientFetchFailureDoesNotEndThePoll() async throws {
+        let repository = StubComprehensionRepository()
+        repository.recordResults = [
+            .failure(APIError.httpStatus(503)),
+            .success(.stub(status: "ok", notes: "…")),
+        ]
+
+        let finished = await poll(repository)
+
+        #expect(finished?.status == .ok)
+    }
+
+    // MARK: - Marking read
+
+    /// "Read" means the reader saw it arrive, which is only knowable here.
+    @Test func marksTheRecordReadWhenTheExplanationLands() async throws {
+        let repository = StubComprehensionRepository()
+        repository.recordResults = [.success(.stub(status: "ok", notes: "…"))]
+
+        _ = await poll(repository)
+
+        #expect(repository.setReadCallCount == 1)
+        #expect(repository.lastSetReadValue == true)
+    }
+
+    /// Nothing arrived, so there is nothing the reader can have read — leaving
+    /// it unread is what makes 歷史紀錄's unread state mean anything.
+    @Test func doesNotMarkReadWhenTheRecordFinishedWithoutAnExplanation() async throws {
+        for status in ["failed", "declined"] {
+            let repository = StubComprehensionRepository()
+            repository.recordResults = [.success(.stub(status: status))]
+
+            _ = await poll(repository)
+
+            #expect(repository.setReadCallCount == 0)
+        }
+    }
+
+    /// A failed `PATCH` must never cost the reader the explanation itself.
+    @Test func aFailedMarkReadStillReturnsTheExplanation() async throws {
+        let repository = StubComprehensionRepository()
+        repository.recordResults = [.success(.stub(status: "ok", notes: "…"))]
+        repository.enqueueResult = .failure(APIError.httpStatus(500))
+
+        let finished = await poll(repository)
+
+        #expect(finished?.status == .ok)
+    }
+
+    // MARK: - What the section shows for a record
+
+    /// `pending` and `running` are deliberately not distinguished: a queue
+    /// position is not something the reader can act on.
+    @Test func pendingAndRunningBothReadAsOneInProgressState() async throws {
+        for status in ["pending", "running", "something-new"] {
+            let state = ComprehensionSectionState(record: .stub(status: status))
+            #expect(state == .inProgress)
+        }
+    }
+
+    @Test func okWithNotesShowsTheThreeFields() async throws {
+        let state = ComprehensionSectionState(
+            record: .stub(status: "ok", notes: "note")
+        )
+
+        #expect(
+            state == .explained(
+                grammarNotes: "note", contextNotes: "note", toneRegister: "note"
+            )
+        )
+    }
+
+    /// A heading with nothing under it is worse than an honest failure, and a
+    /// retry is the honest offer.
+    @Test func okWithoutAnyNotesIsTreatedAsAFailure() async throws {
+        let state = ComprehensionSectionState(record: .stub(status: "ok"))
+
+        #expect(state == .unavailable(.failed))
+    }
+
+    /// The split that decides whether a retry appears at all.
+    @Test func onlyTheFixableReasonsOfferARetry() async throws {
+        #expect(ComprehensionSectionState(record: .stub(status: "failed"))
+            == .unavailable(.failed))
+        #expect(ComprehensionSectionState(record: .stub(status: "declined"))
+            == .unavailable(.declined))
+
+        #expect(ComprehensionSectionState.Reason.failed.allowsRetry)
+        #expect(ComprehensionSectionState.Reason.enqueueFailed.allowsRetry)
+        #expect(ComprehensionSectionState.Reason.declined.allowsRetry == false)
+        #expect(ComprehensionSectionState.Reason.quotaExhausted.allowsRetry == false)
+    }
+
+    // MARK: - Display precedence
+
+    @Test func theCloudWordingReplacesTheOnDeviceOneOnceItArrives() async throws {
+        let landed = ComprehensionRecord.stub(
+            status: "ok", cloudTranslation: "您好", notes: "…"
+        )
+
+        #expect(landed.displayedTranslation == "您好")
+        #expect(ComprehensionRecord.stub().displayedTranslation == "你好")
     }
 }
