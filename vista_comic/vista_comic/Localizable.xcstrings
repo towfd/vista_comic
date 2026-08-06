@@ -1,7 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "·" : {
+
+    },
     "#%lld" : {
+
+    },
+    "%@ · %@ · page %lld" : {
 
     },
     "%@ · %@ · page %lld · %@" : {
@@ -64,6 +70,9 @@
         }
       }
     },
+    "Check your connection and try again." : {
+
+    },
     "Check that the server is running and try again." : {
       "comment" : "Error state: description when a fetch fails",
       "localizations" : {
@@ -114,10 +123,13 @@
         }
       }
     },
-    "Couldn't delete this translation. Check your connection and try again." : {
+    "Couldn't ask for this explanation again" : {
 
     },
-    "Couldn't get a stronger explanation. Check your connection and try again." : {
+    "Couldn't delete this record. Check your connection and try again." : {
+
+    },
+    "Couldn't delete this translation. Check your connection and try again." : {
 
     },
     "Couldn't load this page" : {
@@ -131,10 +143,10 @@
         }
       }
     },
-    "Couldn't save this translation. Check your connection and try again." : {
+    "Deeper" : {
 
     },
-    "Deeper" : {
+    "Delete this record?" : {
 
     },
     "Deeper explanation" : {
@@ -305,12 +317,6 @@
     "Record" : {
 
     },
-    "Request deeper explanation" : {
-
-    },
-    "Requesting deeper explanation…" : {
-
-    },
     "Retry" : {
       "comment" : "Error state: retry the failed fetch",
       "localizations" : {
@@ -321,15 +327,6 @@
           }
         }
       }
-    },
-    "Save" : {
-
-    },
-    "Saved" : {
-
-    },
-    "Saving…" : {
-
     },
     "Select text" : {
 
@@ -373,6 +370,9 @@
 
     },
     "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄." : {
+
+    },
+    "Today's explanation limit is used up. The limit resets tomorrow." : {
 
     },
     "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {

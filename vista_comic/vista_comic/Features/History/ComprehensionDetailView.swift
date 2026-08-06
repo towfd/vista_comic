@@ -13,18 +13,60 @@
 //  Opening this screen is what "read" means, so marking read happens here and
 //  nowhere else. Visiting the tab clears nothing.
 //
+//  Ticket 20 makes this the screen the reader *acts* from: retry, delete, and
+//  the jump back to the source page all live here. **Retry lives only here** —
+//  reaching it costs a deliberate tap into one record, which is precisely what
+//  keeps an expensive call hard to trigger by mis-tapping a long list.
+//
 
 import SwiftUI
 
 struct ComprehensionDetailView: View {
     let record: ComprehensionRecord
-    /// Called once this record has been marked read on the backend, so the
-    /// list can drop it from the badge without re-fetching. Passed in rather
-    /// than reaching back into the list's state, per CLAUDE.md's rule about
-    /// passing actions into views instead of hard-coding behavior in them.
-    var onMarkedRead: (ComprehensionRecord) -> Void = { _ in }
+    /// Called whenever this record changes on the backend — marked read, or
+    /// re-enqueued by a retry — so the list can update the row and the badge
+    /// without re-fetching. Passed in rather than reaching back into the list's
+    /// state, per CLAUDE.md's rule about passing actions into views instead of
+    /// hard-coding behavior in them.
+    var onChanged: (ComprehensionRecord) -> Void = { _ in }
+    /// Called once this record is gone from the backend, so the list can drop
+    /// the row. This screen dismisses itself; removing the row is the list's.
+    var onDeleted: (ComprehensionRecord) -> Void = { _ in }
 
     @Environment(\.comprehensionRepository) private var repository
+    @Environment(\.dismiss) private var dismiss
+
+    /// The record as the backend last returned it, once an action here has
+    /// changed it. `nil` until then, so the screen normally renders exactly the
+    /// record it was pushed with — a retry is the only thing that rewrites what
+    /// is on screen, and it should be visible immediately rather than waiting
+    /// for the list to refresh underneath.
+    @State private var updated: ComprehensionRecord?
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var showDeleteError = false
+    /// Why a retry didn't happen, `nil` when none has failed. A reason rather
+    /// than a message string: the String Catalog is populated by extracting
+    /// literals from the call site, so copy held in a variable never reaches
+    /// it — the alert switches over this and states each message itself.
+    @State private var retryFailure: RetryFailure?
+
+    /// The two ways asking again can fail, kept apart for the same reason the
+    /// section keeps a decline apart from a failure: a reader who has spent
+    /// today's budget must not be sent to go and look at their connection.
+    private enum RetryFailure: Identifiable {
+        /// The backend refused: today's request budget is spent. Permanent
+        /// until tomorrow, so asking again now cannot help.
+        case dailyCapReached
+        /// Network or server trouble. Asking again may well work.
+        case unreachable
+
+        var id: Self { self }
+    }
+
+    /// What this screen renders and acts on: the updated record where an action
+    /// has produced one, otherwise the one it was pushed with.
+    private var current: ComprehensionRecord { updated ?? record }
 
     var body: some View {
         ScrollView {
@@ -34,7 +76,7 @@ struct ComprehensionDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Original")
                         .font(AppFont.rowTitle)
-                    Text(record.sourceText)
+                    Text(current.sourceText)
                         .font(AppFont.caption)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -43,25 +85,91 @@ struct ComprehensionDetailView: View {
                     HStack(spacing: 6) {
                         Text("Translation")
                             .font(AppFont.rowTitle)
-                        TranslationProvenanceChip(isCloud: record.cloudTranslation != nil)
+                        TranslationProvenanceChip(isCloud: current.cloudTranslation != nil)
                     }
-                    Text(record.displayedTranslation)
+                    Text(current.displayedTranslation)
                         .font(AppFont.caption)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Divider()
 
-                // No `retry` action: retrying is the next ticket. Passing none
-                // means the section shows the failure copy without offering a
-                // button that would do nothing.
-                ComprehensionDetailSection(state: ComprehensionSectionState(record: record))
+                ComprehensionDetailSection(state: sectionState, retry: retryAction)
             }
             .padding()
         }
         .navigationTitle("Record")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { actions }
         .task { await markRead() }
+        .recordDeletionAlerts(
+            isConfirming: $showDeleteConfirmation,
+            isShowingFailure: $showDeleteError,
+            confirm: { Task { await delete() } }
+        )
+        .alert(
+            "Couldn't ask for this explanation again",
+            isPresented: Binding(
+                get: { retryFailure != nil },
+                set: { if !$0 { retryFailure = nil } }
+            ),
+            presenting: retryFailure
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { failure in
+            switch failure {
+            case .dailyCapReached:
+                Text("Today's explanation limit is used up. The limit resets tomorrow.")
+            case .unreachable:
+                Text("Check your connection and try again.")
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    /// Jump-back and delete sit in the toolbar rather than in the scrolling
+    /// body: they act on the whole record, so they should not scroll away from
+    /// it — and keeping delete out of the reading flow is half of why a stray
+    /// tap can't reach it.
+    @ToolbarContentBuilder
+    private var actions: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            // M9's peek-mode jump survives unchanged: `targetPage` opens the
+            // exact page, `isPeek` keeps the visit from writing progress, so
+            // re-reading an old scene never moves where the reader actually is.
+            NavigationLink(value: current.sourceRoute) {
+                Image(systemName: "location.circle")
+            }
+            // Disabled rather than hidden for a comic that has left the
+            // library: the record is still readable, and a greyed control says
+            // the navigation is gone instead of silently dropping it.
+            .disabled(!current.canJumpToSource)
+            .accessibilityLabel("Jump to source page")
+
+            if isDeleting {
+                ProgressView()
+            } else {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .accessibilityLabel("Delete")
+            }
+        }
+    }
+
+    private var sectionState: ComprehensionSectionState {
+        ComprehensionSectionState(record: current)
+    }
+
+    /// Offered for a `failed` record and withheld from a `declined` one — see
+    /// `ComprehensionRecord.offersRetry` for both halves of that rule. Returning
+    /// `nil` is what keeps the button from appearing at all.
+    private var retryAction: (() -> Void)? {
+        guard current.offersRetry else { return nil }
+        return { Task { await retry() } }
     }
 
     private var sourceHeader: some View {
@@ -73,12 +181,16 @@ struct ComprehensionDetailView: View {
 
     /// Titles rather than the raw stable ids, and a plain statement when the
     /// comic has left the library — its old records stay readable either way.
+    /// `String(localized:)` rather than bare literals, following
+    /// `SavedTranslationRow.sourceText`: this is assembled into a `String`, and
+    /// `Text(someString)` does not localize — so the words have to be looked up
+    /// here or they never can be.
     private var sourceLabel: String {
-        guard let comic = record.comicTitle else {
-            return "No longer in your library"
+        guard let comic = current.comicTitle else {
+            return String(localized: "No longer in your library")
         }
-        guard let chapter = record.chapterTitle else { return comic }
-        return "\(comic) · \(chapter) · page \(record.pageNumber)"
+        guard let chapter = current.chapterTitle else { return comic }
+        return String(localized: "\(comic) · \(chapter) · page \(current.pageNumber)")
     }
 
     /// Best-effort: a failed `PATCH` must not cost the reader the record they
@@ -86,11 +198,51 @@ struct ComprehensionDetailView: View {
     /// it. Skipped entirely when there is nothing to mark — an unfinished or
     /// failed record was never unread in the first place.
     private func markRead() async {
-        guard record.isUnreadExplanation else { return }
-        guard let updated = try? await repository.setRead(id: record.id, isRead: true) else {
+        guard current.isUnreadExplanation else { return }
+        guard let read = try? await repository.setRead(id: current.id, isRead: true) else {
             return
         }
-        onMarkedRead(updated)
+        updated = read
+        onChanged(read)
+    }
+
+    /// On success the section flips to "being written" straight away, because
+    /// the backend returns the re-enqueued record — the reader sees their tap
+    /// take effect without a refresh.
+    private func retry() async {
+        switch await retryComprehensionRecord(id: current.id, using: repository) {
+        case .loaded(let requeued):
+            updated = requeued
+            onChanged(requeued)
+        case .failed(let error):
+            // The seam already tells these apart (`APIComprehensionRepository`
+            // asks for `.distinguishDailyCap`, since a retry spends a request
+            // too); collapsing them here would throw that away and send a
+            // reader whose budget is spent to go and check their Wi-Fi.
+            retryFailure = (error as? ComprehensionEnqueueError) == .dailyCapReached
+                ? .dailyCapReached
+                : .unreachable
+        case .loading:
+            break
+        }
+    }
+
+    /// Dismisses only after the backend confirms, so a failed delete leaves the
+    /// reader looking at the record that still exists rather than at a list it
+    /// has vanished from.
+    private func delete() async {
+        isDeleting = true
+        defer { isDeleting = false }
+
+        switch await deleteComprehensionRecord(id: current.id, using: repository) {
+        case .loaded:
+            onDeleted(current)
+            dismiss()
+        case .failed:
+            showDeleteError = true
+        case .loading:
+            break
+        }
     }
 }
 
@@ -112,8 +264,27 @@ struct ComprehensionDetailView: View {
     }
 }
 
+/// The one state that offers retry.
+#Preview("Failed") {
+    NavigationStack {
+        ComprehensionDetailView(record: .preview(status: "failed"))
+    }
+}
+
+/// Retrying this would spend a request to receive the same verdict, so the
+/// section shows its own copy and no button.
 #Preview("Declined") {
     NavigationStack {
         ComprehensionDetailView(record: .preview(status: "declined"))
+    }
+}
+
+/// The comic has left the library: still readable, but the jump is disabled
+/// because that navigation would fail.
+#Preview("Comic removed") {
+    NavigationStack {
+        ComprehensionDetailView(
+            record: .preview(status: "ok", notes: "…", comicTitle: nil, chapterTitle: nil)
+        )
     }
 }
