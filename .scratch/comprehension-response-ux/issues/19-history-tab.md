@@ -15,7 +15,7 @@ Actions on records — retry, delete, jump back to the source page — are the n
 - [ ] The 單字本 tab slot now holds 歷史紀錄, with the tab label and icon updated and the string catalog adjusted.
 - [ ] The list shows compact two-line rows, newest first, flat and ungrouped, using the comic and chapter **titles** from the API — never the raw ids.
 - [ ] Each row's status line distinguishes arrived, being produced, declined and failed.
-- [ ] Rows show the cloud translation where present, the on-device one otherwise.
+- [ ] ~~Rows show the cloud translation where present, the on-device one otherwise.~~ **Superseded during implementation.** This contradicted the Variant B mockup this ticket was drawn from, which puts the translation on the detail screen and keeps rows to two lines. Resolved in favour of the mockup: a third line costs roughly a third of the records visible per screen, on a list whose whole job is scanning. The intent is carried instead by the row's status glyph, which is a cloud exactly when a cloud translation exists — so the row still says *that* the cloud version is there. The **detail screen** shows the cloud translation where present, the on-device one otherwise (see the AC below).
 - [ ] The tab carries a badge counting unread records, computed client-side from the fetched list — there is no count endpoint and no shared client store.
 - [ ] The list refreshes when the app returns to the foreground and when the tab appears.
 - [ ] Only a successfully-arrived explanation is ever unread: never the fast translation, never a failure, and never one the reader already watched land on the result screen.

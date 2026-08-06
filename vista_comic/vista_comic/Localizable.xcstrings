@@ -158,6 +158,9 @@
     "English" : {
 
     },
+    "Everything you translate while reading is recorded here automatically." : {
+
+    },
     "Exit text selection" : {
 
     },
@@ -169,6 +172,16 @@
     },
     "Hide explanation" : {
 
+    },
+    "History" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歷史紀錄"
+          }
+        }
+      }
     },
     "Japanese" : {
 
@@ -215,6 +228,9 @@
     "No explanation was written for this selection. Trying again would return the same answer." : {
 
     },
+    "No longer in your library" : {
+
+    },
     "No text was found in the selected region. Try selecting a tighter area around the text." : {
 
     },
@@ -228,6 +244,9 @@
           }
         }
       }
+    },
+    "Nothing here yet" : {
+
     },
     "Nothing saved yet" : {
 
@@ -281,6 +300,9 @@
 
     },
     "Recognizing text…" : {
+
+    },
+    "Record" : {
 
     },
     "Request deeper explanation" : {
