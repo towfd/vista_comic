@@ -19,8 +19,16 @@
 //
 //  - `refresh()` on launch and on return to the foreground, catching whatever
 //    finished while the app was dead or backgrounded.
-//  - `watch(_:)` on a record known to be in flight, handed over when the reader
-//    translates, polling until the backend reaches a terminal status.
+//  - `watch(_:)` on a record still in flight when the reader **dismisses** the
+//    result sheet, polling until the backend reaches a terminal status.
+//
+//  The handoff is at dismissal, not at translate, and that boundary is the whole
+//  design: while the sheet is open the reader's own screen owns the wait and an
+//  arrival counts as read; the moment they leave, this takes over and an arrival
+//  counts as missed. Exactly one of the two is ever waiting, so they cannot race
+//  to a contradictory answer — an earlier version started both at translate and
+//  would light the badge for the explanation the reader was in the middle of
+//  reading.
 //
 //  Each covers the other's hole: watching alone loses anything enqueued before a
 //  relaunch, and refreshing alone either misses the arrival by minutes or polls
@@ -51,17 +59,34 @@ final class UnreadExplanationBadge {
     /// screen polls at, because it is the same wait seen from two places.
     private let pollInterval: Duration
 
+    /// How long one watch may run before giving up.
+    ///
+    /// A bound is load-bearing here in a way it was not on the result screen,
+    /// whose identical loop was bounded by the sheet closing. This object lives
+    /// as long as the app, so a record that never reaches a terminal status —
+    /// deleted while pending, orphaned by a worker that died, or carrying a
+    /// status this build does not recognise — would otherwise be polled until
+    /// the process ends.
+    ///
+    /// Ten minutes is comfortably past any real job: the spec's worst case is a
+    /// 120s per-attempt timeout with the SDK's own retries, roughly six minutes.
+    /// Giving up still recounts, so a record that *did* finish unnoticed is
+    /// picked up rather than lost.
+    private let watchTimeout: Duration
+
     /// Injected so tests drive the loop in real time rather than real minutes —
     /// the seam `awaitExplanation` already established.
     private let sleep: @Sendable (Duration) async throws -> Void
 
     init(
         pollInterval: Duration = .seconds(3),
+        watchTimeout: Duration = .seconds(600),
         sleep: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
         }
     ) {
         self.pollInterval = pollInterval
+        self.watchTimeout = watchTimeout
         self.sleep = sleep
     }
 
@@ -93,22 +118,41 @@ final class UnreadExplanationBadge {
     /// watch sees land is one the reader missed, which is exactly what the
     /// badge is for.
     ///
-    /// Owned by this object rather than by the view that starts it, so
-    /// dismissing the result sheet does not cancel the wait it began.
+    /// Owned by this object rather than by the view that hands the record over,
+    /// so dismissing the result sheet does not cancel the wait that dismissal
+    /// started.
     func watch(_ record: ComprehensionRecord, using repository: any ComprehensionRepository) {
         guard record.status.isInProgress, !watched.contains(record.id) else { return }
         watched.insert(record.id)
 
         Task { [weak self] in
             guard let self else { return }
-            _ = await awaitRecordFinishing(
-                for: record.id,
-                using: repository,
-                pollInterval: pollInterval,
-                sleep: sleep
-            )
-            watched.remove(record.id)
+            // The timeout races the poll rather than being checked inside it, so
+            // a loop that is wedged on an id the backend will never finish is
+            // abandoned rather than merely asked to stop.
+            _ = await withTaskGroup(of: Bool.self, returning: Bool.self) { group in
+                group.addTask { @MainActor in
+                    _ = await awaitRecordFinishing(
+                        for: record.id,
+                        using: repository,
+                        pollInterval: self.pollInterval,
+                        sleep: self.sleep
+                    )
+                    return true
+                }
+                group.addTask { @MainActor in
+                    try? await self.sleep(self.watchTimeout)
+                    return false
+                }
+                let finished = await group.next() ?? false
+                group.cancelAll()
+                return finished
+            }
+            // Recount before clearing the flag, so anything waiting on the watch
+            // to end sees the number it produced — and so a second `watch` for
+            // this id cannot slip in mid-refresh.
             await refresh(using: repository)
+            watched.remove(record.id)
         }
     }
 

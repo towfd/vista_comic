@@ -67,8 +67,14 @@ private final class StubComprehensionRepository: ComprehensionRepository, @unche
 struct UnreadExplanationBadgeTests {
 
     /// A badge that never sleeps, so a poll costs no wall-clock time.
+    ///
+    /// `watchTimeout` is left far larger than `pollInterval` so the timeout does
+    /// not fire in tests about the poll itself — the sleep stub ignores the
+    /// duration, so the two are told apart only by which task the runtime
+    /// resumes first, and `theWatchGivesUpOnARecordThatNeverFinishes` pins the
+    /// timeout by making the poll genuinely endless instead.
     private func makeBadge() -> UnreadExplanationBadge {
-        UnreadExplanationBadge(pollInterval: .zero, sleep: { _ in })
+        UnreadExplanationBadge(pollInterval: .zero, watchTimeout: .seconds(600), sleep: { _ in })
     }
 
     /// Waits for the badge's unstructured watch task to finish.
@@ -214,6 +220,26 @@ struct UnreadExplanationBadgeTests {
         await settle(badge)
 
         #expect(stub.recordCallCount == 1)
+    }
+
+    /// A record that never reaches a terminal status — deleted while pending,
+    /// orphaned by a worker that died, or carrying a status this build does not
+    /// know — must not be polled for the life of the process. This object
+    /// outlives every screen, so the bound is the only thing that stops it.
+    @Test func theWatchGivesUpOnARecordThatNeverFinishes() async throws {
+        let badge = makeBadge()
+        let stub = StubComprehensionRepository()
+        // Never terminal, and never failing either: the loop has no reason of
+        // its own to stop.
+        stub.recordResults = [.success(.preview(id: 7, status: "pending"))]
+
+        badge.watch(.preview(id: 7, status: "pending"), using: stub)
+        await settle(badge)
+
+        #expect(badge.isWatching == false)
+        // Giving up still recounts, so a record that finished unnoticed is
+        // picked up rather than lost.
+        #expect(stub.listCallCount == 1)
     }
 
     /// A transient failure mid-wait must not end the poll — a dropped

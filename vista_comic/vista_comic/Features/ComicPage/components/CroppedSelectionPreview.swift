@@ -52,10 +52,12 @@ struct CroppedSelectionPreview: View {
     let comprehensionRepository: any ComprehensionRepository
 
     @Environment(\.dismiss) private var dismiss
-    /// The tab shell's unread count. Handed the newly-enqueued record so the
-    /// badge still lights up when this sheet is dismissed before the
-    /// explanation lands (ticket 22) — the wait belongs to the shell, which
-    /// outlives this screen, not to `.task(id:)`, which does not.
+    /// The tab shell's unread count, handed this screen's record on the way out
+    /// (ticket 22) so the badge still lights up when the reader dismisses before
+    /// the explanation lands. The handoff is at dismissal rather than at
+    /// translate on purpose: while this screen is open it owns the wait and an
+    /// arrival counts as read, so a badge watching in parallel would light up
+    /// for the explanation the reader is in the middle of reading.
     @Environment(\.unreadExplanationBadge) private var badge
     @State private var recognitionState: LoadState<String> = .loading
     /// User-editable text, seeded from a successful recognition. Purely for
@@ -122,6 +124,9 @@ struct CroppedSelectionPreview: View {
         // first exists, re-starts on a translate or a retry, and does *not*
         // restart merely because polling replaced the record with a newer one.
         .task(id: pollKey) { await pollForExplanation() }
+        // …and hand the wait to the badge on the way out, so an explanation
+        // that lands after the reader has gone still reaches them.
+        .onDisappear { handOffToBadge() }
     }
 
     @ViewBuilder
@@ -444,13 +449,17 @@ struct CroppedSelectionPreview: View {
         enqueueState = outcome
         // Setting this is what starts `.task(id:)` polling.
         if case .loaded(let value) = outcome { record = value.record }
-        // Hand the same record to the badge. Both watches run, and they cannot
-        // double-count: if the reader stays, `awaitExplanation` marks it read
-        // and the badge's own recount then sees a read record. If they leave,
-        // only the badge's watch survives — which is the whole point.
-        if let enqueued = record {
-            badge.watch(enqueued, using: comprehensionRepository)
-        }
+    }
+
+    /// Hands an unfinished record to the badge as this screen goes away.
+    ///
+    /// `.task(id:)`'s poll dies with the screen, so without this the explanation
+    /// lands with nobody listening — which is the bug ticket 22 exists to fix. A
+    /// record that already finished is not handed over: the reader saw it, and
+    /// `awaitExplanation` already marked it read.
+    private func handOffToBadge() {
+        guard let current = record, current.status.isInProgress else { return }
+        badge.watch(current, using: comprehensionRepository)
     }
 
     /// What `.task(id:)` watches. A record id alone is not enough: a retry puts
@@ -480,10 +489,6 @@ struct CroppedSelectionPreview: View {
     private func retryRecord(id: Int) async {
         guard let requeued = try? await comprehensionRepository.retry(id: id) else { return }
         record = requeued
-        // A retry puts the record back in flight, so the badge has to follow it
-        // again — dismissing the sheet mid-retry is no different from
-        // dismissing it mid-translate.
-        badge.watch(requeued, using: comprehensionRepository)
         pollGeneration += 1
     }
 }
