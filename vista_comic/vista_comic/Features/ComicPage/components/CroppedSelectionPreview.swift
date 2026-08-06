@@ -7,7 +7,7 @@
 //
 //  Extracted verbatim from `ComicView.swift` (`comprehension-response-ux`
 //  ticket 13); placed under `components/` to match the convention set by
-//  `Features/Vocabulary/components/SavedTranslationRow.swift` and
+//  the 歷史紀錄 row/detail pair and
 //  `Features/ChapterPage/components/ChapterListView.swift`. Behaviour is
 //  unchanged; the one unavoidable difference is that `CroppedSelectionPreview`
 //  is no longer `private`, because a top-level `private` in Swift is

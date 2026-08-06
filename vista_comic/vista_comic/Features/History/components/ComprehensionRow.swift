@@ -6,11 +6,11 @@
 //  under `Features/<Tab>/components/`, matching `ComicListView`'s own placement
 //  and its `AppFont` token usage.
 //
-//  Unlike `SavedTranslationRow` — which showed a short list of things the
-//  reader deliberately kept, and could afford an expandable disclosure per row
-//  — this list fills up on its own, so scanning is what matters. Two compact
-//  lines, no disclosure, no per-row actions: the whole record is one tap away
-//  on the detail screen, and actions are the next ticket.
+//  單字本's rows showed a short list of things the reader deliberately kept, and
+//  could afford an expandable disclosure each. This list fills up on its own, so
+//  scanning is what matters instead: two compact lines, no disclosure, and the
+//  whole record one tap away on the detail screen, which is also where every
+//  action lives.
 //
 //  **The translation is deliberately not on the row.** Ticket 19's AC read
 //  "rows show the cloud translation where present, the on-device one

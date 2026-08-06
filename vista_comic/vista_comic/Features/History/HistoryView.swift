@@ -3,9 +3,9 @@
 //  vista_comic
 //
 //  歷史紀錄 tab content (`comprehension-response-ux` ticket 19), taking the tab
-//  slot 單字本 held. Mirrors `VocabularyView`'s `LoadState`-driven
-//  loading/loaded/failed wiring and its own `NavigationStack` — each tab is its
-//  own navigation context.
+//  slot 單字本 held (since deleted). Follows `HomeView`'s `LoadState`-driven
+//  loading/loaded/failed wiring and carries its own `NavigationStack` — each tab
+//  is its own navigation context.
 //
 //  The list is flat and newest-first, not grouped by comic and chapter: a
 //  reader working through one long series would collapse into a single enormous
@@ -187,8 +187,8 @@ struct HistoryView: View {
 
 // MARK: - Preview support
 
-/// Preview-only stub, mirroring `PreviewTranslationRepository`'s role for
-/// `TranslationRepository` — keeps `#Preview`s off the network, since
+/// Preview-only stub, mirroring `PreviewComicRepository`'s role for
+/// `ComicRepository` — keeps `#Preview`s off the network, since
 /// `comprehensionRepository`'s environment default is the live API conformer.
 private struct PreviewComprehensionRepository: ComprehensionRepository {
     struct StubError: Error {}
@@ -217,8 +217,8 @@ private struct PreviewComprehensionRepository: ComprehensionRepository {
 extension ComprehensionRecord {
     /// Preview/sample-only factory. `ComprehensionRecord` exposes no memberwise
     /// initializer beyond `Decodable`, so this decodes a canned payload —
-    /// mirroring `SavedTranslation.preview()`'s own reasoning. Not `private`
-    /// because `ComprehensionRow`'s `#Preview` uses it too.
+    /// so the previews and the tests share one fixture and cannot drift. Not
+    /// `private` because `ComprehensionRow`'s `#Preview` uses it too.
     static func preview(
         id: Int = 1,
         sourceText: String = "お前、なかなかやるじゃないか",

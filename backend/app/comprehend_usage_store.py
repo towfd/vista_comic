@@ -1,11 +1,13 @@
-"""Global daily request-count guard for ``POST /comprehend`` (ticket 12).
+"""Global daily request-count guard, reserved when a record is enqueued.
 
 Thin functions over a SQLAlchemy ``Session``, mirroring ``progress_store.py``'s
 plain-function-over-a-session shape. Unlike ``progress_store``/
 ``comprehension_store`` (which model durable domain state), this module backs a
 single anomaly guard: a global (not per-user -- see ``db.ComprehendUsage``'s
-docstring and ADR-0005) count of ``/comprehend`` attempts for the current
-calendar day, capped at ``DAILY_CAP``. It exists only to stop a bug (e.g. a
+docstring and ADR-0005) count of Claude requests reserved for the current
+calendar day, capped at ``DAILY_CAP``. The reservation is taken at
+``POST /comprehensions`` and given back only when the request never reached
+Claude, so the queue can never grow longer than the remaining budget. It exists only to stop a bug (e.g. a
 retry loop) from generating unbounded Claude spend -- it is not real
 usage-limiting, so it does not need to be exact under heavy concurrency,
 only atomic enough that a burst of requests can't blow past the cap by much.

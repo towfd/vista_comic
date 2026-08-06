@@ -3,14 +3,14 @@
 //  vista_comic
 //
 //  One 歷史紀錄 entry, matching the backend's `ComprehensionRecordResponse`
-//  exactly (see `backend/app/models.py`). Replaces `SavedTranslation`, which
-//  modelled something different: a pair the reader chose to keep. Every
-//  translate now writes one of these automatically, so this is a history of
-//  what was read rather than a curated vocabulary book.
+//  exactly (see `backend/app/models.py`). It replaced 單字本's saved-translation
+//  model, which described something different: a pair the reader chose to keep.
+//  Every translate now writes one of these automatically, so this is a history
+//  of what was read rather than a curated vocabulary book.
 //
 //  Kept in `Networking/` alongside the seam that fetches it, deliberately
-//  separate from `Shared/Models.swift`'s `Comic`/`Chapter` — same reasoning
-//  `SavedTranslation` used.
+//  separate from `Shared/Models.swift`'s `Comic`/`Chapter`, which are catalog
+//  types rather than things this app creates.
 //
 
 import Foundation

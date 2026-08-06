@@ -8,8 +8,7 @@
 //
 //  Exercises the free functions the two History screens call, against a stub
 //  `ComprehensionRepository`, so nothing here touches the network or renders a
-//  view. Mirrors `VocabularyDeleteFlowTests`' shape for the delete flow it
-//  replaces. Reuses `ComprehensionRecord.preview(...)`, the same factory the
+//  view. Reuses `ComprehensionRecord.preview(...)`, the same factory the
 //  `#Preview`s use, so fixtures and previews cannot drift apart.
 //
 

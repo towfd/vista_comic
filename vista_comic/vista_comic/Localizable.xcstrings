@@ -387,17 +387,6 @@
           }
         }
       }
-    },
-    "Vocabulary" : {
-      "comment" : "單字本 tab label",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "單字本"
-          }
-        }
-      }
     }
   },
   "version" : "1.0"

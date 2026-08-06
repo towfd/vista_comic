@@ -111,7 +111,7 @@ class ComprehensionRecord(Base):
 
 
 class ComprehendUsage(Base):
-    """Global daily request counter backing ``/comprehend``'s cost guard.
+    """Global daily request counter backing the Claude-spend cost guard.
 
     Not per-user -- this backend has no per-user identity (a single shared
     Cloudflare Access Service Token gates every request, see ADR-0005), so the

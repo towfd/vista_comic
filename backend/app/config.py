@@ -44,7 +44,7 @@ def get_database_url() -> str:
 
 
 def get_claude_api_key() -> str:
-    """Return the Claude (Anthropic) API key backing ``POST /comprehend``.
+    """Return the Claude (Anthropic) API key the comprehension worker calls with.
 
     Read from the ``ANTHROPIC_API_KEY`` environment variable (loaded from the
     gitignored repo-root ``.env``, same pattern as ``MANGA_LIBRARY_PATH``) --
