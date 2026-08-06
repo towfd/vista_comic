@@ -10,16 +10,6 @@
     "%@ · %@ · page %lld" : {
 
     },
-    "%@ · %@ · page %lld · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$@ · page %3$lld · %4$@"
-          }
-        }
-      }
-    },
     "%@ · last read" : {
       "comment" : "Library card: last read timestamp",
       "localizations" : {
@@ -129,9 +119,6 @@
     "Couldn't delete this record. Check your connection and try again." : {
 
     },
-    "Couldn't delete this translation. Check your connection and try again." : {
-
-    },
     "Couldn't load this page" : {
       "comment" : "Reader: page failed to load",
       "localizations" : {
@@ -153,9 +140,6 @@
 
     },
     "Delete" : {
-
-    },
-    "Delete this translation?" : {
 
     },
     "Depth" : {
@@ -180,9 +164,6 @@
 
     },
     "Grammar notes" : {
-
-    },
-    "Hide explanation" : {
 
     },
     "History" : {
@@ -260,9 +241,6 @@
     "Nothing here yet" : {
 
     },
-    "Nothing saved yet" : {
-
-    },
     "OK" : {
 
     },
@@ -332,9 +310,6 @@
 
     },
     "Selected text" : {
-
-    },
-    "Show explanation" : {
 
     },
     "Spanish" : {
@@ -412,20 +387,6 @@
           }
         }
       }
-    },
-    "Vocabulary" : {
-      "comment" : "單字本 tab label",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "單字本"
-          }
-        }
-      }
-    },
-    "Words and sentences you save while reading will appear here." : {
-
     }
   },
   "version" : "1.0"

@@ -186,7 +186,7 @@ private struct ReaderView: View {
                         comicID: comic.id,
                         chapterID: currentChapter.id,
                         // 1-based, matching `Progress.lastPage`'s and
-                        // `SavedTranslation.pageNumber`'s convention.
+                        // `ComprehensionRecord.pageNumber`'s convention.
                         pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
@@ -710,7 +710,7 @@ private struct ReaderPage: View {
             imagePixelSize: imagePixelSize
         )
         guard cropRect != .zero, let croppedCGImage = cgImage.cropping(to: cropRect) else { return }
-        croppedSelection = CroppedSelection(image: UIImage(cgImage: croppedCGImage), pageImage: decodedImage)
+        croppedSelection = CroppedSelection(image: UIImage(cgImage: croppedCGImage))
     }
 
     private var failurePlaceholder: some View {

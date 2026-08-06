@@ -7,11 +7,10 @@
 //  concrete network client, so the live backend (`APIComprehensionRepository`)
 //  can be swapped for a stub in tests and `#Preview`s.
 //
-//  It replaces **two** existing seams — `Comprehender` (the app no longer
-//  calls Claude at all; the backend owns that) and `TranslationRepository`
-//  (manual saving is gone) — so the app ends with one fewer network protocol
-//  than it had. Both of those stay in place until the removal ticket, so the
-//  shipped paths keep working while this one is wired up.
+//  It replaced **two** seams, both since deleted: the comprehender (the app no
+//  longer calls Claude at all; the backend owns that) and the translation
+//  repository (manual saving is gone). The app therefore ends with one fewer
+//  network protocol than it had before this feature.
 //
 //  One protocol rather than a reader-facing and a history-facing pair:
 //  marking read is needed by both, so splitting would mean two protocols
@@ -91,10 +90,9 @@ enum ComprehensionEnqueueError: Error, Equatable {
 
 private struct ComprehensionRepositoryKey: EnvironmentKey {
     /// Defaults straight to the concrete production conformer, following
-    /// `TranslationRepositoryKey`'s precedent for a network-backed seam rather
-    /// than `ComicRepository`'s offline preview mock: there is no preview
-    /// conformer today and none is needed, since `#Preview`s that don't
-    /// override this never enqueue anything.
+    /// the precedent for a network-backed seam rather than `ComicRepository`'s
+    /// offline preview mock: `#Preview`s that need one inject a stub, and those
+    /// that don't override this never reach the network anyway.
     static let defaultValue: any ComprehensionRepository = APIComprehensionRepository()
 }
 

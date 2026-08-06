@@ -6,10 +6,9 @@
 //  (`comprehension-response-ux` ticket 20), as free functions over
 //  `ComprehensionRepository` mapped onto `LoadState`.
 //
-//  Kept out of the views for the same reason `deleteSavedTranslation` was
-//  (see `VocabularyView`) and `SelectionActions.swift` before it: these are the
-//  parts most worth testing, and they must be testable against a stub
-//  repository without rendering anything. The views keep only the question of
+//  Kept out of the views for the same reason `SelectionActions.swift`'s own
+//  free functions are: these are the parts most worth testing, and they must be
+//  testable against a stub repository without rendering anything. The views keep only the question of
 //  *when* to call them and what to show afterwards.
 //
 
@@ -36,8 +35,7 @@ func retryComprehensionRecord(
 ///
 /// Surfaced as `.failed` rather than swallowed, so the caller can say so and
 /// leave the row in place: nothing was deleted, and a list that dropped the row
-/// anyway would lie about it. Same non-silent-failure rule 單字本's delete
-/// already followed.
+/// anyway would lie about it.
 func deleteComprehensionRecord(
     id: Int,
     using repository: any ComprehensionRepository

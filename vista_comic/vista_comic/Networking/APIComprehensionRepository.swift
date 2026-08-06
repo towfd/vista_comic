@@ -3,7 +3,7 @@
 //  vista_comic
 //
 //  Live `ComprehensionRepository` backed by the local FastAPI service over
-//  `URLSession` with `Codable` decoding, mirroring `APITranslationRepository`'s
+//  `URLSession` with `Codable` decoding, mirroring `APIComicRepository`'s
 //  request-building/decoding conventions exactly — including Cloudflare Access
 //  header attachment through `APIConfig.authorizedRequest`, so every request
 //  routes through one construction point. See `backend/app/main.py`'s

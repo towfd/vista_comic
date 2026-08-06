@@ -3,7 +3,8 @@
 //  vista_comicUITests
 //
 //  Covers the tab-bar-navigation restructuring (M4 kickoff): the app now
-//  launches into a 書庫/單字本 TabView instead of a bare NavigationStack.
+//  launches into a 書庫/歷史紀錄 TabView instead of a bare NavigationStack.
+//  (The second slot held 單字本 when this was written; ticket 21 removed it.)
 //  Asserts both tabs are reachable and that switching away and back
 //  preserves 書庫's navigation state rather than resetting it.
 //
@@ -49,10 +50,12 @@ final class TabNavigationUITests: XCTestCase {
         chapterButton.tap()
         XCTAssertTrue(app.staticTexts["Chapter 1"].waitForExistence(timeout: 5))
 
-        // Switch to 單字本: a clear placeholder, not blank and not a crash.
-        app.tabBars.buttons["Vocabulary"].tap()
-        XCTAssertTrue(app.staticTexts["Nothing saved yet"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Chapter 1"].exists, "書庫's chapter list should not be visible under 單字本")
+        // Switch to 歷史紀錄: whichever of its states settles, never blank and
+        // never a crash. Which one it lands on is `HistoryTabUITests`' subject;
+        // what matters here is that the other tab's content is gone.
+        app.tabBars.buttons["History"].tap()
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Chapter 1"].exists, "書庫's chapter list should not be visible under 歷史紀錄")
 
         // Switch back to 書庫: the chapter list should still be on screen —
         // proof the tab's navigation state was preserved, not reset to the

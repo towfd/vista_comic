@@ -51,53 +51,16 @@ class Progress(Base):
     )
 
 
-class SavedTranslation(Base):
-    """One saved original/translation pair, with the source Page it came from.
-
-    Unlike ``Progress`` (natural key ``(comic_id, chapter_id)``, upserted in
-    place), each save is a distinct event -- a reader may save more than one
-    pair from the same chapter or page -- so this table uses a surrogate
-    autoincrement ``id`` instead. ``comic_id`` / ``chapter_id`` are the same
-    stable, path-hash IDs the catalog and ``Progress`` use; ``page_number`` is
-    the same 1-based Page index the reader/``Progress`` use within a Chapter
-    (see ``docs/api-contract.md``). ``saved_at`` is a creation timestamp (set
-    once, never updated), unlike ``Progress.updated_at``.
-    """
-
-    __tablename__ = "saved_translation"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    original_text: Mapped[str] = mapped_column(String, nullable=False)
-    translated_text: Mapped[str] = mapped_column(String, nullable=False)
-    # Deeper explanation fields (llm-comprehension ticket 15), all nullable:
-    # present when this was saved from a full cloud comprehension result
-    # (ticket 14's blue banner), NULL when saved from a declined/error
-    # fallback (orange/gray banner) or from a pre-existing ocr-translation-era
-    # row. No separate provenance column -- all three NULL already means
-    # "translation-only", per the spec's decision.
-    grammar_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    context_notes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    tone_register: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    target_language: Mapped[str] = mapped_column(String, nullable=False)
-    comic_id: Mapped[str] = mapped_column(String, nullable=False)
-    chapter_id: Mapped[str] = mapped_column(String, nullable=False)
-    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    saved_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
 class ComprehensionRecord(Base):
     """One auto-created comprehension record; the row is also the work queue.
 
-    Replaces ``SavedTranslation`` (``comprehension-response-ux``): every
+    Replaced ``saved_translation`` (``comprehension-response-ux``): every
     translate now creates a row automatically rather than the reader choosing to
     save one, so this is a history of what was read, not a curated vocabulary
-    book. Both tables exist during the migration -- the shipped app still calls
-    ``/translations`` until the client is cut over -- and ``saved_translation``
-    is dropped in the removal ticket. That drop is manual: this project has no
-    Alembic (see ``init_engine``), so ``create_all`` adds this table for free but
-    would never have added columns to the old one.
+    book. The old table was dropped by hand in the removal ticket -- this project
+    has no Alembic (see ``init_engine``), so ``create_all`` added this table for
+    free but would never have altered the old one. See
+    ``docs/manual-migrations.md``.
 
     ``status`` is the single discriminator for the row's whole lifecycle and
     doubles as the queue state a worker claims on:
@@ -148,7 +111,7 @@ class ComprehensionRecord(Base):
 
 
 class ComprehendUsage(Base):
-    """Global daily request counter backing ``/comprehend``'s cost guard.
+    """Global daily request counter backing the Claude-spend cost guard.
 
     Not per-user -- this backend has no per-user identity (a single shared
     Cloudflare Access Service Token gates every request, see ADR-0005), so the

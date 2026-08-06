@@ -178,7 +178,7 @@ struct ReaderRoute: Hashable {
     var targetPage: Int? = nil
     /// Opens a read-only preview: still honors `targetPage`, but never calls
     /// `saveProgress`, however the user navigates once inside — so jumping
-    /// back to an old page (e.g. from a saved translation in 單字本) can
+    /// back to an old page (e.g. from a record in 歷史紀錄) can
     /// never regress the chapter's real reading progress.
     var isPeek: Bool = false
 }

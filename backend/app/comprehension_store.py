@@ -1,10 +1,10 @@
 """Repository for comprehension records (the 歷史紀錄 store).
 
 Thin functions over a SQLAlchemy ``Session``, mirroring ``progress_store.py``/
-``translation_store.py``'s plain-function-over-a-session shape (no repository
+``progress_store.py``'s plain-function-over-a-session shape (no repository
 class).
 
-Like ``translation_store`` and unlike ``progress_store``, there are no ``safe_*``
+Unlike ``progress_store``, there are no ``safe_*``
 degrade-to-default read wrappers: the catalog reads degrade gracefully because
 the library folder is an independent source of truth, but these rows *are* the
 data, so a store failure surfaces to the caller (503 in ``main.py``) rather than
@@ -50,7 +50,7 @@ def insert_record(
     """Insert one ``pending`` record; return it with the DB-generated columns.
 
     ``created_at`` uses the database clock (``now()``) as the source of truth,
-    matching ``progress_store.upsert``'s and ``translation_store``'s convention.
+    matching ``progress_store.upsert``'s convention.
     Returns a plain (session-detached) row built from the caller's values plus
     the generated ones, so the endpoint can echo the record without a second
     round trip.

@@ -9,31 +9,39 @@ So any schema change that isn't a brand-new table is a manual step, run against
 the deployed Postgres before the new build starts. This file is the record of
 those steps.
 
-Adopting Alembic is the right call and is deliberately deferred — see
-`ROADMAP.md`'s M10 entry and the `comprehension-response-ux` map's Out of scope.
-**The trigger is the step below landing**: once `comprehension_record` starts
-holding data worth keeping, baseline the schema and every change after that is a
-migration rather than an entry here.
+**Adopting a migration tool is now triggered.** The deferral was explicitly
+conditional on the step below landing (see `ROADMAP.md`'s M10 entry and the
+`comprehension-response-ux` map's Out of scope), and it has: `comprehension_record`
+is now the live table and holds data worth keeping. Baseline the post-drop schema,
+and every schema change after that is a migration rather than an entry in this
+file. Whoever picks it up should know two things: `progress` already holds data
+that would hurt to lose, and `tests/conftest.py` builds the test schema through
+the same `create_all` path as production, so adopting migrations without changing
+that fixture leaves the tests validating a schema built a different way than the
+deployed one.
 
-## Pending
+## Executed
 
-### Drop `saved_translation` (comprehension-response-ux)
+### Drop `saved_translation` (comprehension-response-ux) — 2026-08-06
 
-`comprehension_record` replaces `saved_translation`. The new table is created
-automatically; the old one has to go by hand.
+`comprehension_record` replaced `saved_translation`. The new table was created
+automatically; the old one had to go by hand.
 
-**Do not run this yet.** Both tables are live during the client cutover — the
-shipped app still calls `/translations` until the iOS client moves to
-`/comprehensions`. Run it as part of the removal ticket, which deletes the
-`/translations` routes in the same change:
+Run as the last step of the removal ticket, **after** the rebuilt API (with the
+`/translations` routes deleted) was confirmed live — so nothing was still reading
+the table when it went:
 
 ```sql
 DROP TABLE IF EXISTS saved_translation;
 ```
 
-The rows are disposable by decision — saved vocabulary was confirmed as rarely
+The rows were disposable by decision — saved vocabulary was confirmed as rarely
 revisited, which is the premise for replacing it with automatic history — so
-there is nothing to migrate across, only to drop.
+there was nothing to migrate across, only to drop. Two rows existed at the time.
+
+Ordering that was actually followed, and the one to copy next time: merge the code
+that stops using the table → rebuild and confirm the deployed API no longer serves
+the old routes → drop.
 
 **If this is skipped**, nothing fails loudly: `create_all` simply does nothing,
 the orphaned table lingers, and the only symptom is a table no code reads. The

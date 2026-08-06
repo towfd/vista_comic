@@ -118,7 +118,7 @@ enum APIConfig {
     /// non-zero — e.g. `2026-07-29T22:20:10.081902+00:00`. `JSONDecoder`'s
     /// stock `.iso8601` strategy uses an `ISO8601DateFormatter` that does
     /// NOT accept fractional seconds and throws on that shape, so every
-    /// timestamp field (`Comic.lastReadAt`, `SavedTranslation.savedAt`, ...)
+    /// timestamp field (`Comic.lastReadAt`, `ComprehensionRecord.createdAt`, ...)
     /// silently failed to decode as soon as real (not exactly-on-the-second)
     /// data existed — the whole response then failed with a generic
     /// "Couldn't connect" (`ErrorStateView` doesn't distinguish a decoding

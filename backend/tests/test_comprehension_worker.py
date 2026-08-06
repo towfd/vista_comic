@@ -6,7 +6,8 @@ step -- so nothing here starts a thread, sleeps, or waits. The daemon thread in
 worth testing.
 
 Claude is stubbed at ``comprehension_client._client``, the same seam the
-``/comprehend`` tests already use, so no API key or network is ever needed.
+M9's own comprehension tests already used, so no API key or network is ever
+needed.
 """
 
 from __future__ import annotations

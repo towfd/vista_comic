@@ -1,17 +1,18 @@
-"""Client wrapper around the Claude Messages API backing ``POST /comprehend``.
+"""Client wrapper around the Claude Messages API, called by the worker.
 
-Mirrors ``progress_store.py``/``translation_store.py``'s "thin functions over a
+Mirrors ``progress_store.py``'s "thin functions over a
 fresh resource" shape: instead of a SQLAlchemy ``Session``, the resource here
 is an ``anthropic.Anthropic`` client, constructed fresh per call from
 ``config.get_claude_api_key()`` (never hardcoded, never logged). ``_client()``
 is a small seam so tests substitute a stub client without a real API key,
 mirroring how ``db.new_session()`` is monkeypatched in the store tests.
 
-Sends both the selection crop (original resolution) and the downscaled full
-page as image content blocks, plus ``source_text`` as plain text -- Claude
-translates/explains *that* text; it is never asked to re-read text from the
-images (a user's OCR correction must not be silently overridden by the
-model's own reading of the crop).
+Sends the downscaled full page as an image content block, plus ``source_text``
+as plain text -- Claude translates/explains *that* text; it is never asked to
+re-read text from the image (a user's OCR correction must not be silently
+overridden by the model's own reading). The selection crop left the flow with
+the synchronous endpoint: the call is deferred now, so the worker rebuilds what
+it needs from the record, and a crop was never stored to rebuild.
 
 Uses a ``strict: true`` tool-use schema (``additionalProperties: false``, all
 four fields ``required``) and forces the tool call via ``tool_choice``, so a
@@ -34,8 +35,8 @@ from .config import get_claude_api_key
 # (`anthropic.types.model_param.ModelParam`), confirmed via
 # `pip show anthropic` (0.120.2) in backend/.venv. Default: Claude Haiku 4.5
 # (dated ID, matching the SDK's own literal). Stronger tier: Claude Sonnet 5,
-# selected when the request's `useStrongerModel` is true (ticket 17 wires up
-# the UI trigger; the parameter exists starting this ticket).
+# selected when the record's `use_stronger_model` is set -- the reader's depth
+# picker, stored on the row because the worker runs minutes after the choice.
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 _STRONGER_MODEL = "claude-sonnet-5"
 
@@ -128,7 +129,7 @@ def _client() -> anthropic.Anthropic:
 
 
 def _image_block(base64_data: str) -> dict[str, Any]:
-    # The request contract (ComprehendRequest) does not carry a media-type
+    # The caller does not pass a media-type
     # field alongside each base64 image; both the crop and the downscaled
     # page image are assumed JPEG, matching this backend's own re-encoded
     # network payloads elsewhere. Revisit if a non-JPEG source turns out to
@@ -160,7 +161,6 @@ def _prompt_text(source_text: str, target_language_code: str) -> str:
 def comprehend(
     *,
     page_image_base64: str,
-    crop_image_base64: Optional[str] = None,
     source_text: str,
     target_language_code: str,
     use_stronger_model: bool = False,
@@ -177,8 +177,8 @@ def comprehend(
 
     Any other failure (a connection/API error from the SDK, or a malformed
     tool-use ``input`` that should be impossible under ``strict: true``)
-    propagates as an exception; the caller (``main.comprehend_endpoint``) maps
-    that to an HTTP 4xx/5xx rather than a 200.
+    propagates as an exception; the worker catches it and writes the record as
+    ``failed`` (see ``comprehension_worker``).
     """
     model = _STRONGER_MODEL if use_stronger_model else _DEFAULT_MODEL
     client = _client()
@@ -191,11 +191,6 @@ def comprehend(
             {
                 "role": "user",
                 "content": [
-                    *(
-                        [_image_block(crop_image_base64)]
-                        if crop_image_base64 is not None
-                        else []
-                    ),
                     _image_block(page_image_base64),
                     {
                         "type": "text",

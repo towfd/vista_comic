@@ -7,7 +7,7 @@
 //  `ComprehensionRecord` responses, maps 429 to the daily-cap error, and
 //  attaches the Cloudflare Access headers — using a stubbed
 //  `URLProtocol`-backed `URLSession`, the same technique as
-//  `APITranslationRepositoryTests` and `APIComicRepositoryTests`.
+//  `APIComicRepositoryTests` and `APIComicRepositoryTests`.
 //
 //  The per-call *path* assertions earn their place: five of the six routes
 //  differ only by id and suffix, and they share one `send` helper, so a single
@@ -48,9 +48,9 @@ private final class ComprehensionStubURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
-/// `.serialized` for the same reason `APITranslationRepositoryTests` and
-/// `APIComicRepositoryTests` are: the stub's request/response state is static,
-/// so tests sharing it must not run in parallel with each other.
+/// `.serialized` for the same reason `APIComicRepositoryTests` is: the stub's
+/// request/response state is static, so tests sharing it must not run in
+/// parallel with each other.
 @Suite("APIComprehensionRepository", .serialized)
 struct APIComprehensionRepositoryTests {
     private static let recordJSON = """
@@ -251,8 +251,7 @@ struct APIComprehensionRepositoryTests {
     }
 
     /// `URLProtocol.request.httpBody` is `nil` when `URLSession` has moved the
-    /// body into an upload stream instead — the same helper, and the same
-    /// reason, as `APITranslationRepositoryTests`'s.
+    /// body into an upload stream instead.
     private func bodyStream(from request: URLRequest) -> Data? {
         guard let stream = request.httpBodyStream else { return nil }
         stream.open()
