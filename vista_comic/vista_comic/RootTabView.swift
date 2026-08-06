@@ -10,8 +10,8 @@
 //  It is a replacement rather than an addition: every translate now records
 //  itself automatically, so the thing worth keeping a tab for is what the
 //  reader actually produced while reading — not the short list of items they
-//  remembered to save. `VocabularyView` stays in the tree, unreferenced, until
-//  the removal ticket takes it out along with the rest of the M9 paths.
+//  remembered to save. Ticket 21 then deleted 單字本 outright, so 歷史紀錄 is now
+//  the only thing this slot has ever held as far as the code is concerned.
 //
 
 import SwiftUI

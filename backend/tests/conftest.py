@@ -105,14 +105,6 @@ def db_session(progress_db):
 
 
 @pytest.fixture
-def translation_db(_progress_engine):
-    """Truncate the ``saved_translation`` table before each test that uses it."""
-    with _progress_engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE saved_translation"))
-    return _progress_engine
-
-
-@pytest.fixture
 def comprehension_db(_progress_engine):
     """Truncate the comprehension record + usage tables before each test.
 
@@ -137,17 +129,6 @@ def comprehension_session(comprehension_db):
     finally:
         session.close()
 
-
-@pytest.fixture
-def translation_session(translation_db):
-    """A standalone session against the truncated ``saved_translation`` table."""
-    from app import db
-
-    session = db.new_session()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def _write_page(path: Path, data: bytes = _IMG) -> Path:

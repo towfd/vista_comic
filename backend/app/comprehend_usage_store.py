@@ -2,7 +2,7 @@
 
 Thin functions over a SQLAlchemy ``Session``, mirroring ``progress_store.py``'s
 plain-function-over-a-session shape. Unlike ``progress_store``/
-``translation_store`` (which model durable domain state), this module backs a
+``comprehension_store`` (which model durable domain state), this module backs a
 single anomaly guard: a global (not per-user -- see ``db.ComprehendUsage``'s
 docstring and ADR-0005) count of ``/comprehend`` attempts for the current
 calendar day, capped at ``DAILY_CAP``. It exists only to stop a bug (e.g. a

@@ -3,8 +3,8 @@
 //  vista_comic
 //
 //  One row in 歷史紀錄's list (`comprehension-response-ux` ticket 19). Placed
-//  under `Features/<Tab>/components/`, matching `SavedTranslationRow`'s own
-//  placement and its `AppFont` token usage.
+//  under `Features/<Tab>/components/`, matching `ComicListView`'s own placement
+//  and its `AppFont` token usage.
 //
 //  Unlike `SavedTranslationRow` — which showed a short list of things the
 //  reader deliberately kept, and could afford an expandable disclosure per row

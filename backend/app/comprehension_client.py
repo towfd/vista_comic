@@ -1,6 +1,6 @@
 """Client wrapper around the Claude Messages API backing ``POST /comprehend``.
 
-Mirrors ``progress_store.py``/``translation_store.py``'s "thin functions over a
+Mirrors ``progress_store.py``'s "thin functions over a
 fresh resource" shape: instead of a SQLAlchemy ``Session``, the resource here
 is an ``anthropic.Anthropic`` client, constructed fresh per call from
 ``config.get_claude_api_key()`` (never hardcoded, never logged). ``_client()``
@@ -128,7 +128,7 @@ def _client() -> anthropic.Anthropic:
 
 
 def _image_block(base64_data: str) -> dict[str, Any]:
-    # The request contract (ComprehendRequest) does not carry a media-type
+    # The caller does not pass a media-type
     # field alongside each base64 image; both the crop and the downscaled
     # page image are assumed JPEG, matching this backend's own re-encoded
     # network payloads elsewhere. Revisit if a non-JPEG source turns out to

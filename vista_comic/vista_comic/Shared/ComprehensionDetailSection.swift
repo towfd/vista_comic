@@ -155,8 +155,8 @@ struct ComprehensionDetailSection: View {
         }
     }
 
-    /// Same shape as `SavedTranslationRow.explanationField`, so an explanation
-    /// reads identically wherever it appears.
+    /// One shape for an explanation field, so it reads identically wherever it
+    /// appears.
     private func explanationField(titleKey: LocalizedStringKey, text: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(titleKey)

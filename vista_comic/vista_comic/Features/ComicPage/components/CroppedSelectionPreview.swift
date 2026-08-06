@@ -546,7 +546,7 @@ private struct TargetLanguageOption: Identifiable {
     }
 }
 
-#Preview("Reader — peek from 單字本") {
+#Preview("Reader — peek from 歷史紀錄") {
     NavigationStack {
         ComicView(
             comicID: SampleData.comics[0].id,

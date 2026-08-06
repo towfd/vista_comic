@@ -181,8 +181,8 @@ struct ComprehensionDetailView: View {
 
     /// Titles rather than the raw stable ids, and a plain statement when the
     /// comic has left the library — its old records stay readable either way.
-    /// `String(localized:)` rather than bare literals, following
-    /// `SavedTranslationRow.sourceText`: this is assembled into a `String`, and
+    /// `String(localized:)` rather than bare literals: this is assembled into a
+    /// `String`, and
     /// `Text(someString)` does not localize — so the words have to be looked up
     /// here or they never can be.
     private var sourceLabel: String {
