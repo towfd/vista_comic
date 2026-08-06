@@ -34,6 +34,24 @@ extension ComprehensionRecord {
         status == .ok && hasExplanation && !isRead
     }
 
+    /// Whether jumping back to the page this record came from can actually
+    /// work.
+    ///
+    /// The titles are joined by the backend from its live catalog, so a `nil`
+    /// comic title *is* the statement that the comic has left the library — the
+    /// stored ids would still resolve to a route, and that route would fail.
+    /// The record itself stays perfectly readable; only the navigation is
+    /// withdrawn, which is why this is a separate question from whether the
+    /// record can be shown at all.
+    ///
+    /// The chapter is not consulted: a comic present with a chapter missing is
+    /// the reader having reorganised files under one comic, and the reader
+    /// route resolves the chapter itself — so gating on the comic is both the
+    /// honest signal and the one the backend actually gives.
+    var canJumpToSource: Bool {
+        comicTitle != nil
+    }
+
     /// The one-line status shown on a row, distinguishing the four outcomes
     /// the reader can actually act on differently.
     ///

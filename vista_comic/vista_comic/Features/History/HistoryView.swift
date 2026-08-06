@@ -14,8 +14,15 @@
 //
 //  The badge count is computed here, from the fetched list, because there is no
 //  count endpoint and no shared client store. That makes this view the owner of
-//  both the list and the number derived from it, which is why marking one
-//  record read has to come back up (`onMarkedRead`) rather than being re-fetched.
+//  both the list and the number derived from it, which is why a record changing
+//  on the detail screen has to come back up (`onChanged`) rather than being
+//  re-fetched.
+//
+//  Ticket 20 adds swipe-to-delete. Deleting moved from a button to a swipe
+//  because every translate now writes a row, so pruning is routine rather than
+//  rare — but the confirmation stays, since deletion is still irreversible and
+//  there is no undo. Retry deliberately did **not** move here: it lives only on
+//  the detail screen, where it costs a deliberate tap into one record.
 //
 
 import SwiftUI
@@ -24,14 +31,33 @@ struct HistoryView: View {
     @Environment(\.comprehensionRepository) private var repository
     @Environment(\.scenePhase) private var scenePhase
     @State private var state: LoadState<[ComprehensionRecord]> = .loading
+    /// The record a swipe has proposed deleting, held until the reader confirms
+    /// — nothing is sent to the backend while this is set.
+    @State private var pendingDeletion: ComprehensionRecord?
+    /// Set on a failed delete to drive a one-shot alert. The row stays in the
+    /// list, since nothing was actually deleted.
+    @State private var showDeleteError = false
 
     var body: some View {
         NavigationStack {
             content
                 .navigationDestination(for: ComprehensionRecord.self) { record in
-                    ComprehensionDetailView(record: record) { updated in
-                        replace(updated)
-                    }
+                    ComprehensionDetailView(
+                        record: record,
+                        onChanged: { replace($0) },
+                        onDeleted: { remove($0) }
+                    )
+                }
+                // The detail screen's jump-back pushes onto *this* tab's stack,
+                // exactly as 單字本's did: each tab is its own navigation
+                // context, so peeking at an old page never touches 書庫's.
+                .navigationDestination(for: ReaderRoute.self) { route in
+                    ComicView(
+                        comicID: route.comicID,
+                        chapterID: route.chapterID,
+                        targetPage: route.targetPage,
+                        isPeek: route.isPeek
+                    )
                 }
         }
         .task { await load() }
@@ -42,6 +68,25 @@ struct HistoryView: View {
             if phase == .active { Task { await load() } }
         }
         .badge(unreadCount)
+        .alert(
+            "Delete this record?",
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
+            ),
+            presenting: pendingDeletion
+        ) { record in
+            Button("Delete", role: .destructive) { Task { await delete(record) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This can't be undone.")
+        }
+        .alert(
+            "Couldn't delete this record. Check your connection and try again.",
+            isPresented: $showDeleteError
+        ) {
+            Button("OK", role: .cancel) {}
+        }
     }
 
     /// `0` renders no badge, so an empty or failed load simply shows nothing
@@ -75,6 +120,17 @@ struct HistoryView: View {
             NavigationLink(value: record) {
                 ComprehensionRow(record: record)
             }
+            // A swipe only *proposes* the deletion; the alert is what performs
+            // it. `allowsFullSwipe` is off for the same reason the confirmation
+            // exists — a full-swipe gesture that deletes on its own is exactly
+            // the stray flick this list must survive.
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) {
+                    pendingDeletion = record
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
         }
         .listStyle(.plain)
         .navigationTitle("History")
@@ -100,14 +156,37 @@ struct HistoryView: View {
         }
     }
 
-    /// Swaps one record in place after the detail screen marked it read, so the
-    /// badge drops by exactly one without a round trip — and without the list
-    /// reordering or scrolling under the reader on their way back.
+    /// Swaps one record in place after the detail screen changed it — marked it
+    /// read, or retried it — so the badge and the row's status follow without a
+    /// round trip, and without the list reordering or scrolling under the
+    /// reader on their way back.
     private func replace(_ updated: ComprehensionRecord) {
         guard case .loaded(var records) = state,
               let index = records.firstIndex(where: { $0.id == updated.id })
         else { return }
         records[index] = updated
+        state = .loaded(records)
+    }
+
+    /// Deletes `record` and, on success, drops it from the displayed list in
+    /// place — no full reload, so the rest of the list neither flickers nor
+    /// scrolls. A failure leaves the row exactly where it is, because it is
+    /// still there on the backend.
+    private func delete(_ record: ComprehensionRecord) async {
+        switch await deleteComprehensionRecord(id: record.id, using: repository) {
+        case .loaded:
+            remove(record)
+        case .failed:
+            showDeleteError = true
+        case .loading:
+            break
+        }
+    }
+
+    /// Drops one row, whether this screen deleted it or the detail screen did.
+    private func remove(_ record: ComprehensionRecord) {
+        guard case .loaded(var records) = state else { return }
+        records.removeAll { $0.id == record.id }
         state = .loaded(records)
     }
 }

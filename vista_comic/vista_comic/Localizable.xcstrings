@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "·" : {
+
+    },
     "#%lld" : {
 
     },
@@ -117,9 +120,6 @@
     "Couldn't delete this translation. Check your connection and try again." : {
 
     },
-    "Couldn't get a stronger explanation. Check your connection and try again." : {
-
-    },
     "Couldn't load this page" : {
       "comment" : "Reader: page failed to load",
       "localizations" : {
@@ -130,9 +130,6 @@
           }
         }
       }
-    },
-    "Couldn't save this translation. Check your connection and try again." : {
-
     },
     "Deeper" : {
 
@@ -228,9 +225,6 @@
     "No explanation was written for this selection. Trying again would return the same answer." : {
 
     },
-    "No longer in your library" : {
-
-    },
     "No text was found in the selected region. Try selecting a tighter area around the text." : {
 
     },
@@ -305,12 +299,6 @@
     "Record" : {
 
     },
-    "Request deeper explanation" : {
-
-    },
-    "Requesting deeper explanation…" : {
-
-    },
     "Retry" : {
       "comment" : "Error state: retry the failed fetch",
       "localizations" : {
@@ -321,15 +309,6 @@
           }
         }
       }
-    },
-    "Save" : {
-
-    },
-    "Saved" : {
-
-    },
-    "Saving…" : {
-
     },
     "Select text" : {
 
