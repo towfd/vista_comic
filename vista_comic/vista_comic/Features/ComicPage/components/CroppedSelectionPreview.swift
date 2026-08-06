@@ -52,6 +52,11 @@ struct CroppedSelectionPreview: View {
     let comprehensionRepository: any ComprehensionRepository
 
     @Environment(\.dismiss) private var dismiss
+    /// The tab shell's unread count. Handed the newly-enqueued record so the
+    /// badge still lights up when this sheet is dismissed before the
+    /// explanation lands (ticket 22) — the wait belongs to the shell, which
+    /// outlives this screen, not to `.task(id:)`, which does not.
+    @Environment(\.unreadExplanationBadge) private var badge
     @State private var recognitionState: LoadState<String> = .loading
     /// User-editable text, seeded from a successful recognition. Purely for
     /// on-screen display/correction — never written anywhere.
@@ -439,6 +444,13 @@ struct CroppedSelectionPreview: View {
         enqueueState = outcome
         // Setting this is what starts `.task(id:)` polling.
         if case .loaded(let value) = outcome { record = value.record }
+        // Hand the same record to the badge. Both watches run, and they cannot
+        // double-count: if the reader stays, `awaitExplanation` marks it read
+        // and the badge's own recount then sees a read record. If they leave,
+        // only the badge's watch survives — which is the whole point.
+        if let enqueued = record {
+            badge.watch(enqueued, using: comprehensionRepository)
+        }
     }
 
     /// What `.task(id:)` watches. A record id alone is not enough: a retry puts
@@ -468,6 +480,10 @@ struct CroppedSelectionPreview: View {
     private func retryRecord(id: Int) async {
         guard let requeued = try? await comprehensionRepository.retry(id: id) else { return }
         record = requeued
+        // A retry puts the record back in flight, so the badge has to follow it
+        // again — dismissing the sheet mid-retry is no different from
+        // dismissing it mid-translate.
+        badge.watch(requeued, using: comprehensionRepository)
         pollGeneration += 1
     }
 }

@@ -12,11 +12,16 @@
 //  section, and a just-arrived explanation would stop being reliably at the top
 //  — which is exactly where the thing the badge points at wants to be.
 //
-//  The badge count is computed here, from the fetched list, because there is no
-//  count endpoint and no shared client store. That makes this view the owner of
-//  both the list and the number derived from it, which is why a record changing
-//  on the detail screen has to come back up (`onChanged`) rather than being
-//  re-fetched.
+//  The badge used to be computed and displayed here. Ticket 22 moved ownership
+//  up to `RootTabView`, because a tab's content does not appear until the tab is
+//  selected — so a badge living here could only learn something had arrived once
+//  the reader had already opened it. What stays here is the *counting*: this view
+//  hands its freshly-fetched list to `UnreadExplanationBadge.recount(from:)`, so
+//  the tab on screen never causes a second request and the badge can never
+//  disagree with the list it points at.
+//
+//  A record changing on the detail screen still comes back up (`onChanged`)
+//  rather than being re-fetched, for the same reason as before.
 //
 //  Ticket 20 adds swipe-to-delete. Deleting moved from a button to a swipe
 //  because every translate now writes a row, so pruning is routine rather than
@@ -30,6 +35,7 @@ import SwiftUI
 struct HistoryView: View {
     @Environment(\.comprehensionRepository) private var repository
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.unreadExplanationBadge) private var badge
     @State private var state: LoadState<[ComprehensionRecord]> = .loading
     /// The record a swipe has proposed deleting, held until the reader confirms
     /// — nothing is sent to the backend while this is set.
@@ -67,7 +73,6 @@ struct HistoryView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await load() } }
         }
-        .badge(unreadCount)
         // Same two alerts the detail screen shows, from one definition — the
         // two screens must never word an irreversible action differently.
         .recordDeletionAlerts(
@@ -81,13 +86,6 @@ struct HistoryView: View {
                 Task { await delete(record) }
             }
         )
-    }
-
-    /// `0` renders no badge, so an empty or failed load simply shows nothing
-    /// rather than a misleading zero.
-    private var unreadCount: Int {
-        guard case .loaded(let records) = state else { return 0 }
-        return unreadExplanationCount(in: records)
     }
 
     @ViewBuilder
@@ -148,6 +146,7 @@ struct HistoryView: View {
         } catch {
             state = .failed(error)
         }
+        publishCount()
     }
 
     /// Swaps one record in place after the detail screen changed it — marked it
@@ -160,6 +159,7 @@ struct HistoryView: View {
         else { return }
         records[index] = updated
         state = .loaded(records)
+        publishCount()
     }
 
     /// Deletes `record` and, on success, drops it from the displayed list in
@@ -182,6 +182,18 @@ struct HistoryView: View {
         guard case .loaded(var records) = state else { return }
         records.removeAll { $0.id == record.id }
         state = .loaded(records)
+        publishCount()
+    }
+
+    /// Hands the badge the list this view already holds, so opening a record or
+    /// deleting one moves the number with no second request.
+    ///
+    /// A failed load publishes nothing: the previous count is more honest than
+    /// zero, since "we couldn't ask" is not "nothing is waiting" — the same rule
+    /// that stops the list itself degrading a read failure into an empty state.
+    private func publishCount() {
+        guard case .loaded(let records) = state else { return }
+        badge.recount(from: records)
     }
 }
 

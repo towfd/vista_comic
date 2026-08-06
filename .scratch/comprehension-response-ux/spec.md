@@ -192,7 +192,15 @@ M9's peek-mode jump back to the source page survives unchanged, and is disabled 
 
 Empty and unreachable are distinct screens. This is not polish — the existing store convention already forbids degrading a read failure into an empty list, because that misrepresents "the store is unreachable" as "you have nothing". The empty copy also changes in kind: the reader never chose to save anything, so an empty history is a statement about the feature, not about their diligence.
 
-The unread badge counts unread records, computed client-side from the fetched list, refreshed when the app returns to the foreground and when the tab appears. There is no count endpoint and no shared client store: the backend is the single source of truth and each screen fetches for itself, so marking read is a write whose effect simply shows up on the next refresh.
+The unread badge counts unread records, computed client-side from the fetched list. There is no count endpoint: the backend stays the single source of truth.
+
+~~Refreshed when the app returns to the foreground and when the tab appears. There is no shared client store: each screen fetches for itself, so marking read is a write whose effect simply shows up on the next refresh.~~ **Reversed by ticket 22, after shipping.** This gave the badge a refresh policy that could only learn something had arrived at the exact moments the reader no longer needed telling — translate, dismiss the sheet, keep reading, and nothing fetched the list until the reader opened the tab the badge was supposed to send them to. It contradicted user story 12 outright.
+
+The per-screen-fetch rule was the right call for the *list*, which only matters while it is on screen, and the wrong call for the *badge*, whose whole job is to speak while the reader is somewhere else. So badge ownership sits in the tab shell, not in 歷史紀錄, and it is kept current two ways: a refresh on launch and on return to the foreground, catching anything that finished while the app was dead or backgrounded; and a watch on a record known to be in flight, handed over when the reader translates, polling until the backend reaches a terminal status. Nothing in flight means no polling — the mechanism is silent on a day the reader never translates. Each half covers the other's hole: watching alone loses anything enqueued before a relaunch, and refreshing alone either misses the arrival by minutes or polls all day to avoid it.
+
+The shared store this rejected is therefore unavoidable, and is kept to the size of the job: a count, a recount from a list a screen already holds, and a watch on one record. 歷史紀錄 hands over the list it just fetched rather than causing a second one.
+
+The counting rule never changed and is not implicated: a reader who dismisses the sheet cancels the poll, so nothing marks the record read and it is correctly unread — it was simply never counted again.
 
 ### The client seam
 
