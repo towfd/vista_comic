@@ -187,22 +187,48 @@ func translateAndEnqueueSelection(
     }
 }
 
-/// Polls one record until the backend has finished with it, then marks it read
-/// if an explanation actually landed.
+/// Polls one record until the backend has finished with it.
 ///
 /// Polling rather than a push channel is the deliberate choice recorded in the
 /// spec: one reader, minutes-long work, and a screen that is allowed to be
 /// closed at any moment — cancelling a `.task` is the entire teardown story.
 ///
-/// Marking read is part of *this* function because "read" means the reader saw
-/// the explanation arrive, which is only knowable here. It is best-effort: a
-/// failed `PATCH` must never cost the reader the explanation itself, so the
-/// record is returned either way and 歷史紀錄 simply still shows it as unread.
-///
 /// Transient fetch failures do not end the poll — a dropped connection mid-wait
-/// is exactly the case worth surviving. The caller's cancellation is the only
-/// exit besides a terminal status, which is why `sleep` is injected: it makes
-/// the loop testable in real time instead of in real minutes.
+/// is exactly the case worth surviving. Cancellation is the only exit besides a
+/// terminal status, which is why `sleep` is injected: it makes the loop testable
+/// in real time instead of in real minutes.
+///
+/// Two callers wait on the same thing from different places, and they differ in
+/// exactly one respect, which is why this loop is separate from
+/// `awaitExplanation`: the result screen's wait means the reader is watching, so
+/// an arrival counts as read; the badge's wait (`UnreadExplanationBadge.watch`)
+/// means they are not, so it must not.
+///
+/// Returns `nil` when cancelled before the record finished.
+func awaitRecordFinishing(
+    for id: Int,
+    using repository: any ComprehensionRepository,
+    pollInterval: Duration = .seconds(3),
+    sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+) async -> ComprehensionRecord? {
+    while !Task.isCancelled {
+        if let record = try? await repository.record(id: id), !record.status.isInProgress {
+            return record
+        }
+        // A throw here is cancellation during the wait, not a poll failure.
+        guard (try? await sleep(pollInterval)) != nil else { return nil }
+    }
+    return nil
+}
+
+/// Waits for one record on behalf of a reader who is looking at it, marking it
+/// read if an explanation actually landed.
+///
+/// Marking read belongs here rather than in the loop above because "read" means
+/// the reader saw the explanation arrive, which is only knowable at this call
+/// site. It is best-effort: a failed `PATCH` must never cost the reader the
+/// explanation itself, so the record is returned either way and 歷史紀錄 simply
+/// still shows it as unread.
 ///
 /// Returns `nil` when cancelled before the record finished.
 func awaitExplanation(
@@ -211,15 +237,12 @@ func awaitExplanation(
     pollInterval: Duration = .seconds(3),
     sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
 ) async -> ComprehensionRecord? {
-    while !Task.isCancelled {
-        if let record = try? await repository.record(id: id), !record.status.isInProgress {
-            if record.hasExplanation {
-                _ = try? await repository.setRead(id: id, isRead: true)
-            }
-            return record
-        }
-        // A throw here is cancellation during the wait, not a poll failure.
-        guard (try? await sleep(pollInterval)) != nil else { return nil }
+    guard let record = await awaitRecordFinishing(
+        for: id, using: repository, pollInterval: pollInterval, sleep: sleep
+    ) else { return nil }
+
+    if record.hasExplanation {
+        _ = try? await repository.setRead(id: id, isRead: true)
     }
-    return nil
+    return record
 }
