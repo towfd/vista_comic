@@ -10,7 +10,7 @@ A `spec.md` under `.scratch/comprehension-response-ux/`, ready to hand to `/to-t
 - Consult `/grilling` and `/domain-modeling` for open questions; `/prototype` for UI or model-output spikes needing a concrete artifact to react to.
 - Standing constraint: single-user, single-device app (no accounts, no per-user identity — see `docs/adr/0005-cloudflare-tunnel-for-public-connectivity.md`). Keep solutions single-user-simple.
 - Existing `saved_translation` rows are explicitly disposable — the developer has confirmed the data there is not worth preserving, so no migration path is needed for any storage decision on this map.
-- The developer's stated end-goal (whole-book precompute, tap-a-bubble-for-instant-explanation) is **out of scope here on purpose** — this map exists to ship a usable version of the *current* interaction model first. Don't let decisions here quietly assume that future model.
+- The developer's stated end-goal (whole-book precompute, tap-a-bubble-for-instant-explanation) is **out of scope here on purpose** — this map exists to ship a usable version of the *current* interaction model first. Don't let decisions here quietly assume that future model. **(Amended 2026-08-07: that end-goal was subsequently abandoned — see `ROADMAP.md`. The current interaction model is the model, not a stopgap.)**
 
 ## Decisions so far
 

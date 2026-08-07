@@ -271,7 +271,7 @@ For UI-facing work, XCUITest code is written and build-verified as part of the i
 
 ## Out of Scope
 
-- **Whole-book or whole-chapter precompute with tap-a-bubble instant display.** The stated long-term direction — OCR plus LLM over an entire comic at import time — replaces this interaction model rather than extending it, and carries an unresolved cost question. Deliberately deferred so a usable version of the current model ships first.
+- **Whole-book or whole-chapter precompute with tap-a-bubble instant display.** The stated long-term direction — OCR plus LLM over an entire comic at import time — replaces this interaction model rather than extending it, and carries an unresolved cost question. Deliberately deferred so a usable version of the current model ships first. **(Amended 2026-08-07: abandoned outright — see `ROADMAP.md`. What this spec shipped is the permanent interaction model, not a first version of something else.)**
 - **The OCR text-editing lag.** Tapping recognised text to correct it stalls. A defect needing root-cause diagnosis, with nothing to decide; split out into its own effort.
 - **單字本 as a study or review feature** — spaced repetition, quizzing, curation. The tab is being removed, not improved.
 - **Adopting a migration tool.** The right call, but infrastructure work rather than a step toward this feature, and writing a migration for a table this work destroys anyway would be wasted. **Triggered by this schema landing**: baseline the post-drop schema, and every change after that is a migration. Whoever picks it up should know the progress table already holds data that would hurt to lose, and that the test suite currently builds its schema through the same create-if-missing path as production.
