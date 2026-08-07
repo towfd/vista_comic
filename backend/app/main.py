@@ -56,7 +56,7 @@ from .models import (
     ProgressResponse,
     ProgressUpdate,
 )
-from .scanner import Catalog, ComicEntry, scan_library
+from .scanner import Catalog, ChapterEntry, ComicEntry, scan_library
 
 # Map a file extension (lowercased, with dot) to the Content-Type we serve.
 # Only the accepted page extensions are here; anything else never reaches the
@@ -156,6 +156,20 @@ def _cover_url(base: str, comic_id: str) -> str:
     / traversal, and matches the page URL shape so the app configures one base.
     """
     return f"{base}/media/{comic_id}/cover"
+
+
+def _chapter_cover_url(base: str, comic_id: str, chapter: ChapterEntry) -> str:
+    """What a chapter row should show.
+
+    Its own ``cover.*`` where it has one, otherwise the comic's cover. The
+    fallback is deliberately not the chapter's first page: the app has already
+    loaded the comic's cover for the library card and the chapter screen's
+    header, so borrowing it costs nothing, where a full-resolution manga page
+    behind a 60-point thumbnail costs a download per row.
+    """
+    if chapter.cover_path is not None:
+        return f"{base}/media/{comic_id}/{chapter.id}/cover"
+    return _cover_url(base, comic_id)
 
 
 def _page_url(base: str, comic_id: str, chapter_id: str, index_1based: int) -> str:
@@ -282,6 +296,7 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
                 number=ch.number,
                 title=ch.title,
                 pageCount=ch.page_count,
+                coverUrl=_chapter_cover_url(base, comic.id, ch),
                 readState=progress_store.read_state(
                     rows[ch.id].last_page if ch.id in rows else None,
                     ch.page_count,
@@ -688,6 +703,26 @@ def _reserve_daily_cap() -> date:
             status_code=429, detail="Daily comprehension request cap reached"
         )
     return usage_date
+
+
+@app.get("/media/{comic_id}/{chapter_id}/cover")
+def get_chapter_cover_image(comic_id: str, chapter_id: str) -> FileResponse:
+    """Stream a chapter's own ``cover.*``.
+
+    Declared before the page route below, which would otherwise match ``cover``
+    as its ``{page}`` selector and 404 on the int parse.
+
+    404 when the chapter has no cover of its own: the app is told which chapters
+    have one (see the ``coverUrl`` on each chapter summary) and asks for the
+    comic's cover instead, so reaching here without one means a stale client or
+    a hand-typed URL.
+    """
+    catalog = _require_catalog()
+    chapter = catalog.chapters_by_id.get(chapter_id)
+    if chapter is None or chapter.cover_path is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    file_path = _safe_file(catalog, chapter.cover_path)
+    return FileResponse(file_path, media_type=_content_type_for(chapter.cover_path))
 
 
 @app.get("/media/{comic_id}/{chapter_id}/{page}")

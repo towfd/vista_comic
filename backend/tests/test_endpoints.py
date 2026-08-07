@@ -58,12 +58,64 @@ def test_get_comic_detail_shape_and_counts(client):
     assert len(detail["chapters"]) == 2
 
     ch = detail["chapters"][0]
-    assert set(ch) == {"id", "number", "title", "pageCount", "readState"}
+    assert set(ch) == {"id", "number", "title", "pageCount", "readState", "coverUrl"}
     assert ch["number"] == 1
     assert ch["title"] == "The Journey"
     assert ch["pageCount"] == 2
     assert ch["readState"] == "unread"  # always unread in v1
     assert ch["id"] == stable_id("Alpha/01 - The Journey")
+
+
+def test_a_chapters_own_cover_is_advertised_and_is_not_a_page(client):
+    comic_id = stable_id("Alpha")
+    chapters = client.get(f"/comics/{comic_id}").json()["chapters"]
+    with_cover = chapters[0]  # "01 - The Journey" has its own cover.jpg
+
+    assert with_cover["coverUrl"].endswith(
+        f"/media/{comic_id}/{with_cover['id']}/cover"
+    )
+    # Two pages, not three: the cover is something to recognise the chapter by,
+    # not something to read.
+    assert with_cover["pageCount"] == 2
+
+
+def test_a_chapter_without_a_cover_borrows_the_comics(client):
+    comic_id = stable_id("Alpha")
+    chapters = client.get(f"/comics/{comic_id}").json()["chapters"]
+    without_cover = chapters[1]  # "02" has no cover.jpg
+
+    # The comic's cover, which the app has already loaded for the library card
+    # and the chapter screen's header -- free, unlike a full-resolution page.
+    assert without_cover["coverUrl"].endswith(f"/media/{comic_id}/cover")
+
+
+def test_a_chapter_cover_is_served(client):
+    comic_id = stable_id("Alpha")
+    chapter_id = stable_id("Alpha/01 - The Journey")
+
+    resp = client.get(f"/media/{comic_id}/{chapter_id}/cover")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/jpeg"
+
+
+def test_a_chapter_without_a_cover_has_none_to_serve(client):
+    comic_id = stable_id("Alpha")
+    chapter_id = stable_id("Alpha/02")
+
+    resp = client.get(f"/media/{comic_id}/{chapter_id}/cover")
+
+    assert resp.status_code == 404
+
+
+def test_a_chapter_cover_never_appears_in_the_reading_order(client):
+    comic_id = stable_id("Alpha")
+    chapter_id = stable_id("Alpha/01 - The Journey")
+
+    pages = client.get(f"/comics/{comic_id}/chapters/{chapter_id}").json()["pages"]
+
+    assert len(pages) == 2
+    assert not any(url.endswith("/cover") for url in pages)
 
 
 def test_get_unknown_comic_returns_404(client):

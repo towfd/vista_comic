@@ -153,8 +153,8 @@ def sample_library(tmp_path, write_page):
         library/
         ├── Alpha/
         │   ├── cover.png
-        │   ├── 01 - The Journey/  (2 pages)
-        │   └── 02/                (1 page)
+        │   ├── 01 - The Journey/  (2 pages + its own cover.jpg)
+        │   └── 02/                (1 page, no chapter cover)
         └── Beta/
             └── 01-intro/          (3 pages, no explicit cover)
     """
@@ -163,6 +163,9 @@ def sample_library(tmp_path, write_page):
     write_page(root / "Alpha" / "cover.png")
     write_page(root / "Alpha" / "01 - The Journey" / "001.jpg")
     write_page(root / "Alpha" / "01 - The Journey" / "002.jpg")
+    # A chapter-level cover: not a page, and the thing that chapter's row shows.
+    # Only one of Alpha's two chapters has one, so the fallback is covered too.
+    write_page(root / "Alpha" / "01 - The Journey" / "cover.jpg")
     write_page(root / "Alpha" / "02" / "001.jpg")
 
     write_page(root / "Beta" / "01-intro" / "1.jpg")

@@ -158,6 +158,11 @@ def _parse_chapter_name(name: str) -> Optional[Tuple[int, str]]:
     return number, title
 
 
+def _is_cover(entry: Path) -> bool:
+    """``cover.*`` — the same test the comic level uses for its own cover."""
+    return _is_page(entry) and entry.stem.lower() == "cover"
+
+
 def _list_pages(
     chapter_dir: Path, root: Path, root_real: Path, report: ScanReport
 ) -> List[Path]:
@@ -165,6 +170,11 @@ def _list_pages(
     pages: List[Path] = []
     for entry in chapter_dir.iterdir():
         if entry.is_dir():
+            continue
+        # A chapter's own cover is not part of it: leaving it in would put it
+        # in the reading order, add one to the page count, and land at whatever
+        # position "cover" happens to natural-sort to.
+        if _is_cover(entry):
             continue
         if _is_page(entry):
             # A page file that is a symlink out of the library is not served.
@@ -223,6 +233,7 @@ def _scan_comic(
                 number=number,
                 title=title,
                 page_paths=page_paths,
+                cover_path=_resolve_chapter_cover(chapter_dir, root, root_real),
             )
         )
 
@@ -232,6 +243,28 @@ def _scan_comic(
 
     cover_path = _resolve_cover(comic_dir, root, root_real, chapters)
     return ComicEntry(id=comic_id, title=comic_dir.name, cover_path=cover_path, chapters=chapters)
+
+
+def _resolve_chapter_cover(
+    chapter_dir: Path, root: Path, root_real: Path
+) -> Optional[str]:
+    """This chapter's own ``cover.*``, or None.
+
+    No fallback here on purpose. The comic level falls back to a first page
+    because a comic must have *something* to show on a shelf; a chapter row can
+    borrow the comic's cover instead, which the app has already loaded for the
+    card and the header — free, where a full-resolution first page behind a
+    60-point thumbnail is not.
+    """
+    covers = [
+        e
+        for e in chapter_dir.iterdir()
+        if _is_cover(e) and _real_within(e, root_real) is not None
+    ]
+    if not covers:
+        return None
+    covers.sort(key=lambda p: _natural_key(p.name))
+    return covers[0].relative_to(root).as_posix()
 
 
 def _resolve_cover(

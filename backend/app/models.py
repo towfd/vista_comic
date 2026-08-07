@@ -29,6 +29,11 @@ class ChapterEntry:
     # Relative POSIX page paths under the library root, in reading order.
     # Held now for Slice 2 (reader + /media); not exposed in Slice 1 JSON.
     page_paths: List[str] = field(default_factory=list)
+    # Relative POSIX path of this chapter's own ``cover.*``, or None when it has
+    # none. Deliberately NOT one of ``page_paths``: a cover is something to
+    # recognise the chapter by, not something to read, so it is excluded from
+    # the reading order and from ``page_count``.
+    cover_path: Optional[str] = None
 
     @property
     def page_count(self) -> int:
@@ -59,6 +64,10 @@ class ChapterSummary(BaseModel):
     number: int
     title: str
     pageCount: int
+    # This chapter's own first page, so the chapter list can show what the
+    # chapter actually looks like instead of one shared placeholder. Absolute,
+    # like every other media URL here -- the app never builds these itself.
+    coverUrl: str
     # Derived live from the progress store (Slice 4): "unread" | "reading" | "read".
     readState: str
 

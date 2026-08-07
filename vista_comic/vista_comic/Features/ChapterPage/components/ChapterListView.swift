@@ -15,9 +15,13 @@ struct ChapterListView: View {
         VStack{
             NavigationLink(value: ReaderRoute(comicID: comic.id, chapterID: chapter.id)){
                 HStack(spacing: 17){
-                    Image("Landscape_4")
-                        .resizable()
-                        .frame(width: 60, height: 60, alignment: .center)
+                    // The chapter's own first page, not one shared stock
+                    // image: what a chapter looks like is the fastest way to
+                    // recognise it, and a list where every row shows the same
+                    // picture is telling the reader nothing.
+                    CoverImage(url: chapter.coverURL)
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
 
                     VStack(alignment: .leading, spacing: 10){
                         Text(chapter.title)
