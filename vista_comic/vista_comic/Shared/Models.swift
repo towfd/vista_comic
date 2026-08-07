@@ -46,6 +46,12 @@ struct Chapter: Identifiable, Hashable, Decodable {
     /// (M5 Slice 4). `nil` when the chapter has no saved progress, or when only
     /// a chapter summary (not the reader endpoint) is known.
     let lastReadPage: Int?
+    /// This chapter's own first page, for the chapter list's thumbnail.
+    ///
+    /// Optional because only the chapter *summary* carries it: the reader
+    /// endpoint returns the full page list, where a separate cover would be the
+    /// first of those pages repeated.
+    let coverURL: URL?
 
     init(
         id: String,
@@ -54,7 +60,8 @@ struct Chapter: Identifiable, Hashable, Decodable {
         pageURLs: [URL] = [],
         pageCount: Int? = nil,
         readState: ReadState = .unread,
-        lastReadPage: Int? = nil
+        lastReadPage: Int? = nil,
+        coverURL: URL? = nil
     ) {
         self.id = id
         self.number = number
@@ -63,11 +70,13 @@ struct Chapter: Identifiable, Hashable, Decodable {
         self.pageCount = pageCount ?? pageURLs.count
         self.readState = readState
         self.lastReadPage = lastReadPage
+        self.coverURL = coverURL
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, number, title, pageCount, readState, lastReadPage
         case pageURLs = "pages"
+        case coverURL = "coverUrl"
     }
 
     init(from decoder: any Decoder) throws {
@@ -82,6 +91,7 @@ struct Chapter: Identifiable, Hashable, Decodable {
         let rawReadState = try container.decodeIfPresent(String.self, forKey: .readState)
         let readState = rawReadState.flatMap(ReadState.init(rawValue:)) ?? .unread
         let lastReadPage = try container.decodeIfPresent(Int.self, forKey: .lastReadPage)
+        let coverURL = try container.decodeIfPresent(URL.self, forKey: .coverURL)
         self.init(
             id: id,
             number: number,
@@ -89,7 +99,8 @@ struct Chapter: Identifiable, Hashable, Decodable {
             pageURLs: pageURLs,
             pageCount: pageCount,
             readState: readState,
-            lastReadPage: lastReadPage
+            lastReadPage: lastReadPage,
+            coverURL: coverURL
         )
     }
 }

@@ -58,12 +58,26 @@ def test_get_comic_detail_shape_and_counts(client):
     assert len(detail["chapters"]) == 2
 
     ch = detail["chapters"][0]
-    assert set(ch) == {"id", "number", "title", "pageCount", "readState"}
+    assert set(ch) == {"id", "number", "title", "pageCount", "readState", "coverUrl"}
     assert ch["number"] == 1
     assert ch["title"] == "The Journey"
     assert ch["pageCount"] == 2
     assert ch["readState"] == "unread"  # always unread in v1
     assert ch["id"] == stable_id("Alpha/01 - The Journey")
+    # Each chapter advertises its own first page, so the chapter list can show
+    # what the chapter looks like rather than one placeholder for all of them.
+    assert ch["coverUrl"].endswith(f"/media/{comic_id}/{ch['id']}/1")
+
+
+def test_every_chapter_advertises_its_own_cover(client):
+    comic_id = stable_id("Alpha")
+    chapters = client.get(f"/comics/{comic_id}").json()["chapters"]
+
+    covers = [ch["coverUrl"] for ch in chapters]
+
+    # Distinct per chapter -- a shared cover would defeat the point.
+    assert len(set(covers)) == len(chapters)
+    assert all(url.endswith("/1") for url in covers)
 
 
 def test_get_unknown_comic_returns_404(client):

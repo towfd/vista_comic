@@ -59,6 +59,10 @@ class ChapterSummary(BaseModel):
     number: int
     title: str
     pageCount: int
+    # This chapter's own first page, so the chapter list can show what the
+    # chapter actually looks like instead of one shared placeholder. Absolute,
+    # like every other media URL here -- the app never builds these itself.
+    coverUrl: str
     # Derived live from the progress store (Slice 4): "unread" | "reading" | "read".
     readState: str
 

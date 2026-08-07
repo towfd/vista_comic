@@ -52,8 +52,13 @@ struct ChapterPageView: View {
                 .font(AppFont.title)
 
             ScrollView {
-                ForEach(detail.chapters) { chapter in
-                    ChapterListView(comic: detail, chapter: chapter)
+                // Lazy now that each row loads its own cover: a comic with a
+                // hundred chapters would otherwise request a hundred
+                // full-resolution pages the moment the list appears.
+                LazyVStack(spacing: 0) {
+                    ForEach(detail.chapters) { chapter in
+                        ChapterListView(comic: detail, chapter: chapter)
+                    }
                 }
             }
         }

@@ -73,6 +73,63 @@ struct APIComicRepositoryTests {
         )
     }
 
+    // MARK: - Chapter covers
+
+    /// Each chapter carries its own first page, so the chapter list can show
+    /// what the chapter looks like instead of one shared placeholder.
+    @Test func comicDetailDecodesEachChaptersOwnCover() async throws {
+        RepositoryStubURLProtocol.responseBody = Data("""
+        {
+            "id": "comic-1",
+            "title": "Alpha",
+            "coverUrl": "https://example.test/media/comic-1/cover",
+            "chapters": [
+                {
+                    "id": "ch-1", "number": 1, "title": "One", "pageCount": 2,
+                    "readState": "unread",
+                    "coverUrl": "https://example.test/media/comic-1/ch-1/1"
+                },
+                {
+                    "id": "ch-2", "number": 2, "title": "Two", "pageCount": 3,
+                    "readState": "unread",
+                    "coverUrl": "https://example.test/media/comic-1/ch-2/1"
+                }
+            ]
+        }
+        """.utf8)
+        RepositoryStubURLProtocol.statusCode = 200
+
+        let comic = try await makeRepository(clientID: nil, clientSecret: nil).comic(id: "comic-1")
+
+        #expect(comic.chapters.count == 2)
+        #expect(
+            comic.chapters[0].coverURL
+                == URL(string: "https://example.test/media/comic-1/ch-1/1")
+        )
+        // Distinct per chapter — a shared cover would defeat the point.
+        #expect(comic.chapters[0].coverURL != comic.chapters[1].coverURL)
+    }
+
+    /// The reader endpoint returns the full page list and no separate cover,
+    /// where one would just be the first of those pages repeated. Decoding must
+    /// not require it.
+    @Test func aChapterWithoutACoverStillDecodes() async throws {
+        RepositoryStubURLProtocol.responseBody = Data("""
+        {
+            "id": "ch-1", "number": 1, "title": "One", "pageCount": 1,
+            "readState": "unread",
+            "pages": ["https://example.test/media/comic-1/ch-1/1"]
+        }
+        """.utf8)
+        RepositoryStubURLProtocol.statusCode = 200
+
+        let chapter = try await makeRepository(clientID: nil, clientSecret: nil)
+            .readerChapter(comicID: "comic-1", chapterID: "ch-1")
+
+        #expect(chapter.coverURL == nil)
+        #expect(chapter.pageURLs.count == 1)
+    }
+
     // MARK: - Headers present when configured
 
     @Test func libraryAttachesHeadersWhenConfigured() async throws {

@@ -282,6 +282,9 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
                 number=ch.number,
                 title=ch.title,
                 pageCount=ch.page_count,
+                # Page 1. A chapter with no pages is skipped by the scanner, so
+                # every chapter that reaches here has one.
+                coverUrl=_page_url(base, comic.id, ch.id, 1),
                 readState=progress_store.read_state(
                     rows[ch.id].last_page if ch.id in rows else None,
                     ch.page_count,
