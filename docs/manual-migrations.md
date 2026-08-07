@@ -1,24 +1,22 @@
 # Manual schema migrations
 
-This backend has **no migration tool**. `db.init_engine` calls
+> **This file is closed.** Alembic owns the schema as of 2026-08-07 — see
+> `.scratch/alembic-adoption/spec.md`. Schema changes are migrations now:
+> `alembic revision --autogenerate -m "..."`, read what it produced, commit it,
+> rebuild. The app runs `alembic upgrade head` itself on startup, so there is
+> nothing left to remember and nothing new to add below.
+>
+> What remains here is the record of the era before that, kept because the
+> **one-time stamp** at the bottom is the step that connects the two.
+
+The backend used to have no migration tool. `db.init_engine` called
 `Base.metadata.create_all`, which issues `CREATE TABLE IF NOT EXISTS`: it adds a
 **new table** for free, and will **never** add, drop or alter a column on an
 existing one.
 
-So any schema change that isn't a brand-new table is a manual step, run against
-the deployed Postgres before the new build starts. This file is the record of
-those steps.
-
-**Adopting a migration tool is now triggered.** The deferral was explicitly
-conditional on the step below landing (see `ROADMAP.md`'s M10 entry and the
-`comprehension-response-ux` map's Out of scope), and it has: `comprehension_record`
-is now the live table and holds data worth keeping. Baseline the post-drop schema,
-and every schema change after that is a migration rather than an entry in this
-file. Whoever picks it up should know two things: `progress` already holds data
-that would hurt to lose, and `tests/conftest.py` builds the test schema through
-the same `create_all` path as production, so adopting migrations without changing
-that fixture leaves the tests validating a schema built a different way than the
-deployed one.
+So any schema change that wasn't a brand-new table was a manual step, run
+against the deployed Postgres before the new build started. This file was the
+record of those steps.
 
 ## Executed
 
@@ -49,3 +47,34 @@ more dangerous variant is the reverse ordering — shipping a build whose model
 expects columns an existing table lacks — which surfaces at runtime as a
 "column does not exist" error that reads like a code bug rather than a missed
 deployment step. That is the failure mode this file exists to prevent.
+
+
+## The step that closed this file
+
+### Baseline the deployed database onto Alembic — 2026-08-07
+
+`alembic upgrade head` on a database that already has the tables would fail on
+creating them, and `progress` holds reading progress that would hurt to lose. So
+the deployed database is **marked** as already at the baseline revision instead
+of running it:
+
+```bash
+docker compose exec api alembic stamp head
+```
+
+**Ordering is load-bearing, and stricter than it looks.** The stamp has to
+happen *before* a container built from the new image starts serving. A container
+that starts unstamped tries to run the baseline against tables that exist, the
+migration fails, and — by the deliberate policy in `lifespan` — the container
+fails hard rather than serving with a schema it cannot vouch for. That is the
+designed behaviour, not a bug, but it means the sequence is:
+
+1. Rebuild the image without starting it: `docker compose build api`
+2. Stamp through a one-off container: `docker compose run --rm api alembic stamp head`
+3. Start normally: `docker compose up -d api`
+
+Safe to check first, and safe to repeat: stamping writes one row to
+`alembic_version` and touches no table of the app's own.
+
+Verified afterwards with `SELECT * FROM alembic_version;` returning the baseline
+revision, and the API starting clean.

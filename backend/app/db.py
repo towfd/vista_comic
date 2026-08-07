@@ -14,6 +14,7 @@ dependency yielding a short-lived session per request.
 from __future__ import annotations
 
 from datetime import date, datetime
+from pathlib import Path
 from typing import Iterator, Optional
 
 from sqlalchemy import Boolean, Date, Engine, Integer, String, create_engine
@@ -136,18 +137,46 @@ _SessionLocal: Optional[sessionmaker[Session]] = None
 
 
 def init_engine(database_url: Optional[str] = None) -> Engine:
-    """Create the engine + session factory and ensure the table exists.
+    """Create the engine + session factory. Does **not** touch the schema.
 
     Idempotent enough for our needs: calling it again swaps in a fresh engine
-    (used by tests to point at a throwaway database). ``create_all`` issues
-    ``CREATE TABLE IF NOT EXISTS`` so an existing table is left untouched.
+    (used by tests to point at a throwaway database).
+
+    It used to call ``Base.metadata.create_all`` here. Alembic owns the schema
+    now, and leaving ``create_all`` in place would mean two mechanisms building
+    it -- one of them silently creating tables the other believes do not exist
+    yet, with nothing to notice the drift. See ``upgrade_schema`` below.
+
+    Creates no connection: SQLAlchemy engines connect lazily, so an unreachable
+    database surfaces at the first real query rather than here.
     """
     global _engine, _SessionLocal
     url = database_url or get_database_url()
     _engine = create_engine(url, pool_pre_ping=True, future=True)
     _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False, future=True)
-    Base.metadata.create_all(_engine)
     return _engine
+
+
+def upgrade_schema(database_url: Optional[str] = None) -> None:
+    """Bring the database up to the latest migration (``alembic upgrade head``).
+
+    Run in-process rather than from a shell entrypoint, because the caller has
+    to tell two failures apart and a shell script cannot: a database that is
+    simply unreachable is an outage the app degrades through, while a migration
+    that will not apply means the schema is not what the code expects and the
+    app must not serve. Both look like a non-zero exit from the command line;
+    here, the first is an ``OperationalError`` and the second is anything else.
+
+    Imported lazily so the Alembic dependency is only needed by the paths that
+    actually migrate -- the app at startup and the test fixtures.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    config = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+    if database_url is not None:
+        config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "head")
 
 
 def get_engine() -> Engine:

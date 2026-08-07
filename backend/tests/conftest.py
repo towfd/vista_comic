@@ -68,14 +68,54 @@ def _ensure_test_database(url: str) -> None:
         maintenance.dispose()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _never_touch_the_dev_database():
+    """Point every database-URL lookup at the throwaway database, for the whole
+    session, whether a test asked for a DB fixture or not.
+
+    The `_test`-suffix guard above protects the engine the fixtures build. It
+    cannot protect `alembic/env.py`, which imports `config.get_database_url`
+    itself when Alembic execs it — so a bare `db.upgrade_schema()` in a test
+    would run migrations against the developer's real database, outside
+    everything this file does to prevent exactly that. It happened once while
+    writing these tests; Postgres's transactional DDL rolled it back and no data
+    was lost, which was luck rather than design.
+
+    Patching the source closes it: there is no longer a path from the test
+    session to a database whose name does not end in `_test`.
+    """
+    from app import config, db
+
+    url = _test_database_url()
+    original_config, original_db = config.get_database_url, db.get_database_url
+    config.get_database_url = lambda: url
+    db.get_database_url = lambda: url
+    try:
+        yield
+    finally:
+        config.get_database_url = original_config
+        db.get_database_url = original_db
+
+
 @pytest.fixture(scope="session")
 def _progress_engine():
-    """Point the app's engine at the throwaway test DB and ensure the table."""
+    """Point the app's engine at the throwaway test DB and migrate it.
+
+    Migrated rather than built from ``Base.metadata``, which is what this used
+    to do via ``init_engine``. Alembic owns the schema now, and building the
+    test schema a different way than production's would leave the suite
+    validating something no deployment ever produces — a hazard
+    ``docs/manual-migrations.md`` flagged while it was still true.
+
+    Once per session: migrations are idempotent, and the per-test fixtures below
+    truncate rather than rebuild.
+    """
     from app import db
 
     url = _test_database_url()
     _ensure_test_database(url)
     engine = db.init_engine(url)
+    db.upgrade_schema(url)
     # Defense-in-depth: the active engine must target a `_test` database, so a
     # future change (e.g. wrapping TestClient in `with`, which runs the app
     # lifespan and re-inits the engine from DATABASE_URL) can never silently
