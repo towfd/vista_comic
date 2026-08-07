@@ -75,8 +75,9 @@ struct APIComicRepositoryTests {
 
     // MARK: - Chapter covers
 
-    /// Each chapter carries its own first page, so the chapter list can show
-    /// what the chapter looks like instead of one shared placeholder.
+    /// A chapter carries whichever cover the server resolved for it — its own
+    /// `cover.*` where it has one, the comic's otherwise. This asserts the
+    /// decoding, not that rule; the rule is the backend's and is tested there.
     @Test func comicDetailDecodesEachChaptersOwnCover() async throws {
         RepositoryStubURLProtocol.responseBody = Data("""
         {
@@ -87,12 +88,12 @@ struct APIComicRepositoryTests {
                 {
                     "id": "ch-1", "number": 1, "title": "One", "pageCount": 2,
                     "readState": "unread",
-                    "coverUrl": "https://example.test/media/comic-1/ch-1/1"
+                    "coverUrl": "https://example.test/media/comic-1/ch-1/cover"
                 },
                 {
                     "id": "ch-2", "number": 2, "title": "Two", "pageCount": 3,
                     "readState": "unread",
-                    "coverUrl": "https://example.test/media/comic-1/ch-2/1"
+                    "coverUrl": "https://example.test/media/comic-1/ch-2/cover"
                 }
             ]
         }
@@ -104,10 +105,10 @@ struct APIComicRepositoryTests {
         #expect(comic.chapters.count == 2)
         #expect(
             comic.chapters[0].coverURL
-                == URL(string: "https://example.test/media/comic-1/ch-1/1")
+                == URL(string: "https://example.test/media/comic-1/ch-1/cover")
         )
-        // Distinct per chapter — a shared cover would defeat the point.
-        #expect(comic.chapters[0].coverURL != comic.chapters[1].coverURL)
+        // Decoded per chapter rather than shared or dropped.
+        #expect(comic.chapters[1].coverURL == URL(string: "https://example.test/media/comic-1/ch-2/cover"))
     }
 
     /// The reader endpoint returns the full page list and no separate cover,

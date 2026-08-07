@@ -29,6 +29,11 @@ class ChapterEntry:
     # Relative POSIX page paths under the library root, in reading order.
     # Held now for Slice 2 (reader + /media); not exposed in Slice 1 JSON.
     page_paths: List[str] = field(default_factory=list)
+    # Relative POSIX path of this chapter's own ``cover.*``, or None when it has
+    # none. Deliberately NOT one of ``page_paths``: a cover is something to
+    # recognise the chapter by, not something to read, so it is excluded from
+    # the reading order and from ``page_count``.
+    cover_path: Optional[str] = None
 
     @property
     def page_count(self) -> int:
