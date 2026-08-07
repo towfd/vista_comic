@@ -54,14 +54,15 @@ Take `vista-backup.sql`, the repo-root `.env`, and both files in `cloudflared/`.
 ### On the new machine
 
 ```bash
-# 3. Docker, once.
-sudo apt install docker.io docker-compose-v2      # or the distro equivalent
+# 3. Docker, once. `docker-buildx` is not optional: recent Compose builds
+#    through Bake and fails with "buildx isn't installed" without it.
+sudo apt install docker.io docker-compose-v2 docker-buildx
 sudo usermod -aG docker "$USER"                   # log out and back in
 
 # 4. Code and secrets.
 git clone <this repo> && cd vista_comic
-cp /path/from/old/.env .env
-cp /path/from/old/cloudflared/* cloudflared/
+cp /path/from/old/.env .env                       # repo ROOT, not a subdirectory
+cp /path/from/old/cloudflared/* cloudflared/      # only the tunnel's two files
 
 # 5. The library, wherever MANGA_LIBRARY_PATH now points.
 
@@ -74,6 +75,22 @@ docker compose exec -T postgres psql -U vista -d vista < vista-backup.sql
 docker compose up -d api
 curl -s localhost:8000/healthz
 curl -s localhost:8000/comics | head -c 200
+```
+
+**Run Compose from the repository root, and keep `.env` there.** Only the two
+tunnel files belong in `cloudflared/`. Running from inside a subdirectory fails
+twice over and neither message names the cause: Compose reports every variable as
+"not set" (it looks for `.env` in the working directory), and the build context
+resolves to `<subdirectory>/backend`, which does not exist.
+
+```text
+vista_comic/          <- run `docker compose` here
+├── .env
+├── docker-compose.yml
+├── backend/
+└── cloudflared/
+    ├── config.yml
+    └── <tunnel-id>.json
 ```
 
 Confirm the data actually arrived — an empty library reads the same as a working
@@ -148,3 +165,29 @@ your own network.
   would mean rebuilding the iOS app against the new hostname.
 - **Running both machines at once.** See the ordering rule: this stack has one
   database, and nothing reconciles two.
+
+
+## Executed — 2026-08-07
+
+Moved from the developer's Mac to a dedicated Linux machine, which is now the
+server. Verified from the app over the public hostname.
+
+Two deliberate departures from the steps above:
+
+- **The database was not carried across.** It held nine reading positions and
+  nine comprehension records, and several positions were already orphaned —
+  comic folders had been renamed, and a stable ID is a hash of the folder's
+  path, so renaming one detaches its progress. Rebuilding from empty cost less
+  than the transfer was worth. A dump was taken anyway and kept outside the
+  repository; nothing needed it.
+- **The new database was built by migration, not restore.** Alembic had landed
+  days earlier, so an empty database came up to head on first start — no
+  `stamp`, and the first proof that the migration path produces a working schema
+  unaided.
+
+What actually cost time, both now folded into the steps above rather than left
+here: running Compose from inside `cloudflared/`, and `docker.io` shipping
+without `buildx`.
+
+`MANGA_LIBRARY_PATH` needed no edit — rewritten as `${HOME}/Documents/comic`
+beforehand, it resolved on the new machine unchanged.
