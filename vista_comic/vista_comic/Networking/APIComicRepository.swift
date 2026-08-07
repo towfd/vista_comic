@@ -54,6 +54,13 @@ struct APIComicRepository: ComicRepository {
         try await put(body: body, at: "comics/\(comicID)/chapters/\(chapterID)/progress")
     }
 
+    func rescan() async throws {
+        // The response reports how many comics and chapters were found; the
+        // caller re-fetches the library either way, so the counts are the
+        // backend's own log rather than something to decode here.
+        try await post(at: "rescan")
+    }
+
     // MARK: - Request plumbing
 
     /// Builds a `URLRequest` for `path`, routed through `APIConfig.authorizedRequest`
@@ -87,6 +94,20 @@ struct APIComicRepository: ComicRepository {
             return try decoder.decode(T.self, from: data)
         } catch {
             throw APIError.decoding(error)
+        }
+    }
+
+    /// Sends a bodyless `POST` and treats any non-2xx status as an error.
+    /// The response body is ignored, the same as `put` below.
+    private func post(at path: String) async throws {
+        let request = makeRequest(method: "POST", at: path)
+        let (_, response) = try await session.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.httpStatus(http.statusCode)
         }
     }
 

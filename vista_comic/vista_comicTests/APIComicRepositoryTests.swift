@@ -100,6 +100,65 @@ struct APIComicRepositoryTests {
         #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == "test-client-secret")
     }
 
+    // MARK: - Rescan
+
+    /// The catalog is scanned once at startup and held in memory, so this is
+    /// the only way a comic added since then becomes visible without restarting
+    /// the backend. It must be a `POST` to `/rescan` and nothing else.
+    @Test func rescanPostsToTheRescanPath() async throws {
+        RepositoryStubURLProtocol.responseBody = Data(
+            #"{"status":"rescanned","comics":3,"chapters":9}"#.utf8
+        )
+        RepositoryStubURLProtocol.statusCode = 200
+
+        let repository = makeRepository(clientID: nil, clientSecret: nil)
+        try await repository.rescan()
+
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.path == "/rescan")
+        // Nothing to send: the backend rescans the folder it already knows about.
+        #expect(request.httpBody == nil)
+    }
+
+    @Test func rescanAttachesHeadersWhenConfigured() async throws {
+        RepositoryStubURLProtocol.responseBody = Data("{}".utf8)
+        RepositoryStubURLProtocol.statusCode = 200
+
+        let repository = makeRepository(clientID: "test-client-id", clientSecret: "test-client-secret")
+        try await repository.rescan()
+
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
+        #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == "test-client-id")
+        #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == "test-client-secret")
+    }
+
+    @Test func rescanOmitsHeadersWhenUnconfigured() async throws {
+        RepositoryStubURLProtocol.responseBody = Data("{}".utf8)
+        RepositoryStubURLProtocol.statusCode = 200
+
+        let repository = makeRepository(clientID: nil, clientSecret: nil)
+        try await repository.rescan()
+
+        let request = try #require(RepositoryStubURLProtocol.lastRequest)
+        #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == nil)
+        #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == nil)
+    }
+
+    /// Surfaced rather than swallowed, so the pull gesture's caller can decide
+    /// what to do about it. Both screens choose to reload anyway — a failed
+    /// rescan should still show the reader whatever the backend already has.
+    @Test func rescanThrowsHTTPStatusErrorOnServerFailure() async throws {
+        RepositoryStubURLProtocol.responseBody = Data()
+        RepositoryStubURLProtocol.statusCode = 503
+
+        let repository = makeRepository(clientID: nil, clientSecret: nil)
+
+        await #expect(throws: APIError.self) {
+            try await repository.rescan()
+        }
+    }
+
     // MARK: - Headers absent when unconfigured
 
     @Test func libraryOmitsHeadersWhenUnconfigured() async throws {

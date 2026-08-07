@@ -32,6 +32,18 @@ protocol ComicRepository {
     /// when there is no saved progress).
     func readerChapter(comicID: String, chapterID: String) async throws -> Chapter
 
+    /// Rebuilds the backend's catalog from the library folder on disk.
+    ///
+    /// The catalog is scanned once at startup and held in memory — the folder
+    /// stays the source of truth, and nothing watches it — so a comic or chapter
+    /// added since then is invisible until something asks for a rescan. That
+    /// "something" is the reader pulling to refresh; there is no other trigger
+    /// short of restarting the backend.
+    ///
+    /// Rebuilds everything, so where it is called from does not matter: the
+    /// library and the chapter list both reach the same catalog.
+    func rescan() async throws
+
     /// Persist the reader's position for a chapter. `lastPage` is 1-based.
     /// Best-effort: callers should treat failures as non-fatal so reading is
     /// never interrupted when the progress store is unavailable.
