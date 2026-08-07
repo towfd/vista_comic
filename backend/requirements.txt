@@ -9,3 +9,6 @@ anthropic==0.120.2
 # comprehension-response-ux ticket 16: the worker reads pages from the library
 # itself, so downscaling moved off the client and needs an image library here.
 Pillow==11.0.0
+# The schema's owner: migrations replace `create_all`, which can add a table
+# but never a column (see docs/manual-migrations.md for what that used to cost).
+alembic==1.14.0

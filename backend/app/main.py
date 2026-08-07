@@ -35,7 +35,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from . import (
     comprehend_usage_store,
@@ -44,7 +44,7 @@ from . import (
 )
 from .comprehension_worker import ComprehensionWorker
 from .config import get_library_root
-from .db import ComprehensionRecord, init_engine, new_session
+from .db import ComprehensionRecord, init_engine, new_session, upgrade_schema
 from .models import (
     ChapterDetail,
     ChapterSummary,
@@ -105,12 +105,24 @@ async def lifespan(_: FastAPI):
     # catalog browsing, so a failed init is logged and the app still starts —
     # progress reads degrade to "no progress" until the DB is reachable and the
     # API is restarted.
+    #
+    # Two failures, deliberately handled differently:
+    #
+    # - The database is unreachable (`OperationalError`). An outage must not
+    #   take browsing down — the catalog is scanned from disk and never needed
+    #   Postgres — so this is logged and serving continues, with progress and
+    #   history degraded until the database is back and the API is restarted.
+    # - Anything else means the migration itself would not apply: the schema is
+    #   not what this code expects. Serving through that only moves the error
+    #   somewhere further from its cause, so it propagates and the container
+    #   fails to start.
     try:
         init_engine()
-    except Exception:  # noqa: BLE001 — degrade gracefully; the catalog is independent
+        upgrade_schema()
+    except OperationalError:
         logger.warning(
-            "Progress store unavailable at startup; serving the catalog without "
-            "reading progress until the database is reachable and the API is "
+            "Database unreachable at startup; serving the catalog without "
+            "reading progress or history until it is reachable and the API is "
             "restarted.",
             exc_info=True,
         )

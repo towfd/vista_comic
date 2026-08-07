@@ -15,6 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Application code (read-only at runtime; the manga library is bind-mounted).
 COPY app ./app
 
+# The schema's history. The app runs `alembic upgrade head` itself on startup
+# (see `db.upgrade_schema`), so both the config and the revisions have to be in
+# the image — a container that cannot find them cannot migrate, and by design
+# will not serve.
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
+
 EXPOSE 8000
 
 # One uvicorn worker for now (single developer / single client). The manga
