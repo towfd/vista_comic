@@ -2,15 +2,15 @@
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 
 ## Current status
 
-- Milestones M1–M9 are complete; **M9 (LLM-assisted comprehension) is merged** — all 17 tickets resolved, PR [#35](https://github.com/towfd/vista_comic/pull/35) merged into `main` on 2026-08-04.
+- Milestones M1–M10 are complete; **M10 (comprehension response UX) is merged** — all 10 implementation tickets resolved, PRs [#38](https://github.com/towfd/vista_comic/pull/38)–[#48](https://github.com/towfd/vista_comic/pull/48) merged into `main` on 2026-08-06.
 - M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
-- Next action: **M10 (comprehension response UX) is in progress** — tickets 14 and 15 are merged, ticket 13 is in review (PR #39). Ticket 16 (the worker) is unblocked; ticket 17 waits on PR #39 landing.
+- Next action: **the OCR text-editing lag**, the one reported problem M10 did not address — split out at M10's planning as a `/diagnosing-bugs` effort because it is a defect needing root-cause diagnosis, not a decision. In diagnosis now.
 
 ## Current release goal
 
@@ -278,15 +278,22 @@ Verification: `xcodebuild build`/`test` clean, full suite passing with no regres
 
 ### M10 — Comprehension response UX
 
-- Status: **In progress** — 12 wayfinder decisions resolved, spec written, 9 implementation tickets (13–21) under `.scratch/comprehension-response-ux/`, which is the source of truth for their status
-- Shipped so far: ticket 14 (explanation language, PR #38) and ticket 15 (comprehension record resource, PR #40). Ticket 13 (result-sheet extraction) is in review as PR #39
+- Status: **Merged** — 12 wayfinder decisions resolved, spec written, all 10 implementation tickets (13–22) shipped; PRs [#38](https://github.com/towfd/vista_comic/pull/38)–[#48](https://github.com/towfd/vista_comic/pull/48) merged into `main` on 2026-08-06
 - Owner: main session
+- Spec of record: `.scratch/comprehension-response-ux/spec.md`; wayfinder map: `.scratch/comprehension-response-ux/map.md`
 
 Reshapes M9's comprehension flow around the two complaints that surfaced from using it: the reader waits tens of seconds for anything at all, and the explanation comes back in an unpredictable language. The on-device translator is promoted from failure fallback to always-first, so a literal translation is immediate; the cloud explanation is enqueued on the **backend**, which owns it from then on and completes it across sheet dismissal, app backgrounding and container restarts. Every translate auto-creates a record — the manual Save is removed — and 單字本 becomes a **歷史紀錄** tab with an unread badge. The language problem is fixed at its root: the tool schema's three explanation fields now name the target language, verified against real Claude calls (18/18 note fields compliant on the default tier).
 
 This deliberately **supersedes several of M9's own locked decisions** — the single merged call, the client-owned lifecycle, the manual save model, the one-shot verdict banner, the per-result stronger-model upgrade, and the "all note columns NULL means translation-only" convention. The spec's Further Notes carries the full list.
 
 Also decided and deliberately deferred out of this milestone: adopting a migration tool (triggered by this schema landing), converting the backend to async (buys almost nothing at this scale), and history pagination/retention (no data yet on where the threshold is).
+
+**Two things changed during implementation and are recorded as amendments in the spec rather than silently:**
+
+- Ticket 19's "rows show the cloud translation" AC contradicted the mockup it was drawn from and was **superseded** in favour of two-line rows, since a third line costs roughly a third of the records visible on a list whose whole job is scanning. The intent survives in the row's status glyph, which is a cloud exactly when a cloud translation exists.
+- The badge's refresh policy ("when the tab appears, no shared client store") was **reversed after shipping**, by ticket 22. A tab's content does not appear until the tab is selected, so the badge could only ever learn an explanation had arrived at the moment the reader opened the tab it existed to send them to — it contradicted its own user story. Ownership moved to the tab shell, which refreshes on launch/foreground and watches a record still in flight when the reader dismisses the result sheet.
+
+`DROP TABLE saved_translation` was executed against the deployed database on 2026-08-06 as the last step of ticket 21, in the order `docs/manual-migrations.md` now records: merge the code that stops using the table, rebuild and confirm the API no longer serves the old routes, then drop. **Adopting a migration tool is therefore now triggered** — the deferral was explicitly conditional on this landing.
 
 ## Known issues and constraints
 
@@ -309,11 +316,16 @@ Also decided and deliberately deferred out of this milestone: adopting a migrati
 
 ## Next action
 
-M1–M9 are merged. **M10 (comprehension response UX) is in progress** — the wayfinder map, spec and tickets 13–21 live under `.scratch/comprehension-response-ux/`, which is the source of truth for their status, not this file.
+M1–M10 are merged. The wayfinder map, spec and tickets for M10 live under `.scratch/comprehension-response-ux/`, which is the source of truth for their status, not this file.
 
-Shipped: ticket 14 (explanation notes now come back in the reader's chosen language, PR #38) and ticket 15 (the comprehension record resource — new table, six endpoints, cap reserved at enqueue, PR #40). Ticket 13 (extracting the result sheet out of the reader file) is in review as PR #39.
+**Next action: the OCR text-editing lag.** Tapping the recognised text to correct it stalls. It was one of the three problems reported alongside M10's two and was deliberately split out at planning time, since it is a performance defect with an unknown root cause rather than something to decide. In diagnosis now; the symptom has been narrowed to the *first* tap only — subsequent typing is smooth — which rules out anything that runs per keystroke.
 
-Next action: ticket 16, the worker that drains the queue — unblocked, and the piece that makes the backend work end to end on its own. Ticket 17 (the iOS instant-translation path) needs PR #39 merged first, since it reworks the file that ticket extracts.
+Then, in rough order of how much each is already owed:
+
+- **Adopt a migration tool.** Explicitly triggered by M10's schema landing (see `docs/manual-migrations.md`). Cheapest now, while the schema is freshly clean and `comprehension_record` has barely accumulated.
+- **Whole-book precompute** — the stated long-term direction (OCR + LLM over a whole comic at import, so no selection is needed at read time). It replaces the current interaction model rather than extending it and carries an unresolved cost question, so it needs a `/wayfinder` before any implementation.
+- **History pagination or retention.** Every translate writes a row forever. Deferred until there are real row counts rather than a guess.
+- **Backend async conversion.** Deferred until real usage shows the backend being held up, with numbers.
 
 Longer range, README roadmap item 5 ("Profile and sync") remains the only major direction not yet covered by a milestone.
 
