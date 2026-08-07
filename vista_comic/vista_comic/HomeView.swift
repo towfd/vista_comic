@@ -53,9 +53,23 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let comics):
             FavouriteView(comics: comics)
+                .refreshable { await rescanAndLoad() }
         case .failed:
             ErrorStateView { Task { await load() } }
         }
+    }
+
+    /// What the pull gesture runs. Rescanning first is the whole point: the
+    /// backend's catalog is scanned once at startup and held in memory, so
+    /// re-fetching alone would hand back the same list and the gesture would
+    /// silently promise freshness it did not deliver.
+    ///
+    /// A failed rescan still reloads, matching `load()`'s own rule that a failed
+    /// background refresh keeps the usable library rather than replacing it with
+    /// an error — the reader gets what the backend already knows about.
+    private func rescanAndLoad() async {
+        try? await repository.rescan()
+        await load()
     }
 
     private func load() async {

@@ -37,6 +37,12 @@ struct PreviewComicRepository: ComicRepository {
         try await waitIfNeeded()
     }
 
+    /// A preview's library is a fixed sample, so there is nothing on disk to
+    /// rescan — the pull gesture still completes, it just finds the same comics.
+    func rescan() async throws {
+        try await waitIfNeeded()
+    }
+
     private func waitIfNeeded() async throws {
         guard delay != .zero else { return }
         try await Task.sleep(for: delay)
@@ -52,6 +58,10 @@ struct FailingPreviewRepository: ComicRepository {
         throw APIError.invalidResponse
     }
     func saveProgress(comicID: String, chapterID: String, lastPage: Int) async throws {
+        throw APIError.invalidResponse
+    }
+
+    func rescan() async throws {
         throw APIError.invalidResponse
     }
 }

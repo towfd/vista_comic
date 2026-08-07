@@ -39,9 +39,19 @@ struct ChapterPageView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let detail):
             loaded(detail)
+                .refreshable { await rescanAndLoad() }
         case .failed:
             ErrorStateView { Task { await load() } }
         }
+    }
+
+    /// Same gesture as the library's, and for the more common reason: chapters
+    /// arrive in a comic that is already on the shelf. A rescan rebuilds the
+    /// whole catalog, so pulling here is exactly as effective as walking back to
+    /// the library to do it — and this is where the reader already is.
+    private func rescanAndLoad() async {
+        try? await repository.rescan()
+        await load()
     }
 
     private func loaded(_ detail: Comic) -> some View {
