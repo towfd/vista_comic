@@ -324,7 +324,11 @@ The OCR text-editing defect — the last of the three problems reported alongsid
 **Nothing is in progress. The next action is unclaimed**, in rough order of how much each is already owed:
 
 - **Adopt a migration tool.** Explicitly triggered by M10's schema landing (see `docs/manual-migrations.md`). Cheapest now, while the schema is freshly clean and `comprehension_record` has barely accumulated.
-- **Whole-book precompute** — the stated long-term direction (OCR + LLM over a whole comic at import, so no selection is needed at read time). It replaces the current interaction model rather than extending it and carries an unresolved cost question, so it needs a `/wayfinder` before any implementation.
+- ~~**Whole-book precompute**~~ — **abandoned, 2026-08-07.** Precomputing OCR + LLM over a whole comic at import, so no selection is needed at read time, was carried as the long-term direction through M9 and M10. It is now dropped: the select-and-translate flow stays as the model.
+
+  This is the decision's third and final pass. M9's wayfinder considered a batch pipeline and rejected it as replacing the selection design rather than extending it; M10 deferred it again to ship a usable version of the current model first. That version shipped, has been used, and is what the reader wants.
+
+  **The consequence worth noting is what it removes, not what it cancels.** The selection flow was described in both efforts as a first usable version of something later replaced, which quietly put a shelf life on any investment in it. There is no shelf life now: Dynamic Type, the reader-screen structure surfaced by [#50](https://github.com/towfd/vista_comic/pull/50), and history retention are all improvements to the permanent model.
 - **History pagination or retention.** Every translate writes a row forever. Deferred until there are real row counts rather than a guess.
 - **Backend async conversion.** Deferred until real usage shows the backend being held up, with numbers.
 
