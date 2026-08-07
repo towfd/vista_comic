@@ -14,7 +14,7 @@ needs no port forwarding, no static IP, and no inbound firewall rule.
 | Thing | Where it is now | How it moves |
 | --- | --- | --- |
 | Code | git | `git clone` |
-| `.env` | gitignored, repo root | Copy by hand. **`MANGA_LIBRARY_PATH` must be rewritten** for the new machine. |
+| `.env` | gitignored, repo root | Copy by hand. Nothing to edit, as long as the library keeps its place in the home folder — see below. |
 | The manga library | a folder on disk | Copy. The largest transfer, and the one you could redo from scratch. |
 | **Postgres data** | the `pg_data` named volume | **`pg_dump` → restore.** The only thing here that cannot be rebuilt. |
 | Tunnel credentials | `cloudflared/<uuid>.json` (gitignored) + `cloudflared/config.yml` | Copy both files. |
@@ -60,7 +60,7 @@ sudo usermod -aG docker "$USER"                   # log out and back in
 
 # 4. Code and secrets.
 git clone <this repo> && cd vista_comic
-cp /path/from/old/.env .env                       # then edit MANGA_LIBRARY_PATH
+cp /path/from/old/.env .env
 cp /path/from/old/cloudflared/* cloudflared/
 
 # 5. The library, wherever MANGA_LIBRARY_PATH now points.
@@ -85,6 +85,23 @@ docker compose exec -T postgres psql -U vista -d vista \
   -c "SELECT count(*) FROM comprehension_record;" \
   -c "SELECT * FROM alembic_version;"
 ```
+
+### About `MANGA_LIBRARY_PATH`
+
+It is written as `${HOME}/Documents/comic`, so the same line resolves on both
+machines and there is nothing to edit — provided the library lands in the same
+place under the new user's home. If it goes somewhere else, this is the one value
+to change.
+
+**A bare `~` does not work here.** Compose interpolates `${HOME}` from the
+environment but does not expand `~`, so `~/Documents/comic` is taken literally
+and bind-mounts a directory named `~` next to the compose file. The symptom is an
+empty catalog rather than an error, which is why it is worth stating.
+
+`../comic` resolves correctly too — relative bind mounts are taken from the
+compose file's directory — and survives being run by a different user, where
+`${HOME}` would not. It costs making the repo and the library siblings, a layout
+constraint nothing else imposes.
 
 ### The switchover
 
