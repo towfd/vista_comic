@@ -143,6 +143,18 @@ struct CroppedSelectionPreview: View {
             // Editable, not read-only: the whole point of showing recognized
             // text is letting the user fix a misread in place.
             TextEditor(text: $editedText)
+                // This field holds OCR output the reader is correcting
+                // character by character, in a language that is not the
+                // keyboard's. Autocorrect has nothing useful to offer it and
+                // actively rewrites deliberate fixes.
+                //
+                // It is also measurably expensive here: with autocorrect on,
+                // the first tap spent 5.4s between `keyboardWillShow` and
+                // `keyboardDidShow`, its candidate service timing out twice at
+                // 3s and dropping an XPC connection; with it off, 2.0s. The
+                // remaining 2.0s was the separate bug this shipped with — a
+                // sheet owned by a recycled `LazyVStack` row (see `ReaderView`).
+                .autocorrectionDisabled()
                 .font(AppFont.caption)
                 .frame(minHeight: 120)
                 .overlay {
