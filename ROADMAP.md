@@ -10,7 +10,7 @@ Last updated: 2026-08-06
 - M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
-- Next action: **the OCR text-editing lag**, the one reported problem M10 did not address — split out at M10's planning as a `/diagnosing-bugs` effort because it is a defect needing root-cause diagnosis, not a decision. In diagnosis now.
+- The OCR text-editing defect is **fixed** ([#50](https://github.com/towfd/vista_comic/pull/50)), which closes the last of the three problems reported alongside M10's two. No milestone is in progress; next action is unclaimed.
 
 ## Current release goal
 
@@ -297,6 +297,7 @@ Also decided and deliberately deferred out of this milestone: adopting a migrati
 
 ## Known issues and constraints
 
+- **CoreGraphics is being handed a NaN somewhere.** `Error: this application, or a library it uses, has passed an invalid numeric value (NaN...) to CoreGraphics API` appears in the console around the selection sheet, several times in a row. Almost certainly pre-existing — it predates the sheet-lifetime fix ([#50](https://github.com/towfd/vista_comic/pull/50)), which touched no geometry — and harmless so far, since CoreGraphics ignores the value. `SelectionCropMapping` and the selection-overlay drawing were both read and cleared. To find it, set `CG_NUMERICS_SHOW_BACKTRACE=1` in the scheme's environment variables and reproduce; the backtrace names the exact call site, which beats reading code for it.
 - Xcode builds may report simulator-service or cache permission limitations in restricted execution environments.
 - `LibraryFlowUITests` and `ReaderFlowUITests` now cover the core flow; the original unit/UITest boilerplate is still unused.
 - Comic and chapter titles in `SampleData` are English placeholders (data, not UI chrome) and are intentionally not localized.
@@ -318,9 +319,9 @@ Also decided and deliberately deferred out of this milestone: adopting a migrati
 
 M1–M10 are merged. The wayfinder map, spec and tickets for M10 live under `.scratch/comprehension-response-ux/`, which is the source of truth for their status, not this file.
 
-**Next action: the OCR text-editing lag.** Tapping the recognised text to correct it stalls. It was one of the three problems reported alongside M10's two and was deliberately split out at planning time, since it is a performance defect with an unknown root cause rather than something to decide. In diagnosis now; the symptom has been narrowed to the *first* tap only — subsequent typing is smooth — which rules out anything that runs per keystroke.
+The OCR text-editing defect — the last of the three problems reported alongside M10's two, split out at planning time as a `/diagnosing-bugs` effort — is **fixed** ([#50](https://github.com/towfd/vista_comic/pull/50)). It turned out not to be the lag it was reported as: the confirmation sheet was presented by a `ReaderPage`, a row inside the reader's `LazyVStack`, so the keyboard shrinking the scroll viewport recycled the owning row and destroyed the sheet's `@State` mid-correction. Rebuilding those rows re-decoded full-resolution pages on the main thread, which is where the stall came from — the keyboard was waiting on us, not the other way round. The sheet now belongs to `ReaderView`, which the lazy container cannot recycle.
 
-Then, in rough order of how much each is already owed:
+**Nothing is in progress. The next action is unclaimed**, in rough order of how much each is already owed:
 
 - **Adopt a migration tool.** Explicitly triggered by M10's schema landing (see `docs/manual-migrations.md`). Cheapest now, while the schema is freshly clean and `comprehension_record` has barely accumulated.
 - **Whole-book precompute** — the stated long-term direction (OCR + LLM over a whole comic at import, so no selection is needed at read time). It replaces the current interaction model rather than extending it and carries an unresolved cost question, so it needs a `/wayfinder` before any implementation.
