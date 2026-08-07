@@ -120,6 +120,25 @@ private struct ReaderView: View {
     /// Bumped by the reader's reload control; each `ReaderPage` re-requests only
     /// if it is currently in the failure state (loaded pages stay put).
     @State private var retryAllToken = 0
+    /// The crop awaiting confirmation, and the sheet showing it.
+    ///
+    /// Owned **here** rather than on the page the selection was drawn on. A
+    /// `ReaderPage` lives inside a `LazyVStack`, which destroys a row once it
+    /// leaves the viewport — taking its `@State`, and therefore any sheet bound
+    /// to that state, with it. The keyboard appearing for the text field inside
+    /// the sheet shrinks the viewport, which was enough to recycle the owning
+    /// page and close the sheet out from under the reader mid-correction (and,
+    /// on the way, to re-decode several full-resolution pages on the main
+    /// thread, which is where the stall came from). The reader itself is not
+    /// recycled, so the sheet outlives any scrolling or resizing beneath it.
+    @State private var croppedSelection: CroppedSelection?
+    /// The recognizer, translator and repository `CroppedSelectionPreview`
+    /// needs. Read here — the owner of `croppedSelection` — and passed down
+    /// explicitly rather than having that view reach into the environment
+    /// itself (CLAUDE.md: pass data and actions into reusable views).
+    @Environment(\.ocrRecognizer) private var ocrRecognizer
+    @Environment(\.translator) private var translator
+    @Environment(\.comprehensionRepository) private var comprehensionRepository
     @Environment(\.comicRepository) private var repository
     @Environment(\.dismiss) private var dismiss
 
@@ -152,6 +171,17 @@ private struct ReaderView: View {
         .sheet(isPresented: $showChapterList) {
             chapterListSheet
         }
+        .sheet(item: $croppedSelection) { selection in
+            CroppedSelectionPreview(
+                image: selection.image,
+                comicID: comic.id,
+                chapterID: currentChapter.id,
+                pageNumber: selection.pageNumber,
+                recognizer: ocrRecognizer,
+                translator: translator,
+                comprehensionRepository: comprehensionRepository
+            )
+        }
         // Load the current chapter's pages on open, and reload whenever the
         // chapter changes (prev / next / chapter list / auto-advance).
         .task(id: currentChapter.id) { await loadPages() }
@@ -183,8 +213,6 @@ private struct ReaderView: View {
                 ForEach(Array(urls.enumerated()), id: \.offset){ index, url in
                     ReaderPage(
                         url: url,
-                        comicID: comic.id,
-                        chapterID: currentChapter.id,
                         // 1-based, matching `Progress.lastPage`'s and
                         // `ComprehensionRecord.pageNumber`'s convention.
                         pageNumber: index + 1,
@@ -197,7 +225,8 @@ private struct ReaderView: View {
                             } else {
                                 visiblePages.remove(index)
                             }
-                        }
+                        },
+                        onCrop: { croppedSelection = $0 }
                     )
                 }
             }
@@ -499,13 +528,9 @@ private struct ReaderView: View {
 /// view so it re-issues the request.
 private struct ReaderPage: View {
     let url: URL
-    /// The comic/chapter this page belongs to, and this page's 1-based
-    /// position within the chapter — threaded down from `ReaderView` (which
-    /// already carries `comic.id`/`currentChapter.id` for progress-saving)
-    /// so a confirmed selection's "Save" action (`ocr-translation` ticket 05)
-    /// knows which source reference to save against.
-    let comicID: String
-    let chapterID: String
+    /// This page's 1-based position within the chapter. Travels out with a
+    /// produced crop (see `CroppedSelection.pageNumber`) because the reader,
+    /// not this page, presents the confirmation sheet.
     let pageNumber: Int
     /// Shared token from the reader. A change re-requests this page only when it
     /// is currently failed.
@@ -519,6 +544,13 @@ private struct ReaderPage: View {
     /// Reports this page entering (`true`) / leaving (`false`) the viewport, so
     /// the reader can track the top-most visible page for progress reporting.
     let onVisible: (Bool) -> Void
+    /// Hands a finished crop up to the reader, which owns the confirmation
+    /// sheet. Reported rather than presented here: this view lives inside a
+    /// `LazyVStack` and is destroyed when it scrolls out of the viewport, so a
+    /// sheet bound to its `@State` dies with it — which is exactly what used to
+    /// happen when the keyboard shrank the viewport and closed the sheet out
+    /// from under the reader mid-edit.
+    let onCrop: (CroppedSelection) -> Void
     @State private var reloadToken = 0
     /// Whether this page's image is currently in the failure state, so the
     /// reader-level reload can skip pages that already loaded.
@@ -535,22 +567,6 @@ private struct ReaderPage: View {
     /// `cancelZoneFrame`), so the badge can visually confirm "release here to
     /// cancel" before the finger lifts.
     @State private var isHoveringCancelZone = false
-    /// The most recently produced crop, shown in a confirmation sheet.
-    @State private var croppedSelection: CroppedSelection?
-    /// The recognizer `CroppedSelectionPreview` runs the confirmed crop
-    /// through (Ticket 05). Read here — the owner of `croppedSelection` — and
-    /// passed down explicitly rather than having that view reach into the
-    /// environment itself (CLAUDE.md: pass data/actions into reusable views).
-    @Environment(\.ocrRecognizer) private var ocrRecognizer
-    /// The translator `CroppedSelectionPreview`'s "Translate" action runs
-    /// through (`ocr-translation` ticket 04). Read here for the same reason
-    /// as `ocrRecognizer` above, rather than that view reaching into the
-    /// environment itself.
-    @Environment(\.translator) private var translator
-    /// The repository `CroppedSelectionPreview`'s "Translate" action enqueues
-    /// through. Same reasoning as `ocrRecognizer`/`translator` above: read
-    /// here, at the owner of `croppedSelection`, and passed down explicitly.
-    @Environment(\.comprehensionRepository) private var comprehensionRepository
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -612,17 +628,7 @@ private struct ReaderPage: View {
         // Report viewport membership so the reader can derive the top page.
         .onAppear { onVisible(true) }
         .onDisappear { onVisible(false) }
-        .sheet(item: $croppedSelection) { selection in
-            CroppedSelectionPreview(
-                image: selection.image,
-                comicID: comicID,
-                chapterID: chapterID,
-                pageNumber: pageNumber,
-                recognizer: ocrRecognizer,
-                translator: translator,
-                comprehensionRepository: comprehensionRepository
-            )
-        }
+
     }
 
     // MARK: - Selection
@@ -710,7 +716,9 @@ private struct ReaderPage: View {
             imagePixelSize: imagePixelSize
         )
         guard cropRect != .zero, let croppedCGImage = cgImage.cropping(to: cropRect) else { return }
-        croppedSelection = CroppedSelection(image: UIImage(cgImage: croppedCGImage))
+        onCrop(
+            CroppedSelection(image: UIImage(cgImage: croppedCGImage), pageNumber: pageNumber)
+        )
     }
 
     private var failurePlaceholder: some View {

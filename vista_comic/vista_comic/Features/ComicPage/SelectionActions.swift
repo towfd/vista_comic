@@ -29,9 +29,18 @@ import UIKit
 /// alongside it, because the app uploaded both to Claude; the backend fetches
 /// the page from the library itself, so nothing on this side needs to hold a
 /// second full-size image per selection.
+///
+/// It carries `pageNumber` because the confirmation sheet is presented by the
+/// **reader**, not by the page the crop was drawn on: a page inside a
+/// `LazyVStack` is destroyed when it scrolls out of the viewport, taking any
+/// `@State` — and therefore any sheet bound to it — with it. So the one fact
+/// the sheet needed from the page has to travel with the crop instead.
 struct CroppedSelection: Identifiable {
     let id = UUID()
     let image: UIImage
+    /// The 1-based page index within the chapter this crop was drawn on,
+    /// matching `ComprehensionRecord.pageNumber`'s convention.
+    let pageNumber: Int
 }
 
 /// Runs OCR recognition for a confirmed crop and maps the outcome onto
