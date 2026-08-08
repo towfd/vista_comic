@@ -329,7 +329,7 @@ The OCR text-editing defect — the last of the three problems reported alongsid
   This is the decision's third and final pass. M9's wayfinder considered a batch pipeline and rejected it as replacing the selection design rather than extending it; M10 deferred it again to ship a usable version of the current model first. That version shipped, has been used, and is what the reader wants.
 
   **The consequence worth noting is what it removes, not what it cancels.** The selection flow was described in both efforts as a first usable version of something later replaced, which quietly put a shelf life on any investment in it. There is no shelf life now: Dynamic Type, the reader-screen structure surfaced by [#50](https://github.com/towfd/vista_comic/pull/50), and history retention are all improvements to the permanent model.
-- **History pagination or retention.** Every translate writes a row forever. Deferred until there are real row counts rather than a guess.
+- **History pagination or retention.** Less pressing since translate and 深入解釋 split (2026-08-08): only an explicit explanation request writes a row now, so rows accrue at the rate the reader asks for explanations rather than at the rate they glance at speech bubbles. Still deferred until there are real row counts rather than a guess.
 - **Backend async conversion.** Deferred until real usage shows the backend being held up, with numbers.
 
 Longer range, README roadmap item 5 ("Profile and sync") remains the only major direction not yet covered by a milestone.

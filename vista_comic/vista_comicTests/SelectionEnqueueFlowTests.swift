@@ -2,16 +2,17 @@
 //  SelectionEnqueueFlowTests.swift
 //  vista_comicTests
 //
-//  Exercises `comprehension-response-ux` ticket 17's wiring:
-//  `translateAndEnqueueSelection(...)`, the free function
-//  `CroppedSelectionPreview`'s "Translate" action now runs. It translates on
-//  device **first** and only then enqueues the deeper explanation on the
-//  backend, inverting M9's cloud-first order.
+//  Exercises `requestExplanation(...)`, the free function
+//  `CroppedSelectionPreview`'s opt-in "深入解釋" action runs — the *only* thing
+//  in the selection flow that reaches the backend, spends a Claude request, or
+//  creates a 歷史紀錄 row. Tapping "Translate" runs `translateSelection` alone
+//  (covered by `SelectionTranslationFlowTests`) and touches none of this.
 //
-//  Reuses `StubTranslator` (Ticket 01) so the suite stays independent of the
-//  real on-device `Translation` framework, and stubs `ComprehensionRepository`
-//  so nothing touches the network. This proves the ordering and the failure
-//  boundaries, not translation quality.
+//  That separation is structural rather than asserted: `translateSelection`
+//  takes no repository, so there is no way for a plain translate to enqueue
+//  anything. What remains testable here is the enqueue's own boundaries.
+//
+//  Stubs `ComprehensionRepository` so nothing touches the network.
 //
 
 import Foundation
@@ -123,55 +124,46 @@ extension ComprehensionRecord {
     }
 }
 
-@Suite("Selection → translate then enqueue flow")
+@Suite("Selection → request a deeper explanation")
 struct SelectionEnqueueFlowTests {
-    private let traditionalChinese = Locale.Language(languageCode: "zh", script: "Hant")
-
     private func run(
         text: String = "Xin chào",
-        translator: StubTranslator,
+        translation: String = "你好",
         repository: StubComprehensionRepository,
         useStrongerModel: Bool = false
-    ) async -> LoadState<SelectionEnqueueOutcome> {
-        await translateAndEnqueueSelection(
-            text,
-            to: traditionalChinese,
+    ) async -> ExplanationRequestOutcome {
+        await requestExplanation(
+            sourceText: text,
+            translation: translation,
             targetLanguageCode: "zh-Hant",
             comicID: "comic-1",
             chapterID: "chapter-1",
             pageNumber: 3,
             useStrongerModel: useStrongerModel,
-            using: translator,
             repository: repository
         )
     }
 
     // MARK: - The happy path
 
-    @Test func aSuccessfulTranslateRecordsAndReturnsBoth() async throws {
-        let translator = StubTranslator()
-        translator.result = .success("你好")
+    @Test func aSuccessfulRequestReturnsTheCreatedRecord() async throws {
         let repository = StubComprehensionRepository()
 
-        let state = await run(translator: translator, repository: repository)
+        let outcome = await run(repository: repository)
 
-        guard case .loaded(.recorded(let translation, let record)) = state else {
-            Issue.record("expected .loaded(.recorded), got \(state)")
+        guard case .recorded(let record) = outcome else {
+            Issue.record("expected .recorded, got \(outcome)")
             return
         }
-        #expect(translation == "你好")
         #expect(record.id == 1)
     }
 
-    /// The whole inversion: the reader's translation comes from the device, and
-    /// what goes to the backend is that translation plus a source reference —
-    /// never an image.
+    /// What goes to the backend is the text plus the translation the reader is
+    /// already looking at, and a source reference — never an image.
     @Test func enqueuesTheOnDeviceTranslationWithItsSourceReference() async throws {
-        let translator = StubTranslator()
-        translator.result = .success("你好")
         let repository = StubComprehensionRepository()
 
-        _ = await run(text: "Xin chào", translator: translator, repository: repository)
+        _ = await run(text: "Xin chào", translation: "你好", repository: repository)
 
         #expect(repository.lastSourceText == "Xin chào")
         #expect(repository.lastTranslatedText == "你好")
@@ -182,87 +174,49 @@ struct SelectionEnqueueFlowTests {
     }
 
     @Test func passesTheRequestedModelTierThrough() async throws {
-        let translator = StubTranslator()
-        translator.result = .success("你好")
         let repository = StubComprehensionRepository()
 
-        _ = await run(translator: translator, repository: repository, useStrongerModel: true)
+        _ = await run(repository: repository, useStrongerModel: true)
 
         #expect(repository.lastUseStrongerModel == true)
     }
 
-    // MARK: - The on-device step failing is the only real failure
+    // MARK: - A refused enqueue still leaves the translation standing
 
-    /// Without a translation there is nothing to show and nothing to record, so
-    /// the backend must not be called and no request may be spent.
-    @Test func aFailedOnDeviceTranslationEnqueuesNothing() async throws {
-        let translator = StubTranslator()
-        translator.result = .failure(TranslationError.languagePackUnavailable)
-        let repository = StubComprehensionRepository()
-
-        let state = await run(translator: translator, repository: repository)
-
-        guard case .failed = state else {
-            Issue.record("expected .failed, got \(state)")
-            return
-        }
-        #expect(repository.enqueueCallCount == 0)
-    }
-
-    // MARK: - An enqueue failure is a variant of success
-
-    /// The reader does have their translation, so treating this as failure
-    /// would make the screen throw away something it actually has.
-    @Test func aQuotaRefusalStillReturnsTheTranslation() async throws {
-        let translator = StubTranslator()
-        translator.result = .success("你好")
+    /// The reader keeps the translation on screen either way, so what a refusal
+    /// costs them is the explanation and the 歷史紀錄 row — which is what these
+    /// reasons distinguish, rather than success from failure.
+    @Test func aQuotaRefusalIsReportedAsPermanent() async throws {
         let repository = StubComprehensionRepository()
         repository.enqueueResult = .failure(ComprehensionEnqueueError.dailyCapReached)
 
-        let state = await run(translator: translator, repository: repository)
+        let outcome = await run(repository: repository)
 
-        guard case .loaded(.notRecorded(let translation, let reason)) = state else {
-            Issue.record("expected .loaded(.notRecorded), got \(state)")
-            return
-        }
-        #expect(translation == "你好")
-        #expect(reason == .quotaExhausted)
+        #expect(outcome == .notRecorded(.quotaExhausted))
+        #expect(outcome.record == nil)
     }
 
     /// Split by whether retrying can possibly help — the same rule the screen
     /// applies to a declined versus a failed explanation.
     @Test func aTransientEnqueueFailureIsDistinguishedFromTheQuotaCase() async throws {
-        let translator = StubTranslator()
-        translator.result = .success("你好")
         let repository = StubComprehensionRepository()
         repository.enqueueResult = .failure(APIError.httpStatus(503))
 
-        let state = await run(translator: translator, repository: repository)
+        let outcome = await run(repository: repository)
 
-        guard case .loaded(.notRecorded(let translation, let reason)) = state else {
-            Issue.record("expected .loaded(.notRecorded), got \(state)")
-            return
-        }
-        #expect(translation == "你好")
-        #expect(reason == .transient)
+        #expect(outcome == .notRecorded(.transient))
     }
 
     /// A conformer throwing something this flow has never heard of is still
     /// transient — it must not be mistaken for the one permanent case.
     @Test func anUnexpectedEnqueueErrorIsTreatedAsTransient() async throws {
         struct Unexpected: Error {}
-        let translator = StubTranslator()
-        translator.result = .success("你好")
         let repository = StubComprehensionRepository()
         repository.enqueueResult = .failure(Unexpected())
 
-        let state = await run(translator: translator, repository: repository)
+        let outcome = await run(repository: repository)
 
-        guard case .loaded(.notRecorded(_, let reason)) = state else {
-            Issue.record("expected .loaded(.notRecorded), got \(state)")
-            return
-        }
-        #expect(reason == .transient)
+        #expect(outcome == .notRecorded(.transient))
     }
 
     // MARK: - Display precedence

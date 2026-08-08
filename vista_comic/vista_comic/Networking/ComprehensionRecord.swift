@@ -5,8 +5,9 @@
 //  One 歷史紀錄 entry, matching the backend's `ComprehensionRecordResponse`
 //  exactly (see `backend/app/models.py`). It replaced 單字本's saved-translation
 //  model, which described something different: a pair the reader chose to keep.
-//  Every translate now writes one of these automatically, so this is a history
-//  of what was read rather than a curated vocabulary book.
+//  One of these is written whenever the reader asks for a deeper explanation —
+//  never for a plain on-device translation — so this is a history of what was
+//  studied rather than a curated vocabulary book.
 //
 //  Kept in `Networking/` alongside the seam that fetches it, deliberately
 //  separate from `Shared/Models.swift`'s `Comic`/`Chapter`, which are catalog

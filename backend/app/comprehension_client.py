@@ -40,7 +40,11 @@ from .config import get_claude_api_key
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 _STRONGER_MODEL = "claude-sonnet-5"
 
-_MAX_OUTPUT_TOKENS = 1024
+# Raised from 1024 when `grammarNotes` began carrying a per-word vocabulary
+# breakdown as well as the grammar notes: a long speech bubble's word list plus
+# the other two fields can run past the old ceiling, and a truncated word list
+# is exactly the missing-vocabulary complaint this change exists to fix.
+_MAX_OUTPUT_TOKENS = 2048
 
 # Per-attempt ceiling on one Claude call. The SDK's own default is 600s, which
 # a background worker cannot afford: a hung call would hold one of its few
@@ -92,7 +96,22 @@ def _tool_schema(target_language_code: str) -> dict[str, Any]:
                     "type": "string",
                     "description": "Translation of sourceText into the target language.",
                 },
-                "grammarNotes": note("Notes on the sentence's grammar/structure."),
+                # Vocabulary lives here rather than in a field of its own: the
+                # reader's complaint was that explanations arrived with no
+                # word-level breakdown at all, and a required, spelled-out
+                # instruction on the existing field fixes that without a schema
+                # change rippling through the DB, the API model and the app.
+                # Word list first, because it is the part that was missing.
+                "grammarNotes": note(
+                    "Explain the line in detail, in two parts. First, a "
+                    "vocabulary breakdown: go through the meaningful words and "
+                    "set phrases in sourceText one by one, each on its own "
+                    "line, giving the word exactly as it appears, its meaning "
+                    "here, and its part of speech -- do not skip words the "
+                    "reader is likely to already know, and never return this "
+                    "field without a word list. Then, notes on the sentence's "
+                    "grammar and structure, referring back to those words."
+                ),
                 "contextNotes": note(
                     "How the surrounding panel/page (visible in the images) "
                     "resolves ambiguity in the text (e.g. pronouns)."
@@ -153,6 +172,12 @@ def _prompt_text(source_text: str, target_language_code: str) -> str:
         "context (who is speaking, what is happening in the panel, tone) to "
         "inform grammarNotes/contextNotes/toneRegister and to resolve "
         "ambiguity (e.g. pronouns) in the translation.\n\n"
+        "The reader is studying this language, so be thorough rather than "
+        "brief. grammarNotes must open with a word-by-word vocabulary "
+        "breakdown of sourceText -- one line per meaningful word or set "
+        "phrase, with its meaning in this context and its part of speech -- "
+        "before explaining the sentence's structure. An explanation with no "
+        "vocabulary list is incomplete, however short the line is.\n\n"
         f"Source text: {source_text}\n"
         f"Target language code: {target_language_code}"
     )

@@ -111,7 +111,11 @@ struct ComprehensionDetailSection: View {
             case .explained(let grammarNotes, let contextNotes, let toneRegister):
                 VStack(alignment: .leading, spacing: 12) {
                     if let grammarNotes {
-                        explanationField(titleKey: "Grammar notes", text: grammarNotes)
+                        // Titled for what the field actually carries: the
+                        // backend now asks for a per-word breakdown ahead of
+                        // the grammar notes, because explanations kept arriving
+                        // with no vocabulary in them at all.
+                        explanationField(titleKey: "Vocabulary & grammar", text: grammarNotes)
                     }
                     if let contextNotes {
                         explanationField(titleKey: "Context notes", text: contextNotes)

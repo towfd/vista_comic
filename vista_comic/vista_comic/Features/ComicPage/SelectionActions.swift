@@ -4,8 +4,13 @@
 //
 //  The selection domain shared by the reader and its result sheet: the
 //  confirmed-crop model plus the free functions the sheet's actions run
-//  through (recognize, translate, translate-and-enqueue, await the
-//  explanation).
+//  through (recognize, translate, request an explanation, await it).
+//
+//  Translation and explanation are two separate actions, not one. Tapping
+//  "Translate" runs on-device translation and nothing else — no network call,
+//  no request spent, no 歷史紀錄 row. Only the explicit "深入解釋" action reaches
+//  the backend, which is why `requestExplanation` takes an already-translated
+//  string rather than producing one.
 //
 //  Extracted verbatim from `ComicView.swift` (`comprehension-response-ux`
 //  ticket 13) so the reader file keeps only reader/page/progress code and the
@@ -87,112 +92,88 @@ func translateSelection(
     }
 }
 
-/// The "Translate" action's result under `comprehension-response-ux`: the
-/// reader always gets a translation, and the deeper explanation is enqueued on
-/// the backend to arrive later.
+/// The result of asking the backend for a deeper explanation — the *second*,
+/// opt-in half of the result sheet's flow.
 ///
-/// The flow now has **two independently failing steps** where M9 had one, so
-/// this deliberately does not collapse them into success/failure. An enqueue
-/// failure is a variant of *success*: the reader does have their translation,
-/// and modelling it as failure would make the screen throw away something it
-/// actually has. Only the on-device translation failing is a real failure —
-/// see `translateAndEnqueueSelection`.
-enum SelectionEnqueueOutcome: Equatable {
-    /// Translated, and the backend is now producing the explanation.
-    case recorded(translation: String, record: ComprehensionRecord)
-    /// Translated, but nothing was recorded — so no explanation is coming and
-    /// there is nothing in 歷史紀錄 for this selection.
-    case notRecorded(translation: String, reason: NotRecordedReason)
+/// Deliberately not collapsed into success/failure: a refused enqueue still
+/// leaves the reader with the on-device translation they already have on
+/// screen, so it is a variant of *success* for the screen as a whole. What it
+/// costs them is the explanation and the 歷史紀錄 entry, which is what the
+/// reasons below distinguish.
+enum ExplanationRequestOutcome: Equatable {
+    /// Recorded, and the backend is now producing the explanation. This is also
+    /// the only way a row enters 歷史紀錄.
+    case recorded(ComprehensionRecord)
+    /// Nothing was recorded — so no explanation is coming and there is nothing
+    /// in 歷史紀錄 for this selection.
+    case notRecorded(NotRecordedReason)
 
     /// Why no record exists. Split by whether retrying can possibly help,
     /// which is the same rule the result screen applies to a declined versus a
     /// failed explanation — and it decides whether a retry is offered at all.
     enum NotRecordedReason: Equatable {
         /// Today's request budget is spent. Permanent until tomorrow, so no
-        /// retry. The one case where "every translate is recorded" does not
-        /// hold, and the reader should be told plainly.
+        /// retry, and the reader should be told plainly.
         case quotaExhausted
         /// A connection or server problem. Worth retrying.
         case transient
     }
 
-    /// The translation to show, present in every case — the reader is never
-    /// left with nothing once the on-device step has succeeded.
-    var translation: String {
-        switch self {
-        case .recorded(let translation, _): return translation
-        case .notRecorded(let translation, _): return translation
-        }
-    }
-
     /// The record to poll for an explanation, if one was created.
     var record: ComprehensionRecord? {
         switch self {
-        case .recorded(_, let record): return record
+        case .recorded(let record): return record
         case .notRecorded: return nil
         }
     }
 }
 
-/// Runs the "Translate" action: translate on device **first**, then enqueue the
-/// deeper explanation on the backend.
+/// Runs the opt-in "深入解釋" action: record this selection on the backend and
+/// let it produce the explanation.
 ///
-/// This inverts M9's order, where the cloud ran first and the on-device
-/// translator was only a fallback. The reader now sees a literal translation
-/// essentially immediately, and never waits on the cloud at all — the backend
-/// owns that call from the moment this returns, and completes it whether or not
-/// the reader stays on the screen.
+/// Split out from translation on purpose. Translation is on-device, instant and
+/// free, and most selections need nothing more than that; the explanation costs
+/// a Claude request out of a daily budget and takes minutes. Binding the two
+/// together spent a request on every glance at a speech bubble, and filled
+/// 歷史紀錄 with rows the reader never wanted to keep. So **this function is the
+/// only thing that calls the backend, and therefore the only thing that creates
+/// a 歷史紀錄 row** — a plain translate now leaves no trace anywhere.
 ///
-/// **If the on-device translation fails, nothing is enqueued**, the backend is
-/// never called and no request is spent. The fast translation *is* the product
-/// here; when it does not arrive there is nothing immediate to record, and
-/// leaving the reader in front of an empty screen for minutes is the exact
-/// experience this work removes.
+/// Takes the on-device `translation` rather than producing one, because by the
+/// time this runs the reader is already looking at it: it is enqueued alongside
+/// the source text so the record carries something readable from the moment it
+/// exists, even if the cloud never answers.
 ///
 /// A free function, mirroring `translateSelection`'s/`recognizeSelection`'s own
-/// reasoning: unit-testable against stub `Translator`/`ComprehensionRepository`
-/// conformers independent of any SwiftUI rendering.
-func translateAndEnqueueSelection(
-    _ text: String,
-    to targetLanguage: Locale.Language,
+/// reasoning: unit-testable against a stub `ComprehensionRepository` conformer
+/// independent of any SwiftUI rendering.
+func requestExplanation(
+    sourceText: String,
+    translation: String,
     targetLanguageCode: String,
     comicID: String,
     chapterID: String,
     pageNumber: Int,
     useStrongerModel: Bool,
-    using translator: any Translator,
     repository: any ComprehensionRepository
-) async -> LoadState<SelectionEnqueueOutcome> {
-    let translated: String
-    switch await translateSelection(text, to: targetLanguage, using: translator) {
-    case .loaded(let value):
-        translated = value
-    case .failed(let error):
-        // The only genuine failure: without a translation there is nothing to
-        // show and nothing to record.
-        return .failed(error)
-    case .loading:
-        // Unreachable: `translateSelection` never returns `.loading`.
-        return .loading
-    }
-
+) async -> ExplanationRequestOutcome {
     do {
         let record = try await repository.enqueue(
-            sourceText: text,
-            translatedText: translated,
+            sourceText: sourceText,
+            translatedText: translation,
             targetLanguage: targetLanguageCode,
             comicID: comicID,
             chapterID: chapterID,
             pageNumber: pageNumber,
             useStrongerModel: useStrongerModel
         )
-        return .loaded(.recorded(translation: translated, record: record))
+        return .recorded(record)
     } catch ComprehensionEnqueueError.dailyCapReached {
-        return .loaded(.notRecorded(translation: translated, reason: .quotaExhausted))
+        return .notRecorded(.quotaExhausted)
     } catch {
         // Any other enqueue failure is transient — including a conformer
         // throwing something unexpected — so a retry is worth offering.
-        return .loaded(.notRecorded(translation: translated, reason: .transient))
+        return .notRecorded(.transient)
     }
 }
 
