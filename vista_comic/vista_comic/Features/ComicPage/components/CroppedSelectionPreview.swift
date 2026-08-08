@@ -22,13 +22,17 @@ import UIKit
 /// translates the current (possibly user-corrected) text into a picked target
 /// language.
 ///
-/// Translation runs **on device and first**, so it appears with no perceptible
-/// wait, and the deeper explanation is enqueued on the backend to be produced
-/// afterwards. There is no "Save": every translate is recorded automatically.
+/// The screen has **two separate actions**, not one. "Translate" runs entirely
+/// on device: no network call, no Claude request spent, no 歷史紀錄 row. Most
+/// selections are a glance at a speech bubble and need nothing more. Only when
+/// the reader asks for a deeper explanation does anything reach the backend —
+/// and that request is what creates the 歷史紀錄 entry, so the history is a list
+/// of lines the reader actually chose to study rather than of everything they
+/// ever glanced at.
 ///
-/// Dismissing therefore loses nothing. The record already exists on the backend
-/// and the explanation arrives whether or not this screen is still open — which
-/// is the whole point of enqueueing rather than waiting.
+/// Once an explanation has been requested, dismissing loses nothing: the record
+/// exists on the backend and the explanation arrives whether or not this screen
+/// is still open, which is the whole point of enqueueing rather than waiting.
 struct CroppedSelectionPreview: View {
     let image: UIImage
     /// The comic/chapter/page this crop was selected from, threaded down from
@@ -43,12 +47,11 @@ struct CroppedSelectionPreview: View {
     /// recognizer it's given (CLAUDE.md: pass data/actions into reusable
     /// views instead of hard-coding production behavior inside them).
     let recognizer: any OCRRecognizer
-    /// Same reasoning as `recognizer` above, for the "Translate" action —
-    /// now the *first* thing that runs, not a fallback, so a literal
-    /// translation appears with no perceptible wait.
+    /// Same reasoning as `recognizer` above, for the "Translate" action — the
+    /// whole of it, now that translating no longer calls the backend at all.
     let translator: any Translator
-    /// Same reasoning as `recognizer`/`translator` above, for enqueueing the
-    /// record whose explanation the backend produces afterwards.
+    /// Same reasoning as `recognizer`/`translator` above, for the opt-in
+    /// explanation request whose record the backend produces afterwards.
     let comprehensionRepository: any ComprehensionRepository
 
     @Environment(\.dismiss) private var dismiss
@@ -63,23 +66,30 @@ struct CroppedSelectionPreview: View {
     /// User-editable text, seeded from a successful recognition. Purely for
     /// on-screen display/correction — never written anywhere.
     @State private var editedText = ""
-    /// Translation + enqueue state, deliberately separate from
+    /// On-device translation state, deliberately separate from
     /// `recognitionState`: recognition runs automatically on appear, this runs
     /// on demand (tapping "Translate") and can be re-run against a different
     /// language or a further-edited text without disturbing the recognition
     /// result. `nil` until the user taps "Translate" for the first time.
+    @State private var translationState: LoadState<String>?
+    /// How the opt-in explanation request went, `nil` until the reader asks for
+    /// one — which is what keeps a plain translate off the network entirely.
     ///
-    /// Holds a `SelectionEnqueueOutcome`, so a successful translation that the
-    /// backend refused to record is still a success — the reader has their
-    /// translation either way.
-    @State private var enqueueState: LoadState<SelectionEnqueueOutcome>?
+    /// Not a `LoadState`: this request has no failure case of its own. A
+    /// refused enqueue is `.notRecorded`, still leaving the translation above
+    /// untouched, so modelling it as failure would misdescribe the screen.
+    @State private var explanationOutcome: ExplanationRequestOutcome?
+    /// True only while the enqueue call itself is in flight. Rendered as the
+    /// section's `.inProgress` state, the same as a record the backend has not
+    /// finished — from the reader's side both are "it's being written".
+    @State private var isRequestingExplanation = false
     @State private var selectedLanguageID = LastUsedTargetLanguage.id
     @State private var useStrongerModel = LastUsedModelTier.useStrongerModel
     /// The latest known state of the record this screen created — replaced
     /// wholesale each time polling returns a newer one, so the translation
     /// column and the `深度解釋` section always read from a single source.
     ///
-    /// Separate from `enqueueState`, which records how the *translate action*
+    /// Separate from `explanationOutcome`, which records how the *request*
     /// went and never changes afterwards. This changes for minutes after it.
     @State private var record: ComprehensionRecord?
     /// Bumped whenever a record becomes watchable again *without* its id
@@ -224,7 +234,7 @@ struct CroppedSelectionPreview: View {
     }
 
     private var isTranslating: Bool {
-        if case .loading = enqueueState { return true }
+        if case .loading = translationState { return true }
         return false
     }
 
@@ -234,21 +244,7 @@ struct CroppedSelectionPreview: View {
 
     private var translateSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Side by side where the width allows, stacked where it doesn't:
-            // a label plus two menus overflows a compact phone (a language name
-            // like "Traditional Chinese" is wide on its own), and a truncated
-            // picker is worse than a second row.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    languagePicker
-                    Spacer(minLength: 8)
-                    depthPicker
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    languagePicker
-                    depthPicker
-                }
-            }
+            languagePicker
 
             Button("Translate") {
                 Task { await translate() }
@@ -281,13 +277,13 @@ struct CroppedSelectionPreview: View {
         .fixedSize()
     }
 
-    /// Inline beside the language picker rather than behind a settings screen:
-    /// this app has no settings screen and does not gain one here, and depth is
-    /// a judgement the reader makes with the text in front of them.
+    /// Sits with the "深入解釋" button rather than with the language picker,
+    /// because depth is a property of *that* request and means nothing to a
+    /// plain on-device translation — offering it up front implied the cloud
+    /// call was part of translating, which is exactly what this split undoes.
     ///
-    /// It replaces M9's "request a stronger explanation" action, which under a
-    /// queue would mean a second multi-minute wait on the very screen this work
-    /// exists to unblock — so the choice moves *before* the request, not after.
+    /// Still chosen *before* the request rather than after it: under a queue,
+    /// upgrading afterwards would mean a second multi-minute wait.
     private var depthPicker: some View {
         HStack(spacing: 4) {
             Text("Depth")
@@ -309,11 +305,11 @@ struct CroppedSelectionPreview: View {
 
     @ViewBuilder
     private var translationResultContent: some View {
-        // `enqueueState` is `nil` until "Translate" is tapped once;
+        // `translationState` is `nil` until "Translate" is tapped once;
         // unwrap explicitly rather than relying on optional/enum pattern
         // sugar, so each case below is unambiguous.
-        if let enqueueState {
-            switch enqueueState {
+        if let translationState {
+            switch translationState {
             case .loading:
                 HStack {
                     Spacer()
@@ -321,7 +317,7 @@ struct CroppedSelectionPreview: View {
                     Spacer()
                 }
                 .frame(minHeight: 80)
-            case .loaded(let outcome):
+            case .loaded(let translation):
                 VStack(alignment: .leading, spacing: 12) {
                     // Original and translated text side by side, so the reader
                     // can compare them directly without scrolling between two
@@ -336,21 +332,14 @@ struct CroppedSelectionPreview: View {
                             // record means pending, failed and declined records
                             // need no special case here — they simply have no
                             // cloud wording yet, or ever.
-                            text: record?.displayedTranslation ?? outcome.translation,
+                            text: record?.displayedTranslation ?? translation,
                             isCloud: record?.cloudTranslation != nil
                         )
                     }
 
                     Divider()
 
-                    // M9's verdict banner is gone, its two jobs split: the chip
-                    // above says which translation this is, and this section
-                    // says whether more is coming — standing exactly where the
-                    // explanation itself will render.
-                    ComprehensionDetailSection(
-                        state: sectionState(for: outcome),
-                        retry: retryAction(for: outcome)
-                    )
+                    explanationContent
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
@@ -358,34 +347,91 @@ struct CroppedSelectionPreview: View {
         }
     }
 
-    /// Folds the two independent things that can go wrong — the enqueue, and
-    /// the explanation itself — into the section's single vocabulary, so both
-    /// render in the same slot instead of the screen growing a second one.
-    private func sectionState(for outcome: SelectionEnqueueOutcome) -> ComprehensionSectionState {
-        switch outcome {
-        case .recorded(_, let created):
-            // The polled record when one has arrived, otherwise the record as
-            // enqueued (always `pending`).
-            return ComprehensionSectionState(record: record ?? created)
-        case .notRecorded(_, let reason):
-            switch reason {
-            case .quotaExhausted: return .unavailable(.quotaExhausted)
-            case .transient: return .unavailable(.enqueueFailed)
-            }
+    // MARK: - Deeper explanation
+
+    /// The second, opt-in action — an offer until the reader takes it, and the
+    /// shared `深度解釋` section from the moment they do.
+    ///
+    /// Both halves stand in the same slot on purpose: the button is replaced by
+    /// the thing it produces, so the screen never shows an explanation section
+    /// and a way to ask for one at the same time.
+    @ViewBuilder
+    private var explanationContent: some View {
+        if let state = explanationSectionState {
+            ComprehensionDetailSection(state: state, retry: explanationRetryAction(for: state))
+        } else {
+            explanationPrompt
         }
     }
 
-    /// What "Retry" means depends on how far the flow got: a record that
+    private var explanationPrompt: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Side by side where the width allows, stacked where it doesn't: a
+            // label plus a menu plus a button overflows a compact phone, and a
+            // truncated picker is worse than a second row.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    depthPicker
+                    Spacer(minLength: 8)
+                    explanationButton
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    depthPicker
+                    explanationButton
+                }
+            }
+
+            // Says plainly what taking this costs, since it is the only action
+            // on this screen that spends anything or leaves anything behind.
+            Text("Uses one of today's requests, and saves this line to 歷史紀錄.")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var explanationButton: some View {
+        Button("Explain in depth") {
+            Task { await requestDeeperExplanation() }
+        }
+        .buttonStyle(.bordered)
+        .tint(.primaryRed)
+        .accessibilityIdentifier("explainInDepth")
+    }
+
+    /// What the `深度解釋` section is showing, or `nil` while the reader has not
+    /// asked for one — which is what makes the button appear instead.
+    ///
+    /// Folds the two independent things that can go wrong — the enqueue, and
+    /// the explanation itself — into the section's single vocabulary, so both
+    /// render in the same slot instead of the screen growing a second one.
+    private var explanationSectionState: ComprehensionSectionState? {
+        guard let explanationOutcome else {
+            return isRequestingExplanation ? .inProgress : nil
+        }
+        switch explanationOutcome {
+        case .recorded(let created):
+            // The polled record when one has arrived, otherwise the record as
+            // enqueued (always `pending`).
+            return ComprehensionSectionState(record: record ?? created)
+        case .notRecorded(.quotaExhausted):
+            return .unavailable(.quotaExhausted)
+        case .notRecorded(.transient):
+            return .unavailable(.enqueueFailed)
+        }
+    }
+
+    /// What "Retry" means depends on how far the request got: a record that
     /// `failed` is re-enqueued on the backend, whereas an enqueue that never
-    /// landed means running the whole translate action again. Returning `nil`
-    /// where retrying cannot help keeps the button from appearing at all.
-    private func retryAction(for outcome: SelectionEnqueueOutcome) -> (() -> Void)? {
-        switch sectionState(for: outcome) {
+    /// landed means asking again from scratch. Returning `nil` where retrying
+    /// cannot help keeps the button from appearing at all.
+    private func explanationRetryAction(for state: ComprehensionSectionState) -> (() -> Void)? {
+        switch state {
         case .unavailable(.failed):
-            guard let id = (record ?? outcome.record)?.id else { return nil }
+            guard let id = (record ?? explanationOutcome?.record)?.id else { return nil }
             return { Task { await retryRecord(id: id) } }
         case .unavailable(.enqueueFailed):
-            return { Task { await translate() } }
+            return { Task { await requestDeeperExplanation() } }
         case .inProgress, .explained, .unavailable:
             return nil
         }
@@ -442,25 +488,46 @@ struct CroppedSelectionPreview: View {
         }
     }
 
+    /// Translates on device and stops there — no network call, no request
+    /// spent, nothing written to 歷史紀錄.
     private func translate() async {
-        enqueueState = .loading
-        // Dropped before the new request so a re-translate can't briefly show
-        // the previous selection's explanation under the new translation.
+        translationState = .loading
+        // Dropped before the new translation so a re-translate can't leave the
+        // previous text's explanation sitting under a different translation.
+        // The record itself survives on the backend; only this screen forgets
+        // it, and the badge still reports it if it was unfinished.
+        explanationOutcome = nil
         record = nil
-        let outcome = await translateAndEnqueueSelection(
-            editedText,
-            to: selectedLanguage,
+        translationState = await translateSelection(
+            editedText, to: selectedLanguage, using: translator
+        )
+    }
+
+    /// Asks the backend for the deeper explanation of the translation currently
+    /// on screen. The only path here that spends a request or creates a
+    /// 歷史紀錄 row.
+    private func requestDeeperExplanation() async {
+        // The button only exists under a loaded translation, so this is a
+        // guard against a re-entrant tap rather than a real branch.
+        guard case .loaded(let translation) = translationState else { return }
+
+        isRequestingExplanation = true
+        explanationOutcome = nil
+        record = nil
+        let outcome = await requestExplanation(
+            sourceText: editedText,
+            translation: translation,
             targetLanguageCode: selectedLanguageID,
             comicID: comicID,
             chapterID: chapterID,
             pageNumber: pageNumber,
             useStrongerModel: useStrongerModel,
-            using: translator,
             repository: comprehensionRepository
         )
-        enqueueState = outcome
+        isRequestingExplanation = false
+        explanationOutcome = outcome
         // Setting this is what starts `.task(id:)` polling.
-        if case .loaded(let value) = outcome { record = value.record }
+        record = outcome.record
     }
 
     /// Hands an unfinished record to the badge as this screen goes away.

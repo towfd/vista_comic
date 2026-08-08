@@ -23,10 +23,11 @@
 //  A record changing on the detail screen still comes back up (`onChanged`)
 //  rather than being re-fetched, for the same reason as before.
 //
-//  Ticket 20 adds swipe-to-delete. Deleting moved from a button to a swipe
-//  because every translate now writes a row, so pruning is routine rather than
-//  rare — but the confirmation stays, since deletion is still irreversible and
-//  there is no undo. Retry deliberately did **not** move here: it lives only on
+//  Ticket 20 adds swipe-to-delete. Deleting moved from a button to a swipe when
+//  every translate wrote a row and pruning was routine; it stays a swipe now
+//  that only an explicit 深入解釋 request does, since it is no worse for a
+//  shorter list — but the confirmation stays, since deletion is still
+//  irreversible and there is no undo. Retry deliberately did **not** move here: it lives only on
 //  the detail screen, where it costs a deliberate tap into one record.
 //
 
@@ -133,7 +134,7 @@ struct HistoryView: View {
         ContentUnavailableView(
             "Nothing here yet",
             systemImage: "clock.arrow.circlepath",
-            description: Text("Everything you translate while reading is recorded here automatically.")
+            description: Text("Lines you ask for a deeper explanation of are kept here.")
         )
     }
 

@@ -7,10 +7,9 @@
 //  unchanged — it simply becomes one tab's content instead of the app's root.
 //
 //  `comprehension-response-ux` ticket 19 puts 歷史紀錄 in the slot 單字本 held.
-//  It is a replacement rather than an addition: every translate now records
-//  itself automatically, so the thing worth keeping a tab for is what the
-//  reader actually produced while reading — not the short list of items they
-//  remembered to save. Ticket 21 then deleted 單字本 outright, so 歷史紀錄 is now
+//  It is a replacement rather than an addition: the thing worth keeping a tab
+//  for is the lines the reader asked for a deeper explanation of, which is a
+//  record of what they studied rather than of everything they glanced at. Ticket 21 then deleted 單字本 outright, so 歷史紀錄 is now
 //  the only thing this slot has ever held as far as the code is concerned.
 //
 
