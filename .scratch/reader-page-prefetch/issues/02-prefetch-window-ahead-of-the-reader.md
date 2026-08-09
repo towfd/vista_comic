@@ -18,7 +18,9 @@ The window and progress reporting consume the same "which Pages are visible" sig
 
 Likewise, 01 has **no failure marking**: a failed fetch simply clears its in-flight entry and a retry genuinely re-requests. That was the right call there, because the retry storm this spec guards against is created by *this* ticket's window reconciler. The marking is yours to add, and it must not break today's tap-to-retry.
 
-**Status:** implemented, unit-verified (commit `667d021` on `feat/reader-page-prefetch`) — pending device verification
+**Status:** resolved (commit `667d021`, PR [#60](https://github.com/towfd/vista_comic/pull/60), merged 2026-08-09)
+
+Device-verified by the repo owner before merge, including the two that unit tests can only approximate: scrolling down a chapter at normal speed no longer shows a loading indicator, and reading position is not advanced by Pages fetched ahead of the reader.
 
 - [ ] Scrolling down a chapter on a normal connection shows Pages with no loading indicator
 - [ ] Opening a chapter starts fetching immediately, centred on the Page actually being displayed
