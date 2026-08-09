@@ -77,7 +77,7 @@ For every implementation increment:
 1. Inspect the Git diff and confirm unrelated work is unchanged.
 2. Build or run relevant SwiftUI previews when the environment supports it.
 3. Exercise the changed navigation path in an iOS simulator when available.
-4. For UI-facing work, write the XCUITest code as part of the increment and build-verify it compiles — but do not spend time trying to run it. This environment's simulator cannot reliably initialize XCUITest's accessibility runner (confirmed structurally broken across repeated attempts, not a configuration issue — retrying wastes time). Hand off actually running it, and interactive verification, to me on a real device or a normal Xcode session.
+4. **UI verification is mine, not yours.** Do not write XCUITest code, do not build-verify it, do not attempt to run it, and do not spend increment time deliberating whether some behaviour is assertable through the accessibility API. Instead, hand off a specific list of what I should look for on a real device — that list is the deliverable for any UI-facing behaviour a unit test cannot cover. (Separately, and regardless: this environment's simulator cannot reliably initialize XCUITest's accessibility runner — confirmed structurally broken across repeated attempts, not a configuration issue — so running them here would fail anyway.)
 5. Check at least one compact phone layout and one larger phone layout for UI changes.
 6. Verify relevant empty, loading, failure, and boundary states when the ticket requires them.
 7. Explain any verification that could not be completed because of environment limitations.
