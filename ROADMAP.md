@@ -2,7 +2,7 @@
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
-Last updated: 2026-08-06
+Last updated: 2026-08-09
 
 ## Current status
 
@@ -11,6 +11,7 @@ Last updated: 2026-08-06
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
 - The OCR text-editing defect is **fixed** ([#50](https://github.com/towfd/vista_comic/pull/50)), which closes the last of the three problems reported alongside M10's two.
+- **Alembic owns the schema** ([#55](https://github.com/towfd/vista_comic/pull/55), 2026-08-07) — the migration tool M10 made conditional on its own schema landing. `docs/manual-migrations.md` is closed.
 - **Reader page prefetch is merged** ([#60](https://github.com/towfd/vista_comic/pull/60), 2026-08-09) — Page images are cached and prefetched ahead of the reader, so scrolling no longer waits. Tracked under `.scratch/reader-page-prefetch/`. No milestone is in progress; next action is unclaimed.
 
 ## Current release goal
@@ -294,7 +295,17 @@ Also decided and deliberately deferred out of this milestone: adopting a migrati
 - Ticket 19's "rows show the cloud translation" AC contradicted the mockup it was drawn from and was **superseded** in favour of two-line rows, since a third line costs roughly a third of the records visible on a list whose whole job is scanning. The intent survives in the row's status glyph, which is a cloud exactly when a cloud translation exists.
 - The badge's refresh policy ("when the tab appears, no shared client store") was **reversed after shipping**, by ticket 22. A tab's content does not appear until the tab is selected, so the badge could only ever learn an explanation had arrived at the moment the reader opened the tab it existed to send them to — it contradicted its own user story. Ownership moved to the tab shell, which refreshes on launch/foreground and watches a record still in flight when the reader dismisses the result sheet.
 
-`DROP TABLE saved_translation` was executed against the deployed database on 2026-08-06 as the last step of ticket 21, in the order `docs/manual-migrations.md` now records: merge the code that stops using the table, rebuild and confirm the API no longer serves the old routes, then drop. **Adopting a migration tool is therefore now triggered** — the deferral was explicitly conditional on this landing.
+`DROP TABLE saved_translation` was executed against the deployed database on 2026-08-06 as the last step of ticket 21, in the order `docs/manual-migrations.md` now records: merge the code that stops using the table, rebuild and confirm the API no longer serves the old routes, then drop. **Adopting a migration tool was therefore triggered** — the deferral was explicitly conditional on this landing — **and was done the next day** ([#55](https://github.com/towfd/vista_comic/pull/55), 2026-08-07).
+
+### Alembic adoption (post-M10, ticket-driven)
+
+- Status: **Merged** — PR [#55](https://github.com/towfd/vista_comic/pull/55) merged into `main` on 2026-08-07
+- Owner: main session
+- Spec of record: `.scratch/alembic-adoption/spec.md`
+
+Closes the deferral M10 made conditional on its own schema landing. The backend had no migration tool: `db.init_engine` called `metadata.create_all` at startup, which can add a table but never a column — a limitation `docs/manual-migrations.md` existed to work around, by hand, per change.
+
+Alembic now owns the schema. `create_all` is gone, the app runs `alembic upgrade head` itself on startup, and `docs/manual-migrations.md` is closed — kept only for the one-time stamp that connects the pre-Alembic database to the baseline revision, which is the step that makes the old era and the new one line up.
 
 ### Reader page prefetch (post-M10, ticket-driven)
 
@@ -340,7 +351,7 @@ The OCR text-editing defect — the last of the three problems reported alongsid
 
 **Nothing is in progress. The next action is unclaimed**, in rough order of how much each is already owed:
 
-- **Adopt a migration tool.** Explicitly triggered by M10's schema landing (see `docs/manual-migrations.md`). Cheapest now, while the schema is freshly clean and `comprehension_record` has barely accumulated.
+- ~~**Adopt a migration tool.**~~ — **done, 2026-08-07** ([#55](https://github.com/towfd/vista_comic/pull/55)). Alembic owns the schema; `docs/manual-migrations.md` is closed and kept only for the one-time stamp that connects the two eras. This bullet outlived the work by two days and was still being read as owed on 2026-08-09.
 - ~~**Whole-book precompute**~~ — **abandoned, 2026-08-07.** Precomputing OCR + LLM over a whole comic at import, so no selection is needed at read time, was carried as the long-term direction through M9 and M10. It is now dropped: the select-and-translate flow stays as the model.
 
   This is the decision's third and final pass. M9's wayfinder considered a batch pipeline and rejected it as replacing the selection design rather than extending it; M10 deferred it again to ship a usable version of the current model first. That version shipped, has been used, and is what the reader wants.
