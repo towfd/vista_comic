@@ -10,9 +10,11 @@ Introduce the Page image cache as a protocol with a live implementation, injecte
 
 **Blocked by:** None — can start immediately.
 
-**Status:** implemented, unit-verified — pending device verification (uncommitted)
+**Status:** resolved (commit `b59d3a9`, PR [#60](https://github.com/towfd/vista_comic/pull/60), merged 2026-08-09)
 
-The four criteria below marked ⧗ hold by construction and are build-verified, but need a rendered Reader against a running backend to confirm: the no-flash guarantee, the unchanged miss path, selection/cropping, and covers.
+Device-verified by the repo owner before merge: the no-flash guarantee, the unchanged miss path, selection/cropping at full resolution, and covers no longer re-downloading — the four criteria unit tests could not reach, since they need a rendered Reader against a running backend.
+
+One thing worth carrying forward: this ticket alone fixed the scroll-up jitter that ticket 03 was written to address. A cached Page's first drawn frame already carries the image at full height, so nothing collapses and there is nothing for a height estimate to correct.
 
 - [ ] Scrolling back up to a previously viewed Page shows it with no network request and no placeholder frame
 - [ ] A Page image already in memory is obtainable synchronously, without `await`, from a SwiftUI body evaluation
