@@ -8,7 +8,11 @@ No backend, API or model change: the Scanner, the Catalog, the API contract and 
 
 **Blocked by:** 02 — Prefetch a window of Pages ahead of the reader.
 
-**Status:** ready-for-agent
+**Status:** not doing — closed 2026-08-09 after device verification of ticket 02
+
+**Do not pick this up off the frontier.** With the prefetch window in place the repo owner scrolled a real device and reported the remaining shift as "not very noticeable", so the value of this ticket collapsed. The gap it was written to close — a Page reserving a fixed short placeholder before it has ever been decoded — is real and still present in the code, but the window now decodes nearly every Page before the reader reaches it, which leaves the gap exposed only when a reader deliberately outruns prefetching.
+
+Reopen this only if that changes, and check the assumption before rebuilding: the running-median approach assumes Pages within a comic are consistently sized, which held for the library measured in 2026-08 (fixed widths, predominantly 900px). A library of conventional whole pages, mixed sources, or widely varying widths would break that assumption and might make backend-supplied dimensions the better answer after all — see the spec's Out of Scope for why that was rejected the first time.
 
 - [ ] Scrolling down a brand-new chapter faster than prefetching keeps up no longer shoves content down as Pages arrive
 - [ ] A Page whose image has been evicted still reserves its correct height when its row is rebuilt

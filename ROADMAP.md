@@ -10,7 +10,8 @@ Last updated: 2026-08-06
 - M5 (local backend) is fully complete, including Slice 4 (reading-progress persistence) and the `remote-access` connectivity work (Cloudflare Tunnel + Access — tracked under `.scratch/remote-access/`, not a separate `ROADMAP.md` slice, per the ticket-driven workflow established in PR #19).
 - Active work now runs on the ticket-driven workflow: specs and tickets live under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`); this file only records milestone history once a feature ships.
 - Current owner: main Claude Code session (delegates to `backend-implementer`/`frontend-implementer` sub-agents per increment).
-- The OCR text-editing defect is **fixed** ([#50](https://github.com/towfd/vista_comic/pull/50)), which closes the last of the three problems reported alongside M10's two. No milestone is in progress; next action is unclaimed.
+- The OCR text-editing defect is **fixed** ([#50](https://github.com/towfd/vista_comic/pull/50)), which closes the last of the three problems reported alongside M10's two.
+- **Reader page prefetch is merged** ([#60](https://github.com/towfd/vista_comic/pull/60), 2026-08-09) — Page images are cached and prefetched ahead of the reader, so scrolling no longer waits. Tracked under `.scratch/reader-page-prefetch/`. No milestone is in progress; next action is unclaimed.
 
 ## Current release goal
 
@@ -294,6 +295,22 @@ Also decided and deliberately deferred out of this milestone: adopting a migrati
 - The badge's refresh policy ("when the tab appears, no shared client store") was **reversed after shipping**, by ticket 22. A tab's content does not appear until the tab is selected, so the badge could only ever learn an explanation had arrived at the moment the reader opened the tab it existed to send them to — it contradicted its own user story. Ownership moved to the tab shell, which refreshes on launch/foreground and watches a record still in flight when the reader dismisses the result sheet.
 
 `DROP TABLE saved_translation` was executed against the deployed database on 2026-08-06 as the last step of ticket 21, in the order `docs/manual-migrations.md` now records: merge the code that stops using the table, rebuild and confirm the API no longer serves the old routes, then drop. **Adopting a migration tool is therefore now triggered** — the deferral was explicitly conditional on this landing.
+
+### Reader page prefetch (post-M10, ticket-driven)
+
+- Status: **Merged** — tickets 01 and 02 shipped; PR [#60](https://github.com/towfd/vista_comic/pull/60) merged into `main` on 2026-08-09. Ticket 03 closed as **not doing**.
+- Owner: main session
+- Spec of record: `.scratch/reader-page-prefetch/spec.md`
+
+Fixes reading being stop-start. Every Page used to begin loading only as it entered the viewport, so scrolling down was interrupted on *every* page; and because the lazy stack destroys off-screen rows, scrolling back up re-downloaded pages that had just been on screen, collapsing their height and lurching the scroll position. There was no cache anywhere in the image path.
+
+Adds an in-memory Page image cache and a prefetch window — current Page, five ahead, two behind, seeded at the Page actually being displayed rather than at page one, four fetches at once in priority order, out-of-window requests cancelled, failed URLs marked so a dead network cannot become a request storm.
+
+**The decisive detail was not the network round trip.** The request was issued from a task SwiftUI runs *after* the row has already been drawn once, so even a Page whose bytes were in hand still flashed its placeholder. Since reading an actor's state requires `await` and `await` cannot happen during body evaluation, the cache is deliberately two pieces — a synchronously readable store plus an actor owning what is in flight — so a hit is resolved during body evaluation and its first drawn frame already carries the image at full height. A second non-obvious find: `preparingForDisplay()` is best-effort and under load returns a non-nil image still backed by encoded data, leaving the decode on the main thread at draw time; decoding now goes through a `CGContext` this code constructs.
+
+Sizing was measured against the real library rather than assumed — 1855 Pages, fixed widths (predominantly 900px), heights 8px–2500px, averaging 94 KB — which is why cost is treated as latency rather than bandwidth, why retention is bounded by decoded bytes (a proxy for reading distance, since width is fixed), and why five ahead was kept rather than ten (4.2 vs 8.3 median screens).
+
+**Ticket 03 (reserving correct height for Pages not in memory) was closed as not doing**, after device verification: the synchronous hit path fixed the reported scroll-up jitter on its own, and the remaining first-pass shift was judged not noticeable. Spec user stories 8 and 9 are therefore unmet by design. Also rejected, with reasons recorded in the spec: backend-supplied Page dimensions, a disk cache, downsampling, and a hand-rolled LRU in place of `NSCache`.
 
 ## Known issues and constraints
 

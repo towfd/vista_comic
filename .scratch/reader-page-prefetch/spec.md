@@ -24,6 +24,8 @@ Crucially, an image that is already cached is read **synchronously, while the ro
 
 Retention is bounded by total decoded bytes rather than by a Page count. Because every Page in this library is the same width, a Page's decoded size is proportional to its on-screen height, so a byte budget is automatically a consistent budget of *reading distance* — it self-adjusts between a run of tall Pages and a run of thin slices, with no height arithmetic anywhere.
 
+**Shipped status (2026-08-09): the height-reservation half below was not built.** Tickets 01 and 02 shipped in PR #60. The synchronous hit path turned out to fix the reported scroll-up jitter on its own — a cached Page's first drawn frame already carries the image at its full height, so nothing collapses — and with prefetching in place the repo owner judged the remaining first-pass shift "not very noticeable" on a real device. Ticket 03 is closed as not-doing; user stories 8 and 9 are therefore unmet by design, not by oversight. The rest of this section describes what was designed, and remains the plan if that judgement ever reverses.
+
 The jitter is addressed separately: **once a Page's proportions are known they are remembered for the rest of the session**, in the cache rather than in the row, so they survive both row recycling and image eviction. A Page whose image is no longer resident still reserves its correct height. A Page never yet seen reserves the running median height of the Pages already decoded in that chapter, which is far closer than today's fixed short placeholder.
 
 No backend, API, or model change is required.
