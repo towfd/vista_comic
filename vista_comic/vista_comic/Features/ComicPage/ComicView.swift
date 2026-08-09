@@ -140,6 +140,11 @@ private struct ReaderView: View {
     @Environment(\.translator) private var translator
     @Environment(\.comprehensionRepository) private var comprehensionRepository
     @Environment(\.comicRepository) private var repository
+    /// Read here rather than in `ReaderPage` because the *window* is the
+    /// reader's business: only this view knows the chapter's whole page list
+    /// and where in it the reader currently is. `AuthorizedAsyncImage` reads
+    /// the same cache separately for the row it is drawing.
+    @Environment(\.pageImageCache) private var pageImageCache
     @Environment(\.dismiss) private var dismiss
 
     /// How far the reader must be pulled *past* the bottom (points of overscroll)
@@ -241,7 +246,16 @@ private struct ReaderView: View {
         // Resume only: setting `topPage` after load (see `loadPages`) scrolls to
         // the resume page. Its reported value is not used for progress.
         .scrollPosition(id: $topPage, anchor: .top)
-        // Debounced progress reporting whenever the top-most visible page changes.
+        // Two deliberately separate reactions to the same "which pages are
+        // visible" signal, because they must behave oppositely: the prefetch
+        // window has to slide *immediately* to be of any use, while progress
+        // stays debounced so a scroll writes once it settles. Kept as two
+        // handlers rather than one convenience that does both — a page fetched
+        // ahead of the reader being counted as read would silently corrupt
+        // their saved position across the whole library.
+        .onChange(of: visiblePages) { _, pages in
+            updatePrefetchWindow(pageURLs: urls, visiblePages: pages, cache: pageImageCache)
+        }
         .onChange(of: visiblePages) { _, _ in scheduleProgressSave() }
         // Auto-advance: after reaching the bottom, the user must keep pulling
         // *past* the end (overscroll) to continue into the next chapter — so
@@ -430,16 +444,12 @@ private struct ReaderView: View {
             // restart (auto-advance) we ignore both and force the top.
             // Setting `topPage` in the same update that flips to `.loaded`
             // positions the freshly built scroll view accordingly.
-            let resumeIndex: Int?
-            if restart {
-                resumeIndex = urls.isEmpty ? nil : 0
-            } else if let targetPage {
-                resumeIndex = urls.isEmpty ? nil : min(max(targetPage - 1, 0), urls.count - 1)
-            } else {
-                resumeIndex = chapter.lastReadPage.flatMap { page in
-                    urls.isEmpty ? nil : min(max(page - 1, 0), urls.count - 1)
-                }
-            }
+            let resumeIndex = readerStartIndex(
+                pageCount: urls.count,
+                restart: restart,
+                targetPage: targetPage,
+                lastReadPage: chapter.lastReadPage
+            )
             pagesState = .loaded(urls)
             topPage = resumeIndex
             pageCount = urls.count
@@ -447,6 +457,18 @@ private struct ReaderView: View {
             // Fresh visibility set for the incoming chapter; the new pages
             // repopulate it as they appear.
             visiblePages = []
+
+            // Start fetching the moment the chapter opens, seeded at the page
+            // the reader is actually about to look at — the resume position, a
+            // history jump's target, or the top on an auto-advance restart —
+            // rather than unconditionally at page 1, which would leave a
+            // reader resuming mid-chapter waiting for pages they will never
+            // scroll back to. `nil` means "no saved position", i.e. the top.
+            //
+            // A chapter change re-seeds the window; it never clears the cache,
+            // which is what keeps flipping to an adjacent chapter and back
+            // instant.
+            pageImageCache.setPrefetchWindow(pageURLs: urls, currentIndex: resumeIndex ?? 0)
 
             if restart {
                 // Overwrite the store to page 1 for the incoming chapter, even if
@@ -469,12 +491,13 @@ private struct ReaderView: View {
 
     // MARK: - Progress reporting
 
-    /// The 1-based page to report: the chapter's last page once the reader has
-    /// reached the real bottom (so the backend can mark it `read`), otherwise the
-    /// top-most visible page (`visiblePages.min()`, reliable on a lazy stack).
-    /// `nil` before the first layout (empty set) → `sendProgress` ignores it.
+    /// The 1-based page to report. See `reportedProgressPage`.
     private var reportedPage: Int? {
-        reachedEnd ? pageCount : visiblePages.min().map { $0 + 1 }
+        reportedProgressPage(
+            visiblePages: visiblePages,
+            reachedEnd: reachedEnd,
+            pageCount: pageCount
+        )
     }
 
     /// Restarts the debounce so a rapid scroll only writes once it settles.
@@ -518,6 +541,71 @@ private struct ReaderView: View {
             )
         }
     }
+}
+
+// MARK: - What the reader derives from "which pages are visible"
+//
+// Two free functions rather than two methods on `ReaderView`, so both can be
+// tested without rendering the reader — and so the difference between them is
+// legible at a glance. They read the same input and must never be merged:
+// `updatePrefetchWindow` reaches *ahead* of the reader, `reportedProgressPage`
+// reports only where the reader actually is.
+
+/// Re-centres the prefetch window on the top-most visible page.
+///
+/// Deliberately given nothing but the page list, the visible set and the cache.
+/// It holds no repository and no `lastSentPage`, so there is no path from
+/// prefetching to a progress write even by accident — pages fetched ahead of
+/// the reader cannot move their saved position.
+///
+/// Uses the *top-most* visible page rather than any other, matching what
+/// `.scrollPosition` anchors to and what progress reports, so the window is
+/// centred on the page the reader is looking at rather than one partly off the
+/// bottom of the screen. Does nothing before the first layout, when nothing
+/// has reported itself visible yet.
+func updatePrefetchWindow(pageURLs: [URL], visiblePages: Set<Int>, cache: any PageImageCache) {
+    guard let topMost = visiblePages.min() else { return }
+    cache.setPrefetchWindow(pageURLs: pageURLs, currentIndex: topMost)
+}
+
+/// The 1-based page the reader reports as its position: the chapter's last page
+/// once the real bottom has been reached (so the backend can mark it `read`),
+/// otherwise the top-most visible page — `visiblePages.min()`, which unlike
+/// `.scrollPosition`'s reported value is reliable on a lazy stack of
+/// unknown-height images.
+///
+/// `nil` before the first layout (empty set) → `sendProgress` ignores it.
+func reportedProgressPage(visiblePages: Set<Int>, reachedEnd: Bool, pageCount: Int) -> Int? {
+    reachedEnd ? pageCount : visiblePages.min().map { $0 + 1 }
+}
+
+/// The 0-based index the reader positions at when a chapter opens, or `nil`
+/// when it has no saved position to return to and simply starts at the top.
+///
+/// The three ways a chapter can open, in the order they override one another:
+/// an auto-advance restart forces the top, an explicit target page (a jump from
+/// a 歷史紀錄 record — see `ReaderRoute.targetPage`) wins over the saved
+/// position, and otherwise the chapter resumes where it was left. Page numbers
+/// are 1-based and clamped, in case the chapter shrank since one was recorded.
+///
+/// Load-bearing for prefetching as well as scrolling: this is the page the
+/// window is seeded at, which is why resuming mid-chapter is not slower than
+/// starting from the beginning.
+func readerStartIndex(
+    pageCount: Int,
+    restart: Bool,
+    targetPage: Int?,
+    lastReadPage: Int?
+) -> Int? {
+    guard pageCount > 0 else { return nil }
+
+    func clamped(_ page: Int) -> Int {
+        min(max(page - 1, 0), pageCount - 1)
+    }
+
+    if restart { return 0 }
+    if let targetPage { return clamped(targetPage) }
+    return lastReadPage.map(clamped)
 }
 
 /// A single reading page. `AuthorizedAsyncImage` (see `Shared/AuthorizedAsyncImage.swift`
