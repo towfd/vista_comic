@@ -60,9 +60,6 @@
         }
       }
     },
-    "Check your connection and try again." : {
-
-    },
     "Check that the server is running and try again." : {
       "comment" : "Error state: description when a fetch fails",
       "localizations" : {
@@ -73,6 +70,9 @@
           }
         }
       }
+    },
+    "Check your connection and try again." : {
+
     },
     "Cloud" : {
 
@@ -102,6 +102,9 @@
         }
       }
     },
+    "Couldn't ask for this explanation again" : {
+
+    },
     "Couldn't connect" : {
       "comment" : "Error state: title when a fetch fails",
       "localizations" : {
@@ -112,9 +115,6 @@
           }
         }
       }
-    },
-    "Couldn't ask for this explanation again" : {
-
     },
     "Couldn't delete this record. Check your connection and try again." : {
 
@@ -133,13 +133,13 @@
     "Deeper" : {
 
     },
-    "Delete this record?" : {
-
-    },
     "Deeper explanation" : {
 
     },
     "Delete" : {
+
+    },
+    "Delete this record?" : {
 
     },
     "Depth" : {
@@ -154,16 +154,13 @@
     "English" : {
 
     },
-    "Everything you translate while reading is recorded here automatically." : {
-
-    },
     "Exit text selection" : {
 
     },
-    "French" : {
+    "Explain in depth" : {
 
     },
-    "Grammar notes" : {
+    "French" : {
 
     },
     "History" : {
@@ -195,6 +192,9 @@
           }
         }
       }
+    },
+    "Lines you ask for a deeper explanation of are kept here." : {
+
     },
     "Next chapter" : {
       "comment" : "Reader: next chapter",
@@ -347,10 +347,10 @@
     "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄." : {
 
     },
-    "Today's explanation limit is used up. The limit resets tomorrow." : {
+    "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
 
     },
-    "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
+    "Today's explanation limit is used up. The limit resets tomorrow." : {
 
     },
     "Tone & register" : {
@@ -387,6 +387,12 @@
           }
         }
       }
+    },
+    "Uses one of today's requests, and saves this line to 歷史紀錄." : {
+
+    },
+    "Vocabulary & grammar" : {
+
     }
   },
   "version" : "1.0"
