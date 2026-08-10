@@ -8,7 +8,11 @@ No backend, API or model change: the Scanner, the Catalog, the API contract and 
 
 **Blocked by:** 02 — Prefetch a window of Pages ahead of the reader.
 
-**Status:** reopened 2026-08-10 — implemented, pending device verification
+**Status:** reopened 2026-08-10 — implemented and accepted on device the same day, with a known residual
+
+Device report from the repo owner: "鍵盤跳出來的時候 後面的圖片還是會上下滑動 但好多了 先這樣可以". Much improved, some movement remains, accepted as it stands.
+
+**The residual is not diagnosed, and closing this ticket does not mean it is gone.** The likely candidate is the first pages of a chapter nothing has decoded yet, which reserve the library default rather than anything measured, and adjust once when the first real page lands — but that is a hypothesis, not a finding. Anyone picking this up again should measure before rebuilding: if the movement turns out to be concentrated at chapter openings the default is the lever, and if it is spread through a chapter the assumption that pages within a comic are consistently sized is the thing to re-check, and backend-supplied Page dimensions become the better answer after all.
 
 **Reopened for a reason that was not on the table when it was closed.** The close below rested on the shift being cosmetic. It is not: `reader-auto-advance-false-trigger` found that the 220pt placeholder makes the reader's `contentSize` collapse by an order of magnitude when rows recycle, and the reader *infers from scroll geometry*. On an iPad, raising the keyboard to correct recognized text mid-chapter collapsed the content, which read as an overscroll past the bottom and ran the reader to the last chapter of the comic. See that spec for the full mechanism.
 

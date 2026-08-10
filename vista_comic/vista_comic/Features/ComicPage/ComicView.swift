@@ -254,7 +254,20 @@ private struct ReaderView: View {
                                 visiblePages.remove(index)
                             }
                         },
-                        onCrop: { croppedSelection = $0 }
+                        onCrop: { crop in
+                            croppedSelection = crop
+                            // Selecting text is one action, not a mode to
+                            // remember to leave: readers select occasionally
+                            // and deliberately, and leaving the mode on meant
+                            // closing the sheet onto a reader that would not
+                            // scroll. Ends on a crop being *produced* rather
+                            // than on the sheet closing, so the reader behind
+                            // an iPad form sheet is live rather than frozen
+                            // under it. A drag that produced nothing — the
+                            // cancel zone, or a selection off the page — never
+                            // reaches here, and so stays in selection mode.
+                            withAnimation { isSelecting = false }
+                        }
                     )
                 }
             }

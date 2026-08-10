@@ -12,9 +12,11 @@ A genuine pull past the bottom must still advance, still restart the incoming ch
 
 **Out of scope:** the reading position still shifts when the content collapses, on the last chapter and everywhere else. That is the collapse itself, and it belongs to `.scratch/reader-page-prefetch/issues/03` (reopened).
 
-**Status:** implemented — pending device verification
+**Status:** implemented — the reported defect confirmed fixed on device 2026-08-10 ("不會跳到最後一集了"); the rest of the checklist still to sweep
 
 Unit-testable parts are covered by `ReaderAutoAdvanceGateTests`; everything involving the keyboard, the form sheet and real Page heights is device verification, which is the repo owner's (CLAUDE.md).
+
+The confirmation covers the first three boxes below. The ones still worth a deliberate pass are the two the gate could plausibly have broken rather than fixed: that a genuine pull past the bottom still advances, and that releasing a fling at the bottom still marks a chapter read.
 
 - [ ] Tapping the text field mid-chapter on iPad leaves the reader on the same chapter
 - [ ] The same tap near the top of a chapter still leaves the reader where it was
