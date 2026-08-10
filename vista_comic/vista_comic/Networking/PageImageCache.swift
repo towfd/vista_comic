@@ -68,6 +68,25 @@ protocol PageImageCache: Sendable {
     /// anything back into the Reader — in particular, none by which a Page
     /// fetched ahead of the reader could be mistaken for a Page they read.
     func setPrefetchWindow(pageURLs: [URL], currentIndex: Int)
+
+    /// How tall `url` is relative to its width, from the last time it was
+    /// decoded — `nil` for a Page this cache has never held.
+    ///
+    /// Kept here, next to the images, rather than by the row that displays a
+    /// Page, because it has to outlive both things that destroy a row's state:
+    /// the `LazyVStack` recycling the row, and this cache evicting the image.
+    /// A Page seen once therefore reserves its exact height forever after,
+    /// resident or not — which is what stops the reader's content collapsing
+    /// when anything (the keyboard, a rotation, a memory warning) rebuilds
+    /// rows the byte budget no longer covers.
+    ///
+    /// Deliberately **not** dropped by eviction or by a memory warning. A
+    /// ratio is two words against an image's megabytes, and a purge is exactly
+    /// the moment stable heights matter most.
+    ///
+    /// Synchronous and non-blocking by contract, like `cachedImage(for:)`, and
+    /// for the same reason: it is read while a row's `body` is being evaluated.
+    func heightRatio(for url: URL) -> CGFloat?
 }
 
 // MARK: - The window
@@ -179,6 +198,10 @@ final class MemoryPageImageCache: PageImageCache {
 
     func cachedImage(for url: URL) -> UIImage? {
         store.image(for: url)
+    }
+
+    func heightRatio(for url: URL) -> CGFloat? {
+        store.heightRatio(for: url)
     }
 
     func image(for url: URL) async throws -> UIImage {
@@ -305,6 +328,20 @@ final class MemoryPageImageCache: PageImageCache {
 private final class DecodedImageStore: @unchecked Sendable {
     private let cache = NSCache<NSURL, UIImage>()
     private var memoryWarningObserver: (any NSObjectProtocol)?
+    /// Height-to-width ratio per URL, from the last decode.
+    ///
+    /// A plain dictionary rather than a second `NSCache` on purpose: this must
+    /// **not** be evicted. `NSCache` drops entries on its own schedule, which
+    /// would silently reintroduce the collapsing content this exists to
+    /// prevent, and at the worst possible moment — under memory pressure, when
+    /// every image has just gone and every row is rebuilding from nothing.
+    /// A `CGFloat` per Page ever read is negligible beside a single decoded
+    /// Page, so there is nothing here worth reclaiming.
+    private var heightRatios: [URL: CGFloat] = [:]
+    /// Guards `heightRatios` only. `NSCache` is already thread-safe; the
+    /// dictionary alongside it is not, and it is read from `body` on the main
+    /// thread while fetches write to it from background threads.
+    private let ratioLock = NSLock()
 
     init(byteLimit: Int) {
         cache.totalCostLimit = byteLimit
@@ -332,12 +369,28 @@ private final class DecodedImageStore: @unchecked Sendable {
         cache.object(forKey: url as NSURL)
     }
 
-    func insert(_ image: UIImage, for url: URL) {
-        cache.setObject(image, forKey: url as NSURL, cost: Self.decodedByteCount(of: image))
+    func heightRatio(for url: URL) -> CGFloat? {
+        ratioLock.withLock { heightRatios[url] }
     }
 
+    func insert(_ image: UIImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL, cost: Self.decodedByteCount(of: image))
+        if let ratio = Self.heightRatio(of: image) {
+            ratioLock.withLock { heightRatios[url] = ratio }
+        }
+    }
+
+    /// Releases the images. The recorded proportions stay — see `heightRatios`.
     func removeAll() {
         cache.removeAllObjects()
+    }
+
+    /// How tall this image is relative to its width. `nil` for a degenerate
+    /// image, so a zero width can never divide into the reader's layout.
+    private static func heightRatio(of image: UIImage) -> CGFloat? {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        return size.height / size.width
     }
 
     /// What this image actually costs in memory once decoded — the budget is

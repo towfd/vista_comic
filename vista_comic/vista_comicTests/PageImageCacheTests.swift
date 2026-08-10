@@ -184,6 +184,8 @@ private struct StubPageImageCache: PageImageCache {
     func image(for url: URL) async throws -> UIImage { stubbedImage }
 
     func setPrefetchWindow(pageURLs: [URL], currentIndex: Int) {}
+
+    func heightRatio(for url: URL) -> CGFloat? { nil }
 }
 
 @Suite("PageImageCache", .serialized)
@@ -456,6 +458,79 @@ struct PageImageCacheTests {
 
         #expect(cache.cachedImage(for: Self.pageURL) == nil)
         #expect(cache.cachedImage(for: Self.otherPageURL) == nil)
+    }
+
+    // MARK: - Reserved proportions (ticket 03)
+    //
+    // A Page's proportions are held here rather than by the row that draws it
+    // precisely so they outlive the two things that destroy a row's state: the
+    // reader's `LazyVStack` recycling it, and this cache evicting the image.
+    // The assertions below are therefore all of the form "the image went, the
+    // proportions stayed" — the property the reader depends on to stop its
+    // content collapsing.
+
+    @Test func decodingAPageRecordsItsProportions() async throws {
+        CacheStubURLProtocol.reset()
+        CacheStubURLProtocol.serve(Self.makePNG(width: 900, height: 1800), for: Self.pageURL)
+        let cache = makeCache()
+
+        #expect(cache.heightRatio(for: Self.pageURL) == nil)
+        _ = try await cache.image(for: Self.pageURL)
+
+        #expect(cache.heightRatio(for: Self.pageURL) == 2.0)
+    }
+
+    @Test func proportionsOutliveEviction() async throws {
+        CacheStubURLProtocol.reset()
+        let urls = (0..<8).map {
+            URL(string: "https://api.example.com/media/comic/chapter/ratio/\($0)")!
+        }
+        for url in urls {
+            CacheStubURLProtocol.serve(Self.makePNG(width: 100, height: 200), for: url)
+        }
+
+        let unbounded = makeCache()
+        let costPerImage = Self.decodedByteCount(of: try await unbounded.image(for: urls[0]))
+        let cache = MemoryPageImageCache(
+            session: CacheStubURLProtocol.makeSession(),
+            clientID: nil,
+            clientSecret: nil,
+            byteLimit: costPerImage * 2
+        )
+        for url in urls {
+            _ = try await cache.image(for: url)
+        }
+
+        // Not vacuous: with a budget of two images, most of these are gone.
+        let evicted = urls.filter { cache.cachedImage(for: $0) == nil }
+        #expect(!evicted.isEmpty)
+
+        // Every one of them still reserves its correct height.
+        for url in evicted {
+            #expect(cache.heightRatio(for: url) == 2.0)
+        }
+    }
+
+    @Test func proportionsSurviveAMemoryWarning() async throws {
+        CacheStubURLProtocol.reset()
+        CacheStubURLProtocol.serve(Self.makePNG(width: 900, height: 1350), for: Self.pageURL)
+        let cache = makeCache()
+        _ = try await cache.image(for: Self.pageURL)
+
+        NotificationCenter.default.post(
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
+
+        // The purge is when every row rebuilds from nothing at once, so it is
+        // the moment stable heights matter most — dropping the proportions
+        // here would reintroduce the collapse at its worst.
+        #expect(cache.cachedImage(for: Self.pageURL) == nil)
+        #expect(cache.heightRatio(for: Self.pageURL) == 1.5)
+    }
+
+    @Test func aPageNeverHeldHasNoProportions() {
+        #expect(makeCache().heightRatio(for: Self.otherPageURL) == nil)
     }
 
     // MARK: - The prefetch window
