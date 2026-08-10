@@ -12,7 +12,7 @@ A genuine pull past the bottom must still advance, still restart the incoming ch
 
 **Out of scope:** the reading position still shifts when the content collapses, on the last chapter and everywhere else. That is the collapse itself, and it belongs to `.scratch/reader-page-prefetch/issues/03` (reopened).
 
-**Status:** implemented — the reported defect confirmed fixed on device 2026-08-10 ("不會跳到最後一集了"); the rest of the checklist still to sweep
+**Status:** resolved — the reported defect confirmed fixed on device 2026-08-10 ("不會跳到最後一集了"), shipped in [#65](https://github.com/towfd/vista_comic/pull/65)
 
 Unit-testable parts are covered by `ReaderAutoAdvanceGateTests`; everything involving the keyboard, the form sheet and real Page heights is device verification, which is the repo owner's (CLAUDE.md).
 

@@ -8,7 +8,7 @@ No backend, API or model change: the Scanner, the Catalog, the API contract and 
 
 **Blocked by:** 02 — Prefetch a window of Pages ahead of the reader.
 
-**Status:** reopened 2026-08-10 — implemented and accepted on device the same day, with a known residual
+**Status:** resolved 2026-08-10 — reopened, implemented and accepted on device the same day, with a known residual. Shipped in [#65](https://github.com/towfd/vista_comic/pull/65).
 
 Device report from the repo owner: "鍵盤跳出來的時候 後面的圖片還是會上下滑動 但好多了 先這樣可以". Much improved, some movement remains, accepted as it stands.
 

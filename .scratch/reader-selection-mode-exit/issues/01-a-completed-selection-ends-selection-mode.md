@@ -8,9 +8,11 @@ Selection mode ends when a crop is actually **produced**, not when the sheet is 
 
 The two ways a drag ends without producing anything — releasing inside the cancel zone, and a selection that did not overlap the displayed image — must **stay** in selection mode. Nothing was selected, so there is nothing to have finished, and dropping the mode there would punish a misdrag with a trip back to the toolbar.
 
-**Status:** implemented — pending device verification
+**Status:** implemented and accepted by the repo owner, 2026-08-10 ([#65](https://github.com/towfd/vista_comic/pull/65))
 
 View state with no seam a unit test can reach without rendering the reader; it is one assignment in the reader's `onCrop`, handed to device verification per CLAUDE.md.
+
+Accepted on the owner's say-so rather than on a reported box-by-box sweep. The two worth a deliberate pass if anything here ever looks wrong are the last two: re-entering the mode, and a cancel-zone release *staying* in it. They are the only behaviours this change could have broken rather than improved, and neither is covered by a test.
 
 - [ ] Drawing a selection opens the result sheet and leaves selection mode
 - [ ] Dismissing the sheet leaves the reader scrollable with no further tap
