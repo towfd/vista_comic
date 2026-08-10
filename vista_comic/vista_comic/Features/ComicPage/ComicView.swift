@@ -132,6 +132,15 @@ private struct ReaderView: View {
     /// exactly that state. Without this gate a mid-chapter correction read as a
     /// pull past the bottom and ran the reader to the last chapter.
     @State private var isScrollDriven = false
+    /// The width the pages are laid out at, measured from the stack itself
+    /// rather than assumed, since it changes with rotation and with iPad
+    /// multitasking. `0` until the first layout, which `reservedPageHeight`
+    /// reads as "no reservation possible yet".
+    @State private var pageWidth: CGFloat = 0
+    /// This chapter's median height ratio, standing in for pages that have
+    /// never been decoded. Recomputed rather than accumulated, because the
+    /// cache — not the reader — is where the per-page ratios actually live.
+    @State private var chapterHeightRatio: CGFloat?
     /// The crop awaiting confirmation, and the sheet showing it.
     ///
     /// Owned **here** rather than on the page the selection was drawn on. A
@@ -235,6 +244,8 @@ private struct ReaderView: View {
                         pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
+                        reservedWidth: pageWidth,
+                        chapterHeightRatio: chapterHeightRatio,
                         onRetryAll: { retryAllToken += 1 },
                         onVisible: { isVisible in
                             if isVisible {
@@ -250,6 +261,11 @@ private struct ReaderView: View {
             // Marks the pages as scroll targets so `.scrollPosition` can both
             // resume to a page and report the top-most visible page index.
             .scrollTargetLayout()
+            // Measured on the stack rather than taken from the scroll view's
+            // container, so it is the width the pages are actually laid out
+            // at — insets and all — and it follows rotation and iPad
+            // multitasking without a second source of truth.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
         }
         // Selection mode owns the drag gesture on the current page instead;
         // disabling scroll while selecting stops the ScrollView from fighting
@@ -269,6 +285,14 @@ private struct ReaderView: View {
             updatePrefetchWindow(pageURLs: urls, visiblePages: pages, cache: pageImageCache)
         }
         .onChange(of: visiblePages) { _, _ in scheduleProgressSave() }
+        // A third reaction to the same signal, kept separate for the same
+        // reason as the two above: this one neither reaches ahead of the
+        // reader nor reports where they are, it re-reads what the cache has
+        // learned about this chapter's page shapes. Hung off visibility
+        // because that is when new pages have decoded — the median converges
+        // in the first few and then barely moves, so this needs no finer
+        // signal of its own.
+        .onChange(of: visiblePages) { _, _ in refreshChapterHeightRatio(pageURLs: urls) }
         // The gate both inferences below depend on. Tracked as a phase rather
         // than derived from geometry because geometry is precisely what cannot
         // be trusted here: an offset far past the end means "the reader pulled"
@@ -518,6 +542,12 @@ private struct ReaderView: View {
             // instant.
             pageImageCache.setPrefetchWindow(pageURLs: urls, currentIndex: resumeIndex ?? 0)
 
+            // Seed from whatever the cache already knows about this chapter —
+            // re-entering one read earlier reserves correct heights from the
+            // first frame, rather than starting from the library default and
+            // visibly settling.
+            refreshChapterHeightRatio(pageURLs: urls)
+
             if restart {
                 // Overwrite the store to page 1 for the incoming chapter, even if
                 // it was previously `read`. Clear `lastSentPage` first so the
@@ -534,6 +564,21 @@ private struct ReaderView: View {
             }
         } catch {
             pagesState = .failed(error)
+        }
+    }
+
+    /// Re-reads the chapter's known page proportions from the cache and keeps
+    /// their median as the stand-in for pages not yet decoded.
+    ///
+    /// Recomputed from the cache rather than accumulated here, so it is right
+    /// after an eviction, after a memory warning, and on re-entering a chapter
+    /// read earlier in the session — none of which the reader would otherwise
+    /// hear about. Holds the previous value when nothing is known yet, so a
+    /// fresh chapter does not first un-reserve every height it had.
+    private func refreshChapterHeightRatio(pageURLs: [URL]) {
+        let known = pageURLs.compactMap { pageImageCache.heightRatio(for: $0) }
+        if let median = medianHeightRatio(of: known) {
+            chapterHeightRatio = median
         }
     }
 
@@ -614,6 +659,63 @@ private struct ReaderView: View {
 func updatePrefetchWindow(pageURLs: [URL], visiblePages: Set<Int>, cache: any PageImageCache) {
     guard let topMost = visiblePages.min() else { return }
     cache.setPrefetchWindow(pageURLs: pageURLs, currentIndex: topMost)
+}
+
+// MARK: - Reserving height for pages that are not showing an image
+//
+// The reader's content must be the same height whether or not its images
+// happen to be in memory. Where that is not true, anything that rebuilds rows
+// — the keyboard raised over the reader, a rotation, a memory warning, simply
+// scrolling far enough for the byte budget to evict — changes the height of
+// content *above* the reader, and the page they were looking at slides out
+// from under them.
+
+/// The height-to-width ratio reserved for a page in a chapter where nothing at
+/// all has been decoded yet.
+///
+/// Measured rather than guessed: every page in the library as of 2026-08 is
+/// 900px wide with a median height of 1549px. It is only ever the answer for
+/// the first moments of a brand-new chapter — the first decode replaces it
+/// with that chapter's own median — so being wrong for a differently-shaped
+/// library costs one adjustment, not a persistent mis-sizing.
+let defaultPageHeightRatio: CGFloat = 1549.0 / 900.0
+
+/// The height to reserve for a page that is not currently rendering an image,
+/// or `nil` before the first layout has established a width.
+///
+/// Answers in the order the reader can be most confident: this page's own
+/// proportions if it has ever been decoded, otherwise what the rest of the
+/// chapter looks like, otherwise the library-wide default. The point of the
+/// first case is that it survives everything — the row being recycled and the
+/// image being evicted both leave the ratio behind in the cache — so a page
+/// seen once reserves its exact height forever after.
+func reservedPageHeight(
+    width: CGFloat,
+    recordedHeightRatio: CGFloat?,
+    chapterHeightRatio: CGFloat?
+) -> CGFloat? {
+    guard width > 0 else { return nil }
+    let ratio = recordedHeightRatio ?? chapterHeightRatio ?? defaultPageHeightRatio
+    guard ratio > 0 else { return nil }
+    return width * ratio
+}
+
+/// The median of the height ratios known for a chapter, or `nil` when none of
+/// its pages has been decoded yet.
+///
+/// The median rather than the mean because page heights in this library span
+/// 8px to 2500px: a handful of full spreads or thin slices drags a mean well
+/// away from what a typical page looks like, and the typical page is what an
+/// undecoded row should be guessing at. It converges after a few pages and
+/// then barely moves.
+func medianHeightRatio(of ratios: [CGFloat]) -> CGFloat? {
+    let sorted = ratios.filter { $0 > 0 }.sorted()
+    guard !sorted.isEmpty else { return nil }
+    let middle = sorted.count / 2
+    if sorted.count.isMultiple(of: 2) {
+        return (sorted[middle - 1] + sorted[middle]) / 2
+    }
+    return sorted[middle]
 }
 
 /// Whether the reader has scrolled `overscroll` points past the bottom of the
@@ -706,6 +808,12 @@ private struct ReaderPage: View {
     /// Whether the Reader is in text-selection mode. Drives whether this page
     /// installs the drag-to-select overlay/gesture over its rendered image.
     let isSelecting: Bool
+    /// The width this page is laid out at, measured by the reader. `0` before
+    /// the first layout, which means no height can be reserved yet.
+    let reservedWidth: CGFloat
+    /// The chapter's median height ratio, used when *this* page has never been
+    /// decoded and so has no proportions of its own on record.
+    let chapterHeightRatio: CGFloat?
     /// Tapping any failed page's retry button reloads every failed page at once
     /// (bumps the shared `retryAllToken` in the parent).
     let onRetryAll: () -> Void
@@ -735,6 +843,12 @@ private struct ReaderPage: View {
     /// `cancelZoneFrame`), so the badge can visually confirm "release here to
     /// cancel" before the finger lifts.
     @State private var isHoveringCancelZone = false
+    /// Read for this row alone — this page's own recorded proportions — the
+    /// way `AuthorizedAsyncImage` reads the same cache for the image it draws.
+    /// The reader holds the same environment value for different questions
+    /// (the prefetch window, and this chapter's median), which are its
+    /// business rather than a row's.
+    @Environment(\.pageImageCache) private var pageImageCache
 
     /// Fixed-size "release here to cancel" zone anchored to a corner of the
     /// displayed image, so cancelling is possible mid-drag with a single
@@ -767,8 +881,7 @@ private struct ReaderPage: View {
                             }
                         }
                 case .empty:
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 220)
+                    loadingPlaceholder
                         .onAppear { hasFailed = false }
                 case .failure:
                     failurePlaceholder
@@ -889,6 +1002,35 @@ private struct ReaderPage: View {
         )
     }
 
+    /// Stands in for the image at as close to its real height as is known, so
+    /// this row occupies the same space whether or not its image is in memory.
+    ///
+    /// This is the whole of the fix for the reader's content shifting: a row
+    /// that shrinks to a token height while it has no image changes the height
+    /// of everything above the reader, and the page they were looking at moves.
+    /// Falls back to the old fixed height only before the first layout, when
+    /// there is no width to reserve against.
+    @ViewBuilder
+    private var loadingPlaceholder: some View {
+        let reserved = reservedPageHeight(
+            width: reservedWidth,
+            recordedHeightRatio: pageImageCache.heightRatio(for: url),
+            chapterHeightRatio: chapterHeightRatio
+        )
+        if let reserved {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .frame(height: reserved)
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, minHeight: 220)
+        }
+    }
+
+    /// Deliberately *not* height-reserved, unlike `loadingPlaceholder`. A
+    /// failed page is a dead end the reader has to act on, and stranding its
+    /// retry button in the middle of a screen-and-a-half of blank space serves
+    /// nobody. The shift when a retry succeeds is one the reader asked for.
     private var failurePlaceholder: some View {
         Button {
             // Retry every currently-failed page at once, not just this one.

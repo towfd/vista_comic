@@ -37,6 +37,8 @@ private final class RecordingPageImageCache: PageImageCache, @unchecked Sendable
         lock.withLock { windows.append((pageURLs, currentIndex)) }
     }
 
+    func heightRatio(for url: URL) -> CGFloat? { nil }
+
     var windowCount: Int {
         lock.withLock { windows.count }
     }

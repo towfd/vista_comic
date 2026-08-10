@@ -8,7 +8,7 @@ No backend, API or model change: the Scanner, the Catalog, the API contract and 
 
 **Blocked by:** 02 — Prefetch a window of Pages ahead of the reader.
 
-**Status:** reopened 2026-08-10 — open, unclaimed
+**Status:** reopened 2026-08-10 — implemented, pending device verification
 
 **Reopened for a reason that was not on the table when it was closed.** The close below rested on the shift being cosmetic. It is not: `reader-auto-advance-false-trigger` found that the 220pt placeholder makes the reader's `contentSize` collapse by an order of magnitude when rows recycle, and the reader *infers from scroll geometry*. On an iPad, raising the keyboard to correct recognized text mid-chapter collapsed the content, which read as an overscroll past the bottom and ran the reader to the last chapter of the comic. See that spec for the full mechanism.
 
@@ -17,6 +17,15 @@ That feature's ticket 01 fixed the inference — auto-advance and read-detection
 Re-check the assumption before rebuilding, as the original close said: the running-median approach assumes Pages within a comic are consistently sized, which held for the library measured in 2026-08 (fixed widths, predominantly 900px). A library of conventional whole pages, mixed sources, or widely varying widths would break that assumption and might make backend-supplied dimensions the better answer after all — see the spec's Out of Scope for why that was rejected the first time.
 
 Add to the criteria below: a mid-chapter row recycle (the keyboard raised over the reader is the reproducible one) no longer moves the reading position.
+
+### What was built, 2026-08-10
+
+Close to the design above, with two departures worth knowing:
+
+- The running median is **recomputed from the cache** on each visibility change rather than accumulated as pages decode. It costs a dictionary lookup per page in the chapter, and in exchange it is correct after an eviction, after a memory warning, and on re-entering a chapter read earlier in the session — none of which an accumulator would hear about. It also carries the previous chapter's median forward instead of resetting, so a chapter change never briefly un-reserves every height.
+- The **failure** placeholder is deliberately left at its old fixed height. A failed page is a dead end the reader has to act on, and stranding its retry button in the middle of a screen and a half of blank space serves nobody; the shift when a retry succeeds is one the reader asked for. Only the loading/not-in-memory placeholder reserves.
+
+Height ratios are held in a plain dictionary beside the `NSCache`, not in it — an evictable ratio would reintroduce the collapse under memory pressure, which is the worst possible moment for it.
 
 ### Original close — 2026-08-09, after device verification of ticket 02
 
