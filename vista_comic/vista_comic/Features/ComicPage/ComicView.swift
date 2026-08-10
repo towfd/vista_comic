@@ -120,6 +120,18 @@ private struct ReaderView: View {
     /// Bumped by the reader's reload control; each `ReaderPage` re-requests only
     /// if it is currently in the failure state (loaded pages stay put).
     @State private var retryAllToken = 0
+    /// Whether the pages scroll view is currently being driven by the reader's
+    /// finger (dragging, or coasting after a fling) rather than sitting still.
+    ///
+    /// Load-bearing, not a convenience: both scroll-geometry inferences below
+    /// ask "did the reader scroll past the end", and scroll geometry alone
+    /// cannot tell that from "the content got shorter underneath a stationary
+    /// reader". The content does get shorter — pages outside the prefetch
+    /// window fall back to a 220pt placeholder, and the keyboard raised for the
+    /// result sheet's text field resizes the reader enough to recycle rows into
+    /// exactly that state. Without this gate a mid-chapter correction read as a
+    /// pull past the bottom and ran the reader to the last chapter.
+    @State private var isScrollDriven = false
     /// The crop awaiting confirmation, and the sheet showing it.
     ///
     /// Owned **here** rather than on the page the selection was drawn on. A
@@ -257,15 +269,32 @@ private struct ReaderView: View {
             updatePrefetchWindow(pageURLs: urls, visiblePages: pages, cache: pageImageCache)
         }
         .onChange(of: visiblePages) { _, _ in scheduleProgressSave() }
+        // The gate both inferences below depend on. Tracked as a phase rather
+        // than derived from geometry because geometry is precisely what cannot
+        // be trusted here: an offset far past the end means "the reader pulled"
+        // only if the reader was touching the scroll view at the time.
+        //
+        // Deceleration counts as driven: releasing a fling that coasts to the
+        // bottom is a normal way to finish a chapter, and the geometry update
+        // that crosses the threshold usually arrives after the finger has left.
+        .onScrollPhaseChange { _, phase in
+            isScrollDriven = phase == .tracking
+                || phase == .interacting
+                || phase == .decelerating
+        }
         // Auto-advance: after reaching the bottom, the user must keep pulling
         // *past* the end (overscroll) to continue into the next chapter — so
         // simply reaching the bottom is not enough. Does nothing on the last
         // chapter (nextChapter == nil), and only for content taller than the
         // screen (otherwise there is no bottom to pull past).
         .onScrollGeometryChange(for: Bool.self) { geometry in
-            let maxScroll = geometry.contentSize.height - geometry.containerSize.height
-            guard maxScroll > 0 else { return false }
-            return geometry.contentOffset.y >= maxScroll + pullThreshold
+            readerPassedBottom(
+                contentOffsetY: geometry.contentOffset.y,
+                contentHeight: geometry.contentSize.height,
+                containerHeight: geometry.containerSize.height,
+                isScrollDriven: isScrollDriven,
+                overscroll: pullThreshold
+            )
         } action: { wasPulledPastEnd, isPulledPastEnd in
             if isPulledPastEnd && !wasPulledPastEnd {
                 // Auto-advance restarts the next chapter from the top, unlike an
@@ -277,10 +306,18 @@ private struct ReaderView: View {
         // last page has been seen. The top-most visible page is never the final
         // page in a long chapter, so without this the reader could never report
         // `pageCount` and the backend would never mark the chapter `read`.
+        //
+        // Gated on the same phase, and for a consequence of its own rather than
+        // by symmetry: a collapse deep in a chapter reads as the bottom, reports
+        // `pageCount`, and marks a chapter read the reader never finished.
         .onScrollGeometryChange(for: Bool.self) { geometry in
-            let maxScroll = geometry.contentSize.height - geometry.containerSize.height
-            guard maxScroll > 0 else { return false }
-            return geometry.contentOffset.y >= maxScroll - 1
+            readerPassedBottom(
+                contentOffsetY: geometry.contentOffset.y,
+                contentHeight: geometry.contentSize.height,
+                containerHeight: geometry.containerSize.height,
+                isScrollDriven: isScrollDriven,
+                overscroll: -1
+            )
         } action: { wasAtEnd, isAtEnd in
             if isAtEnd && !wasAtEnd && !reachedEnd {
                 reachedEnd = true
@@ -416,6 +453,17 @@ private struct ReaderView: View {
         // scroll view (and `topPage`) is rebuilt for the incoming chapter.
         flushProgress()
         forceRestart = restart
+        // Drop the outgoing chapter's pages *here* rather than leaving it to
+        // `loadPages()`. `.task(id:)` only runs after a render, so between this
+        // assignment and that task there was one pass carrying the incoming
+        // chapter's `.id` over the outgoing chapter's URLs and a stale
+        // `topPage` — a freshly built scroll view scrolled deep into content of
+        // mostly placeholder-height rows, which is how a single false advance
+        // became a run to the last chapter.
+        pagesState = .loading
+        // The rebuilt scroll view starts idle; leaving this true would let its
+        // first geometry reading be read as a pull the reader never made.
+        isScrollDriven = false
         currentChapter = chapter
     }
 
@@ -566,6 +614,38 @@ private struct ReaderView: View {
 func updatePrefetchWindow(pageURLs: [URL], visiblePages: Set<Int>, cache: any PageImageCache) {
     guard let topMost = visiblePages.min() else { return }
     cache.setPrefetchWindow(pageURLs: pageURLs, currentIndex: topMost)
+}
+
+/// Whether the reader has scrolled `overscroll` points past the bottom of the
+/// chapter — the shared inference behind both auto-advance (`overscroll` =
+/// `pullThreshold`, a deliberate pull *past* the end) and read-detection
+/// (`overscroll` = `-1`, merely reaching the end).
+///
+/// `isScrollDriven` is the whole point of this function existing, and the
+/// reason it takes the scroll phase rather than deriving everything from
+/// geometry. The three geometry numbers describe where the content sits, not
+/// how it got there, and the reader's content resizes on its own: pages outside
+/// the prefetch window reserve 220pt instead of a real page's height, so
+/// anything that recycles rows — most importantly the keyboard raised for the
+/// result sheet's text field — collapses `contentHeight` under a stationary
+/// reader. A large `contentOffsetY` left over from before the collapse then
+/// clears any threshold, and the further into the chapter the reader was, the
+/// more certainly it does. Requiring the scroll view to be under the reader's
+/// finger is what separates the two.
+///
+/// Returns `false` for content no taller than the container: there is no bottom
+/// to pass when everything already fits.
+func readerPassedBottom(
+    contentOffsetY: CGFloat,
+    contentHeight: CGFloat,
+    containerHeight: CGFloat,
+    isScrollDriven: Bool,
+    overscroll: CGFloat
+) -> Bool {
+    guard isScrollDriven else { return false }
+    let maxScroll = contentHeight - containerHeight
+    guard maxScroll > 0 else { return false }
+    return contentOffsetY >= maxScroll + overscroll
 }
 
 /// The 1-based page the reader reports as its position: the chapter's last page
