@@ -8,11 +8,19 @@ No backend, API or model change: the Scanner, the Catalog, the API contract and 
 
 **Blocked by:** 02 — Prefetch a window of Pages ahead of the reader.
 
-**Status:** not doing — closed 2026-08-09 after device verification of ticket 02
+**Status:** reopened 2026-08-10 — open, unclaimed
 
-**Do not pick this up off the frontier.** With the prefetch window in place the repo owner scrolled a real device and reported the remaining shift as "not very noticeable", so the value of this ticket collapsed. The gap it was written to close — a Page reserving a fixed short placeholder before it has ever been decoded — is real and still present in the code, but the window now decodes nearly every Page before the reader reaches it, which leaves the gap exposed only when a reader deliberately outruns prefetching.
+**Reopened for a reason that was not on the table when it was closed.** The close below rested on the shift being cosmetic. It is not: `reader-auto-advance-false-trigger` found that the 220pt placeholder makes the reader's `contentSize` collapse by an order of magnitude when rows recycle, and the reader *infers from scroll geometry*. On an iPad, raising the keyboard to correct recognized text mid-chapter collapsed the content, which read as an overscroll past the bottom and ran the reader to the last chapter of the comic. See that spec for the full mechanism.
 
-Reopen this only if that changes, and check the assumption before rebuilding: the running-median approach assumes Pages within a comic are consistently sized, which held for the library measured in 2026-08 (fixed widths, predominantly 900px). A library of conventional whole pages, mixed sources, or widely varying widths would break that assumption and might make backend-supplied dimensions the better answer after all — see the spec's Out of Scope for why that was rejected the first time.
+That feature's ticket 01 fixed the inference — auto-advance and read-detection now require a real scroll gesture, so the collapse can no longer change chapters or mark a chapter read. It deliberately did **not** fix the collapse. What remains is the reading position still shifting when it happens, which is visible on the last chapter (where the chapter change was already a no-op) and everywhere else. That is this ticket.
+
+Re-check the assumption before rebuilding, as the original close said: the running-median approach assumes Pages within a comic are consistently sized, which held for the library measured in 2026-08 (fixed widths, predominantly 900px). A library of conventional whole pages, mixed sources, or widely varying widths would break that assumption and might make backend-supplied dimensions the better answer after all — see the spec's Out of Scope for why that was rejected the first time.
+
+Add to the criteria below: a mid-chapter row recycle (the keyboard raised over the reader is the reproducible one) no longer moves the reading position.
+
+### Original close — 2026-08-09, after device verification of ticket 02
+
+With the prefetch window in place the repo owner scrolled a real device and reported the remaining shift as "not very noticeable", so the value of this ticket collapsed. The gap it was written to close — a Page reserving a fixed short placeholder before it has ever been decoded — is real and still present in the code, but the window now decodes nearly every Page before the reader reaches it, which leaves the gap exposed only when a reader deliberately outruns prefetching.
 
 - [ ] Scrolling down a brand-new chapter faster than prefetching keeps up no longer shoves content down as Pages arrive
 - [ ] A Page whose image has been evicted still reserves its correct height when its row is rebuilt
