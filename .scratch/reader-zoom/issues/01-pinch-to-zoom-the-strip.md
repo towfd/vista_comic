@@ -20,7 +20,33 @@ The scale returns to 1.0 whenever the chapter changes and whenever the Reader is
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** implemented, awaiting device verification (commit `38095ea` + review fixes; branch `feat/reader-zoom`)
+
+Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 218 unit tests pass, none failing, including the seven pre-existing auto-advance gate tests unchanged.
+
+**`/code-review` found four real defects, all fixed before this line was written.** Recorded because two of them were introduced by judgement calls that looked like improvements:
+
+1. **Pages would have been laid out at 900pt on a 393pt phone.** A scroll view with a horizontal axis proposes an *unspecified* width to its content, and a page sized `maxWidth: .infinity` answers that with its ideal width — the source image's own. An earlier attempt to leave the width unimposed at full width (to dodge a speculative landscape safe-area concern) would have broken the ticket's most important criterion. The width is now imposed at every scale.
+2. **The pinch was not anchored at the focal point** — it used the top of the viewport, and never read the gesture's own anchor.
+3. **The strip snapped sideways on release**, because the commit corrected the vertical offset only.
+4. **Rotating while magnified threw the reader through the chapter**, since a container resize rescales the strip exactly as a pinch does but had no matching offset correction.
+
+**Two review findings were deliberately not acted on**, and belong to a later change rather than this one:
+
+- `readerPassedBottom`'s `isScrollDriven:` parameter is now fed a broader arming decision than its name suggests, and wants renaming. Doing so would edit the existing auto-advance tests, which this ticket promises to leave untouched.
+- The three geometry values those two call sites pass separately are a data clump that `ReaderScrollMetrics` half-solves. Bundling them changes a signature the same tests pin.
+
+**Verify on device — this is the handoff, per `CLAUDE.md`'s verification rules.** In rough order of what would hurt most if wrong:
+
+- Read a chapter normally without zooming at all, on both a compact and a large phone: page size, scrolling, tapping to show and hide the controls, and pulling past the bottom to advance must all feel exactly as before.
+- Zoom to 3x in the middle of a chapter, then pinch back to full width. **The chapter must not change and must not be marked read.** Repeat deep into a long chapter, where the stale offset is largest.
+- Pinch slowly and check the strip tracks the fingers, and that what was under them is still under them when you let go — both zooming in and zooming out.
+- Pinch past both bounds and confirm it resists and settles at full width and at 3x.
+- Zoom in, then scroll several pages: the magnification stays, the horizontal position stays, and pages keep loading at the right size.
+- Rotate the device while at 3x, and on iPad resize the window: the strip should stay coherent and you should stay roughly where you were.
+- Change chapter while magnified, and leave and re-enter the reader: both must come back at full width.
+- Resume: reopen a chapter you were part-way through, jump to a page from 歷史紀錄, and auto-advance past the end of a chapter. All three go through the scroll position that this ticket replaced, so all three are worth a look.
+- Selection still works at full width — magnified selection is ticket 02.
 
 - [ ] Pinching enlarges the whole strip, and the magnification persists while scrolling from Page to Page
 - [ ] The scale is bounded to 1.0–3.0, and both bounds rubber-band and settle at the bound

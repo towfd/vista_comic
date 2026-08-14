@@ -19,7 +19,6 @@
 //  up to 3x.
 //
 
-import CoreGraphics
 import SwiftUI
 
 // MARK: - Scale
@@ -77,20 +76,62 @@ enum ReaderZoom {
 
 // MARK: - Live scroll metrics
 
-/// Where the pages scroll view currently sits, and how tall its content is.
+/// Where the pages scroll view currently sits, how big its content is, and how
+/// big the window onto it is.
 ///
-/// Read only when a pinch begins or commits — never during layout — so that a
-/// zoom can be anchored at, and re-anchored to, the content the reader is
-/// actually looking at.
+/// Read only when a pinch begins or commits, and when the container resizes —
+/// never during layout — so that a zoom can be anchored at, and re-anchored to,
+/// the content the reader is actually looking at.
 struct ReaderScrollMetrics: Equatable {
-    var offsetY: CGFloat = 0
-    var contentHeight: CGFloat = 0
+    var offset: CGPoint = .zero
+    var contentSize: CGSize = .zero
+    var containerSize: CGSize = .zero
 
-    /// Where the top of the viewport sits within the whole strip, as a fraction
-    /// of it. `0` when there is no content for it to be a fraction of.
-    var topFraction: CGFloat {
-        guard contentHeight > 0 else { return 0 }
-        return min(max(offsetY / contentHeight, 0), 1)
+    /// The content under `focal` — a unit point within the *viewport* — as a
+    /// unit point within the whole strip.
+    ///
+    /// This is the translation the pinch needs: a gesture reports where the
+    /// fingers are on screen, while the transform that follows them has to be
+    /// anchored in the content's own coordinate space, which is up to three
+    /// screens wide and many screens tall.
+    func contentAnchor(forFocal focal: UnitPoint) -> UnitPoint {
+        guard contentSize.width > 0, contentSize.height > 0 else { return .center }
+        let point = viewportPointInContent(focal)
+        return UnitPoint(
+            x: Self.clampedToUnit(point.x / contentSize.width),
+            y: Self.clampedToUnit(point.y / contentSize.height)
+        )
+    }
+
+    /// Where the scroll offset has to move once the strip has been re-laid-out
+    /// `ratio` times larger, so that the content under `focal` is still under
+    /// `focal`.
+    ///
+    /// Without this the reader is thrown through the chapter by exactly the
+    /// proportion the content grew — zooming to 3x would leave them a third of
+    /// the way back from where they were reading.
+    func offset(afterScalingBy ratio: CGFloat, focal: UnitPoint) -> CGPoint {
+        let anchorInViewport = CGPoint(
+            x: focal.x * containerSize.width,
+            y: focal.y * containerSize.height
+        )
+        let point = viewportPointInContent(focal)
+        return CGPoint(
+            x: max(0, point.x * ratio - anchorInViewport.x),
+            y: max(0, point.y * ratio - anchorInViewport.y)
+        )
+    }
+
+    /// The content coordinate currently displayed at `focal`.
+    private func viewportPointInContent(_ focal: UnitPoint) -> CGPoint {
+        CGPoint(
+            x: offset.x + focal.x * containerSize.width,
+            y: offset.y + focal.y * containerSize.height
+        )
+    }
+
+    private static func clampedToUnit(_ value: CGFloat) -> CGFloat {
+        min(max(value, 0), 1)
     }
 }
 

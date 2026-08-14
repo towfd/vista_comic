@@ -140,12 +140,13 @@ private struct ReaderView: View {
     /// pinch tracks the fingers instead of re-measuring a 180-page stack on
     /// every frame.
     @State private var liveMagnification: CGFloat?
-    /// Where the strip is scaled from during a pinch: the content point that is
-    /// currently at the top of the viewport, captured once when the gesture
-    /// starts so it cannot drift mid-pinch. Matching it to what the commit does
-    /// to the scroll offset is what makes the transform and the committed layout
-    /// show the same thing.
-    @State private var magnifyAnchor: UnitPoint = .top
+    /// Where the fingers came down, as a unit point within the viewport.
+    @State private var magnifyFocal: UnitPoint = .center
+    /// The same place expressed within the whole strip, which is the coordinate
+    /// space the transform is anchored in. Captured once when the gesture starts
+    /// so it cannot drift mid-pinch, and re-used by the commit so the transform
+    /// and the committed layout put the content in the same place.
+    @State private var magnifyAnchor: UnitPoint = .center
     /// The width the scroll view offers its content, measured rather than
     /// assumed so it follows rotation and iPad multitasking.
     @State private var containerWidth: CGFloat = 0
@@ -302,18 +303,17 @@ private struct ReaderView: View {
             // Marks the pages as scroll targets so `.scrollPosition` can both
             // resume to a page and report the top-most visible page index.
             .scrollTargetLayout()
-            // Measured on the stack rather than taken from the scroll view's
-            // container, so it is the width the pages are actually laid out
-            // at — insets and all — and it follows rotation and iPad
-            // multitasking without a second source of truth.
+            // Measured on the stack rather than on the scroll view, so it is the
+            // width the pages are actually laid out at — which once magnified is
+            // deliberately *not* the container's width. This is what the
+            // reserved page heights are computed against, and measuring it here
+            // is why they need no zoom arithmetic of their own.
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
             // Zoom is a change of *layout* width, not a rendering transform: a
             // wider strip means genuinely wider pages, and since each page is
             // fitted at its own aspect ratio, proportionally taller ones. That
             // is what keeps the scroll view's own knowledge of its content
-            // correct — and why the measurement above, which feeds the reserved
-            // page heights, needs no zoom arithmetic of its own.
-            //
+            // correct.
             .frame(width: imposedContentWidth)
             // The live pinch, which deliberately does not participate in layout.
             .scaleEffect(liveZoomRatio, anchor: magnifyAnchor)
@@ -329,9 +329,24 @@ private struct ReaderView: View {
         // width feels exactly as it does today despite the second axis.
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         // The width available to the strip, which the laid-out width is derived
-        // from. Measured on the scroll view rather than assumed, so rotation and
-        // iPad multitasking are followed without a second source of truth.
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { containerWidth = $0 }
+        // from. Measured rather than assumed so rotation and iPad multitasking
+        // are followed.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { oldWidth, newWidth in
+            containerWidth = newWidth
+            // A resize rescales the whole chapter under a stationary reader for
+            // exactly the reason a pinch does — the strip is laid out relative
+            // to the container — so it needs the same offset correction, or
+            // rotating at 3x throws the reader through the chapter.
+            guard zoomScale > ReaderZoom.minScale, oldWidth > 0, newWidth > 0,
+                  oldWidth != newWidth
+            else { return }
+            scrollPosition.scrollTo(
+                point: scrollMetrics.value.offset(
+                    afterScalingBy: newWidth / oldWidth,
+                    focal: .center
+                )
+            )
+        }
         // Two fingers, so there is nothing to arbitrate against the scroll
         // view's one-finger pan; simultaneous so it composes rather than
         // replaces.
@@ -341,8 +356,9 @@ private struct ReaderView: View {
         // invalidated by it.
         .onScrollGeometryChange(for: ReaderScrollMetrics.self) { geometry in
             ReaderScrollMetrics(
-                offsetY: geometry.contentOffset.y,
-                contentHeight: geometry.contentSize.height
+                offset: geometry.contentOffset,
+                contentSize: geometry.contentSize,
+                containerSize: geometry.containerSize
             )
         } action: { _, metrics in
             scrollMetrics.value = metrics
@@ -366,14 +382,8 @@ private struct ReaderView: View {
         // in the first few and then barely moves, so this needs no finer
         // signal of its own.
         .onChange(of: visiblePages) { _, _ in refreshChapterHeightRatio(pageURLs: urls) }
-        // The gate both inferences below depend on. Tracked as a phase rather
-        // than derived from geometry because geometry is precisely what cannot
-        // be trusted here: an offset far past the end means "the reader pulled"
-        // only if the reader was touching the scroll view at the time.
-        //
-        // Deceleration counts as driven: releasing a fling that coasts to the
-        // bottom is a normal way to finish a chapter, and the geometry update
-        // that crosses the threshold usually arrives after the finger has left.
+        // Feeds the gate both inferences below depend on. What each phase means
+        // to it lives on the gate itself, which is also where it is tested.
         .onScrollPhaseChange { _, phase in
             bottomEdgeGate.scrollPhaseChanged(to: phase)
         }
@@ -433,17 +443,18 @@ private struct ReaderView: View {
 
     // MARK: - Zoom
 
-    /// The width to impose on the pages stack, or `nil` to leave it sizing
-    /// itself exactly as it does today.
+    /// The width to lay the pages stack out at, or `nil` before the first
+    /// layout has established one.
     ///
-    /// Deliberately `nil` at full width rather than "the container width". The
-    /// stack's natural width is the scroll view's *content* region, which is not
-    /// always the same as its frame — horizontal safe-area insets in landscape
-    /// are the case that differs — so imposing the frame width would quietly
-    /// make an unmagnified chapter scrollable sideways by a few points. At full
-    /// width nothing is imposed and the layout is untouched.
+    /// Imposed at *every* scale, including full width, and that is not
+    /// incidental. A scroll view that scrolls horizontally proposes an
+    /// unspecified width to its content, and a page sized with
+    /// `.frame(maxWidth: .infinity)` answers an unspecified proposal with its
+    /// ideal width — which for these images is the source's own 900pt. Without
+    /// a width imposed here, adding the second axis would silently lay an
+    /// unmagnified chapter out at 900pt on a 393pt phone.
     private var imposedContentWidth: CGFloat? {
-        guard zoomScale > ReaderZoom.minScale, containerWidth > 0 else { return nil }
+        guard containerWidth > 0 else { return nil }
         return ReaderZoom.contentWidth(containerWidth: containerWidth, scale: zoomScale)
     }
 
@@ -451,7 +462,7 @@ private struct ReaderView: View {
     /// is in progress, in which case it is the distance between what the layout
     /// is committed to and what the fingers are currently asking for.
     private var liveZoomRatio: CGFloat {
-        guard let liveMagnification, zoomScale > 0 else { return 1 }
+        guard let liveMagnification else { return 1 }
         return ReaderZoom.rubberBanded(zoomScale * liveMagnification) / zoomScale
     }
 
@@ -467,23 +478,30 @@ private struct ReaderView: View {
         MagnifyGesture()
             .onChanged { value in
                 if liveMagnification == nil {
-                    magnifyAnchor = UnitPoint(x: 0.5, y: scrollMetrics.value.topFraction)
+                    // Both captured once, at the start: the gesture keeps
+                    // reporting its original anchor, but the metrics behind the
+                    // translation drift as the transform moves things about.
+                    magnifyFocal = value.startAnchor
+                    magnifyAnchor = scrollMetrics.value.contentAnchor(forFocal: value.startAnchor)
                     bottomEdgeGate.magnificationBegan()
                 }
                 liveMagnification = value.magnification
             }
             .onEnded { value in
                 let committed = ReaderZoom.clamped(zoomScale * value.magnification)
-                let ratio = zoomScale > 0 ? committed / zoomScale : 1
-                let offsetY = scrollMetrics.value.offsetY
+                let ratio = committed / zoomScale
+                let metrics = scrollMetrics.value
                 zoomScale = committed
                 liveMagnification = nil
                 bottomEdgeGate.magnificationEnded(committedScale: committed)
-                // The strip's height changes with its width, so leaving the
-                // offset alone would throw the reader back through the chapter
-                // by the same proportion. Scaling it keeps whatever content was
-                // at the top of the viewport at the top of the viewport.
-                scrollPosition.scrollTo(y: offsetY * ratio)
+                // Re-anchoring the offset to the same point the transform was
+                // anchored at is what makes releasing invisible: the strip is
+                // re-laid-out larger, and the content that was under the fingers
+                // is put back under the fingers. Without it the reader is thrown
+                // through the chapter by the proportion the content grew.
+                scrollPosition.scrollTo(
+                    point: metrics.offset(afterScalingBy: ratio, focal: magnifyFocal)
+                )
             }
     }
 

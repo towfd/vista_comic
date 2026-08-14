@@ -91,6 +91,77 @@ struct ReaderZoomScaleTests {
     }
 }
 
+@Suite("Keeping the reader where they were")
+struct ReaderScrollMetricsTests {
+
+    /// A reader parked well into a chapter: a 400x800 window onto a strip
+    /// 30000pt tall, scrolled 3000pt down.
+    private let metrics = ReaderScrollMetrics(
+        offset: CGPoint(x: 0, y: 3000),
+        contentSize: CGSize(width: 400, height: 30000),
+        containerSize: CGSize(width: 400, height: 800)
+    )
+
+    private func isClose(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
+        abs(lhs - rhs) < 0.0001
+    }
+
+    @Test("A point on screen translates into the same point within the strip")
+    func focalPointBecomesAContentAnchor() {
+        // The middle of the screen is 3400pt down a 30000pt strip.
+        let anchor = metrics.contentAnchor(forFocal: .center)
+        #expect(isClose(anchor.x, 0.5))
+        #expect(isClose(anchor.y, 3400.0 / 30000.0))
+    }
+
+    @Test("With no content there is nothing to anchor to")
+    func anchorBeforeAnyContentIsTheCentre() {
+        let empty = ReaderScrollMetrics()
+        #expect(empty.contentAnchor(forFocal: .topLeading) == .center)
+    }
+
+    @Test("After a zoom commits, the content under the fingers is still under the fingers")
+    func scalingKeepsTheFocalPointPut() {
+        // This is the property the whole correction exists for, so it is
+        // asserted as the property rather than as a magic number: take the
+        // content point under the fingers, scale the strip, and check that point
+        // still lands where the fingers are.
+        let focal = UnitPoint.center
+        let ratio: CGFloat = 3
+
+        let pointInContent = CGPoint(
+            x: metrics.offset.x + focal.x * metrics.containerSize.width,
+            y: metrics.offset.y + focal.y * metrics.containerSize.height
+        )
+        let corrected = metrics.offset(afterScalingBy: ratio, focal: focal)
+
+        #expect(isClose(pointInContent.x * ratio - corrected.x, focal.x * metrics.containerSize.width))
+        #expect(isClose(pointInContent.y * ratio - corrected.y, focal.y * metrics.containerSize.height))
+    }
+
+    @Test("Simply multiplying the offset would not have kept it put")
+    func scalingIsNotJustMultiplyingTheOffset() {
+        // Pins the distinction, because multiplying the offset is the obvious
+        // wrong answer and it is right only when the fingers are at the very top
+        // of the screen.
+        let corrected = metrics.offset(afterScalingBy: 3, focal: .center)
+        #expect(corrected.y != metrics.offset.y * 3)
+        #expect(isClose(corrected.y, 9800))
+    }
+
+    @Test("Zooming out near the top does not produce a negative offset")
+    func correctionNeverScrollsPastTheStart() {
+        let nearTop = ReaderScrollMetrics(
+            offset: CGPoint(x: 0, y: 100),
+            contentSize: CGSize(width: 400, height: 30000),
+            containerSize: CGSize(width: 400, height: 800)
+        )
+        let corrected = nearTop.offset(afterScalingBy: 1.0 / 3.0, focal: .center)
+        #expect(corrected.x >= 0)
+        #expect(corrected.y >= 0)
+    }
+}
+
 @Suite("Reader bottom-edge arming gate")
 struct ReaderBottomEdgeGateTests {
 
