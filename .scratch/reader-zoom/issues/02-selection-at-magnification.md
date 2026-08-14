@@ -10,7 +10,25 @@ Selection mode continues to disable scrolling while active, which means a reader
 
 **Blocked by:** 01 — Pinch to zoom the strip, without breaking auto-advance.
 
-**Status:** ready-for-agent
+**Status:** implemented, awaiting device verification (branch `feat/reader-zoom`)
+
+Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 227 unit tests pass, none failing.
+
+The crop mathematics were left untouched, as intended, and a test now says why that is safe rather than leaving it as an assumption: the display frame the mapping is handed grows with the magnification and so do the drag coordinates drawn in it, so the same visible region selected at 2x and 3x produces the same source-pixel rectangle as at full width.
+
+The badge is now anchored to the top-right of whatever part of the page is visible, which is a change in **both** axes. The horizontal half is the one the ticket described; the vertical half matters just as much, because at 3x a page is several screens tall and a badge pinned to the page's top is off screen whenever the reader is looking at the middle of it.
+
+**The one thing to check first on device.** The visible region comes from asking the page's geometry for the scroll view's bounds in its own coordinate space. If that returns something other than the visible rect, the function falls back to the page's own corner — which is exactly today's behaviour, i.e. the bug this ticket fixes, silently. So the first check is simply: **at 3x, is the badge on screen?** If it is not, the fallback is being taken and the cause is that lookup, not the geometry maths, which the tests cover.
+
+**Verify on device:**
+
+- Enter selection mode at 2x and at 3x, drag a selection over a speech bubble, and confirm recognition and translation behave exactly as at full width.
+- At 3x, panned to the left edge, mid-page: the cancel badge must be on screen. Repeat panned to the right edge and near the top and bottom of a tall page.
+- Drag into the badge and release, at 3x: the selection must be abandoned with no result sheet, and selection mode must stay on.
+- Complete a real selection at 3x: the result sheet appears and selection mode ends itself.
+- Select the same speech bubble at full width and at 3x and compare the recognized text — it should be the same, since the crop is the same pixels.
+- Confirm selection at full width is unchanged, on both a compact and a large phone.
+- Panning while selection mode is on is still deliberately not possible; position the page first, then enter selection mode.
 
 - [ ] Selection mode can be entered and used at any scale, including 3x
 - [ ] The cancel badge is visible and reachable within the visible viewport at every scale and every horizontal offset

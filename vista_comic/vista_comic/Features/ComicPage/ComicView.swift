@@ -869,6 +869,53 @@ func medianHeightRatio(of ratios: [CGFloat]) -> CGFloat? {
     return sorted[middle]
 }
 
+// MARK: - Where the selection's cancel badge goes
+//
+// The badge exists so a selection can be abandoned mid-drag with one continuous
+// touch — drag into it and lift — which only works if it is on screen. Anchoring
+// it to the page's own top-right corner was correct while a page was always
+// exactly as wide as the screen and rarely much taller. Once the reader can
+// magnify to 3x, that corner is two screen widths to the right and, on a tall
+// page, several screens up.
+
+/// The cancel badge's frame, in the page's own coordinate space.
+///
+/// Anchored to the top-right of whatever part of the page is actually visible,
+/// so it is reachable at every magnification and wherever the reader has panned
+/// to. `visibleRect` is that part, in the same coordinate space; `nil` (or a
+/// region that does not overlap the page at all) falls back to the page's own
+/// bounds, which reproduces exactly the behaviour that was correct before zoom
+/// existed.
+///
+/// The result is always kept within the page, so a sliver of a page showing at
+/// the edge of the screen cannot push the badge off it.
+func selectionCancelZoneFrame(
+    displayFrameSize: CGSize,
+    visibleRect: CGRect?,
+    diameter: CGFloat,
+    inset: CGFloat = 12
+) -> CGRect {
+    let pageBounds = CGRect(origin: .zero, size: displayFrameSize)
+
+    var anchorRegion = pageBounds
+    if let visibleRect {
+        let overlap = visibleRect.intersection(pageBounds)
+        if !overlap.isNull, !overlap.isEmpty {
+            anchorRegion = overlap
+        }
+    }
+
+    let furthestX = max(pageBounds.maxX - diameter, pageBounds.minX)
+    let furthestY = max(pageBounds.maxY - diameter, pageBounds.minY)
+
+    return CGRect(
+        x: min(max(anchorRegion.maxX - diameter - inset, pageBounds.minX), furthestX),
+        y: min(max(anchorRegion.minY + inset, pageBounds.minY), furthestY),
+        width: diameter,
+        height: diameter
+    )
+}
+
 /// Whether the reader has scrolled `overscroll` points past the bottom of the
 /// chapter — the shared inference behind both auto-advance (`overscroll` =
 /// `pullThreshold`, a deliberate pull *past* the end) and read-detection
@@ -1034,7 +1081,15 @@ private struct ReaderPage: View {
                             // otherwise.
                             if isSelecting {
                                 GeometryReader { proxy in
-                                    selectionOverlay(displayFrameSize: proxy.size)
+                                    selectionOverlay(
+                                        displayFrameSize: proxy.size,
+                                        // What of this page the reader can
+                                        // actually see. At full width that is
+                                        // the whole page; magnified it is a
+                                        // fraction of it, and the cancel badge
+                                        // has to stay inside that fraction.
+                                        visibleRect: proxy.bounds(of: .scrollView)
+                                    )
                                 }
                             }
                         }
@@ -1072,15 +1127,6 @@ private struct ReaderPage: View {
 
     // MARK: - Selection
 
-    private func cancelZoneFrame(in displayFrameSize: CGSize) -> CGRect {
-        CGRect(
-            x: displayFrameSize.width - cancelZoneDiameter - 12,
-            y: 12,
-            width: cancelZoneDiameter,
-            height: cancelZoneDiameter
-        )
-    }
-
     private func dragRect(_ value: DragGesture.Value) -> CGRect {
         CGRect(
             x: value.startLocation.x,
@@ -1090,8 +1136,12 @@ private struct ReaderPage: View {
         ).standardized
     }
 
-    private func selectionOverlay(displayFrameSize: CGSize) -> some View {
-        let cancelZone = cancelZoneFrame(in: displayFrameSize)
+    private func selectionOverlay(displayFrameSize: CGSize, visibleRect: CGRect?) -> some View {
+        let cancelZone = selectionCancelZoneFrame(
+            displayFrameSize: displayFrameSize,
+            visibleRect: visibleRect,
+            diameter: cancelZoneDiameter
+        )
         return ZStack(alignment: .topLeading) {
             // Transparent, but shaped so it still receives the drag — this is
             // the hit-testable surface the gesture is attached to.
