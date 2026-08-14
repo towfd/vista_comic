@@ -141,12 +141,12 @@ private struct ReaderView: View {
     /// every frame.
     @State private var liveMagnification: CGFloat?
     /// Where the fingers came down, as a unit point within the viewport.
+    ///
+    /// Captured once when the gesture starts so it cannot drift mid-pinch, and
+    /// used twice: it anchors the transform that follows the fingers, and it is
+    /// the point the commit re-anchors the scroll offset to. Those being the
+    /// same point is what makes releasing invisible.
     @State private var magnifyFocal: UnitPoint = .center
-    /// The same place expressed within the whole strip, which is the coordinate
-    /// space the transform is anchored in. Captured once when the gesture starts
-    /// so it cannot drift mid-pinch, and re-used by the commit so the transform
-    /// and the committed layout put the content in the same place.
-    @State private var magnifyAnchor: UnitPoint = .center
     /// The width the scroll view offers its content, measured rather than
     /// assumed so it follows rotation and iPad multitasking.
     @State private var containerWidth: CGFloat = 0
@@ -319,9 +319,20 @@ private struct ReaderView: View {
             // is what keeps the scroll view's own knowledge of its content
             // correct.
             .frame(width: imposedContentWidth)
-            // The live pinch, which deliberately does not participate in layout.
-            .scaleEffect(liveZoomRatio, anchor: magnifyAnchor)
         }
+        // The live pinch, applied to the *viewport* rather than to its content.
+        //
+        // Transforming the content meant transforming a stack tens of thousands
+        // of points tall, which is compositing work on a scale the scroll view
+        // has no way to avoid — and it was applied whether or not a pinch was in
+        // progress. The viewport is one screen. It also removes a translation
+        // step: the gesture reports its anchor in viewport coordinates, which is
+        // now the space the transform is applied in, so there is nothing to
+        // convert and nothing to get wrong.
+        .scaleEffect(liveZoomRatio, anchor: magnifyFocal)
+        // Keeps a pinch-in from letting the transformed viewport bleed outside
+        // the reader's bounds mid-gesture.
+        .clipped()
         // Selection mode owns the drag gesture on the current page instead;
         // disabling scroll while selecting stops the ScrollView from fighting
         // that drag for the touch.
@@ -482,17 +493,13 @@ private struct ReaderView: View {
         MagnifyGesture()
             .onChanged { value in
                 if liveMagnification == nil {
-                    // Both captured once, at the start: the gesture keeps
-                    // reporting its original anchor, but the metrics behind the
-                    // translation drift as the transform moves things about.
                     magnifyFocal = value.startAnchor
-                    magnifyAnchor = scrollMetrics.value.contentAnchor(forFocal: value.startAnchor)
                     bottomEdgeGate.magnificationBegan()
                 }
                 liveMagnification = value.magnification
             }
             .onEnded { value in
-                let committed = ReaderZoom.clamped(zoomScale * value.magnification)
+                let committed = ReaderZoom.committed(zoomScale * value.magnification)
                 let ratio = committed / zoomScale
                 let metrics = scrollMetrics.value
                 zoomScale = committed

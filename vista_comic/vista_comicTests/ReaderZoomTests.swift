@@ -46,6 +46,24 @@ struct ReaderZoomScaleTests {
         #expect(ReaderZoom.maxScale == 3.0)
     }
 
+    @Test("Pinching almost back to full width settles at full width")
+    func committingSnapsToFullWidth() {
+        // Found on device. Full width is what re-enables auto-advance, so a
+        // couple of percent left over from an imprecise pinch silently cost the
+        // reader the next chapter — and nothing on screen said why, because 1.03
+        // looks exactly like 1.0.
+        #expect(ReaderZoom.committed(1.03) == ReaderZoom.minScale)
+        #expect(ReaderZoom.committed(1.0) == ReaderZoom.minScale)
+        #expect(ReaderZoom.committed(0.4) == ReaderZoom.minScale)
+    }
+
+    @Test("A magnification the reader clearly meant is left alone")
+    func committingKeepsADeliberateMagnification() {
+        #expect(ReaderZoom.committed(1.5) == 1.5)
+        #expect(ReaderZoom.committed(2.4) == 2.4)
+        #expect(ReaderZoom.committed(7.5) == ReaderZoom.maxScale)
+    }
+
     @Test("Overshooting resists rather than stopping dead")
     func rubberBandingResistsBeyondTheBounds() {
         // Below the minimum: the reader still sees movement, but less of it,
@@ -104,20 +122,6 @@ struct ReaderScrollMetricsTests {
 
     private func isClose(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
         abs(lhs - rhs) < 0.0001
-    }
-
-    @Test("A point on screen translates into the same point within the strip")
-    func focalPointBecomesAContentAnchor() {
-        // The middle of the screen is 3400pt down a 30000pt strip.
-        let anchor = metrics.contentAnchor(forFocal: .center)
-        #expect(isClose(anchor.x, 0.5))
-        #expect(isClose(anchor.y, 3400.0 / 30000.0))
-    }
-
-    @Test("With no content there is nothing to anchor to")
-    func anchorBeforeAnyContentIsTheCentre() {
-        let empty = ReaderScrollMetrics()
-        #expect(empty.contentAnchor(forFocal: .topLeading) == .center)
     }
 
     @Test("After a zoom commits, the content under the fingers is still under the fingers")
@@ -246,6 +250,28 @@ struct ReaderBottomEdgeGateTests {
         gate.magnificationEnded(committedScale: 1.0)
         gate.scrollPhaseChanged(to: .tracking)
         #expect(gate.isArmed)
+    }
+
+    @Test("A drag that skips straight to interacting still re-arms the gate")
+    func interactingAlsoRearms() {
+        // Found on device: requiring the tracking phase alone left the reader
+        // unable to advance to the next chapter after zooming out. Tracking is
+        // "touched but not yet moved", which a quick flick can skip or have
+        // coalesced away. Both touch phases mean a finger is on the glass, which
+        // is the property the gate actually cares about.
+        var gate = ReaderBottomEdgeGate()
+        gate.magnificationBegan()
+        gate.magnificationEnded(committedScale: 1.0)
+        gate.scrollPhaseChanged(to: .interacting)
+        #expect(gate.isArmed)
+    }
+
+    @Test("Interacting during a pinch still does not re-arm the gate")
+    func interactingDuringMagnificationDoesNotRearm() {
+        var gate = ReaderBottomEdgeGate()
+        gate.magnificationBegan()
+        gate.scrollPhaseChanged(to: .interacting)
+        #expect(gate.isArmed == false)
     }
 
     @Test("Momentum alone does not re-arm the gate")

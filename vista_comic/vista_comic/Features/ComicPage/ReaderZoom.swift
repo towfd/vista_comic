@@ -42,9 +42,25 @@ enum ReaderZoom {
     /// rather than a stuck gesture.
     private static let overshootResistance: CGFloat = 0.35
 
+    /// Anything below this settles at full width rather than just above it.
+    ///
+    /// Without a snap, a reader who pinches in to "put it back to normal" can
+    /// easily stop at 1.03, which looks normal and is not. That matters far more
+    /// than it sounds: full width is what re-enables auto-advance, so a couple
+    /// of percent left over silently costs them the ability to reach the next
+    /// chapter, with nothing on screen to explain why.
+    static let snapToFullWidthBelow: CGFloat = 1.08
+
     /// Where a gesture settles once the fingers lift.
     static func clamped(_ scale: CGFloat) -> CGFloat {
         min(max(scale, minScale), maxScale)
+    }
+
+    /// What to commit when the fingers lift: clamped, then snapped to full width
+    /// if it is close enough that the reader meant full width.
+    static func committed(_ scale: CGFloat) -> CGFloat {
+        let clamped = clamped(scale)
+        return clamped < snapToFullWidthBelow ? minScale : clamped
     }
 
     /// What to show *during* a gesture that has gone past a bound.
@@ -87,22 +103,6 @@ struct ReaderScrollMetrics: Equatable {
     var contentSize: CGSize = .zero
     var containerSize: CGSize = .zero
 
-    /// The content under `focal` — a unit point within the *viewport* — as a
-    /// unit point within the whole strip.
-    ///
-    /// This is the translation the pinch needs: a gesture reports where the
-    /// fingers are on screen, while the transform that follows them has to be
-    /// anchored in the content's own coordinate space, which is up to three
-    /// screens wide and many screens tall.
-    func contentAnchor(forFocal focal: UnitPoint) -> UnitPoint {
-        guard contentSize.width > 0, contentSize.height > 0 else { return .center }
-        let point = viewportPointInContent(focal)
-        return UnitPoint(
-            x: Self.clampedToUnit(point.x / contentSize.width),
-            y: Self.clampedToUnit(point.y / contentSize.height)
-        )
-    }
-
     /// Where the scroll offset has to move once the strip has been re-laid-out
     /// `ratio` times larger, so that the content under `focal` is still under
     /// `focal`.
@@ -128,10 +128,6 @@ struct ReaderScrollMetrics: Equatable {
             x: offset.x + focal.x * containerSize.width,
             y: offset.y + focal.y * containerSize.height
         )
-    }
-
-    private static func clampedToUnit(_ value: CGFloat) -> CGFloat {
-        min(max(value, 0), 1)
     }
 }
 
@@ -210,10 +206,16 @@ struct ReaderBottomEdgeGate: Equatable {
             || phase == .interacting
             || phase == .decelerating
 
-        // Re-arming is narrower than being driven, and only tracking — a finger
-        // actually down and moving — counts. Momentum does not, because that is
-        // what an offset clamp looks like from here.
-        if phase == .tracking, !isMagnifying {
+        // Re-arming is narrower than being driven: it needs a finger actually on
+        // the glass. Momentum does not count, because coasting is what an offset
+        // clamp after a content collapse looks like from here.
+        //
+        // Both touch phases count, and that is not belt-and-braces. `tracking`
+        // is "touched but not yet moved", which a quick flick can skip or have
+        // coalesced away — requiring it alone left the reader unable to advance
+        // to the next chapter after zooming, with no way to recover short of
+        // changing chapter.
+        if phase == .tracking || phase == .interacting, !isMagnifying {
             awaitsRearmingScroll = false
         }
     }
