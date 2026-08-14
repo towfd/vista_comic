@@ -150,6 +150,9 @@ private struct ReaderView: View {
     /// The width the scroll view offers its content, measured rather than
     /// assumed so it follows rotation and iPad multitasking.
     @State private var containerWidth: CGFloat = 0
+    /// How tall the top control bar is, so the selection cancel badge can be
+    /// placed clear of it. `0` until the controls have been laid out once.
+    @State private var controlBarHeight: CGFloat = 0
     /// The scroll view's live offset and content height.
     ///
     /// A reference box rather than `@State` deliberately: this changes on every
@@ -273,6 +276,7 @@ private struct ReaderView: View {
                         pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
+                        controlBarHeight: controlBarHeight,
                         reservedWidth: pageWidth,
                         chapterHeightRatio: chapterHeightRatio,
                         onRetryAll: { retryAllToken += 1 },
@@ -535,6 +539,12 @@ private struct ReaderView: View {
             .padding(.horizontal, 15)
             .padding(.vertical, 12)
             .background(.ultraThinMaterial, ignoresSafeAreaEdges: .top)
+            // How much of the reader this bar covers. Selection mode forces the
+            // controls visible, so the selection cancel badge has to be placed
+            // below this or it is drawn correctly and still cannot be seen.
+            // Measured rather than assumed because the bar grows with Dynamic
+            // Type.
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlBarHeight = $0 }
 
             Spacer()
 
@@ -872,28 +882,30 @@ func medianHeightRatio(of ratios: [CGFloat]) -> CGFloat? {
 // MARK: - Where the selection's cancel badge goes
 //
 // The badge exists so a selection can be abandoned mid-drag with one continuous
-// touch — drag into it and lift — which only works if it is on screen. Anchoring
-// it to the page's own top-right corner was correct while a page was always
-// exactly as wide as the screen and rarely much taller. Once the reader can
-// magnify to 3x, that corner is two screen widths to the right and, on a tall
-// page, several screens up.
+// touch — drag into it and lift — which only works if it is on screen.
 
 /// The cancel badge's frame, in the page's own coordinate space.
 ///
-/// Anchored to the top-right of whatever part of the page is actually visible,
-/// so it is reachable at every magnification and wherever the reader has panned
-/// to. `visibleRect` is that part, in the same coordinate space; `nil` (or a
-/// region that does not overlap the page at all) falls back to the page's own
-/// bounds, which reproduces exactly the behaviour that was correct before zoom
-/// existed.
+/// `visibleRect` is the part of the page the reader can actually see, in the
+/// same coordinate space; `nil` — or a region that does not overlap the page at
+/// all — falls back to the page's own bounds, reproducing exactly the behaviour
+/// that was correct before zoom existed.
+///
+/// `topObstruction` is how much of the top of that visible region is covered by
+/// something drawn over the reader. Selection mode forces the reader's controls
+/// visible, and their bar is opaque material across the top, so without this the
+/// badge would be placed correctly and still be invisible underneath it.
 ///
 /// The result is always kept within the page, so a sliver of a page showing at
-/// the edge of the screen cannot push the badge off it.
+/// the edge of the screen cannot push the badge off it. Where the two cannot
+/// both hold — a sliver narrower than the badge — staying on the page wins; a
+/// reader is not selecting text on a 20pt strip of page.
 func selectionCancelZoneFrame(
     displayFrameSize: CGSize,
     visibleRect: CGRect?,
     diameter: CGFloat,
-    inset: CGFloat = 12
+    inset: CGFloat,
+    topObstruction: CGFloat = 0
 ) -> CGRect {
     let pageBounds = CGRect(origin: .zero, size: displayFrameSize)
 
@@ -905,12 +917,12 @@ func selectionCancelZoneFrame(
         }
     }
 
-    let furthestX = max(pageBounds.maxX - diameter, pageBounds.minX)
-    let furthestY = max(pageBounds.maxY - diameter, pageBounds.minY)
+    let maxOriginX = max(pageBounds.maxX - diameter, pageBounds.minX)
+    let maxOriginY = max(pageBounds.maxY - diameter, pageBounds.minY)
 
     return CGRect(
-        x: min(max(anchorRegion.maxX - diameter - inset, pageBounds.minX), furthestX),
-        y: min(max(anchorRegion.minY + inset, pageBounds.minY), furthestY),
+        x: min(max(anchorRegion.maxX - diameter - inset, pageBounds.minX), maxOriginX),
+        y: min(max(anchorRegion.minY + topObstruction + inset, pageBounds.minY), maxOriginY),
         width: diameter,
         height: diameter
     )
@@ -1013,6 +1025,9 @@ private struct ReaderPage: View {
     /// Whether the Reader is in text-selection mode. Drives whether this page
     /// installs the drag-to-select overlay/gesture over its rendered image.
     let isSelecting: Bool
+    /// How much of the top of the reader the control bar covers. Selection mode
+    /// forces the controls visible, so the cancel badge is placed below this.
+    let controlBarHeight: CGFloat
     /// The width this page is laid out at, measured by the reader. `0` before
     /// the first layout, which means no height can be reserved yet.
     let reservedWidth: CGFloat
@@ -1045,8 +1060,8 @@ private struct ReaderPage: View {
     /// when no drag is active.
     @State private var selectionRect: CGRect?
     /// Whether the drag's current location is inside the cancel zone (see
-    /// `cancelZoneFrame`), so the badge can visually confirm "release here to
-    /// cancel" before the finger lifts.
+    /// `selectionCancelZoneFrame`), so the badge can visually confirm "release
+    /// here to cancel" before the finger lifts.
     @State private var isHoveringCancelZone = false
     /// Read for this row alone — this page's own recorded proportions — the
     /// way `AuthorizedAsyncImage` reads the same cache for the image it draws.
@@ -1055,11 +1070,17 @@ private struct ReaderPage: View {
     /// business rather than a row's.
     @Environment(\.pageImageCache) private var pageImageCache
 
-    /// Fixed-size "release here to cancel" zone anchored to a corner of the
-    /// displayed image, so cancelling is possible mid-drag with a single
-    /// continuous touch: drag into the badge and lift, instead of drawing a
-    /// selection and confirming it. See Ticket 03's cancel requirement.
+    /// Fixed-size "release here to cancel" zone, so cancelling is possible
+    /// mid-drag with a single continuous touch: drag into the badge and lift,
+    /// instead of drawing a selection and confirming it. See `ocr-recognition`
+    /// ticket 03's cancel requirement.
+    ///
+    /// Where it sits is `selectionCancelZoneFrame`'s business — the top-right of
+    /// the *visible* part of the page rather than of the page itself, since a
+    /// magnified page is far larger than the screen.
     private let cancelZoneDiameter: CGFloat = 44
+    /// How far the badge is held off the edges of the visible region.
+    private let cancelZoneInset: CGFloat = 12
 
     var body: some View {
         // Wrap the page so `.id(reloadToken)` re-keys only the inner image view.
@@ -1140,7 +1161,9 @@ private struct ReaderPage: View {
         let cancelZone = selectionCancelZoneFrame(
             displayFrameSize: displayFrameSize,
             visibleRect: visibleRect,
-            diameter: cancelZoneDiameter
+            diameter: cancelZoneDiameter,
+            inset: cancelZoneInset,
+            topObstruction: controlBarHeight
         )
         return ZStack(alignment: .topLeading) {
             // Transparent, but shaped so it still receives the drag — this is

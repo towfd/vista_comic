@@ -12,7 +12,9 @@ Selection mode continues to disable scrolling while active, which means a reader
 
 **Status:** implemented, awaiting device verification (branch `feat/reader-zoom`)
 
-Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 227 unit tests pass, none failing.
+Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 229 unit tests pass, none failing.
+
+**`/code-review` found one real defect, fixed before this line was written.** The badge was placed at the top of the visible region — which is exactly where the reader's own control bar is, and selection mode forces that bar visible. It would have been positioned correctly and still been invisible underneath opaque material: a different failure from being off screen, and just as complete. The badge is now held clear of the bar, whose height is measured rather than assumed so it survives Dynamic Type.
 
 The crop mathematics were left untouched, as intended, and a test now says why that is safe rather than leaving it as an assumption: the display frame the mapping is handed grows with the magnification and so do the drag coordinates drawn in it, so the same visible region selected at 2x and 3x produces the same source-pixel rectangle as at full width.
 
@@ -27,7 +29,8 @@ The badge is now anchored to the top-right of whatever part of the page is visib
 - Drag into the badge and release, at 3x: the selection must be abandoned with no result sheet, and selection mode must stay on.
 - Complete a real selection at 3x: the result sheet appears and selection mode ends itself.
 - Select the same speech bubble at full width and at 3x and compare the recognized text — it should be the same, since the crop is the same pixels.
-- Confirm selection at full width is unchanged, on both a compact and a large phone.
+- Confirm selection at full width still works on both a compact and a large phone. Note that the badge deliberately moves here too: on a page taller than the screen it now follows the visible region rather than sitting at the page's top, where it was previously off screen whenever you were reading the middle of a tall page. That is the same criterion — "visible and reachable at every scale" — applied at 1.0.
+- Selection mode is a one-finger drag and zoom is two fingers, so they do not fight. If you do pinch while selection mode is on, the badge's position will be stale until you let go; that is an untested edge and worth a glance.
 - Panning while selection mode is on is still deliberately not possible; position the page first, then enter selection mode.
 
 - [ ] Selection mode can be entered and used at any scale, including 3x

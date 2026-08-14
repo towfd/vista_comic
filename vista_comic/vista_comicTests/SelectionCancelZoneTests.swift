@@ -26,12 +26,21 @@ struct SelectionCancelZoneTests {
     private let diameter: CGFloat = 44
     private let inset: CGFloat = 12
 
-    private func frame(visible: CGRect?, page: CGSize? = nil) -> CGRect {
+    /// What the reader's own top control bar covers, which selection mode
+    /// always has on screen.
+    private let controlBar: CGFloat = 46
+
+    private func frame(
+        visible: CGRect?,
+        page: CGSize? = nil,
+        topObstruction: CGFloat = 0
+    ) -> CGRect {
         selectionCancelZoneFrame(
             displayFrameSize: page ?? magnifiedPage,
             visibleRect: visible,
             diameter: diameter,
-            inset: inset
+            inset: inset,
+            topObstruction: topObstruction
         )
     }
 
@@ -93,15 +102,42 @@ struct SelectionCancelZoneTests {
         #expect(pageBounds.contains(result))
     }
 
-    @Test("The badge is inside the visible region wherever the reader has panned")
+    @Test("The badge clears the reader's own control bar")
+    func badgeSitsBelowTheControlBar() {
+        // Selection mode forces the controls visible, and their bar is opaque
+        // material across the top of the reader. Placed at the visible region's
+        // own top the badge is positioned correctly and still cannot be seen,
+        // which is a different failure from being off screen and just as bad.
+        let visible = CGRect(x: 0, y: 1500, width: 393, height: 800)
+        let result = frame(visible: visible, topObstruction: controlBar)
+        #expect(result.minY >= visible.minY + controlBar)
+    }
+
+    @Test("With nothing covering the reader the badge sits at the top as before")
+    func noObstructionLeavesTheBadgeAtTheTop() {
+        let visible = CGRect(x: 0, y: 1500, width: 393, height: 800)
+        #expect(frame(visible: visible, topObstruction: 0).minY == visible.minY + inset)
+    }
+
+    @Test("The badge is visible wherever the reader has panned, at either magnification")
     func badgeIsAlwaysReachable() {
         // The property the whole function exists for, checked across the pan
-        // range rather than at one convenient spot.
-        for x in stride(from: CGFloat(0), through: magnifiedPage.width - 393, by: 131) {
-            for y in stride(from: CGFloat(0), through: magnifiedPage.height - 800, by: 400) {
-                let visible = CGRect(x: x, y: y, width: 393, height: 800)
-                let result = frame(visible: visible)
-                #expect(visible.contains(result), "not reachable at pan (\(x), \(y))")
+        // range and at both magnifications rather than at one convenient spot.
+        // "Visible" here means inside the viewport *and* below the control bar,
+        // since the two failures it can have are being off screen and being
+        // underneath something.
+        let viewport = CGSize(width: 393, height: 800)
+        for page in [CGSize(width: 786, height: 2670), magnifiedPage] {
+            for x in stride(from: CGFloat(0), through: page.width - viewport.width, by: 131) {
+                for y in stride(from: CGFloat(0), through: page.height - viewport.height, by: 400) {
+                    let visible = CGRect(origin: CGPoint(x: x, y: y), size: viewport)
+                    let result = frame(visible: visible, page: page, topObstruction: controlBar)
+                    #expect(visible.contains(result), "off screen at \(page) pan (\(x), \(y))")
+                    #expect(
+                        result.minY >= visible.minY + controlBar,
+                        "under the control bar at \(page) pan (\(x), \(y))"
+                    )
+                }
             }
         }
     }
