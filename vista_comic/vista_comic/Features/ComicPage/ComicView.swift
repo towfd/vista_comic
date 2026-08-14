@@ -90,11 +90,13 @@ private struct ReaderView: View {
     /// draws a selection rectangle instead of scrolling or hiding controls.
     @State private var isSelecting = false
     @State private var pagesState: LoadState<[URL]> = .loading
-    /// Resume anchor only: set on load to programmatically scroll to the resume
-    /// page via `.scrollPosition`. The *set* direction is reliable; its reported
-    /// value on a LazyVStack of unknown-height AsyncImages is not, so it is NOT
-    /// used for progress reporting (see `visiblePages`).
-    @State private var topPage: Int?
+    /// Drives the pages scroll view programmatically: the resume position when
+    /// a chapter loads, and the offset correction when a zoom is committed.
+    ///
+    /// Write-only, exactly as the `topPage` binding it replaces was — its
+    /// *reported* value on a LazyVStack of unknown-height AsyncImages is not
+    /// reliable, so it is never read for progress reporting (see `visiblePages`).
+    @State private var scrollPosition = ScrollPosition(idType: Int.self)
     /// 0-based indices of the pages currently on screen, maintained by each
     /// `ReaderPage`'s appear/disappear. `min()` is the top-most visible page and
     /// the reliable source for mid-chapter progress reporting.
@@ -120,18 +122,40 @@ private struct ReaderView: View {
     /// Bumped by the reader's reload control; each `ReaderPage` re-requests only
     /// if it is currently in the failure state (loaded pages stay put).
     @State private var retryAllToken = 0
-    /// Whether the pages scroll view is currently being driven by the reader's
-    /// finger (dragging, or coasting after a fling) rather than sitting still.
+    /// Whether the two scroll-geometry inferences below can be trusted right now.
     ///
-    /// Load-bearing, not a convenience: both scroll-geometry inferences below
-    /// ask "did the reader scroll past the end", and scroll geometry alone
-    /// cannot tell that from "the content got shorter underneath a stationary
-    /// reader". The content does get shorter — pages outside the prefetch
-    /// window fall back to a 220pt placeholder, and the keyboard raised for the
-    /// result sheet's text field resizes the reader enough to recycle rows into
-    /// exactly that state. Without this gate a mid-chapter correction read as a
-    /// pull past the bottom and ran the reader to the last chapter.
-    @State private var isScrollDriven = false
+    /// Load-bearing, not a convenience: both ask "did the reader scroll past the
+    /// end", and scroll geometry alone cannot tell that from "the content got
+    /// shorter underneath a stationary reader". The content does get shorter —
+    /// pages outside the prefetch window fall back to a 220pt placeholder, the
+    /// keyboard raised for the result sheet's text field recycles rows into
+    /// exactly that state, and now zooming changes the content's height by up to
+    /// 3x on demand. See `ReaderBottomEdgeGate` for why re-arming is tied to a
+    /// gesture rather than to a delay.
+    @State private var bottomEdgeGate = ReaderBottomEdgeGate()
+    /// The committed magnification. `1.0` is today's reader exactly.
+    @State private var zoomScale: CGFloat = ReaderZoom.minScale
+    /// The live pinch, non-nil only while fingers are down. The strip is
+    /// *transformed* by this and only re-laid-out when the gesture ends, so a
+    /// pinch tracks the fingers instead of re-measuring a 180-page stack on
+    /// every frame.
+    @State private var liveMagnification: CGFloat?
+    /// Where the strip is scaled from during a pinch: the content point that is
+    /// currently at the top of the viewport, captured once when the gesture
+    /// starts so it cannot drift mid-pinch. Matching it to what the commit does
+    /// to the scroll offset is what makes the transform and the committed layout
+    /// show the same thing.
+    @State private var magnifyAnchor: UnitPoint = .top
+    /// The width the scroll view offers its content, measured rather than
+    /// assumed so it follows rotation and iPad multitasking.
+    @State private var containerWidth: CGFloat = 0
+    /// The scroll view's live offset and content height.
+    ///
+    /// A reference box rather than `@State` deliberately: this changes on every
+    /// frame of every scroll, and holding it in view state would invalidate the
+    /// reader's body continuously. Nothing reads it during layout — it is
+    /// consulted only when a pinch begins or commits.
+    @State private var scrollMetrics = ReaderScrollMetricsBox()
     /// The width the pages are laid out at, measured from the stack itself
     /// rather than assumed, since it changes with rotation and with iPad
     /// multitasking. `0` until the first layout, which `reservedPageHeight`
@@ -231,7 +255,11 @@ private struct ReaderView: View {
     }
 
     private func pagesScrollView(urls: [URL]) -> some View {
-        ScrollView{
+        // Two axes rather than one. At full width the strip is laid out at
+        // exactly the container's width, so there is nothing to scroll
+        // horizontally and the reader behaves as it always has; once magnified
+        // the strip is wider than the screen and must be pannable.
+        ScrollView([.vertical, .horizontal]){
             // Lazy so a long chapter (~100+ pages) doesn't kick off every
             // `AsyncImage` at once; pages load as they scroll into view.
             LazyVStack(spacing: 0){
@@ -279,14 +307,46 @@ private struct ReaderView: View {
             // at — insets and all — and it follows rotation and iPad
             // multitasking without a second source of truth.
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
+            // Zoom is a change of *layout* width, not a rendering transform: a
+            // wider strip means genuinely wider pages, and since each page is
+            // fitted at its own aspect ratio, proportionally taller ones. That
+            // is what keeps the scroll view's own knowledge of its content
+            // correct — and why the measurement above, which feeds the reserved
+            // page heights, needs no zoom arithmetic of its own.
+            //
+            .frame(width: imposedContentWidth)
+            // The live pinch, which deliberately does not participate in layout.
+            .scaleEffect(liveZoomRatio, anchor: magnifyAnchor)
         }
         // Selection mode owns the drag gesture on the current page instead;
         // disabling scroll while selecting stops the ScrollView from fighting
         // that drag for the touch.
         .scrollDisabled(isSelecting)
-        // Resume only: setting `topPage` after load (see `loadPages`) scrolls to
-        // the resume page. Its reported value is not used for progress.
-        .scrollPosition(id: $topPage, anchor: .top)
+        // Drives the resume position on load and the offset correction when a
+        // zoom commits. Never read; see the property's own note.
+        .scrollPosition($scrollPosition, anchor: .top)
+        // No horizontal rubber-banding while the strip already fits, so full
+        // width feels exactly as it does today despite the second axis.
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        // The width available to the strip, which the laid-out width is derived
+        // from. Measured on the scroll view rather than assumed, so rotation and
+        // iPad multitasking are followed without a second source of truth.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { containerWidth = $0 }
+        // Two fingers, so there is nothing to arbitrate against the scroll
+        // view's one-finger pan; simultaneous so it composes rather than
+        // replaces.
+        .simultaneousGesture(magnifyGesture)
+        // Fed into a reference box rather than into view state: this fires on
+        // every frame of every scroll, and the reader's body must not be
+        // invalidated by it.
+        .onScrollGeometryChange(for: ReaderScrollMetrics.self) { geometry in
+            ReaderScrollMetrics(
+                offsetY: geometry.contentOffset.y,
+                contentHeight: geometry.contentSize.height
+            )
+        } action: { _, metrics in
+            scrollMetrics.value = metrics
+        }
         // Two deliberately separate reactions to the same "which pages are
         // visible" signal, because they must behave oppositely: the prefetch
         // window has to slide *immediately* to be of any use, while progress
@@ -315,9 +375,7 @@ private struct ReaderView: View {
         // bottom is a normal way to finish a chapter, and the geometry update
         // that crosses the threshold usually arrives after the finger has left.
         .onScrollPhaseChange { _, phase in
-            isScrollDriven = phase == .tracking
-                || phase == .interacting
-                || phase == .decelerating
+            bottomEdgeGate.scrollPhaseChanged(to: phase)
         }
         // Auto-advance: after reaching the bottom, the user must keep pulling
         // *past* the end (overscroll) to continue into the next chapter — so
@@ -329,7 +387,7 @@ private struct ReaderView: View {
                 contentOffsetY: geometry.contentOffset.y,
                 contentHeight: geometry.contentSize.height,
                 containerHeight: geometry.containerSize.height,
-                isScrollDriven: isScrollDriven,
+                isScrollDriven: bottomEdgeGate.isArmed,
                 overscroll: pullThreshold
             )
         } action: { wasPulledPastEnd, isPulledPastEnd in
@@ -352,7 +410,7 @@ private struct ReaderView: View {
                 contentOffsetY: geometry.contentOffset.y,
                 contentHeight: geometry.contentSize.height,
                 containerHeight: geometry.containerSize.height,
-                isScrollDriven: isScrollDriven,
+                isScrollDriven: bottomEdgeGate.isArmed,
                 overscroll: -1
             )
         } action: { wasAtEnd, isAtEnd in
@@ -371,6 +429,62 @@ private struct ReaderView: View {
             guard !isSelecting else { return }
             withAnimation { showControls.toggle() }
         }
+    }
+
+    // MARK: - Zoom
+
+    /// The width to impose on the pages stack, or `nil` to leave it sizing
+    /// itself exactly as it does today.
+    ///
+    /// Deliberately `nil` at full width rather than "the container width". The
+    /// stack's natural width is the scroll view's *content* region, which is not
+    /// always the same as its frame — horizontal safe-area insets in landscape
+    /// are the case that differs — so imposing the frame width would quietly
+    /// make an unmagnified chapter scrollable sideways by a few points. At full
+    /// width nothing is imposed and the layout is untouched.
+    private var imposedContentWidth: CGFloat? {
+        guard zoomScale > ReaderZoom.minScale, containerWidth > 0 else { return nil }
+        return ReaderZoom.contentWidth(containerWidth: containerWidth, scale: zoomScale)
+    }
+
+    /// How far the laid-out strip is transformed right now: `1` unless a pinch
+    /// is in progress, in which case it is the distance between what the layout
+    /// is committed to and what the fingers are currently asking for.
+    private var liveZoomRatio: CGFloat {
+        guard let liveMagnification, zoomScale > 0 else { return 1 }
+        return ReaderZoom.rubberBanded(zoomScale * liveMagnification) / zoomScale
+    }
+
+    /// The pinch.
+    ///
+    /// The layout is only re-measured when the fingers lift. Re-laying out a
+    /// 100+ page lazy stack on every frame of a gesture is the one cost this
+    /// approach could not absorb, so during the pinch the committed layout is
+    /// transformed instead — and the transform is anchored at the same content
+    /// point the commit re-anchors the scroll offset to, so releasing does not
+    /// move what the reader is looking at.
+    private var magnifyGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                if liveMagnification == nil {
+                    magnifyAnchor = UnitPoint(x: 0.5, y: scrollMetrics.value.topFraction)
+                    bottomEdgeGate.magnificationBegan()
+                }
+                liveMagnification = value.magnification
+            }
+            .onEnded { value in
+                let committed = ReaderZoom.clamped(zoomScale * value.magnification)
+                let ratio = zoomScale > 0 ? committed / zoomScale : 1
+                let offsetY = scrollMetrics.value.offsetY
+                zoomScale = committed
+                liveMagnification = nil
+                bottomEdgeGate.magnificationEnded(committedScale: committed)
+                // The strip's height changes with its width, so leaving the
+                // offset alone would throw the reader back through the chapter
+                // by the same proportion. Scaling it keeps whatever content was
+                // at the top of the viewport at the top of the viewport.
+                scrollPosition.scrollTo(y: offsetY * ratio)
+            }
     }
 
     // MARK: - Controls
@@ -498,9 +612,12 @@ private struct ReaderView: View {
         // mostly placeholder-height rows, which is how a single false advance
         // became a run to the last chapter.
         pagesState = .loading
-        // The rebuilt scroll view starts idle; leaving this true would let its
-        // first geometry reading be read as a pull the reader never made.
-        isScrollDriven = false
+        // The rebuilt scroll view starts idle, and the incoming chapter starts
+        // at full width. Carrying either across would let the new chapter's very
+        // first geometry reading be taken for a pull the reader never made.
+        bottomEdgeGate.chapterChanged()
+        zoomScale = ReaderZoom.minScale
+        liveMagnification = nil
         currentChapter = chapter
     }
 
@@ -527,8 +644,8 @@ private struct ReaderView: View {
             // to a 0-based index, clamped in case the chapter shrank since
             // that page number was recorded. `nil` starts at the top. On a
             // restart (auto-advance) we ignore both and force the top.
-            // Setting `topPage` in the same update that flips to `.loaded`
-            // positions the freshly built scroll view accordingly.
+            // Setting the scroll position in the same update that flips to
+            // `.loaded` positions the freshly built scroll view accordingly.
             let resumeIndex = readerStartIndex(
                 pageCount: urls.count,
                 restart: restart,
@@ -536,7 +653,10 @@ private struct ReaderView: View {
                 lastReadPage: chapter.lastReadPage
             )
             pagesState = .loaded(urls)
-            topPage = resumeIndex
+            // A rebuilt scroll view already starts at the top, so "no saved
+            // position" needs no instruction — just a position holding nothing.
+            scrollPosition = resumeIndex.map { ScrollPosition(id: $0, anchor: .top) }
+                ?? ScrollPosition(idType: Int.self)
             pageCount = urls.count
             reachedEnd = false
             // Fresh visibility set for the incoming chapter; the new pages
@@ -736,7 +856,14 @@ func medianHeightRatio(of ratios: [CGFloat]) -> CGFloat? {
 /// `pullThreshold`, a deliberate pull *past* the end) and read-detection
 /// (`overscroll` = `-1`, merely reaching the end).
 ///
-/// `isScrollDriven` is the whole point of this function existing, and the
+/// `isScrollDriven` is supplied by `ReaderBottomEdgeGate`, which answers a
+/// broader question than its name suggests — "can this geometry be trusted
+/// right now" — because zooming gave the content a second way to change height
+/// on its own. The parameter keeps its original name and meaning here: this
+/// function still only asks whether the offset it was handed was produced by
+/// the reader rather than by a relayout.
+///
+/// That question is the whole point of this function existing, and the
 /// reason it takes the scroll phase rather than deriving everything from
 /// geometry. The three geometry numbers describe where the content sits, not
 /// how it got there, and the reader's content resizes on its own: pages outside
