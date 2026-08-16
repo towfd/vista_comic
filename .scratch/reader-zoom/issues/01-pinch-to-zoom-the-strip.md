@@ -20,7 +20,11 @@ The scale returns to 1.0 whenever the chapter changes and whenever the Reader is
 
 **Blocked by:** None — can start immediately.
 
-**Status:** implemented, awaiting device verification (commit `38095ea` + review fixes; branch `feat/reader-zoom`)
+**Status:** partly device-verified; the rest is blocked on a research question (branch `feat/reader-zoom`)
+
+**Device-verified by the repo owner, 2026-08-16:** the bottom-edge interlock works in both directions — reaching the bottom while magnified does not change chapter, and returning to full width restores auto-advance. This was reported broken on the first device pass and took two independent fixes (snapping the committed scale to exactly 1.0, and re-arming on either touch phase rather than `tracking` alone). They shipped together, so which one was the actual cause is no longer determinable; both are correct regardless.
+
+**Still unverified, and deliberately not tested yet:** the pinch anchor and the stutter. Testing them now would mean testing against a known-broken height model — pages the reader has not reached reserve the chapter's median height, and magnification multiplies that error threefold — so any jumping observed could not be attributed. A background research effort is establishing whether SwiftUI can preserve a reader's position at all when content above them changes size, or whether that requires UIKit; the answer decides both the anchor design and whether the page-dimensions work is necessary or merely an optimisation. See the Comments below.
 
 Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 218 unit tests pass, none failing, including the seven pre-existing auto-advance gate tests unchanged.
 
