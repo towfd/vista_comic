@@ -269,6 +269,71 @@ struct ReaderZoomEndReachTests {
     }
 }
 
+@Suite("What the reader can actually see")
+struct ReaderZoomVisibleRegionTests {
+
+    /// A 400x800 window, in the coordinate space of a page whose top sits
+    /// 300pt above the top of that window.
+    private let viewport = CGRect(x: 0, y: 300, width: 400, height: 800)
+
+    @Test("At full width the whole viewport is visible")
+    func fullWidthIsUnchanged() {
+        // The property that keeps every caller behaving exactly as it did
+        // before zoom existed.
+        #expect(ReaderZoom.visibleRegion(
+            inViewport: viewport, scale: 1, pan: .zero
+        ) == viewport)
+    }
+
+    @Test("Magnified, exactly 1/s of the viewport reaches the screen")
+    func onlyABandIsVisible() {
+        let band = ReaderZoom.visibleRegion(inViewport: viewport, scale: 3, pan: .zero)
+        #expect(isClose(band.width, viewport.width / 3))
+        #expect(isClose(band.height, viewport.height / 3))
+    }
+
+    @Test("With no pan the band sits in the middle of the viewport")
+    func unpannedBandIsCentred() {
+        let band = ReaderZoom.visibleRegion(inViewport: viewport, scale: 3, pan: .zero)
+        #expect(isClose(band.midX, viewport.midX))
+        #expect(isClose(band.midY, viewport.midY))
+    }
+
+    @Test("Panning to the limit puts the band against the edge it reveals")
+    func panMovesTheBandToTheEdge() {
+        // Asserted against the pan limit rather than a number, so this stays
+        // true if the limit's definition ever changes.
+        let limit = ReaderZoom.panLimit(containerLength: viewport.width, scale: 3)
+        let left = ReaderZoom.visibleRegion(
+            inViewport: viewport, scale: 3, pan: CGSize(width: limit, height: 0)
+        )
+        #expect(isClose(left.minX, viewport.minX))
+
+        let right = ReaderZoom.visibleRegion(
+            inViewport: viewport, scale: 3, pan: CGSize(width: -limit, height: 0)
+        )
+        #expect(isClose(right.maxX, viewport.maxX))
+    }
+
+    @Test("The vertical shift at a chapter's end moves the band with it")
+    func endOfChapterShiftMovesTheBand() {
+        let limit = ReaderZoom.panLimit(containerLength: viewport.height, scale: 3)
+        let atTop = ReaderZoom.visibleRegion(
+            inViewport: viewport, scale: 3, pan: CGSize(width: 0, height: limit)
+        )
+        #expect(isClose(atTop.minY, viewport.minY))
+    }
+
+    @Test("The band is expressed in the same coordinate space it was handed")
+    func bandStaysInTheCallersSpace() {
+        // The caller is a page whose own origin is not the viewport's, and the
+        // cancel badge is placed by intersecting the two — so an answer in the
+        // wrong space would put the badge somewhere plausible and wrong.
+        let band = ReaderZoom.visibleRegion(inViewport: viewport, scale: 3, pan: .zero)
+        #expect(viewport.contains(band))
+    }
+}
+
 @Suite("Handing a pinch's vertical shift to the scroll view")
 struct ReaderZoomScrollHandoffTests {
 

@@ -19,7 +19,9 @@ The scale and the pan offset both return to their defaults whenever the chapter 
 
 **Blocked by:** None.
 
-**Status:** implemented, awaiting device verification (branch `feat/reader-zoom`)
+**Status:** done — device-verified by the repo owner, 2026-08-18 (branch `feat/reader-zoom`)
+
+**Device-verified, 2026-08-18.** All three of the checks that decided this rewrite pass: nothing moves at the instant the fingers lift, deep inside a long chapter; pinching out from 3x never draws the reader smaller than the screen; and at 3x the first and last screen of a chapter are fully visible without holding a drag. The 1.4x settle at the chapter ends was accepted as-is, so `ReaderZoom.endReachSettling` stays at 2.5.
 
 Builds on iPhone 16 Pro Max and iPhone SE (3rd generation); 237 unit tests pass, none failing — the three failures in the run are all XCUITests, which this environment's accessibility runner cannot initialise and which this repo does not have Claude write or run.
 
@@ -27,25 +29,25 @@ Builds on iPhone 16 Pro Max and iPhone SE (3rd generation); 237 unit tests pass,
 
 ## Acceptance criteria
 
-- [ ] Pinching enlarges the whole strip, and the magnification persists while scrolling from Page to Page
-- [ ] The scale is bounded to 1.0–3.0, and both bounds rubber-band and settle at the bound
-- [ ] The rendered viewport is **never** drawn smaller than the screen, at any point in any gesture, including mid-rubber-band below 1.0
-- [ ] Nothing moves at the instant the fingers lift — there is no commit, and no re-layout, at any scale
-- [ ] At 1.0 the Reader renders and behaves identically to before this ticket
-- [ ] Zooming is centred on the pinch's focal point, with the horizontal component applied to the pan and the vertical component applied to the scroll offset
-- [ ] While magnified, dragging sideways reveals the rest of the Page, clamped to the magnified content
-- [ ] While magnified, the first and last screen of a chapter are fully reachable, the shift is zero everywhere else in the chapter, and it decays smoothly rather than snapping away
-- [ ] The horizontal pan offset is preserved while scrolling vertically
-- [ ] Changing chapter returns the scale and the pan offset to their defaults; leaving the Reader does the same; nothing is persisted
-- [ ] The pages stack's laid-out width is `containerWidth` at every scale, and `contentSize` is unchanged by zoom — asserted directly, since this is the property everything else in this ticket rests on
-- [ ] Auto-advance does not fire while the scale is not 1.0
-- [ ] Read detection works at every scale, including a chapter read to its end entirely while magnified
-- [ ] `ReaderBottomEdgeGate`'s arm/disarm state machine is removed, and the pre-existing PR #65 scroll-driven gate is left untouched, with its existing tests passing unchanged
-- [ ] The rotation offset correction is removed, and rotating or resizing while magnified keeps the reader where they were
-- [ ] Per-Page progress reporting, prefetching, retention and preview (peek) mode are unaffected at every scale
-- [ ] Tapping to show and hide the controls remains immediate, with no double-tap disambiguation delay introduced
-- [ ] Unit tests cover clamping at both bounds, the floor that keeps the rendered scale at or above 1.0, pan clamping horizontally and vertically (including that mid-chapter yields no vertical slack), the focal-point vertical conversion, and that read detection and auto-advance are armed differently
-- [ ] No XCUITest is written; a device checklist is handed to the repo owner, covering both a compact-phone and a larger-phone layout
+- [x] Pinching enlarges the whole strip, and the magnification persists while scrolling from Page to Page
+- [x] The scale is bounded to 1.0–3.0, and both bounds rubber-band and settle at the bound
+- [x] The rendered viewport is **never** drawn smaller than the screen, at any point in any gesture, including mid-rubber-band below 1.0
+- [x] Nothing moves at the instant the fingers lift — there is no commit, and no re-layout, at any scale
+- [x] At 1.0 the Reader renders and behaves identically to before this ticket
+- [x] Zooming is centred on the pinch's focal point, with the horizontal component applied to the pan and the vertical component applied to the scroll offset
+- [x] While magnified, dragging sideways reveals the rest of the Page, clamped to the magnified content
+- [x] While magnified, the first and last screen of a chapter are fully reachable, the shift is zero everywhere else in the chapter, and it decays smoothly rather than snapping away
+- [x] The horizontal pan offset is preserved while scrolling vertically
+- [x] Changing chapter returns the scale and the pan offset to their defaults; leaving the Reader does the same; nothing is persisted
+- [x] The pages stack's laid-out width is `containerWidth` at every scale, and `contentSize` is unchanged by zoom — asserted directly, since this is the property everything else in this ticket rests on
+- [x] Auto-advance does not fire while the scale is not 1.0
+- [x] Read detection works at every scale, including a chapter read to its end entirely while magnified
+- [x] `ReaderBottomEdgeGate`'s arm/disarm state machine is removed, and the pre-existing PR #65 scroll-driven gate is left untouched, with its existing tests passing unchanged
+- [x] The rotation offset correction is removed, and rotating or resizing while magnified keeps the reader where they were
+- [x] Per-Page progress reporting, prefetching, retention and preview (peek) mode are unaffected at every scale
+- [x] Tapping to show and hide the controls remains immediate, with no double-tap disambiguation delay introduced
+- [x] Unit tests cover clamping at both bounds, the floor that keeps the rendered scale at or above 1.0, pan clamping horizontally and vertically (including that mid-chapter yields no vertical slack), the focal-point vertical conversion, and that read detection and auto-advance are armed differently
+- [x] No XCUITest is written; a device checklist is handed to the repo owner, covering both a compact-phone and a larger-phone layout
 
 ## Verify on device — the handoff, per `CLAUDE.md`'s verification rules
 

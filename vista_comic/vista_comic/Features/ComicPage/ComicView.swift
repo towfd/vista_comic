@@ -297,6 +297,8 @@ private struct ReaderView: View {
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
                         controlBarHeight: controlBarHeight,
+                        magnification: zoomScale,
+                        viewportPan: CGSize(width: panX, height: endPan),
                         reservedWidth: pageWidth,
                         chapterHeightRatio: chapterHeightRatio,
                         onRetryAll: { retryAllToken += 1 },
@@ -1128,6 +1130,15 @@ private struct ReaderPage: View {
     /// How much of the top of the reader the control bar covers. Selection mode
     /// forces the controls visible, so the cancel badge is placed below this.
     let controlBarHeight: CGFloat
+    /// The reader's settled magnification and how far its viewport is moved,
+    /// which together say which part of this page is on screen.
+    ///
+    /// The *settled* scale rather than the live one, deliberately: a pinch in
+    /// flight would otherwise invalidate every realised row on every frame, and
+    /// panning is disabled while selecting, so the badge only has to be right
+    /// once the fingers are off.
+    let magnification: CGFloat
+    let viewportPan: CGSize
     /// The width this page is laid out at, measured by the reader. `0` before
     /// the first layout, which means no height can be reserved yet.
     let reservedWidth: CGFloat
@@ -1206,10 +1217,19 @@ private struct ReaderPage: View {
                                         displayFrameSize: proxy.size,
                                         // What of this page the reader can
                                         // actually see. At full width that is
-                                        // the whole page; magnified it is a
-                                        // fraction of it, and the cancel badge
-                                        // has to stay inside that fraction.
-                                        visibleRect: proxy.bounds(of: .scrollView)
+                                        // the whole viewport; magnified it is
+                                        // the 1/s band the transform puts on
+                                        // screen, which the scroll view knows
+                                        // nothing about — it is unmagnified at
+                                        // every scale — so it has to be derived
+                                        // rather than looked up.
+                                        visibleRect: proxy.bounds(of: .scrollView).map {
+                                            ReaderZoom.visibleRegion(
+                                                inViewport: $0,
+                                                scale: magnification,
+                                                pan: viewportPan
+                                            )
+                                        }
                                     )
                                 }
                             }

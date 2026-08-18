@@ -190,6 +190,31 @@ extension ReaderZoom {
         return fromTop - fromBottom
     }
 
+    /// The part of the viewport the reader can actually see, in the same
+    /// coordinate space as `viewport`.
+    ///
+    /// Nothing in the view hierarchy reports this. The scroll view is
+    /// unmagnified at every scale, so `bounds(of: .scrollView)` describes the
+    /// whole viewport whatever the magnification — and at scale `s` only `1/s`
+    /// of it reaches the screen, with the pan deciding which `1/s`. Anything
+    /// that has to stay reachable, the selection cancel badge above all, has to
+    /// be placed against this rather than against the scroll view's bounds.
+    ///
+    /// Returns the viewport unchanged at full width, which is what makes every
+    /// caller behave exactly as it did before zoom existed.
+    static func visibleRegion(inViewport viewport: CGRect, scale: CGFloat, pan: CGSize) -> CGRect {
+        let scale = clamped(scale)
+        guard scale > minScale else { return viewport }
+        let width = viewport.width / scale
+        let height = viewport.height / scale
+        return CGRect(
+            x: viewport.minX + (viewport.width - width) / 2 - pan.width / scale,
+            y: viewport.minY + (viewport.height - height) / 2 - pan.height / scale,
+            width: width,
+            height: height
+        )
+    }
+
     /// The scroll-offset change that reproduces `pan` exactly, so a transient
     /// vertical pan can be handed to the scroll view when a pinch ends without
     /// anything moving on screen.

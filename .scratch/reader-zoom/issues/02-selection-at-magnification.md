@@ -10,11 +10,13 @@ Selection mode continues to disable scrolling while active, which means a reader
 
 **Blocked by:** 01 — Pinch to zoom the strip, without breaking auto-advance.
 
-**Status:** implemented against the rejected layout-width model; needs rework once 01's rewrite lands (branch `feat/reader-zoom`)
+**Status:** reworked for the absolute-transform model; awaiting device verification (branch `feat/reader-zoom`)
 
-**What the rework is, and is not.** The crop path — `SelectionCropMapping`, `produceCrop`, the overlay's drag handling and all of their tests — is untouched by the model change and stays as it is. One derived value changes: the visible region the badge is placed in, which was read from `proxy.bounds(of: .scrollView)` and is now computed from the scale and the pan offset. Everything below this line was written against the old model and is kept for the reasoning it records; where it says the display frame grows with magnification, it no longer does.
+**What the rework turned out to be.** One derived value, as predicted. `ReaderZoom.visibleRegion(inViewport:scale:pan:)` computes the `1/s` band the transform actually puts on screen, and the overlay hands that to `selectionCancelZoneFrame` in place of the raw `proxy.bounds(of: .scrollView)`. It returns the viewport unchanged at full width, so behaviour at 1.0 is bit-for-bit what it was. The scale passed in is the *settled* one rather than the live one — a pinch in flight would otherwise invalidate every realised row on every frame, and panning is disabled while selecting, so the badge only has to be right once the fingers are off. `SelectionCropMapping`, `produceCrop`, the overlay's drag handling and every one of their tests are untouched.
 
-Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 229 unit tests pass, none failing.
+Builds on iPhone 16 Pro Max and iPhone SE (3rd generation); 231 unit tests pass, none failing.
+
+Everything below this line was written against the rejected layout-width model and is kept for the reasoning it records; where it says the display frame grows with magnification, it no longer does.
 
 **`/code-review` found one real defect, fixed before this line was written.** The badge was placed at the top of the visible region — which is exactly where the reader's own control bar is, and selection mode forces that bar visible. It would have been positioned correctly and still been invisible underneath opaque material: a different failure from being off screen, and just as complete. The badge is now held clear of the bar, whose height is measured rather than assumed so it survives Dynamic Type.
 
@@ -44,5 +46,5 @@ The badge is now anchored to the top-right of whatever part of the page is visib
 - [ ] Selection mode still ends itself once a crop has been produced
 - [ ] Leaving selection mode mid-drag discards the partial selection, as today
 - [ ] Existing selection-crop mapping tests pass unchanged, **and without new cases** — under this zoom model the mapping never sees an enlarged display frame, so a case asserting one would pin a state that cannot occur
-- [ ] The visible region the badge is placed in is a pure function of the scale and the pan offset, with its own unit tests, rather than a geometry lookup that can silently fall back
+- [x] The visible region the badge is placed in is a pure function of the scale and the pan offset, with its own unit tests, rather than a geometry lookup that can silently fall back
 - [ ] No XCUITest is written; a device checklist is handed to the repo owner, covering selecting and recognizing at both 2x and 3x
