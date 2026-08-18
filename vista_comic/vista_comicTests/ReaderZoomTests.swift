@@ -4,18 +4,24 @@
 //
 //  Coverage for `reader-zoom` ticket 01.
 //
-//  Two things are under test here and they are not the same size. The scale
-//  arithmetic is small and obvious. The arming gate is neither: it exists
-//  because zooming changes the reader's content height by up to 3x, and the
-//  bottom-edge inference that decides "the reader pulled past the end" reads
-//  content height. Pinching from 3x back to 1x collapses the content to a
-//  third of its height while the scroll offset is still the old, larger value,
-//  which satisfies that inference anywhere past the first third of a chapter —
-//  the same shape of false trigger `reader-auto-advance-false-trigger` was
-//  opened for, except reproducible on demand.
+//  Zoom is an absolute transform over the viewport and the layout never
+//  changes, so the arithmetic under test here is entirely about *rendering*:
+//  what scale is shown, how far the magnified strip may be moved, and where a
+//  focal point ends up. None of it reads content size for the purpose of
+//  correcting a layout change, because there is no layout change.
 //
-//  So the cases below are organised around the transition, not around the
-//  zoomed state: being zoomed is the easy half.
+//  That is also why there is no arming state machine left to test. The previous
+//  model needed one because committing a new layout width moved content height
+//  by up to 3x and the bottom-edge inference reads content height. A transform
+//  cannot move content height, so the inference needs nothing but the
+//  scroll-driven discipline it already had — covered by
+//  `ReaderAutoAdvanceGateTests`, unchanged.
+//
+//  The rendering model these tests are written against, for one axis:
+//
+//      screen(y) = length/2 + scale × (y − length/2) + pan
+//
+//  where `y` is a point in the untransformed viewport.
 //
 
 import Foundation
@@ -24,358 +30,269 @@ import Testing
 
 @testable import vista_comic
 
+/// Where an untransformed viewport point is drawn, given a scale and a pan.
+private func screenPosition(
+    of viewportPoint: CGFloat,
+    containerLength: CGFloat,
+    scale: CGFloat,
+    pan: CGFloat
+) -> CGFloat {
+    let middle = containerLength / 2
+    return middle + scale * (viewportPoint - middle) + pan
+}
+
+private func isClose(_ lhs: CGFloat, _ rhs: CGFloat, within tolerance: CGFloat = 0.0001) -> Bool {
+    abs(lhs - rhs) < tolerance
+}
+
 @Suite("Reader zoom scale")
 struct ReaderZoomScaleTests {
 
     @Test("A scale inside the bounds is left alone")
-    func clampingPassesThroughInRange() {
+    func scaleInsideBoundsIsUnchanged() {
         #expect(ReaderZoom.clamped(1.0) == 1.0)
         #expect(ReaderZoom.clamped(2.0) == 2.0)
         #expect(ReaderZoom.clamped(3.0) == 3.0)
     }
 
     @Test("Pinching in past full width settles at full width")
-    func clampingStopsAtMinimum() {
+    func scaleBelowMinimumClamps() {
         #expect(ReaderZoom.clamped(0.4) == ReaderZoom.minScale)
         #expect(ReaderZoom.minScale == 1.0)
     }
 
-    @Test("Pinching out past the limit settles at the limit")
-    func clampingStopsAtMaximum() {
+    @Test("Pinching out past the ceiling settles at the ceiling")
+    func scaleAboveMaximumClamps() {
         #expect(ReaderZoom.clamped(7.5) == ReaderZoom.maxScale)
         #expect(ReaderZoom.maxScale == 3.0)
     }
 
-    @Test("Pinching almost back to full width settles at full width")
-    func committingSnapsToFullWidth() {
-        // Found on device. Full width is what re-enables auto-advance, so a
-        // couple of percent left over from an imprecise pinch silently cost the
-        // reader the next chapter — and nothing on screen said why, because 1.03
-        // looks exactly like 1.0.
-        #expect(ReaderZoom.committed(1.03) == ReaderZoom.minScale)
-        #expect(ReaderZoom.committed(1.0) == ReaderZoom.minScale)
-        #expect(ReaderZoom.committed(0.4) == ReaderZoom.minScale)
+    @Test("A scale just above full width settles at exactly full width")
+    func nearlyFullWidthSnaps() {
+        // Load-bearing rather than cosmetic: auto-advance is inert whenever the
+        // scale is not exactly full width, so stopping at 1.03 would silently
+        // cost the reader the next chapter.
+        #expect(ReaderZoom.settled(1.03) == ReaderZoom.minScale)
+        #expect(ReaderZoom.settled(1.0) == ReaderZoom.minScale)
+        #expect(ReaderZoom.settled(0.4) == ReaderZoom.minScale)
     }
 
-    @Test("A magnification the reader clearly meant is left alone")
-    func committingKeepsADeliberateMagnification() {
-        #expect(ReaderZoom.committed(1.5) == 1.5)
-        #expect(ReaderZoom.committed(2.4) == 2.4)
-        #expect(ReaderZoom.committed(7.5) == ReaderZoom.maxScale)
+    @Test("A scale clear of full width keeps its value")
+    func magnifiedScaleSettlesWhereItIs() {
+        #expect(ReaderZoom.settled(1.5) == 1.5)
+        #expect(ReaderZoom.settled(2.4) == 2.4)
+        #expect(ReaderZoom.settled(7.5) == ReaderZoom.maxScale)
     }
 
-    @Test("Overshooting resists rather than stopping dead")
-    func rubberBandingResistsBeyondTheBounds() {
-        // Below the minimum: the reader still sees movement, but less of it,
-        // so the bound is felt as a limit rather than as a stuck gesture.
-        let under = ReaderZoom.rubberBanded(0.5)
-        #expect(under < ReaderZoom.minScale)
-        #expect(under > 0.5)
+    @Test("The rendered scale is never below full width, however hard the reader pinches in")
+    func rubberBandNeverShrinksTheViewport() {
+        // The defect this replaces: the previous model expressed the live
+        // transform as a ratio against a committed layout, so it went below 1
+        // for the whole of every zoom-out gesture and drew the reader smaller
+        // than the screen.
+        #expect(ReaderZoom.rubberBanded(0.5) == ReaderZoom.minScale)
+        #expect(ReaderZoom.rubberBanded(0.001) == ReaderZoom.minScale)
+        #expect(ReaderZoom.rubberBanded(0) == ReaderZoom.minScale)
+        #expect(ReaderZoom.rubberBanded(-2) == ReaderZoom.minScale)
+    }
 
+    @Test("Overshooting the ceiling is damped but still shown")
+    func rubberBandResistsAboveTheCeiling() {
         let over = ReaderZoom.rubberBanded(4.0)
         #expect(over > ReaderZoom.maxScale)
         #expect(over < 4.0)
     }
 
-    @Test("Inside the bounds there is nothing to resist")
-    func rubberBandingPassesThroughInRange() {
+    @Test("Inside the bounds the gesture is not damped at all")
+    func rubberBandPassesThroughInsideTheBounds() {
         #expect(ReaderZoom.rubberBanded(1.0) == 1.0)
         #expect(ReaderZoom.rubberBanded(2.4) == 2.4)
         #expect(ReaderZoom.rubberBanded(3.0) == 3.0)
     }
+}
 
-    @Test("Rubber banding never produces a degenerate scale")
-    func rubberBandingStaysPositive() {
-        // A pinch can report a magnification approaching zero; a scale of zero
-        // or below would collapse the strip's laid-out width.
-        #expect(ReaderZoom.rubberBanded(0.001) > 0)
-        #expect(ReaderZoom.rubberBanded(0) > 0)
+@Suite("Panning a magnified strip")
+struct ReaderZoomPanTests {
+
+    private let width: CGFloat = 400
+
+    @Test("At full width there is nothing to pan")
+    func noSlackAtFullWidth() {
+        #expect(ReaderZoom.panLimit(containerLength: width, scale: 1.0) == 0)
+        #expect(ReaderZoom.clampedPan(120, containerLength: width, scale: 1.0) == 0)
     }
 
-    @Test("At full width the strip is laid out exactly as it is today")
-    func contentWidthAtMinimumIsTheContainer() {
-        #expect(ReaderZoom.contentWidth(containerWidth: 393, scale: 1.0) == 393)
+    @Test("The pan reaches exactly as far as the magnified content does")
+    func slackMatchesTheHiddenContent() {
+        // At scale s the content extends containerLength × (s − 1) / 2 past
+        // each edge, and that is precisely how far the pan has to reach.
+        #expect(ReaderZoom.panLimit(containerLength: width, scale: 2.0) == 200)
+        #expect(ReaderZoom.panLimit(containerLength: width, scale: 3.0) == 400)
     }
 
-    @Test("The strip's laid-out width is the container multiplied by the scale")
-    func contentWidthScalesWithTheScale() {
-        #expect(ReaderZoom.contentWidth(containerWidth: 393, scale: 2.0) == 786)
-        #expect(ReaderZoom.contentWidth(containerWidth: 393, scale: 3.0) == 1179)
+    @Test("Panning stops at the edge of the page rather than pulling in background")
+    func panIsHeldInsideTheContent() {
+        #expect(ReaderZoom.clampedPan(9_999, containerLength: width, scale: 3.0) == 400)
+        #expect(ReaderZoom.clampedPan(-9_999, containerLength: width, scale: 3.0) == -400)
+        #expect(ReaderZoom.clampedPan(120, containerLength: width, scale: 3.0) == 120)
     }
 
-    @Test("Before the first layout there is no width to scale")
-    func contentWidthBeforeLayoutIsZero() {
-        #expect(ReaderZoom.contentWidth(containerWidth: 0, scale: 3.0) == 0)
+    @Test("Panning to the limit puts the page's own edge on the screen's edge")
+    func theLimitIsExactlyTheEdge() {
+        // Asserted as the property rather than as a number: at full pan the
+        // untransformed viewport's left edge should land on the screen's left
+        // edge, which is what "you can see the whole page" means.
+        let scale: CGFloat = 3
+        let limit = ReaderZoom.panLimit(containerLength: width, scale: scale)
+        let leftEdge = screenPosition(of: 0, containerLength: width, scale: scale, pan: limit)
+        #expect(isClose(leftEdge, 0))
+    }
+
+    @Test("A scale change keeps what is under the fingers under the fingers")
+    func focalPointStaysPut() {
+        // The property the whole pan correction exists for. Unlike the model it
+        // replaces, this reads nothing about content size — so there is no
+        // stale measurement available for it to be wrong about.
+        for focal in [CGFloat(0), 0.25, 0.5, 0.8, 1.0] {
+            for (from, to) in [(CGFloat(1), CGFloat(3)), (3, 1), (1.5, 2.2), (2.2, 1.5)] {
+                let previousPan: CGFloat = from == 1 ? 0 : 40
+                let focalScreenPoint = focal * width
+
+                let source = ((focalScreenPoint - width / 2 - previousPan) / from) + width / 2
+                let corrected = ReaderZoom.panKeepingFocalPoint(
+                    focal: focal,
+                    containerLength: width,
+                    previousPan: previousPan,
+                    from: from,
+                    to: to
+                )
+
+                #expect(isClose(
+                    screenPosition(of: source, containerLength: width, scale: to, pan: corrected),
+                    focalScreenPoint
+                ))
+            }
+        }
+    }
+
+    @Test("Pinching at the centre needs no pan at all")
+    func centredPinchDoesNotPan() {
+        let corrected = ReaderZoom.panKeepingFocalPoint(
+            focal: 0.5, containerLength: width, previousPan: 0, from: 1, to: 3
+        )
+        #expect(isClose(corrected, 0))
+    }
+
+    @Test("A container that has not been measured yet is left alone")
+    func unmeasuredContainerIsInert() {
+        #expect(ReaderZoom.panLimit(containerLength: 0, scale: 3) == 0)
+        #expect(ReaderZoom.panKeepingFocalPoint(
+            focal: 0.5, containerLength: 0, previousPan: 12, from: 1, to: 3
+        ) == 12)
     }
 }
 
-@Suite("Keeping the reader where they were")
-struct ReaderScrollMetricsTests {
+@Suite("Reaching the ends of a magnified chapter")
+struct ReaderZoomEndReachTests {
 
-    /// A reader parked well into a chapter: a 400x800 window onto a strip
-    /// 30000pt tall, scrolled 3000pt down.
-    private let metrics = ReaderScrollMetrics(
-        offset: CGPoint(x: 0, y: 3000),
-        contentSize: CGSize(width: 400, height: 30000),
-        containerSize: CGSize(width: 400, height: 800)
-    )
+    private let containerHeight: CGFloat = 800
+    private let contentHeight: CGFloat = 30_000
 
-    private func isClose(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool {
-        abs(lhs - rhs) < 0.0001
-    }
-
-    @Test("After a zoom commits, the content under the fingers is still under the fingers")
-    func scalingKeepsTheFocalPointPut() {
-        // This is the property the whole correction exists for, so it is
-        // asserted as the property rather than as a magic number: take the
-        // content point under the fingers, scale the strip, and check that point
-        // still lands where the fingers are.
-        let focal = UnitPoint.center
-        let ratio: CGFloat = 3
-
-        let pointInContent = CGPoint(
-            x: metrics.offset.x + focal.x * metrics.containerSize.width,
-            y: metrics.offset.y + focal.y * metrics.containerSize.height
+    private func pan(at offset: CGFloat, scale: CGFloat = 3) -> CGFloat {
+        ReaderZoom.endOfChapterPan(
+            scrollOffset: offset,
+            contentHeight: contentHeight,
+            containerHeight: containerHeight,
+            scale: scale
         )
-        let corrected = metrics.offset(afterScalingBy: ratio, focal: focal)
-
-        #expect(isClose(pointInContent.x * ratio - corrected.x, focal.x * metrics.containerSize.width))
-        #expect(isClose(pointInContent.y * ratio - corrected.y, focal.y * metrics.containerSize.height))
     }
 
-    @Test("Simply multiplying the offset would not have kept it put")
-    func scalingIsNotJustMultiplyingTheOffset() {
-        // Pins the distinction, because multiplying the offset is the obvious
-        // wrong answer and it is right only when the fingers are at the very top
-        // of the screen.
-        let corrected = metrics.offset(afterScalingBy: 3, focal: .center)
-        #expect(corrected.y != metrics.offset.y * 3)
-        #expect(isClose(corrected.y, 9800))
+    @Test("At full width there is no shift, anywhere in the chapter")
+    func inertAtFullWidth() {
+        #expect(pan(at: 0, scale: 1) == 0)
+        #expect(pan(at: 15_000, scale: 1) == 0)
+        #expect(pan(at: 29_200, scale: 1) == 0)
     }
 
-    @Test("Zooming out near the top does not produce a negative offset")
-    func correctionNeverScrollsPastTheStart() {
-        let nearTop = ReaderScrollMetrics(
-            offset: CGPoint(x: 0, y: 100),
-            contentSize: CGSize(width: 400, height: 30000),
-            containerSize: CGSize(width: 400, height: 800)
+    @Test("In the middle of a chapter the scroll view is left to do all the work")
+    func noShiftMidChapter() {
+        #expect(pan(at: 15_000) == 0)
+    }
+
+    @Test("At the top the chapter's first screen is brought fully into view")
+    func topOfChapterIsReachable() {
+        // Without this the outermost band of the first screen can never be
+        // scrolled into the magnified view, because there is no scrolling left
+        // to do it with.
+        let shift = pan(at: 0)
+        #expect(shift == ReaderZoom.panLimit(containerLength: containerHeight, scale: 3))
+        let contentTop = screenPosition(
+            of: 0, containerLength: containerHeight, scale: 3, pan: shift
         )
-        let corrected = nearTop.offset(afterScalingBy: 1.0 / 3.0, focal: .center)
-        #expect(corrected.x >= 0)
-        #expect(corrected.y >= 0)
+        #expect(isClose(contentTop, 0))
+    }
+
+    @Test("At the bottom the chapter's last screen is brought fully into view")
+    func bottomOfChapterIsReachable() {
+        let shift = pan(at: contentHeight - containerHeight)
+        #expect(shift == -ReaderZoom.panLimit(containerLength: containerHeight, scale: 3))
+        let contentBottom = screenPosition(
+            of: containerHeight, containerLength: containerHeight, scale: 3, pan: shift
+        )
+        #expect(isClose(contentBottom, containerHeight))
+    }
+
+    @Test("The shift decays as scrolling takes over, rather than snapping away")
+    func shiftDecaysSmoothly() {
+        // A discontinuity here would be a visible jolt as the reader leaves the
+        // top of a chapter, which is exactly the class of defect this feature
+        // was rewritten to remove.
+        let samples = stride(from: CGFloat(0), through: 2_000, by: 50).map { pan(at: $0) }
+        for (earlier, later) in zip(samples, samples.dropFirst()) {
+            #expect(later <= earlier)
+            #expect(earlier - later < ReaderZoom.panLimit(containerLength: containerHeight, scale: 3))
+        }
+        #expect(samples.last == 0)
+    }
+
+    @Test("A chapter shorter than the screen is simply centred")
+    func shortChapterIsCentred() {
+        #expect(ReaderZoom.endOfChapterPan(
+            scrollOffset: 0, contentHeight: 500, containerHeight: containerHeight, scale: 3
+        ) == 0)
+    }
+
+    @Test("A scroll offset outside the chapter is treated as its nearest end")
+    func overscrollIsTreatedAsTheEnd() {
+        #expect(pan(at: -200) == pan(at: 0))
+        #expect(pan(at: contentHeight) == pan(at: contentHeight - containerHeight))
     }
 }
 
-@Suite("Reader bottom-edge arming gate")
-struct ReaderBottomEdgeGateTests {
+@Suite("Handing a pinch's vertical shift to the scroll view")
+struct ReaderZoomScrollHandoffTests {
 
-    /// A gate that has been armed the ordinary way: the reader is dragging the
-    /// scroll view with one finger and has never zoomed.
-    private func armedByScrolling() -> ReaderBottomEdgeGate {
-        var gate = ReaderBottomEdgeGate()
-        gate.scrollPhaseChanged(to: .tracking)
-        return gate
+    @Test("The conversion reproduces the shift exactly, so nothing moves")
+    func conversionIsExact() {
+        // A point of scrolling moves the content `scale` points on screen, in
+        // the opposite direction. Getting this wrong is visible as a jump at
+        // the instant the fingers lift — the defect this model exists to remove.
+        for scale in [CGFloat(1), 1.5, 3] {
+            for pan in [CGFloat(-240), -30, 0, 30, 240] {
+                let delta = ReaderZoom.scrollOffsetDelta(replacingVerticalPan: pan, scale: scale)
+                #expect(isClose(-delta * scale, pan))
+            }
+        }
     }
 
-    // MARK: - Today's behaviour, which must survive unchanged
-
-    @Test("A reader who has not touched the scroll view is not armed")
-    func idleIsNotArmed() {
-        #expect(ReaderBottomEdgeGate().isArmed == false)
+    @Test("Shifting the content down means scrolling up, and the reverse")
+    func directionIsInverted() {
+        #expect(ReaderZoom.scrollOffsetDelta(replacingVerticalPan: 300, scale: 3) == -100)
+        #expect(ReaderZoom.scrollOffsetDelta(replacingVerticalPan: -300, scale: 3) == 100)
     }
 
-    @Test("Dragging arms the gate")
-    func draggingArms() {
-        #expect(armedByScrolling().isArmed)
-    }
-
-    @Test("Coasting after a fling still counts as driven")
-    func deceleratingIsStillDriven() {
-        var gate = ReaderBottomEdgeGate()
-        gate.scrollPhaseChanged(to: .decelerating)
-        #expect(gate.isArmed)
-    }
-
-    @Test("Coming to rest disarms the gate")
-    func idlingDisarms() {
-        var gate = armedByScrolling()
-        gate.scrollPhaseChanged(to: .idle)
-        #expect(gate.isArmed == false)
-    }
-
-    // MARK: - What zooming adds
-
-    @Test("Starting a pinch disarms the gate immediately")
-    func magnificationDisarms() {
-        var gate = armedByScrolling()
-        gate.magnificationBegan()
-        #expect(gate.isArmed == false)
-    }
-
-    @Test("A scroll phase reported during a pinch does not re-arm the gate")
-    func scrollDuringMagnificationDoesNotRearm() {
-        // The scroll view can report tracking while two fingers are on it. If
-        // that re-armed the gate, the interlock would be defeated by the very
-        // gesture it exists to guard against.
-        var gate = armedByScrolling()
-        gate.magnificationBegan()
-        gate.scrollPhaseChanged(to: .tracking)
-        #expect(gate.isArmed == false)
-    }
-
-    @Test("While magnified the gate stays disarmed however the reader scrolls")
-    func magnifiedScrollingIsNeverArmed() {
-        var gate = ReaderBottomEdgeGate()
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 3.0)
-        gate.scrollPhaseChanged(to: .tracking)
-        #expect(gate.isArmed == false)
-    }
-
-    @Test("Returning to full width does not by itself re-arm the gate")
-    func returningToFullWidthDoesNotRearm() {
-        // This is the whole point. At the instant the scale crosses back to
-        // 1.0 the content is still collapsing and the offset is still the old
-        // one; re-arming here would fire the inference on that stale pair.
-        var gate = armedByScrolling()
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-        #expect(gate.isArmed == false)
-    }
-
-    @Test("A genuine one-finger scroll after the pinch re-arms the gate")
-    func aRealScrollRearms() {
-        var gate = ReaderBottomEdgeGate()
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-        gate.scrollPhaseChanged(to: .tracking)
-        #expect(gate.isArmed)
-    }
-
-    @Test("A drag that skips straight to interacting still re-arms the gate")
-    func interactingAlsoRearms() {
-        // Found on device: requiring the tracking phase alone left the reader
-        // unable to advance to the next chapter after zooming out. Tracking is
-        // "touched but not yet moved", which a quick flick can skip or have
-        // coalesced away. Both touch phases mean a finger is on the glass, which
-        // is the property the gate actually cares about.
-        var gate = ReaderBottomEdgeGate()
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-        gate.scrollPhaseChanged(to: .interacting)
-        #expect(gate.isArmed)
-    }
-
-    @Test("Interacting during a pinch still does not re-arm the gate")
-    func interactingDuringMagnificationDoesNotRearm() {
-        var gate = ReaderBottomEdgeGate()
-        gate.magnificationBegan()
-        gate.scrollPhaseChanged(to: .interacting)
-        #expect(gate.isArmed == false)
-    }
-
-    @Test("Momentum alone does not re-arm the gate")
-    func decelerationDoesNotRearm() {
-        // Re-arming is deliberately tied to a fresh touch rather than to any
-        // sign of movement: a scroll view clamping its offset after the content
-        // shrinks emits movement but no new touch.
-        var gate = ReaderBottomEdgeGate()
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-        gate.scrollPhaseChanged(to: .decelerating)
-        #expect(gate.isArmed == false)
-    }
-
-    @Test("Changing chapter resets the gate")
-    func chapterChangeResets() {
-        var gate = armedByScrolling()
-        gate.chapterChanged()
-        #expect(gate.isArmed == false)
-    }
-}
-
-@Suite("Zooming out never advances the chapter")
-struct ReaderZoomCollapseRegressionTests {
-
-    // A reader parked mid-chapter at 3x: thirty pages, each three times its
-    // normal height because the strip is laid out three times as wide.
-    private let containerHeight: CGFloat = 850
-    private let magnifiedContentHeight: CGFloat = 30 * 1500 * 3
-    private let magnifiedOffset: CGFloat = 15 * 1500 * 3
-    // The same chapter one instant after the scale is committed back to 1.0.
-    private let fullWidthContentHeight: CGFloat = 30 * 1500
-
-    @Test("The collapse from 3x to full width clears the past-the-bottom test on geometry alone")
-    func theCollapseLooksLikeAPull() {
-        // The strip is laid out three times as wide at 3x, so every page — and
-        // therefore the whole chapter — is three times as tall.
-        #expect(magnifiedContentHeight == fullWidthContentHeight * 3)
-        // Establishes that the hazard is real rather than theoretical: with the
-        // gate armed, this geometry would advance the chapter.
-        #expect(
-            readerPassedBottom(
-                contentOffsetY: magnifiedOffset,
-                contentHeight: fullWidthContentHeight,
-                containerHeight: containerHeight,
-                isScrollDriven: true,
-                overscroll: 120
-            )
-        )
-    }
-
-    @Test("Pinching back to full width mid-chapter does not advance the chapter")
-    func zoomingOutDoesNotAdvance() {
-        var gate = ReaderBottomEdgeGate()
-        gate.scrollPhaseChanged(to: .tracking)
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-
-        #expect(
-            readerPassedBottom(
-                contentOffsetY: magnifiedOffset,
-                contentHeight: fullWidthContentHeight,
-                containerHeight: containerHeight,
-                isScrollDriven: gate.isArmed,
-                overscroll: 120
-            ) == false
-        )
-    }
-
-    @Test("Pinching back to full width mid-chapter does not mark the chapter read")
-    func zoomingOutDoesNotMarkRead() {
-        var gate = ReaderBottomEdgeGate()
-        gate.scrollPhaseChanged(to: .tracking)
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-
-        #expect(
-            readerPassedBottom(
-                contentOffsetY: magnifiedOffset,
-                contentHeight: fullWidthContentHeight,
-                containerHeight: containerHeight,
-                isScrollDriven: gate.isArmed,
-                overscroll: -1
-            ) == false
-        )
-    }
-
-    @Test("Pulling past the bottom still advances once the reader has scrolled again")
-    func advancingStillWorksAfterZooming() {
-        var gate = ReaderBottomEdgeGate()
-        gate.magnificationBegan()
-        gate.magnificationEnded(committedScale: 1.0)
-        // The reader puts a finger down and scrolls for real.
-        gate.scrollPhaseChanged(to: .tracking)
-
-        let maxScroll = fullWidthContentHeight - containerHeight
-        #expect(
-            readerPassedBottom(
-                contentOffsetY: maxScroll + 120,
-                contentHeight: fullWidthContentHeight,
-                containerHeight: containerHeight,
-                isScrollDriven: gate.isArmed,
-                overscroll: 120
-            )
-        )
+    @Test("A scale of zero cannot be divided by")
+    func degenerateScaleIsSafe() {
+        #expect(ReaderZoom.scrollOffsetDelta(replacingVerticalPan: 300, scale: 0) == 0)
     }
 }

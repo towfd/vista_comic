@@ -2,15 +2,17 @@
 
 **What to build:** Reading small lettering and asking what it means are the same errand. A reader who has just magnified a panel to read it should be able to select that sentence and send it through recognition and translation without first returning to full width — otherwise every lookup costs a re-zoom, which is exactly the friction magnification was added to remove.
 
-The crop mathematics need no change and must not be changed. The mapping from an on-screen selection to source pixels is a pure function of the container size and the source image's pixel size, and because zoom is a real layout change rather than a rendering transform, the geometry reported inside the selection overlay is already the enlarged size. A selection drawn over the same visible region at 3x must therefore produce the same source-pixel rectangle as one drawn at 1.0 — and a test should say so, because this is the property that makes recognition quality independent of magnification.
+The crop mathematics need no change and must not be changed. The mapping from an on-screen selection to source pixels is a pure function of the display frame size and the source image's pixel size, and because zoom is a transform over the viewport, SwiftUI maps gesture coordinates back through it — so the overlay's `GeometryReader` and the drag inside it both speak the **unmagnified** display frame, which is exactly the space the mapping already documents. A selection drawn over the same visible region at 3x must therefore produce the same source-pixel rectangle as one drawn at 1.0, for the same reason it does today: the mapping never learns that magnification happened.
 
-**One thing genuinely breaks and is the substance of this ticket.** The "drag here and release to cancel" badge is positioned relative to the Page's own display frame, near its top-right corner. At 3x that corner sits roughly two screen widths off to the right, so mid-drag cancellation — a single continuous touch that aborts without producing a crop — becomes unreachable at exactly the magnifications where a reader is most likely to be selecting carefully. The badge is re-anchored to the **visible viewport** so it is on screen at every scale and every horizontal offset, while keeping its current behaviour: it appears only once a drag is in progress, confirms visually when the finger is inside it, and cancels on release.
+**One thing genuinely breaks and is the substance of this ticket.** The "drag here and release to cancel" badge has to sit inside the part of the Page the reader can actually see, and under this zoom model nothing in the view hierarchy reports that region. `proxy.bounds(of: .scrollView)` returns the whole **unmagnified** viewport, while what is on screen at scale `s` is a `1/s` band of it positioned by the pan offset — so a badge placed from that lookup can land off screen at exactly the magnifications where a reader is most likely to be selecting carefully. The visible region is therefore **derived from the scale and the pan offset** rather than looked up, while the badge keeps its current behaviour: it appears only once a drag is in progress, confirms visually when the finger is inside it, and cancels on release.
 
 Selection mode continues to disable scrolling while active, which means a reader cannot pan while selecting: they position the Page first, then enter selection mode. That is accepted for this version and is not a defect to fix here.
 
 **Blocked by:** 01 — Pinch to zoom the strip, without breaking auto-advance.
 
-**Status:** implemented, awaiting device verification (branch `feat/reader-zoom`)
+**Status:** implemented against the rejected layout-width model; needs rework once 01's rewrite lands (branch `feat/reader-zoom`)
+
+**What the rework is, and is not.** The crop path — `SelectionCropMapping`, `produceCrop`, the overlay's drag handling and all of their tests — is untouched by the model change and stays as it is. One derived value changes: the visible region the badge is placed in, which was read from `proxy.bounds(of: .scrollView)` and is now computed from the scale and the pan offset. Everything below this line was written against the old model and is kept for the reasoning it records; where it says the display frame grows with magnification, it no longer does.
 
 Build succeeds on iPhone 16 Pro Max and iPhone SE (3rd generation); 229 unit tests pass, none failing.
 
@@ -20,7 +22,7 @@ The crop mathematics were left untouched, as intended, and a test now says why t
 
 The badge is now anchored to the top-right of whatever part of the page is visible, which is a change in **both** axes. The horizontal half is the one the ticket described; the vertical half matters just as much, because at 3x a page is several screens tall and a badge pinned to the page's top is off screen whenever the reader is looking at the middle of it.
 
-**The one thing to check first on device.** The visible region comes from asking the page's geometry for the scroll view's bounds in its own coordinate space. If that returns something other than the visible rect, the function falls back to the page's own corner — which is exactly today's behaviour, i.e. the bug this ticket fixes, silently. So the first check is simply: **at 3x, is the badge on screen?** If it is not, the fallback is being taken and the cause is that lookup, not the geometry maths, which the tests cover.
+**The one thing to check first on device.** The visible region is now computed from the scale and the pan offset rather than looked up, so the silent-fallback failure the old implementation could take no longer exists. The first check is still the same one: **at 3x, panned to an edge, is the badge on screen?** If it is not, the cause is the derivation, which is a pure function and should be pinned by a test before the device is involved.
 
 **Verify on device:**
 
@@ -41,5 +43,6 @@ The badge is now anchored to the top-right of whatever part of the page is visib
 - [ ] Recognition, translation and comprehension for a crop taken while magnified behave identically to one taken at full width
 - [ ] Selection mode still ends itself once a crop has been produced
 - [ ] Leaving selection mode mid-drag discards the partial selection, as today
-- [ ] Existing selection-crop mapping tests pass unchanged, with a new case covering an enlarged display frame
+- [ ] Existing selection-crop mapping tests pass unchanged, **and without new cases** — under this zoom model the mapping never sees an enlarged display frame, so a case asserting one would pin a state that cannot occur
+- [ ] The visible region the badge is placed in is a pure function of the scale and the pan offset, with its own unit tests, rather than a geometry lookup that can silently fall back
 - [ ] No XCUITest is written; a device checklist is handed to the repo owner, covering selecting and recognizing at both 2x and 3x

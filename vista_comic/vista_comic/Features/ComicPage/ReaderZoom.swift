@@ -7,16 +7,23 @@
 //  so it can be exercised without rendering the reader. See
 //  `.scratch/reader-zoom/spec.md`.
 //
-//  Zoom is a change of *layout width*, not a rendering transform. The pages
-//  stack is laid out at the container width multiplied by the scale, so the
-//  pages genuinely become wider and — being fitted at a fixed aspect ratio —
-//  proportionally taller. Everything the reader already derives from its scroll
-//  view therefore keeps working natively, including the reserved-height
-//  calculation, which was already parameterised by width.
+//  Zoom is an *absolute transform over the viewport*, and the layout never
+//  changes. The pages stack stays laid out at the container width at every
+//  magnification; the scale — an absolute value over 1...3, never a ratio
+//  against anything — lives only in the rendering layer. The scroll view is
+//  therefore never told that zoom exists: content offset, content size and
+//  container size hold the same values at 3x as at 1.0.
 //
-//  That is also the source of this file's second, larger half. Content height
-//  is one of the three numbers `readerPassedBottom` reads, and zoom moves it by
-//  up to 3x.
+//  That invariance is what this file is short for. Nothing is committed when
+//  the fingers lift, so there is no offset to re-anchor and nothing that can be
+//  clamped against a content size that has not grown yet; and because content
+//  height cannot move with the scale, the bottom-edge inferences need no gate
+//  of their own beyond the scroll-driven one they already had.
+//
+//  The previous model laid the strip out at `containerWidth × scale` and
+//  committed that width on release. It was built, device-tested and rejected —
+//  see `.scratch/reader-zoom/issues/01-pinch-to-zoom-the-strip.md` for the
+//  measurements.
 //
 
 import SwiftUI
@@ -37,18 +44,18 @@ enum ReaderZoom {
     /// anything legible.
     static let maxScale: CGFloat = 3.0
 
-    /// How much of an overshoot past a bound is still expressed on screen.
-    /// Movement continues, but visibly damped, so the reader feels a limit
-    /// rather than a stuck gesture.
+    /// How much of an overshoot past the *upper* bound is still expressed on
+    /// screen. Movement continues, but visibly damped, so the reader feels a
+    /// limit rather than a stuck gesture.
     private static let overshootResistance: CGFloat = 0.35
 
     /// Anything below this settles at full width rather than just above it.
     ///
-    /// Without a snap, a reader who pinches in to "put it back to normal" can
-    /// easily stop at 1.03, which looks normal and is not. That matters far more
-    /// than it sounds: full width is what re-enables auto-advance, so a couple
-    /// of percent left over silently costs them the ability to reach the next
-    /// chapter, with nothing on screen to explain why.
+    /// Still load-bearing under this model, for one reason: auto-advance is
+    /// deliberately inert whenever the scale is not exactly full width, so a
+    /// reader who pinches back to "normal" and stops at 1.03 would silently
+    /// lose the ability to reach the next chapter, with nothing on screen to
+    /// explain why.
     static let snapToFullWidthBelow: CGFloat = 1.08
 
     /// Where a gesture settles once the fingers lift.
@@ -56,37 +63,145 @@ enum ReaderZoom {
         min(max(scale, minScale), maxScale)
     }
 
-    /// What to commit when the fingers lift: clamped, then snapped to full width
-    /// if it is close enough that the reader meant full width.
-    static func committed(_ scale: CGFloat) -> CGFloat {
+    /// What the scale becomes when the fingers lift: clamped, then snapped to
+    /// full width if it is close enough that the reader meant full width.
+    ///
+    /// Note what this is *not*: nothing is laid out again as a result. The
+    /// value the gesture settles on is simply the value the transform keeps,
+    /// which is why there is no moment at which the reader can be displaced.
+    static func settled(_ scale: CGFloat) -> CGFloat {
         let clamped = clamped(scale)
         return clamped < snapToFullWidthBelow ? minScale : clamped
     }
 
-    /// What to show *during* a gesture that has gone past a bound.
+    /// What to render *during* a gesture that has gone past a bound.
     ///
-    /// Floored well above zero: a pinch can report a magnification approaching
-    /// zero, and a scale of zero or below would collapse the strip's laid-out
-    /// width rather than merely making it small.
+    /// Asymmetric on purpose. Past the upper bound the overshoot is damped and
+    /// still shown, so the reader feels the ceiling. Below full width it is
+    /// damped and then **floored at full width**: a viewport drawn smaller than
+    /// the screen is not a state this reader has. The previous model could not
+    /// express that — its transform was a ratio against a committed layout, so
+    /// it went below 1 for the whole duration of every zoom-out gesture and
+    /// visibly shrank the reader away from the screen edges.
     static func rubberBanded(_ scale: CGFloat) -> CGFloat {
-        if scale < minScale {
-            let resisted = minScale - (minScale - scale) * overshootResistance
-            return max(resisted, minScale * (1 - overshootResistance))
-        }
+        if scale < minScale { return minScale }
         if scale > maxScale {
             return maxScale + (scale - maxScale) * overshootResistance
         }
         return scale
     }
+}
 
-    /// The width the pages stack is laid out at.
+// MARK: - Panning
+
+extension ReaderZoom {
+    /// How far the magnified content can be moved along one axis, in screen
+    /// points, in either direction from centred.
     ///
-    /// Zero before the first layout has established a container width, which
-    /// the reader reads as "no width to impose yet" and lets the stack size
-    /// itself as it does today.
-    static func contentWidth(containerWidth: CGFloat, scale: CGFloat) -> CGFloat {
-        guard containerWidth > 0 else { return 0 }
-        return containerWidth * clamped(scale)
+    /// At scale `s` only `1/s` of the viewport is on screen, and the part that
+    /// is not reaches `containerLength × (s − 1) / 2` past each edge. Zero at
+    /// full width, which is what makes every pan expression below inert at 1.0
+    /// without needing to special-case it.
+    static func panLimit(containerLength: CGFloat, scale: CGFloat) -> CGFloat {
+        guard containerLength > 0 else { return 0 }
+        return max(0, containerLength * (clamped(scale) - 1) / 2)
+    }
+
+    /// A pan held inside what the magnified content can actually show, so that
+    /// dragging sideways stops at the edge of the page rather than pulling
+    /// background into view.
+    static func clampedPan(_ pan: CGFloat, containerLength: CGFloat, scale: CGFloat) -> CGFloat {
+        let limit = panLimit(containerLength: containerLength, scale: scale)
+        return min(max(pan, -limit), limit)
+    }
+
+    /// The pan along one axis that keeps whatever is currently under `focal`
+    /// under `focal` once the scale changes from `oldScale` to `newScale`.
+    ///
+    /// Pure arithmetic on the container size, which is the point: it reads
+    /// nothing about content size, so unlike the offset correction the previous
+    /// model needed, there is no stale measurement for it to be wrong about.
+    ///
+    /// - Parameter focal: where the fingers are, as a fraction of the container.
+    static func panKeepingFocalPoint(
+        focal: CGFloat,
+        containerLength: CGFloat,
+        previousPan: CGFloat,
+        from oldScale: CGFloat,
+        to newScale: CGFloat
+    ) -> CGFloat {
+        guard containerLength > 0, oldScale > 0 else { return previousPan }
+        let middle = containerLength / 2
+        let focalPoint = focal * containerLength
+        // Where the focal point lands in the untransformed viewport.
+        let source = middle + (focalPoint - middle - previousPan) / oldScale
+        return focalPoint - middle - newScale * (source - middle)
+    }
+}
+
+// MARK: - Reaching the ends of a chapter
+
+extension ReaderZoom {
+    /// How much further than strictly necessary the end-of-chapter shift takes
+    /// to decay as the reader scrolls away from an end.
+    ///
+    /// At `1` the shift is spent over exactly the distance that needed it,
+    /// which means the content travels at twice the normal rate for that
+    /// stretch. Spreading it wider trades a longer stretch for a gentler one:
+    /// the excess is `1 + 1/factor`, so 2.5 puts it at 1.4x, which reads as the
+    /// chapter's first screen settling rather than as the reader being pushed.
+    static let endReachSettling: CGFloat = 2.5
+
+    /// The vertical shift that makes a chapter's first and last screen readable
+    /// while magnified.
+    ///
+    /// Vertical movement belongs to the scroll view — with one exception. At
+    /// either end of a chapter, scrolling runs out before the magnified band
+    /// has covered the content there: at 3x on an 800pt viewport the outermost
+    /// ~267pt of the first and last screen can never be scrolled into the band,
+    /// because there is no scrolling left to do it with. This supplies exactly
+    /// that shift, and decays to zero as soon as scrolling can take over.
+    ///
+    /// Derived from the scroll position rather than driven by a finger, which
+    /// is the one deliberate deviation from Mihon's and Kotatsu's clamped
+    /// translation. Their version requires the reader to hold a drag to see the
+    /// end of a chapter; this one just shows it, and it removes the gesture
+    /// arbitration that would otherwise have to decide, mid-drag, whether a
+    /// vertical movement belongs to the scroll view or to the transform.
+    ///
+    /// Positive moves content down the screen (revealing what is above it).
+    static func endOfChapterPan(
+        scrollOffset: CGFloat,
+        contentHeight: CGFloat,
+        containerHeight: CGFloat,
+        scale: CGFloat
+    ) -> CGFloat {
+        let reach = panLimit(containerLength: containerHeight, scale: scale)
+        guard reach > 0 else { return 0 }
+        let maxOffset = max(0, contentHeight - containerHeight)
+        let offset = min(max(scrollOffset, 0), maxOffset)
+        // A point of scrolling moves the content `scale` points on screen, so
+        // that is the rate at which the shift stops being needed — divided by
+        // the settling factor, which is what spreads it over a longer stretch
+        // of scrolling and so makes the excess speed smaller.
+        let decay = clamped(scale) / endReachSettling
+        let fromTop = max(0, reach - offset * decay)
+        let fromBottom = max(0, reach - (maxOffset - offset) * decay)
+        return fromTop - fromBottom
+    }
+
+    /// The scroll-offset change that reproduces `pan` exactly, so a transient
+    /// vertical pan can be handed to the scroll view when a pinch ends without
+    /// anything moving on screen.
+    ///
+    /// A point of scrolling moves the content `scale` points on screen, and in
+    /// the opposite direction, which is the whole conversion. It is exact — and
+    /// safe in a way the previous model's commit was not — because content size
+    /// does not change with the scale, so there is no stale size for the
+    /// resulting offset to be clamped against.
+    static func scrollOffsetDelta(replacingVerticalPan pan: CGFloat, scale: CGFloat) -> CGFloat {
+        guard scale > 0 else { return 0 }
+        return -pan / scale
     }
 }
 
@@ -95,40 +210,13 @@ enum ReaderZoom {
 /// Where the pages scroll view currently sits, how big its content is, and how
 /// big the window onto it is.
 ///
-/// Read only when a pinch begins or commits, and when the container resizes —
-/// never during layout — so that a zoom can be anchored at, and re-anchored to,
-/// the content the reader is actually looking at.
+/// Read when a pinch ends and while deciding how far the end-of-chapter shift
+/// still applies — never to correct for a layout change, because there is no
+/// longer a layout change to correct for.
 struct ReaderScrollMetrics: Equatable {
     var offset: CGPoint = .zero
     var contentSize: CGSize = .zero
     var containerSize: CGSize = .zero
-
-    /// Where the scroll offset has to move once the strip has been re-laid-out
-    /// `ratio` times larger, so that the content under `focal` is still under
-    /// `focal`.
-    ///
-    /// Without this the reader is thrown through the chapter by exactly the
-    /// proportion the content grew — zooming to 3x would leave them a third of
-    /// the way back from where they were reading.
-    func offset(afterScalingBy ratio: CGFloat, focal: UnitPoint) -> CGPoint {
-        let anchorInViewport = CGPoint(
-            x: focal.x * containerSize.width,
-            y: focal.y * containerSize.height
-        )
-        let point = viewportPointInContent(focal)
-        return CGPoint(
-            x: max(0, point.x * ratio - anchorInViewport.x),
-            y: max(0, point.y * ratio - anchorInViewport.y)
-        )
-    }
-
-    /// The content coordinate currently displayed at `focal`.
-    private func viewportPointInContent(_ focal: UnitPoint) -> CGPoint {
-        CGPoint(
-            x: offset.x + focal.x * containerSize.width,
-            y: offset.y + focal.y * containerSize.height
-        )
-    }
 }
 
 /// A box holding the metrics above.
@@ -139,90 +227,4 @@ struct ReaderScrollMetrics: Equatable {
 /// in a `@State` property, not a claim that it is safe to share.
 final class ReaderScrollMetricsBox: @unchecked Sendable {
     var value = ReaderScrollMetrics()
-}
-
-// MARK: - The bottom-edge arming gate
-
-/// Decides whether the reader's bottom-edge inferences can be trusted right now.
-///
-/// `readerPassedBottom` decides "the reader pulled past the end" from content
-/// offset, content height and container height. Those three numbers describe
-/// where the content sits, not how it got there — which is why that function
-/// already refuses to answer unless the scroll view was being driven by the
-/// reader. Zoom adds a second way for the same numbers to lie, and a worse one.
-///
-/// **The dangerous direction is downward.** Pinching from 3x back to full width
-/// collapses the content to a third of its height while the scroll offset is
-/// still the old, larger value. That pair satisfies the past-the-bottom test
-/// anywhere beyond the first third of a chapter, and the further in the reader
-/// was, the more certainly it does. Left alone it would advance the chapter, or
-/// mark it read, every time the reader zoomed out — the same failure PR #65
-/// fixed for a keyboard-driven collapse, except reproducible on demand.
-///
-/// So the gate closes on the *gesture* and reopens only on another gesture:
-/// a pinch disarms it, and only a genuine one-finger drag re-arms it. This is
-/// deliberately not a timer and not a delay. A scroll view clamping its offset
-/// after its content shrinks emits geometry updates but produces no new touch,
-/// so requiring a touch closes the window structurally rather than racing it.
-struct ReaderBottomEdgeGate: Equatable {
-    /// Whether the scroll view is under the reader's finger or coasting from
-    /// it — the original gate, unchanged in meaning.
-    private var isScrollDriven = false
-
-    /// Whether a pinch is in progress right now.
-    private var isMagnifying = false
-
-    /// The scale the layout is currently committed to. While this is not full
-    /// width the inferences stay shut regardless of everything else.
-    private var committedScale: CGFloat = ReaderZoom.minScale
-
-    /// Set by a pinch and cleared only by a real drag. This is the part that
-    /// covers the transition back to full width, where `committedScale` has
-    /// already returned to 1.0 but the content has not finished collapsing.
-    private var awaitsRearmingScroll = false
-
-    var isArmed: Bool {
-        isScrollDriven
-            && !isMagnifying
-            && committedScale == ReaderZoom.minScale
-            && !awaitsRearmingScroll
-    }
-
-    mutating func magnificationBegan() {
-        isMagnifying = true
-        awaitsRearmingScroll = true
-    }
-
-    mutating func magnificationEnded(committedScale: CGFloat) {
-        isMagnifying = false
-        self.committedScale = committedScale
-    }
-
-    mutating func scrollPhaseChanged(to phase: ScrollPhase) {
-        // Deceleration counts as driven: releasing a fling that coasts to the
-        // bottom is a normal way to finish a chapter, and the geometry update
-        // that crosses the threshold usually arrives after the finger has left.
-        isScrollDriven = phase == .tracking
-            || phase == .interacting
-            || phase == .decelerating
-
-        // Re-arming is narrower than being driven: it needs a finger actually on
-        // the glass. Momentum does not count, because coasting is what an offset
-        // clamp after a content collapse looks like from here.
-        //
-        // Both touch phases count, and that is not belt-and-braces. `tracking`
-        // is "touched but not yet moved", which a quick flick can skip or have
-        // coalesced away — requiring it alone left the reader unable to advance
-        // to the next chapter after zooming, with no way to recover short of
-        // changing chapter.
-        if phase == .tracking || phase == .interacting, !isMagnifying {
-            awaitsRearmingScroll = false
-        }
-    }
-
-    /// The scroll view is rebuilt for a new chapter and the scale returns to
-    /// full width, so nothing learned about the old one carries over.
-    mutating func chapterChanged() {
-        self = ReaderBottomEdgeGate()
-    }
 }

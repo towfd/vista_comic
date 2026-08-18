@@ -1,6 +1,31 @@
-Status: ready-for-agent
+Status: parked — the evidence that reopened this was misattributed (2026-08-18)
 
 # Page dimensions: stop guessing how tall a page is
+
+> **Parked, and why.** This spec was written on the premise that the repo owner's
+> report of the reader "jumping around constantly" came from the height estimate,
+> and that zoom had taken an already-known problem from tolerable to unusable.
+> **That attribution was wrong.** A second device pass on 2026-08-18 isolated the
+> jumping to the instant the fingers lift from a pinch — the `reader-zoom`
+> layout-width commit, where `scrollTo(point:)` is clamped against a content size
+> that has not grown yet. Reading through pages that had not been loaded yet
+> produced no observable displacement at 1.0 **or** at 3x.
+>
+> Switching zoom models does not change the height-estimate arithmetic either
+> way: the on-screen displacement from a mis-reserved page is `containerWidth ×
+> scale × Δratio` under both the layout-width and the transform model, so zoom
+> multiplies the error identically in each. What changed is only the evidence for
+> how severe that error is in practice — and there is now none.
+>
+> `reader-page-prefetch` ticket 03's original decision to close this work, on the
+> evidence that prefetching made the residual shift unnoticeable, therefore
+> stands. Everything below remains accurate as a design; nothing below is
+> withdrawn.
+>
+> **Reopen when:** displacement is observed after `reader-zoom` ticket 01's
+> rewrite lands, and specifically while scrolling downward faster than pages can
+> load — the one condition prefetching does not cover, and this spec's own user
+> story 2. That check is on ticket 01's device checklist.
 
 ## Problem Statement
 
