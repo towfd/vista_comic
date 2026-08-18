@@ -42,25 +42,38 @@ struct OfflineFallbackComicRepository: ComicRepository {
     let inner: any ComicRepository
     let snapshots: any CatalogSnapshotStore
     let chapters: any OfflineChapterStore
+    /// Told which URLs are comic covers (ticket 07). It is told here because
+    /// this is the one place a decoded library response passes through on both
+    /// the live path and the stored one, and because the answer is a fact about
+    /// the catalog rather than about any screen.
+    let covers: (any CoverCache)?
 
     init(
         wrapping inner: any ComicRepository,
         snapshots: any CatalogSnapshotStore,
-        chapters: any OfflineChapterStore
+        chapters: any OfflineChapterStore,
+        covers: (any CoverCache)? = nil
     ) {
         self.inner = inner
         self.snapshots = snapshots
         self.chapters = chapters
+        self.covers = covers
     }
 
     private var decoder: JSONDecoder { APIConfig.iso8601Decoder }
 
     func library() async throws -> [Comic] {
+        let comics: [Comic]
         do {
-            return try await inner.library()
+            comics = try await inner.library()
         } catch {
-            return try replay([Comic].self, from: .library, after: error)
+            comics = try replay([Comic].self, from: .library, after: error)
         }
+        // On both paths, since a replayed library is the same library — and a
+        // reader who has been offline since launch should still have the covers
+        // they scrolled past yesterday served rather than pruned.
+        covers?.setKnownCovers(comics.compactMap(\.coverURL))
+        return comics
     }
 
     func comic(id: String) async throws -> Comic {

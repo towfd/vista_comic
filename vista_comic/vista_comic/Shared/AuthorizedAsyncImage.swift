@@ -108,11 +108,18 @@ struct AuthorizedAsyncImage<Content: View>: View {
     }
 
     /// The result of a fetch: the SwiftUI `Image` used to render `content`,
-    /// and the decoded `UIImage` it was built from, for callers that need
-    /// the original source pixels rather than the rendered SwiftUI value.
+    /// the decoded `UIImage` it was built from, for callers that need the
+    /// original source pixels rather than the rendered SwiftUI value, and the
+    /// bytes exactly as they arrived.
+    ///
+    /// The bytes are carried because something that wants to keep an image on
+    /// disk (`offline-download` ticket 07) must write what the server sent
+    /// rather than a re-encoding of the decode — a PNG round-trip of a JPEG is
+    /// both larger and no longer the same file.
     struct FetchedImage {
         let image: Image
         let decodedImage: UIImage
+        let data: Data
     }
 
     /// Isolated from view state so it's directly testable without rendering.
@@ -138,6 +145,6 @@ struct AuthorizedAsyncImage<Content: View>: View {
                 )
             )
         }
-        return FetchedImage(image: Image(uiImage: uiImage), decodedImage: uiImage)
+        return FetchedImage(image: Image(uiImage: uiImage), decodedImage: uiImage, data: data)
     }
 }
