@@ -47,6 +47,11 @@ private final class CacheStubURLProtocol: URLProtocol {
     private static var cancelledURLs: [URL] = []
     private static var loadsInProgress = 0
     private static var peakLoadsInProgress = 0
+    /// While set, responses are parked instead of delivered. Lets a test hold
+    /// every fetch open at once and ask how many are alive without racing a
+    /// timer — see `hold()`.
+    private static var isHolding = false
+    private static var heldResponses: [() -> Void] = []
 
     /// Clears every recorded request and canned response. Called at the start
     /// of each test so counts start from zero.
@@ -60,7 +65,47 @@ private final class CacheStubURLProtocol: URLProtocol {
             cancelledURLs = []
             loadsInProgress = 0
             peakLoadsInProgress = 0
+            isHolding = false
+            heldResponses = []
         }
+    }
+
+    /// Parks every response until `release()`.
+    ///
+    /// A delay makes fetches *probably* overlap; this makes them certainly
+    /// overlap, which is the difference between a concurrency assertion that
+    /// measures the cache and one that measures how busy the machine is.
+    static func hold() {
+        lock.withLock { isHolding = true }
+    }
+
+    /// Delivers exactly one parked response, freeing exactly one slot.
+    ///
+    /// One at a time, because "which request went next" is only a fact if only
+    /// one thing could have gone: release everything at once and two resumed
+    /// fetches record their requests in whichever order the scheduler feels
+    /// like.
+    static func releaseOne() {
+        let respond = lock.withLock { () -> (() -> Void)? in
+            heldResponses.isEmpty ? nil : heldResponses.removeFirst()
+        }
+        respond?()
+    }
+
+    static func release() {
+        let pending = lock.withLock { () -> [() -> Void] in
+            isHolding = false
+            let pending = heldResponses
+            heldResponses = []
+            return pending
+        }
+        for respond in pending { respond() }
+    }
+
+    /// How many requests are loading right now, as opposed to the high-water
+    /// mark `peakConcurrentLoads` reports.
+    static var loadsInFlight: Int {
+        lock.withLock { loadsInProgress }
     }
 
     static func serve(_ body: Data, for url: URL) {
@@ -149,6 +194,13 @@ private final class CacheStubURLProtocol: URLProtocol {
             self.client?.urlProtocolDidFinishLoading(self)
         }
 
+        let parked = CacheStubURLProtocol.lock.withLock { () -> Bool in
+            guard CacheStubURLProtocol.isHolding else { return false }
+            CacheStubURLProtocol.heldResponses.append(respond)
+            return true
+        }
+        if parked { return }
+
         if delay > 0 {
             DispatchQueue.global().asyncAfter(deadline: .now() + delay, execute: respond)
         } else {
@@ -223,7 +275,7 @@ struct PageImageCacheTests {
     /// the old "placeholder frame first" behaviour comes back silently with
     /// everything else still passing.
     @Test func residentImageIsReadableSynchronously() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         let cache = makeCache()
 
@@ -235,7 +287,7 @@ struct PageImageCacheTests {
     }
 
     @Test func synchronousLookupReturnsNothingForAnAbsentURLAndFetchesNothing() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         let cache = makeCache()
 
@@ -249,7 +301,7 @@ struct PageImageCacheTests {
     // MARK: - One request per image
 
     @Test func askingTwiceInSequenceIssuesOneNetworkRequest() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         let cache = makeCache()
 
@@ -260,7 +312,7 @@ struct PageImageCacheTests {
     }
 
     @Test func twoConcurrentAsksIssueOneNetworkRequest() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         // Hold the response open so the second ask genuinely arrives while the
         // first fetch is still running, rather than after it stored its image.
@@ -277,7 +329,7 @@ struct PageImageCacheTests {
     }
 
     @Test func differentURLsAreCachedSeparately() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         CacheStubURLProtocol.serve(Self.makePNG(width: 30, height: 40), for: Self.otherPageURL)
         let cache = makeCache()
@@ -295,7 +347,7 @@ struct PageImageCacheTests {
     /// must carry every one of them — downsampling here would silently degrade
     /// recognition quality.
     @Test func cachesAtFullSourceResolution() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let body = Self.makePNG(width: 120, height: 340)
         CacheStubURLProtocol.serve(body, for: Self.pageURL)
         let cache = makeCache()
@@ -321,7 +373,7 @@ struct PageImageCacheTests {
     /// assertion caught it handing back a still-encoded image under load while
     /// passing when run alone — which is why the check earns its place.
     @Test func aCachedImageHasAlreadyBeenDecoded() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let body = Self.makePNG(width: 120, height: 340)
         CacheStubURLProtocol.serve(body, for: Self.pageURL)
         let cache = makeCache()
@@ -341,7 +393,7 @@ struct PageImageCacheTests {
     /// fetch behind the cache can't quietly lose the headers that
     /// `AuthorizedAsyncImageTests` was written to protect.
     @Test func requestsCarryCloudflareAccessHeaders() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         let cache = makeCache(clientID: "test-client-id", clientSecret: "test-client-secret")
 
@@ -353,7 +405,7 @@ struct PageImageCacheTests {
     }
 
     @Test func requestsOmitCloudflareAccessHeadersWhenUnconfigured() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         let cache = makeCache()
 
@@ -370,7 +422,7 @@ struct PageImageCacheTests {
     /// cache, so a failure must leave nothing behind that would replay itself
     /// instead of trying the network again.
     @Test func aFailedFetchIsNotCachedAndARetryRequestsAgain() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Data("<html>blocked</html>".utf8), for: Self.pageURL)
         CacheStubURLProtocol.setStatus(403)
         let cache = makeCache()
@@ -399,7 +451,7 @@ struct PageImageCacheTests {
     /// is documented as unspecified, so an order-dependent assertion here
     /// would be a flake waiting to happen.
     @Test func retentionIsBoundedByTotalDecodedBytes() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = (0..<8).map {
             URL(string: "https://api.example.com/media/comic/chapter/budget/\($0)")!
         }
@@ -442,7 +494,7 @@ struct PageImageCacheTests {
     }
 
     @Test func everythingIsReleasedOnAMemoryWarning() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 8, height: 12), for: Self.pageURL)
         CacheStubURLProtocol.serve(Self.makePNG(width: 30, height: 40), for: Self.otherPageURL)
         let cache = makeCache()
@@ -470,7 +522,7 @@ struct PageImageCacheTests {
     // content collapsing.
 
     @Test func decodingAPageRecordsItsProportions() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 900, height: 1800), for: Self.pageURL)
         let cache = makeCache()
 
@@ -481,7 +533,7 @@ struct PageImageCacheTests {
     }
 
     @Test func proportionsOutliveEviction() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = (0..<8).map {
             URL(string: "https://api.example.com/media/comic/chapter/ratio/\($0)")!
         }
@@ -512,7 +564,7 @@ struct PageImageCacheTests {
     }
 
     @Test func proportionsSurviveAMemoryWarning() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         CacheStubURLProtocol.serve(Self.makePNG(width: 900, height: 1350), for: Self.pageURL)
         let cache = makeCache()
         _ = try await cache.image(for: Self.pageURL)
@@ -550,6 +602,26 @@ struct PageImageCacheTests {
         }
     }
 
+    /// Clears the stub, having first waited for anything a previous test left
+    /// running.
+    ///
+    /// The window is fire-and-forget: a test can return while the coordinator
+    /// is still working through the pages it asked for, and those requests are
+    /// then recorded against whichever test comes next. Almost every assertion
+    /// in this suite is an exact count, so one straggler reads as a bug in the
+    /// cache — which is what was happening intermittently, in a different test
+    /// each time.
+    ///
+    /// Quiet is checked twice, because a queued fetch starts the moment a slot
+    /// is freed: a single reading of zero can be the gap between two of them.
+    private func freshStub() async {
+        for _ in 0..<2 {
+            _ = await waitUntil { CacheStubURLProtocol.loadsInFlight == 0 }
+            try? await Task.sleep(nanoseconds: 30_000_000)
+        }
+        await freshStub()
+    }
+
     /// Polls for an outcome rather than sleeping a fixed time. The window is
     /// fire-and-forget by design — it returns before any work is done — so a
     /// test has to wait for a result, not for a duration.
@@ -572,7 +644,7 @@ struct PageImageCacheTests {
     /// The window's shape, and the fact that it is seeded where the reader
     /// actually is: a window opened at page 11 must not fetch page 1.
     @Test func aWindowRequestsTheCurrentPageFiveAheadAndTwoBehindAndNothingElse() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(30)
         serve(urls)
         let cache = makeCache()
@@ -587,7 +659,7 @@ struct PageImageCacheTests {
     }
 
     @Test func aWindowNearTheEndOfAChapterClampsInsteadOfRequestingPastTheLastPage() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(12)
         serve(urls)
         let cache = makeCache()
@@ -602,7 +674,7 @@ struct PageImageCacheTests {
     }
 
     @Test func anEmptyChapterRequestsNothing() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let cache = makeCache()
 
         cache.setPrefetchWindow(pageURLs: [], currentIndex: 0)
@@ -614,7 +686,7 @@ struct PageImageCacheTests {
     /// Scrolling must cost only the pages newly come into range — otherwise the
     /// window would re-download most of itself on every slide.
     @Test func slidingTheWindowForwardOnlyRequestsNewlyEnteredPages() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(20)
         serve(urls)
         let cache = makeCache()
@@ -635,16 +707,32 @@ struct PageImageCacheTests {
     /// connection or the decoder. The window is eight pages wide, so half of it
     /// must be made to wait.
     @Test func noMoreThanFourFetchesRunAtOnce() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(30)
         serve(urls)
-        // Long enough that fetches genuinely overlap; without a delay each
-        // would finish before the next began and the cap would be untested.
-        CacheStubURLProtocol.setDelay(0.2)
+        // Held rather than delayed. With nothing able to finish, the four slots
+        // fill and stay filled, so "how many run at once" is a fact rather than
+        // a race against a timer.
+        //
+        // An earlier version served every response after 0.2s and asserted the
+        // peak was exactly four. On a busy machine a slot could be handed over
+        // before the fourth fetch had even started, so the peak was three and
+        // the test failed — reporting a cache that was behaving correctly as
+        // broken, which is the worst thing a test can do.
+        CacheStubURLProtocol.hold()
         let cache = makeCache()
 
         cache.setPrefetchWindow(pageURLs: urls, currentIndex: 10)
 
+        // Four, and then no more however long anything waits: a fifth cannot
+        // start until one of the four gives its slot back, and none of them can.
+        #expect(await waitUntil { CacheStubURLProtocol.loadsInFlight == 4 })
+        #expect(CacheStubURLProtocol.peakConcurrentLoads == 4)
+
+        CacheStubURLProtocol.release()
+
+        // The rest of the window then goes through the same four slots, and the
+        // high-water mark never moves.
         #expect(await waitUntil { self.areResident(urls[8...15], in: cache) })
         #expect(CacheStubURLProtocol.peakConcurrentLoads == 4)
     }
@@ -654,7 +742,7 @@ struct PageImageCacheTests {
     /// the transport, *and* the pages the reader actually landed on arrive far
     /// sooner than the abandoned ones could possibly have finished.
     @Test func pagesLeavingTheWindowAreCancelledAndGiveTheirSlotsBack() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let abandoned = Self.chapterURLs(6, chapter: "abandoned")
         let landed = Self.chapterURLs(6, chapter: "landed")
         serve(abandoned)
@@ -683,32 +771,53 @@ struct PageImageCacheTests {
     /// A page the reader has actually reached must not sit behind prefetches
     /// for pages further down that were queued before it.
     @Test func aPageTheReaderLandsOnIsFetchedAheadOfQueuedPrefetches() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(10, chapter: "priority")
         serve(urls)
-        // Long enough that the explicit ask below lands while the first four
-        // still hold every slot.
-        CacheStubURLProtocol.setDelay(0.4)
+        // Held, so the four slots stay occupied until this test frees one on
+        // purpose. The earlier version served every response after 0.4s and
+        // hoped the explicit ask below arrived first; on a busy machine the
+        // delay elapsed first, a slot went to the page that had merely queued
+        // earlier, and the test reported a priority bug that was not there.
+        CacheStubURLProtocol.hold()
         let cache = makeCache()
 
-        // Pages 1–6 wanted; pages 1–4 start, pages 5 and 6 queue behind them.
+        // Pages 1–6 wanted; pages 1–4 hold the slots, pages 5 and 6 queue.
         cache.setPrefetchWindow(pageURLs: urls, currentIndex: 0)
-        #expect(await waitUntil { CacheStubURLProtocol.requests.count >= 4 })
+        #expect(await waitUntil { CacheStubURLProtocol.loadsInFlight == 4 })
 
         // The reader lands on page 6 — the very last thing the window queued.
-        _ = try await cache.image(for: urls[5])
+        let landed = Task { try await cache.image(for: urls[5]) }
+        // Nothing can finish while everything is held, so this waits for the
+        // ask to be recorded rather than racing anything: the fifth request
+        // cannot be issued until a slot is freed below.
+        try await Task.sleep(for: .milliseconds(200))
+
+        // Exactly one slot, so exactly one queued fetch can start.
+        CacheStubURLProtocol.releaseOne()
+        #expect(await waitUntil { CacheStubURLProtocol.requests.count == 5 })
 
         let order = CacheStubURLProtocol.requests.compactMap(\.url)
-        #expect(order.count >= 5)
-        // The first freed slot went to it, ahead of page 5 which queued first.
+        // It went to the page the reader is looking at, ahead of page 5, which
+        // queued first.
         #expect(order[4] == urls[5])
+
+        CacheStubURLProtocol.release()
+        _ = try? await landed.value
+        // Let the rest of the window finish before leaving. A fetch still
+        // running when the next test resets the stub is recorded against *that*
+        // test's counts — which is what these exact-count assertions have
+        // actually been failing on.
+        #expect(await waitUntil {
+            CacheStubURLProtocol.loadsInFlight == 0 && CacheStubURLProtocol.requests.count == 6
+        })
     }
 
     /// The anti-storm guarantee. Without the failure mark the reconciler would
     /// see "not resident, not in flight", re-request, fail, and loop — a dead
     /// network would become a request storm.
     @Test func aFailedURLIsNotReRequestedByASubsequentWindowReconcile() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(10, chapter: "dead")
         serve(urls)
         CacheStubURLProtocol.setStatus(503)
@@ -736,7 +845,7 @@ struct PageImageCacheTests {
     /// unloadable. This is the path the Reader's tappable failure placeholder
     /// takes, and the path taken when the reader simply scrolls to the page.
     @Test func anExplicitRequestReRequestsAPageThePrefetchWindowGaveUpOn() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let urls = Self.chapterURLs(10, chapter: "recovered")
         serve(urls)
         CacheStubURLProtocol.setStatus(503)
@@ -762,7 +871,7 @@ struct PageImageCacheTests {
     /// Chapter changes re-seed the window; they never clear the cache. This is
     /// what makes flipping to the previous or next chapter and back instant.
     @Test func aNewChaptersWindowKeepsWhatThePreviousOneCached() async throws {
-        CacheStubURLProtocol.reset()
+        await freshStub()
         let previous = Self.chapterURLs(6, chapter: "previous")
         let next = Self.chapterURLs(6, chapter: "next")
         serve(previous)
