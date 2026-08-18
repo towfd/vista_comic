@@ -11,8 +11,17 @@ struct ChapterListView: View {
     let comic: Comic
     let chapter: Chapter
 
+    @Environment(\.chapterDownloads) private var downloads
+
+    private var chapterID: DownloadedChapterID {
+        DownloadedChapterID(comicID: comic.id, chapterID: chapter.id)
+    }
+
     var body: some View{
-        VStack{
+        // The download control sits outside the link rather than inside it: a
+        // button nested in a `NavigationLink` hands its taps to the link, so
+        // cancelling a download would open the reader instead.
+        HStack(spacing: 0){
             NavigationLink(value: ReaderRoute(comicID: comic.id, chapterID: chapter.id)){
                 HStack(spacing: 17){
                     // The chapter's own first page, not one shared stock
@@ -42,10 +51,17 @@ struct ChapterListView: View {
                     VStack(){
                         Text("#\(chapter.number)")
                             .font(AppFont.rowTitle)
-                    }.padding(.trailing, 10)
+                    }
                 }
             }
             .foregroundStyle(.grayFont)
+
+            ChapterDownloadButton(
+                state: downloads.state(for: chapterID),
+                start: { downloads.download(comic: comic, chapter: chapter) },
+                cancel: { downloads.cancel(chapterID) }
+            )
+            .padding(.trailing, 2)
         }.frame(maxWidth: .infinity, maxHeight: 73, alignment: .center)
     }
 
