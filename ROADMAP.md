@@ -323,6 +323,26 @@ Sizing was measured against the real library rather than assumed — 1855 Pages,
 
 **Ticket 03 (reserving correct height for Pages not in memory) was closed as not doing**, after device verification: the synchronous hit path fixed the reported scroll-up jitter on its own, and the remaining first-pass shift was judged not noticeable. Spec user stories 8 and 9 are therefore unmet by design. Also rejected, with reasons recorded in the spec: backend-supplied Page dimensions, a disk cache, downsampling, and a hand-rolled LRU in place of `NSCache`.
 
+### Reader zoom (post-M10, ticket-driven)
+
+- Status: **Merged** — tickets 01 and 02 shipped; PR [#66](https://github.com/towfd/vista_comic/pull/66) merged into `main` on 2026-08-18.
+- Owner: main session
+- Spec of record: `.scratch/reader-zoom/spec.md`
+
+Pinch to magnify the reader, 1.0x–3.0x, so that small Vietnamese lettering is legible without leaving the page. The magnification is a property of reading rather than of a Page: it persists while scrolling, and pinching back in returns to full width with no control to find. Selection keeps working at every scale, because reading small text and asking what it means are the same errand.
+
+**The feature was built twice, and the first version is the more useful record.** It laid the strip out at `containerWidth × scale` and committed that width when the fingers lifted — the model the spec originally specified, implemented in full and device-tested before being rejected. Two defects followed from the commit and neither was fixable within it: committing a new width changes content size, so the scroll offset had to be re-anchored against a size that had not grown yet, and `scrollTo(point:)` is documented to clamp to "the size of its actual content" — the reader was thrown further through the chapter the deeper into it they were. And because the live transform had to be a *ratio* against the committed layout, it was below 1 for the whole of every zoom-out gesture, visibly shrinking the reader away from the screen edges.
+
+Discrete zoom steps were proposed as the fix and rejected on the arithmetic: at 1.3x the same reader is still clamped, by 420pt instead of 26600pt. Quantising the value does not address an ordering problem.
+
+**Zoom is now an absolute transform over the viewport, and the layout never changes.** The pages stack stays laid out at the container width at every magnification and the scale lives only in the rendering layer, so content offset, content size and container size hold the same values at 3x as at 1.0. Nothing is committed, so there is no moment at which the reader can be displaced. That invariance deleted the bottom-edge arm/disarm state machine, the rotation offset correction and the second scroll axis, and it restored read-detection at every scale — a chapter read to its end while magnified is now marked `read`. Auto-advance stays inert above full width as a deliberate product rule.
+
+What had to be built is panning, since the strip is never genuinely wider: sideways from the horizontal component of a one-finger drag, leaving the vertical to the scroll view; and a vertical shift at the two ends of a chapter, derived from the scroll position rather than driven by a finger, because scrolling runs out before the magnified band has covered the first and last screen.
+
+**The research this rests on is worth keeping**: `.scratch/reader-zoom/research-scroll-anchoring-and-zoom.md` establishes from Apple's documentation and the source of Aidoku, Mihon and Kotatsu that no production reader re-lays-out its list under zoom, and that PDFKit — the one that does — can afford to only because it carries position as `(page, point in page space)` rather than as a pixel offset.
+
+**`.scratch/page-dimensions/` was parked as a direct result.** It had been specified on the premise that a report of the reader "jumping around constantly" came from the Reader's height estimate. Isolating the jumping to the instant the fingers lift showed that attribution was wrong, and a device pass found no displacement at 1.0 or at 3x — so `reader-page-prefetch` ticket 03's original decision to close that work stands. Its spec keeps its design intact and records the condition for reopening: displacement observed while scrolling faster than pages can load, the one case prefetching does not cover.
+
 ## Known issues and constraints
 
 - **CoreGraphics is being handed a NaN somewhere.** `Error: this application, or a library it uses, has passed an invalid numeric value (NaN...) to CoreGraphics API` appears in the console around the selection sheet, several times in a row. Almost certainly pre-existing — it predates the sheet-lifetime fix ([#50](https://github.com/towfd/vista_comic/pull/50)), which touched no geometry — and harmless so far, since CoreGraphics ignores the value. `SelectionCropMapping` and the selection-overlay drawing were both read and cleared. To find it, set `CG_NUMERICS_SHOW_BACKTRACE=1` in the scheme's environment variables and reproduce; the backtrace names the exact call site, which beats reading code for it.

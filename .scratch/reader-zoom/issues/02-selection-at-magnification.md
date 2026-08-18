@@ -10,7 +10,7 @@ Selection mode continues to disable scrolling while active, which means a reader
 
 **Blocked by:** 01 — Pinch to zoom the strip, without breaking auto-advance.
 
-**Status:** reworked for the absolute-transform model; awaiting device verification (branch `feat/reader-zoom`)
+**Status:** done — device-verified by the repo owner, 2026-08-18; merged in PR [#66](https://github.com/towfd/vista_comic/pull/66)
 
 **What the rework turned out to be.** One derived value, as predicted. `ReaderZoom.visibleRegion(inViewport:scale:pan:)` computes the `1/s` band the transform actually puts on screen, and the overlay hands that to `selectionCancelZoneFrame` in place of the raw `proxy.bounds(of: .scrollView)`. It returns the viewport unchanged at full width, so behaviour at 1.0 is bit-for-bit what it was. The scale passed in is the *settled* one rather than the live one — a pinch in flight would otherwise invalidate every realised row on every frame, and panning is disabled while selecting, so the badge only has to be right once the fingers are off. `SelectionCropMapping`, `produceCrop`, the overlay's drag handling and every one of their tests are untouched.
 
@@ -37,14 +37,14 @@ The badge is now anchored to the top-right of whatever part of the page is visib
 - Selection mode is a one-finger drag and zoom is two fingers, so they do not fight. If you do pinch while selection mode is on, the badge's position will be stale until you let go; that is an untested edge and worth a glance.
 - Panning while selection mode is on is still deliberately not possible; position the page first, then enter selection mode.
 
-- [ ] Selection mode can be entered and used at any scale, including 3x
-- [ ] The cancel badge is visible and reachable within the visible viewport at every scale and every horizontal offset
-- [ ] Dragging into the badge and releasing cancels the selection, exactly as it does at 1.0
-- [ ] A drag that produces no crop — the cancel zone, or a selection off the Page — leaves selection mode active, as today
-- [ ] A selection over a given visible region while magnified produces the same source-pixel crop as the same visible region at 1.0
-- [ ] Recognition, translation and comprehension for a crop taken while magnified behave identically to one taken at full width
-- [ ] Selection mode still ends itself once a crop has been produced
-- [ ] Leaving selection mode mid-drag discards the partial selection, as today
-- [ ] Existing selection-crop mapping tests pass unchanged, **and without new cases** — under this zoom model the mapping never sees an enlarged display frame, so a case asserting one would pin a state that cannot occur
+- [x] Selection mode can be entered and used at any scale, including 3x
+- [x] The cancel badge is visible and reachable within the visible viewport at every scale and every horizontal offset
+- [x] Dragging into the badge and releasing cancels the selection, exactly as it does at 1.0
+- [x] A drag that produces no crop — the cancel zone, or a selection off the Page — leaves selection mode active, as today
+- [x] A selection over a given visible region while magnified produces the same source-pixel crop as the same visible region at 1.0
+- [x] Recognition, translation and comprehension for a crop taken while magnified behave identically to one taken at full width
+- [x] Selection mode still ends itself once a crop has been produced
+- [x] Leaving selection mode mid-drag discards the partial selection, as today
+- [x] Existing selection-crop mapping tests pass unchanged, **and without new cases** — under this zoom model the mapping never sees an enlarged display frame, so a case asserting one would pin a state that cannot occur
 - [x] The visible region the badge is placed in is a pure function of the scale and the pan offset, with its own unit tests, rather than a geometry lookup that can silently fall back
-- [ ] No XCUITest is written; a device checklist is handed to the repo owner, covering selecting and recognizing at both 2x and 3x
+- [x] No XCUITest is written; a device checklist is handed to the repo owner, covering selecting and recognizing at both 2x and 3x
