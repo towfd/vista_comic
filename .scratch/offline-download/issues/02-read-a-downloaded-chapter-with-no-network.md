@@ -46,6 +46,12 @@ A chapter that was never downloaded, or only partly downloaded, still fails — 
 
 ## What is not delivered
 
+> **Closed by ticket 07** (2026-08-18): the repo owner chose the narrow version
+> of option 2 — **comic covers only**, which is one file per comic and therefore
+> bounded by the library itself. Chapter thumbnails stay as described below.
+> This section is left standing as the record of why that was a separate
+> decision rather than something quietly folded in here.
+
 **Covers do not render with no connection.** A cover's bytes are only ever in the memory cache, which does not survive a relaunch, and the disk holds exactly what was downloaded on purpose — a comic's cover and a chapter's thumbnail are neither. Offline, 書庫 and the chapter list therefore render fully — titles, chapter counts, read state, download markers, and every chapter tappable — with placeholder artwork.
 
 Closing it needs a decision rather than a patch, which is why it is not quietly included here: a cover cache is **unbounded**. At this library's size it is 300+ comic covers and 3,000+ chapter thumbnails at roughly 100 KB each — plausibly 300 MB, well past the 100–400 MB the twenty-chapter cap was sized for — so it needs a budget and an eviction rule of its own, and those are the kind of thing this spec deliberately gave its own ticket. Options, for the repo owner:
