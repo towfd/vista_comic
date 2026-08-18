@@ -247,6 +247,103 @@ struct PendingProgressTests {
         #expect(chapter.lastReadPage == 18)
     }
 
+    // MARK: - What the chapter list says while still offline
+
+    /// A stored comic detail: two chapters of three pages each, both unread at
+    /// the time the app was last online.
+    private static let storedComicJSON = Data("""
+    {
+      "id": "comic-1",
+      "title": "Alpha",
+      "coverUrl": "https://example.test/cover-1",
+      "chapters": [
+        {"id": "chapter-1", "number": 1, "title": "One", "pageCount": 3, "readState": "unread"},
+        {"id": "chapter-2", "number": 2, "title": "Two", "pageCount": 3, "readState": "unread"}
+      ]
+    }
+    """.utf8)
+
+    private func makeOfflineRepository(
+        pending: any PendingProgressStore,
+        inner: RecordingRepository
+    ) -> OfflineFallbackComicRepository {
+        let snapshots = InMemoryCatalogSnapshotStore()
+        snapshots.store(Self.storedComicJSON, for: .comic(id: "comic-1"))
+        inner.libraryError = Self.offline
+        inner.failSaves(with: [Self.offline, Self.offline, Self.offline])
+        return OfflineFallbackComicRepository(
+            wrapping: inner,
+            snapshots: snapshots,
+            chapters: InMemoryOfflineChapterStore(),
+            pending: pending
+        )
+    }
+
+    @Test func aChapterFinishedOfflineSaysSoWhileStillOffline() async throws {
+        let pending = InMemoryPendingProgressStore()
+        // Read to the last page of a three-page chapter.
+        pending.enqueue(PendingProgress(comicID: "comic-1", chapterID: "chapter-1", lastPage: 3))
+        let repository = makeOfflineRepository(pending: pending, inner: RecordingRepository())
+
+        let comic = try await repository.comic(id: "comic-1")
+
+        // The stored response says unread, because it was written before this
+        // reading happened. The queue is the only thing that knows otherwise.
+        #expect(comic.chapters.first?.readState == .read)
+    }
+
+    @Test func aChapterStoppedPartwaySaysReading() async throws {
+        let pending = InMemoryPendingProgressStore()
+        pending.enqueue(PendingProgress(comicID: "comic-1", chapterID: "chapter-1", lastPage: 2))
+        let repository = makeOfflineRepository(pending: pending, inner: RecordingRepository())
+
+        let comic = try await repository.comic(id: "comic-1")
+
+        #expect(comic.chapters.first?.readState == .reading)
+        #expect(comic.chapters.first?.lastReadPage == 2)
+    }
+
+    @Test func aChapterWithNothingQueuedKeepsWhatTheStoredResponseSaid() async throws {
+        let pending = InMemoryPendingProgressStore()
+        pending.enqueue(PendingProgress(comicID: "comic-1", chapterID: "chapter-1", lastPage: 3))
+        let repository = makeOfflineRepository(pending: pending, inner: RecordingRepository())
+
+        let comic = try await repository.comic(id: "comic-1")
+
+        // Untouched: the overlay states what the queue knows and invents nothing.
+        #expect(comic.chapters.last?.readState == .unread)
+        #expect(comic.chapters.last?.lastReadPage == nil)
+    }
+
+    @Test func aLiveResponseIsNeverOverlaid() async throws {
+        let pending = InMemoryPendingProgressStore()
+        pending.enqueue(PendingProgress(comicID: "comic-1", chapterID: "chapter-1", lastPage: 3))
+        let inner = RecordingRepository()
+        // Reachable: `comic(id:)` answers, and the queue is flushed in front of
+        // it, so the server's own read state is the fresher of the two.
+        let repository = OfflineFallbackComicRepository(
+            wrapping: inner,
+            snapshots: InMemoryCatalogSnapshotStore(),
+            chapters: InMemoryOfflineChapterStore(),
+            pending: pending
+        )
+
+        let comic = try await repository.comic(id: "comic-1")
+
+        #expect(comic.chapters.isEmpty)
+        #expect(inner.saved.map(\.lastPage) == [3])
+        #expect(pending.queued().isEmpty)
+    }
+
+    @Test func theReadStateRuleMatchesTheBackends() {
+        // Mirrors `progress_store.read_state`, whose own boundaries are pinned
+        // by `backend/tests/test_progress.py`. A disagreement here would change
+        // the badge under the reader the moment they reconnect.
+        #expect(OfflineFallbackComicRepository.readState(lastPage: 1, pageCount: 2) == .reading)
+        #expect(OfflineFallbackComicRepository.readState(lastPage: 2, pageCount: 2) == .read)
+        #expect(OfflineFallbackComicRepository.readState(lastPage: 3, pageCount: 2) == .read)
+    }
+
     // MARK: - The two stores stay apart
 
     @Test func evictingADownloadedChapterLeavesItsQueuedPositionAlone() async throws {

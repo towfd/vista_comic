@@ -106,9 +106,12 @@ struct OfflineFallbackComicRepository: ComicRepository {
         // Same reason: this screen shows a read badge per chapter.
         await flusher.flush()
         do {
+            // A live response is fresher than anything held here, and the queue
+            // was just flushed in front of it, so it is returned untouched.
             return try await inner.comic(id: id)
         } catch {
-            return try replay(Comic.self, from: .comic(id: id), after: error)
+            let stored = try replay(Comic.self, from: .comic(id: id), after: error)
+            return withPendingProgress(stored)
         }
     }
 
@@ -177,6 +180,63 @@ struct OfflineFallbackComicRepository: ComicRepository {
         // in the background, since the reader is mid-page and waiting on
         // nothing.
         Task { [flusher] in await flusher.flush() }
+    }
+
+    // MARK: - What the queue knows
+
+    /// Re-states a stored chapter list in terms of the positions that have not
+    /// been sent yet (ticket 08).
+    ///
+    /// A stored response is a faithful record of a moment that has since passed:
+    /// it was written the last time the app was online, and the reader has been
+    /// reading since. The queue is the only thing that knows that, and without
+    /// this the reader finishes a chapter offline and the list still calls it
+    /// unread.
+    ///
+    /// Applied **only** to a replayed response. A live one is fresher than
+    /// anything local by definition.
+    private func withPendingProgress(_ comic: Comic) -> Comic {
+        let chapters = comic.chapters.map { chapter -> Chapter in
+            let id = DownloadedChapterID(comicID: comic.id, chapterID: chapter.id)
+            guard let queued = pending.progress(for: id) else { return chapter }
+            return Chapter(
+                id: chapter.id,
+                number: chapter.number,
+                title: chapter.title,
+                pageURLs: chapter.pageURLs,
+                pageCount: chapter.pageCount,
+                readState: Self.readState(lastPage: queued.lastPage, pageCount: chapter.pageCount),
+                lastReadPage: queued.lastPage,
+                coverURL: chapter.coverURL
+            )
+        }
+
+        // `lastReadAt` and `continueChapterId` are left exactly as stored. What
+        // the library card shows is decided by a rule with real branching — the
+        // most recent reading chapter, else the first unread, else the first —
+        // and reproducing that here would be duplication rather than a mirror.
+        return Comic(
+            id: comic.id,
+            title: comic.title,
+            coverURL: comic.coverURL,
+            chapters: chapters,
+            chapterCount: comic.chapterCount,
+            lastReadAt: comic.lastReadAt,
+            continueChapterId: comic.continueChapterId
+        )
+    }
+
+    /// Mirrors the backend's `progress_store.read_state` exactly: a last page at
+    /// or past the page count is `read`, anything else is `reading`. (Its third
+    /// case, no progress at all, cannot arise here — there would be no queued
+    /// entry to ask about.)
+    ///
+    /// Deliberately a mirror rather than a judgement of our own. If this said
+    /// `read` where the backend says `reading`, reconnecting would change the
+    /// badge under the reader — worse than the stale badge this replaces,
+    /// because it looks like the app changing its mind.
+    static func readState(lastPage: Int, pageCount: Int) -> ReadState {
+        lastPage >= pageCount ? .read : .reading
     }
 
     // MARK: - Falling back
