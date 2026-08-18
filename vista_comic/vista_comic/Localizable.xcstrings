@@ -470,6 +470,105 @@
           }
         }
       }
+    },
+    "Downloads" : {
+      "comment" : "Tab: downloaded chapters",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載"
+          }
+        }
+      }
+    },
+    "Nothing downloaded yet" : {
+      "comment" : "已下載: empty state title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載任何章節"
+          }
+        }
+      }
+    },
+    "Chapters you download appear here, ready to read with no connection." : {
+      "comment" : "已下載: empty state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載的章節會出現在這裡，沒有網路也能閱讀。"
+          }
+        }
+      }
+    },
+    "Delete all" : {
+      "comment" : "已下載: clear every download",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部刪除"
+          }
+        }
+      }
+    },
+    "Delete everything downloaded?" : {
+      "comment" : "已下載: confirmation title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除全部已下載的章節？"
+          }
+        }
+      }
+    },
+    "This removes every downloaded chapter from this device. It can't be undone." : {
+      "comment" : "已下載: confirmation body",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會移除裝置上所有已下載的章節，且無法復原。"
+          }
+        }
+      }
+    },
+    "Downloading %lld/%lld" : {
+      "comment" : "已下載 row: pages fetched so far",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載中 %lld/%lld"
+          }
+        }
+      }
+    },
+    "Downloading" : {
+      "comment" : "已下載 row: started, page count not known yet",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載中"
+          }
+        }
+      }
+    },
+    "Incomplete" : {
+      "comment" : "已下載 row: a download that did not finish",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完成"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
