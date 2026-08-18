@@ -152,15 +152,24 @@ enum PagePrefetchWindow {
 ///
 /// Memory only. Nothing is written to disk, and nothing survives launch.
 final class MemoryPageImageCache: PageImageCache {
-    /// The instance the app runs on, and the environment's default (see
-    /// `PageImageCacheKey`). Shared so a Page fetched by the Reader is still
-    /// resident after the Reader is torn down and re-entered — the cache is
-    /// never explicitly cleared on chapter change or on leaving the Reader;
-    /// the byte budget alone bounds it.
+    /// The environment's default (see `PageImageCacheKey`), and what previews
+    /// and any screen outside the app's own wiring load through. Shared so a
+    /// Page fetched by the Reader is still resident after the Reader is torn
+    /// down and re-entered — the cache is never explicitly cleared on chapter
+    /// change or on leaving the Reader; the byte budget alone bounds it.
+    ///
+    /// The running app installs its **own** instance instead, identical but for
+    /// knowing where downloaded pages live (`vista_comicApp`). It is created
+    /// once at launch and lives as long as the process, so retention across the
+    /// app is exactly what it was when this singleton served that role.
     static let shared = MemoryPageImageCache()
 
     private let store: DecodedImageStore
     private let coordinator = FetchCoordinator()
+    /// Consulted before the network (`offline-download` ticket 02). `nil` — the
+    /// default, and what `shared` runs with — behaves exactly as this cache did
+    /// before downloads existed.
+    private let offlineChapters: (any OfflineChapterStore)?
     private let session: URLSession
     private let clientID: String?
     private let clientSecret: String?
@@ -188,8 +197,10 @@ final class MemoryPageImageCache: PageImageCache {
         session: URLSession = .shared,
         clientID: String? = APIConfig.cfAccessClientID,
         clientSecret: String? = APIConfig.cfAccessClientSecret,
-        byteLimit: Int = MemoryPageImageCache.defaultByteLimit
+        byteLimit: Int = MemoryPageImageCache.defaultByteLimit,
+        offlineChapters: (any OfflineChapterStore)? = nil
     ) {
+        self.offlineChapters = offlineChapters
         self.session = session
         self.clientID = clientID
         self.clientSecret = clientSecret
@@ -243,8 +254,25 @@ final class MemoryPageImageCache: PageImageCache {
         let session = self.session
         let clientID = self.clientID
         let clientSecret = self.clientSecret
+        let offlineChapters = self.offlineChapters
 
         return { url in
+            // The disk goes in front of the network, and nowhere else. Every
+            // caller — the explicit ask, the prefetch window, a cover — reaches
+            // the network through this one closure, so one step here is the
+            // whole of offline reading: the Reader gains no offline code path,
+            // and there is therefore no second way for it to be wrong.
+            //
+            // It runs while online too, which is the point rather than a side
+            // effect: a downloaded page is faster and cheaper from disk than
+            // from a server that is answering perfectly well.
+            if let data = offlineChapters?.pageData(for: url),
+               let downloaded = UIImage(data: data) {
+                let decoded = Self.forcedToDecode(downloaded)
+                store.insert(decoded, for: url)
+                return decoded
+            }
+
             // `AuthorizedAsyncImage.fetchImage` stays the one place a media
             // request is built, so the Cloudflare Access behaviour — and the
             // regression tests guarding it — survive this change untouched.
@@ -255,6 +283,10 @@ final class MemoryPageImageCache: PageImageCache {
                 clientSecret: clientSecret
             )
             let decoded = Self.forcedToDecode(fetched.decodedImage)
+            // Nothing is written back to the disk store here, deliberately: a
+            // page merely read is not a page the reader chose to keep, and the
+            // moment it were, the download list, the cap and what is actually
+            // on the device would stop agreeing.
             store.insert(decoded, for: url)
             return decoded
         }

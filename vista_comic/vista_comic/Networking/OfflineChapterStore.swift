@@ -14,9 +14,10 @@
 //  matter how many of them there are, so the record is written before the first
 //  page is fetched rather than after the last.
 //
-//  Nothing here reads a downloaded page back into the app — that is ticket 02's
-//  job, deliberately. What this file delivers is the bytes, and a record of what
-//  they are, genuinely on the device and surviving relaunch.
+//  Ticket 01 delivered the bytes and the record. Ticket 02 adds the one way to
+//  read them back — `pageData(for:)`, keyed by URL alone, which the image cache
+//  consults before the network. There is deliberately no write counterpart to
+//  it: only the download engine puts anything here.
 //
 
 import CryptoKit
@@ -159,6 +160,20 @@ protocol OfflineChapterStore: Sendable {
 
     func writePage(_ data: Data, for url: URL, of chapterID: DownloadedChapterID) throws
 
+    /// The bytes of a downloaded page, from whichever chapter downloaded it, or
+    /// `nil` if this URL is not on the device (ticket 02).
+    ///
+    /// Keyed by URL alone, with no chapter to say where to look, because that is
+    /// all the image cache knows: it resolves a URL, and has no idea which
+    /// chapter — or whether a chapter at all — the picture belongs to.
+    ///
+    /// **Reading never writes.** There is deliberately no counterpart that puts
+    /// a page here on its way past; only the download engine writes. The moment
+    /// a page merely read gets kept, three things that must agree stop agreeing:
+    /// what the 已下載 list shows, what counts against the cap, and what is
+    /// actually on the device.
+    func pageData(for url: URL) -> Data?
+
     /// Removes the chapter's record and its page files together, freeing its slot.
     func delete(_ chapterID: DownloadedChapterID) throws
 }
@@ -197,6 +212,10 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
     /// Guards `records` only. Everything else here is derived from its arguments.
     private let lock = NSLock()
     private var records: [DownloadedChapterID: DownloadedChapter]
+    /// Which chapter downloaded a given page, so a URL on its own is enough to
+    /// find its bytes — the only thing the image cache can ask with.
+    /// Derived from the records; nothing is authoritative here.
+    private var pageOwners: [URL: DownloadedChapterID]
 
     /// - Parameter root: where downloads live. Tests pass a temporary directory;
     ///   nothing may ever write to the real Application Support path from a test.
@@ -205,7 +224,9 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
         self.root = resolvedRoot
         self.chapterLimit = chapterLimit
         try Self.prepare(directory: resolvedRoot)
-        self.records = Self.loadRecords(in: resolvedRoot)
+        let records = Self.loadRecords(in: resolvedRoot)
+        self.records = records
+        self.pageOwners = Self.pageOwners(of: records.values)
     }
 
     /// `Application Support/OfflineChapters`, created if it does not exist —
@@ -236,6 +257,7 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
             }
             try writeRecord(chapter)
             records[chapter.id] = chapter
+            index(chapter)
         }
     }
 
@@ -246,12 +268,14 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
             }
             try writeRecord(chapter)
             records[chapter.id] = chapter
+            index(chapter)
         }
     }
 
     func delete(_ chapterID: DownloadedChapterID) throws {
         try lock.withLock {
             records[chapterID] = nil
+            pageOwners = pageOwners.filter { $0.value != chapterID }
             let directory = directory(for: chapterID)
             guard fileManager.fileExists(atPath: directory.path) else { return }
             try fileManager.removeItem(at: directory)
@@ -273,6 +297,31 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
         // Atomic so a download killed mid-write leaves the page absent rather
         // than half-present — resume trusts "the file is there" completely.
         try data.write(to: file, options: .atomic)
+    }
+
+    func pageData(for url: URL) -> Data? {
+        guard let owner = lock.withLock({ pageOwners[url] }) else { return nil }
+        // Read outside the lock: the index answers where to look, and the bytes
+        // are a page-sized disk read that no record lookup should wait behind.
+        return try? Data(contentsOf: pageFile(for: url, of: owner))
+    }
+
+    private func index(_ chapter: DownloadedChapter) {
+        for url in chapter.pageURLs {
+            pageOwners[url] = chapter.id
+        }
+    }
+
+    private static func pageOwners(
+        of chapters: some Collection<DownloadedChapter>
+    ) -> [URL: DownloadedChapterID] {
+        var owners: [URL: DownloadedChapterID] = [:]
+        for chapter in chapters {
+            for url in chapter.pageURLs {
+                owners[url] = chapter.id
+            }
+        }
+        return owners
     }
 
     // MARK: Layout on disk
@@ -412,6 +461,15 @@ final class InMemoryOfflineChapterStore: OfflineChapterStore, @unchecked Sendabl
 
     func writePage(_ data: Data, for url: URL, of chapterID: DownloadedChapterID) throws {
         lock.withLock { pages[chapterID, default: [:]][url] = data }
+    }
+
+    func pageData(for url: URL) -> Data? {
+        lock.withLock {
+            for chapterPages in pages.values {
+                if let data = chapterPages[url] { return data }
+            }
+            return nil
+        }
     }
 
     func delete(_ chapterID: DownloadedChapterID) throws {

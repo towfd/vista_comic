@@ -14,17 +14,28 @@ struct APIComicRepository: ComicRepository {
     private let session: URLSession
     private let cfAccessClientID: String?
     private let cfAccessClientSecret: String?
+    /// Where a successful catalog response's bytes are kept so the library can
+    /// still be rendered with no connection (`offline-download` ticket 02).
+    ///
+    /// It lives here, rather than in the decorator that reads it back, for the
+    /// only reason that matters: **a decorator never sees the bytes.** It is
+    /// handed decoded `Comic` values, and the display models are `Decodable`
+    /// only — so storing from out there would mean making them `Encodable` and
+    /// keeping a second representation of every field in step with the first.
+    private let snapshots: (any CatalogSnapshotStore)?
 
     init(
         baseURL: URL = APIConfig.baseURL,
         session: URLSession = .shared,
         cfAccessClientID: String? = APIConfig.cfAccessClientID,
-        cfAccessClientSecret: String? = APIConfig.cfAccessClientSecret
+        cfAccessClientSecret: String? = APIConfig.cfAccessClientSecret,
+        snapshots: (any CatalogSnapshotStore)? = nil
     ) {
         self.baseURL = baseURL
         self.session = session
         self.cfAccessClientID = cfAccessClientID
         self.cfAccessClientSecret = cfAccessClientSecret
+        self.snapshots = snapshots
     }
 
     /// Shared decoder: the backend emits ISO-8601 dates (e.g. `lastReadAt`).
@@ -33,11 +44,11 @@ struct APIComicRepository: ComicRepository {
     private var decoder: JSONDecoder { APIConfig.iso8601Decoder }
 
     func library() async throws -> [Comic] {
-        try await get([Comic].self, at: "comics")
+        try await get([Comic].self, at: "comics", snapshot: .library)
     }
 
     func comic(id: String) async throws -> Comic {
-        try await get(Comic.self, at: "comics/\(id)")
+        try await get(Comic.self, at: "comics/\(id)", snapshot: .comic(id: id))
     }
 
     func readerChapter(comicID: String, chapterID: String) async throws -> Chapter {
@@ -79,7 +90,17 @@ struct APIComicRepository: ComicRepository {
         )
     }
 
-    private func get<T: Decodable>(_ type: T.Type, at path: String) async throws -> T {
+    /// - Parameter snapshot: when given, the response's bytes are kept under
+    ///   this key so the same request can be answered from storage while the
+    ///   network is unreachable. Only requests that are worth replaying offline
+    ///   pass one — the reader endpoint deliberately does not, since a
+    ///   downloaded chapter's record already answers it and a stored response
+    ///   for a chapter with no pages on the device would answer it *wrongly*.
+    private func get<T: Decodable>(
+        _ type: T.Type,
+        at path: String,
+        snapshot: CatalogSnapshot? = nil
+    ) async throws -> T {
         let request = makeRequest(method: "GET", at: path)
         let (data, response) = try await session.data(for: request)
 
@@ -90,11 +111,19 @@ struct APIComicRepository: ComicRepository {
             throw APIError.httpStatus(http.statusCode)
         }
 
+        let value: T
         do {
-            return try decoder.decode(T.self, from: data)
+            value = try decoder.decode(T.self, from: data)
         } catch {
             throw APIError.decoding(error)
         }
+
+        // Stored only after it decodes, so what is replayed offline is known to
+        // be readable rather than merely known to have arrived.
+        if let snapshot {
+            snapshots?.store(data, for: snapshot)
+        }
+        return value
     }
 
     /// Sends a bodyless `POST` and treats any non-2xx status as an error.
