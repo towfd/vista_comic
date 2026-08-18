@@ -19,9 +19,10 @@
 //    record, which is exactly what that record was built to make possible, and
 //    a stored response would be the wrong answer — it would hand the Reader a
 //    page list for a chapter whose pages are not on the device.
-//  - `rescan()` and `saveProgress` pass straight through. Rescanning is a
-//    request to the server by definition, and progress is best-effort today;
-//    queueing it for later is ticket 03.
+//  - `rescan()` passes straight through. Rescanning is a request to the server
+//    by definition.
+//  - `saveProgress` queues what it could not send (ticket 03), and any request
+//    that succeeds is the cue to try the queue again.
 //
 
 import Foundation
@@ -42,6 +43,10 @@ struct OfflineFallbackComicRepository: ComicRepository {
     let inner: any ComicRepository
     let snapshots: any CatalogSnapshotStore
     let chapters: any OfflineChapterStore
+    /// Reading positions the backend has not taken yet (ticket 03).
+    let pending: any PendingProgressStore
+    /// Sends them, one at a time, and never twice at once.
+    private let flusher: PendingProgressFlusher
     /// Told which URLs are comic covers (ticket 07). It is told here because
     /// this is the one place a decoded library response passes through on both
     /// the live path and the stored one, and because the answer is a fact about
@@ -52,17 +57,38 @@ struct OfflineFallbackComicRepository: ComicRepository {
         wrapping inner: any ComicRepository,
         snapshots: any CatalogSnapshotStore,
         chapters: any OfflineChapterStore,
+        pending: any PendingProgressStore = InMemoryPendingProgressStore(),
         covers: (any CoverCache)? = nil
     ) {
         self.inner = inner
         self.snapshots = snapshots
         self.chapters = chapters
+        self.pending = pending
         self.covers = covers
+        self.flusher = PendingProgressFlusher(store: pending) { progress in
+            // Sent through the *inner* repository, so a flush cannot re-enter
+            // this decorator and queue what it is in the middle of sending.
+            try await inner.saveProgress(
+                comicID: progress.comicID,
+                chapterID: progress.chapterID,
+                lastPage: progress.lastPage
+            )
+        }
     }
 
     private var decoder: JSONDecoder { APIConfig.iso8601Decoder }
 
     func library() async throws -> [Comic] {
+        // Before, not after. The library is where reading progress is *shown* —
+        // 繼續閱讀, the read badges, "last read" — so catching the server up
+        // first is the difference between landing and seeing where you got to,
+        // and landing, seeing yesterday, and having to refresh again.
+        //
+        // It costs nothing when there is nothing queued, and when the reader is
+        // still offline it costs one request that fails the way every other
+        // request is failing anyway.
+        await flusher.flush()
+
         let comics: [Comic]
         do {
             comics = try await inner.library()
@@ -77,6 +103,8 @@ struct OfflineFallbackComicRepository: ComicRepository {
     }
 
     func comic(id: String) async throws -> Comic {
+        // Same reason: this screen shows a read badge per chapter.
+        await flusher.flush()
         do {
             return try await inner.comic(id: id)
         } catch {
@@ -90,6 +118,10 @@ struct OfflineFallbackComicRepository: ComicRepository {
     /// only thing the Reader actually needs — and unlike a stored response, it
     /// is a promise about the device rather than a memory of the server.
     func readerChapter(comicID: String, chapterID: String) async throws -> Chapter {
+        // And again: this request *is* the resume position. A chapter opened
+        // just after reconnecting must not reopen at the page the server last
+        // heard about.
+        await flusher.flush()
         do {
             return try await inner.readerChapter(comicID: comicID, chapterID: chapterID)
         } catch {
@@ -110,10 +142,12 @@ struct OfflineFallbackComicRepository: ComicRepository {
                 title: record.chapterTitle,
                 pageURLs: record.pageURLs,
                 pageCount: record.pageCount,
-                // No resume position: the server holds progress, and it is not
-                // answering. Reading offline therefore starts at the top for
-                // now — ticket 03 gives the queued local position back here.
-                lastReadPage: nil
+                // The server holds progress and is not answering, so the queue
+                // answers instead: where this reader got to offline is exactly
+                // what is sitting in it, unsent. `nil` when they have not opened
+                // the chapter offline yet, which starts them at the top as
+                // before.
+                lastReadPage: pending.progress(for: id)?.lastPage
             )
         }
     }
@@ -122,8 +156,27 @@ struct OfflineFallbackComicRepository: ComicRepository {
         try await inner.rescan()
     }
 
+    /// Keeps the write's existing contract exactly — it never interrupts
+    /// reading and never surfaces an error — and changes only what happens to
+    /// the position it could not send: it is queued rather than discarded.
     func saveProgress(comicID: String, chapterID: String, lastPage: Int) async throws {
-        try await inner.saveProgress(comicID: comicID, chapterID: chapterID, lastPage: lastPage)
+        do {
+            try await inner.saveProgress(comicID: comicID, chapterID: chapterID, lastPage: lastPage)
+        } catch {
+            guard Self.isUnreachable(error) else { throw error }
+            pending.enqueue(
+                PendingProgress(comicID: comicID, chapterID: chapterID, lastPage: lastPage)
+            )
+            // Not rethrown: the position is not lost, so nothing failed in any
+            // sense the caller could act on.
+            return
+        }
+
+        // A write that got through is the clearest evidence there is that the
+        // backend is reachable, so it is the natural moment to try the rest —
+        // in the background, since the reader is mid-page and waiting on
+        // nothing.
+        Task { [flusher] in await flusher.flush() }
     }
 
     // MARK: - Falling back
@@ -158,5 +211,58 @@ struct OfflineFallbackComicRepository: ComicRepository {
     /// timeout all produce — counts as "offline".
     private static func isUnreachable(_ error: any Error) -> Bool {
         error is URLError
+    }
+}
+
+
+// MARK: - Sending what is queued
+
+/// Drains `PendingProgressStore`, one entry at a time, never twice at once.
+///
+/// An actor because "am I already flushing?" is the only state it has, and two
+/// flushes racing would send the same position twice and — worse — could remove
+/// an entry the other one had just replaced with a newer page.
+actor PendingProgressFlusher {
+    private let store: any PendingProgressStore
+    private let send: @Sendable (PendingProgress) async throws -> Void
+    private var isFlushing = false
+
+    init(
+        store: any PendingProgressStore,
+        send: @escaping @Sendable (PendingProgress) async throws -> Void
+    ) {
+        self.store = store
+        self.send = send
+    }
+
+    /// Sends everything waiting, oldest first, dropping each entry **only**
+    /// once the server has taken it.
+    ///
+    /// Stops at the first entry that cannot be sent rather than working through
+    /// the rest: the overwhelmingly likely reason is that the connection is
+    /// still not there, and the queue exists precisely so that nothing has to be
+    /// hurried.
+    ///
+    /// The exception is a server that *refuses* an entry — a chapter that no
+    /// longer exists, say. That will never be accepted however many times it is
+    /// offered, and leaving it at the head would wedge every later position
+    /// behind it forever, so it is dropped and the flush carries on.
+    func flush() async {
+        guard !isFlushing else { return }
+        isFlushing = true
+        defer { isFlushing = false }
+
+        for entry in store.queued() {
+            do {
+                try await send(entry)
+                store.remove(entry.id)
+            } catch {
+                if case APIError.httpStatus(let code) = error, (400..<500).contains(code) {
+                    store.remove(entry.id)
+                    continue
+                }
+                return
+            }
+        }
     }
 }
