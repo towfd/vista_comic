@@ -459,6 +459,28 @@
           }
         }
       }
+    },
+    "Not downloaded" : {
+      "comment" : "Reader: the chapter is not on the device and there is no connection",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載"
+          }
+        }
+      }
+    },
+    "This chapter isn't on your device. Reconnect to read it, or download it while you're online." : {
+      "comment" : "Reader: what to do about a chapter that is not available offline",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這一章不在你的裝置上。重新連線後即可閱讀，或趁有網路時先下載。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

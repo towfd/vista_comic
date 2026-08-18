@@ -273,8 +273,15 @@ private struct ReaderView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let urls):
             pagesScrollView(urls: urls)
-        case .failed:
-            ErrorStateView { Task { await loadPages() } }
+        case .failed(let error):
+            // Offline and not downloaded is a different fact from "the server
+            // could not be reached", and only the reader can act on it — so the
+            // Reader says which it was rather than showing one error for both.
+            ErrorStateView(
+                kind: error is OfflineReadError ? .notAvailableOffline : .connection
+            ) {
+                Task { await loadPages() }
+            }
         }
     }
 
