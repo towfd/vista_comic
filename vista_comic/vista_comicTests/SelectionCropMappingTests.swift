@@ -165,6 +165,44 @@ struct SelectionCropMappingTests {
         #expect(result == .zero)
     }
 
+    @Test("the same visible region selected while magnified crops the same pixels")
+    func magnificationDoesNotMoveTheCrop() {
+        // `reader-zoom` ticket 02. Zoom enlarges the *layout*, so the display
+        // frame this mapping is handed grows with it — and so do the drag
+        // coordinates drawn in that frame. The two scale together, which is why
+        // this mapping needed no zoom arithmetic; this pins that they do.
+        let imagePixelSize = CGSize(width: 900, height: 1200)
+        let displayFrame = CGSize(width: 300, height: 400)
+        let selection = CGRect(x: 60, y: 80, width: 90, height: 120)
+
+        let atFullWidth = SelectionCropMapping.cropRect(
+            for: selection,
+            displayFrameSize: displayFrame,
+            imagePixelSize: imagePixelSize
+        )
+
+        for magnification in [CGFloat(2), 3] {
+            let magnified = SelectionCropMapping.cropRect(
+                for: CGRect(
+                    x: selection.minX * magnification,
+                    y: selection.minY * magnification,
+                    width: selection.width * magnification,
+                    height: selection.height * magnification
+                ),
+                displayFrameSize: CGSize(
+                    width: displayFrame.width * magnification,
+                    height: displayFrame.height * magnification
+                ),
+                imagePixelSize: imagePixelSize
+            )
+
+            #expect(magnified.minX.isApproximatelyEqual(to: atFullWidth.minX, tolerance: 0.001))
+            #expect(magnified.minY.isApproximatelyEqual(to: atFullWidth.minY, tolerance: 0.001))
+            #expect(magnified.width.isApproximatelyEqual(to: atFullWidth.width, tolerance: 0.001))
+            #expect(magnified.height.isApproximatelyEqual(to: atFullWidth.height, tolerance: 0.001))
+        }
+    }
+
     @Test("result never exceeds the source image's pixel bounds")
     func resultNeverExceedsSourceImageBounds() {
         let imagePixelSize = CGSize(width: 600, height: 800)

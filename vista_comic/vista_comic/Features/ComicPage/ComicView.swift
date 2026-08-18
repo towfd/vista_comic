@@ -90,11 +90,13 @@ private struct ReaderView: View {
     /// draws a selection rectangle instead of scrolling or hiding controls.
     @State private var isSelecting = false
     @State private var pagesState: LoadState<[URL]> = .loading
-    /// Resume anchor only: set on load to programmatically scroll to the resume
-    /// page via `.scrollPosition`. The *set* direction is reliable; its reported
-    /// value on a LazyVStack of unknown-height AsyncImages is not, so it is NOT
-    /// used for progress reporting (see `visiblePages`).
-    @State private var topPage: Int?
+    /// Drives the pages scroll view programmatically: the resume position when
+    /// a chapter loads, and the offset correction when a zoom is committed.
+    ///
+    /// Write-only, exactly as the `topPage` binding it replaces was — its
+    /// *reported* value on a LazyVStack of unknown-height AsyncImages is not
+    /// reliable, so it is never read for progress reporting (see `visiblePages`).
+    @State private var scrollPosition = ScrollPosition(idType: Int.self)
     /// 0-based indices of the pages currently on screen, maintained by each
     /// `ReaderPage`'s appear/disappear. `min()` is the top-most visible page and
     /// the reliable source for mid-chapter progress reporting.
@@ -120,18 +122,64 @@ private struct ReaderView: View {
     /// Bumped by the reader's reload control; each `ReaderPage` re-requests only
     /// if it is currently in the failure state (loaded pages stay put).
     @State private var retryAllToken = 0
-    /// Whether the pages scroll view is currently being driven by the reader's
-    /// finger (dragging, or coasting after a fling) rather than sitting still.
+    /// Whether the two scroll-geometry inferences below can be trusted right now.
     ///
-    /// Load-bearing, not a convenience: both scroll-geometry inferences below
-    /// ask "did the reader scroll past the end", and scroll geometry alone
-    /// cannot tell that from "the content got shorter underneath a stationary
-    /// reader". The content does get shorter — pages outside the prefetch
-    /// window fall back to a 220pt placeholder, and the keyboard raised for the
-    /// result sheet's text field resizes the reader enough to recycle rows into
-    /// exactly that state. Without this gate a mid-chapter correction read as a
-    /// pull past the bottom and ran the reader to the last chapter.
+    /// Load-bearing, not a convenience: both ask "did the reader scroll past the
+    /// end", and scroll geometry alone cannot tell that from "the content got
+    /// shorter underneath a stationary reader". The content does get shorter —
+    /// pages outside the prefetch window fall back to a 220pt placeholder, and
+    /// the keyboard raised for the result sheet's text field recycles rows into
+    /// exactly that state. Zoom is deliberately *not* on that list: it is a
+    /// transform over the viewport, so it cannot move content height at all,
+    /// and it therefore needs no gate of its own.
     @State private var isScrollDriven = false
+    /// The settled magnification. `1.0` is today's reader exactly.
+    @State private var zoomScale: CGFloat = ReaderZoom.minScale
+    /// The live pinch's scale, non-nil only while fingers are down. Absolute
+    /// rather than a ratio against anything, which is what keeps the rendered
+    /// viewport from ever being drawn smaller than the screen.
+    @State private var gestureScale: CGFloat?
+    /// How far the magnified strip is moved sideways, in screen points. Zero at
+    /// full width, where the pan limit makes it inert anyway.
+    @State private var panX: CGFloat = 0
+    /// `panX` as it stood when the current sideways drag began, so the drag is
+    /// applied as one total translation rather than accumulated per frame.
+    @State private var panXAtDragStart: CGFloat?
+    /// The vertical shift a pinch needs in order to keep its focal point still.
+    ///
+    /// Held here only for the duration of the gesture, and handed to the scroll
+    /// view exactly when the fingers lift. Vertical movement belongs to the
+    /// scroll view; this is the transient form it takes while a pinch is in
+    /// flight, when moving the scroll view on every frame would mean animating
+    /// it against the gesture.
+    @State private var gesturePanY: CGFloat = 0
+    /// The vertical shift that makes a chapter's first and last screen readable
+    /// while magnified. Derived from the scroll position, and zero everywhere
+    /// but within reach of an end — see `ReaderZoom.endOfChapterPan`.
+    @State private var endPan: CGFloat = 0
+    /// Where the fingers came down, as a unit point within the viewport.
+    ///
+    /// Captured once when the gesture starts so it cannot drift mid-pinch. Its
+    /// horizontal half is resolved through the pan and its vertical half
+    /// through the scroll offset, so two mechanisms have to agree — which is
+    /// what `applyFocalPoint` exists to keep true.
+    @State private var magnifyFocal: UnitPoint = .center
+    /// The width the scroll view offers its content, measured rather than
+    /// assumed so it follows rotation and iPad multitasking.
+    @State private var containerWidth: CGFloat = 0
+    /// The height of the same window onto the content, which the pan limits and
+    /// the end-of-chapter shift are both expressed against.
+    @State private var containerHeight: CGFloat = 0
+    /// How tall the top control bar is, so the selection cancel badge can be
+    /// placed clear of it. `0` until the controls have been laid out once.
+    @State private var controlBarHeight: CGFloat = 0
+    /// The scroll view's live offset and content height.
+    ///
+    /// A reference box rather than `@State` deliberately: this changes on every
+    /// frame of every scroll, and holding it in view state would invalidate the
+    /// reader's body continuously. Nothing reads it during layout — it is
+    /// consulted only when a pinch begins or commits.
+    @State private var scrollMetrics = ReaderScrollMetricsBox()
     /// The width the pages are laid out at, measured from the stack itself
     /// rather than assumed, since it changes with rotation and with iPad
     /// multitasking. `0` until the first layout, which `reservedPageHeight`
@@ -231,6 +279,10 @@ private struct ReaderView: View {
     }
 
     private func pagesScrollView(urls: [URL]) -> some View {
+        // One axis, at every magnification. The strip is laid out at exactly
+        // the container's width whatever the scale, so there is never anything
+        // to scroll horizontally — moving sideways while magnified is a
+        // transform offset this view owns, not a second scroll axis.
         ScrollView{
             // Lazy so a long chapter (~100+ pages) doesn't kick off every
             // `AsyncImage` at once; pages load as they scroll into view.
@@ -244,6 +296,9 @@ private struct ReaderView: View {
                         pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
+                        controlBarHeight: controlBarHeight,
+                        magnification: zoomScale,
+                        viewportPan: CGSize(width: panX, height: endPan),
                         reservedWidth: pageWidth,
                         chapterHeightRatio: chapterHeightRatio,
                         onRetryAll: { retryAllToken += 1 },
@@ -274,19 +329,85 @@ private struct ReaderView: View {
             // Marks the pages as scroll targets so `.scrollPosition` can both
             // resume to a page and report the top-most visible page index.
             .scrollTargetLayout()
-            // Measured on the stack rather than taken from the scroll view's
-            // container, so it is the width the pages are actually laid out
-            // at — insets and all — and it follows rotation and iPad
-            // multitasking without a second source of truth.
+            // Measured on the stack rather than on the scroll view, so it is
+            // the width the pages are actually laid out at. Under this zoom
+            // model that is the container's width at every scale — the pages
+            // are never re-laid-out — which is exactly why the reserved page
+            // heights need no zoom arithmetic of their own.
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
         }
+        // The magnification, applied to the *viewport* rather than to its
+        // content, and anchored at the centre so that the pan below is the only
+        // thing that decides which part of the strip is on screen.
+        //
+        // Transforming the content would mean transforming a stack tens of
+        // thousands of points tall, which is compositing work on a scale the
+        // scroll view has no way to avoid. The viewport is one screen.
+        .scaleEffect(renderedScale, anchor: .center)
+        // Sideways from the reader's own pan; vertically from the
+        // end-of-chapter shift plus whatever a pinch in flight needs. Offsets
+        // do not participate in layout, so the scroll view above is untouched
+        // by either.
+        .offset(x: panX, y: endPan + gesturePanY)
+        // Keeps the transformed viewport from bleeding outside the reader's
+        // bounds.
+        .clipped()
         // Selection mode owns the drag gesture on the current page instead;
         // disabling scroll while selecting stops the ScrollView from fighting
         // that drag for the touch.
         .scrollDisabled(isSelecting)
-        // Resume only: setting `topPage` after load (see `loadPages`) scrolls to
-        // the resume page. Its reported value is not used for progress.
-        .scrollPosition(id: $topPage, anchor: .top)
+        // Drives the resume position on load and the offset correction when a
+        // zoom commits. Never read; see the property's own note.
+        .scrollPosition($scrollPosition, anchor: .top)
+        // The window onto the strip, measured rather than assumed so rotation
+        // and iPad multitasking are followed.
+        //
+        // No offset correction here any more. A resize used to rescale the
+        // whole chapter under a stationary reader, because the laid-out width
+        // was derived from this one; now the strip is laid out at the container
+        // width at every scale, so a resize changes what is visible and not
+        // where the reader is. Only the pan has to be brought back inside the
+        // new bounds.
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            containerWidth = size.width
+            containerHeight = size.height
+            panX = ReaderZoom.clampedPan(
+                panX, containerLength: size.width, scale: renderedScale
+            )
+        }
+        // Two fingers, so there is nothing to arbitrate against the scroll
+        // view's one-finger pan; simultaneous so it composes rather than
+        // replaces.
+        .simultaneousGesture(magnifyGesture)
+        // One finger. The scroll view keeps the vertical component of the same
+        // drag and this reads only the horizontal one, so the two never have to
+        // arbitrate for the touch.
+        .simultaneousGesture(panGesture)
+        // Fed into a reference box rather than into view state: this fires on
+        // every frame of every scroll, and the reader's body must not be
+        // invalidated by it.
+        .onScrollGeometryChange(for: ReaderScrollMetrics.self) { geometry in
+            ReaderScrollMetrics(
+                offset: geometry.contentOffset,
+                contentSize: geometry.contentSize,
+                containerSize: geometry.containerSize
+            )
+        } action: { _, metrics in
+            scrollMetrics.value = metrics
+        }
+        // The end-of-chapter shift. Recomputed only when its value actually
+        // changes, which at full width is never and while magnified is only
+        // within reach of the first or last screen.
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            ReaderZoom.endOfChapterPan(
+                scrollOffset: geometry.contentOffset.y,
+                contentHeight: geometry.contentSize.height,
+                containerHeight: geometry.containerSize.height,
+                scale: renderedScale
+            )
+        } action: { _, pan in
+            endPan = pan
+        }
         // Two deliberately separate reactions to the same "which pages are
         // visible" signal, because they must behave oppositely: the prefetch
         // window has to slide *immediately* to be of any use, while progress
@@ -306,11 +427,8 @@ private struct ReaderView: View {
         // in the first few and then barely moves, so this needs no finer
         // signal of its own.
         .onChange(of: visiblePages) { _, _ in refreshChapterHeightRatio(pageURLs: urls) }
-        // The gate both inferences below depend on. Tracked as a phase rather
-        // than derived from geometry because geometry is precisely what cannot
-        // be trusted here: an offset far past the end means "the reader pulled"
-        // only if the reader was touching the scroll view at the time.
-        //
+        // Feeds the gate both inferences below depend on. What each phase means
+        // to it lives on the gate itself, which is also where it is tested.
         // Deceleration counts as driven: releasing a fling that coasts to the
         // bottom is a normal way to finish a chapter, and the geometry update
         // that crosses the threshold usually arrives after the finger has left.
@@ -329,7 +447,12 @@ private struct ReaderView: View {
                 contentOffsetY: geometry.contentOffset.y,
                 contentHeight: geometry.contentSize.height,
                 containerHeight: geometry.containerSize.height,
-                isScrollDriven: isScrollDriven,
+                // Deliberately inert while magnified. Not a technical
+                // limitation — the geometry is trustworthy at every scale under
+                // this model — but a product rule: a reader who has magnified a
+                // panel is examining it, and that should never turn into a
+                // chapter change. Read-detection below is armed at every scale.
+                isScrollDriven: isScrollDriven && zoomScale == ReaderZoom.minScale,
                 overscroll: pullThreshold
             )
         } action: { wasPulledPastEnd, isPulledPastEnd in
@@ -373,6 +496,118 @@ private struct ReaderView: View {
         }
     }
 
+    // MARK: - Zoom
+
+    /// The scale the viewport is rendered at right now — the settled scale,
+    /// unless a pinch is in flight.
+    private var renderedScale: CGFloat { gestureScale ?? zoomScale }
+
+    /// The pinch.
+    ///
+    /// Nothing is committed when the fingers lift. The scale the gesture
+    /// settles on is simply the scale the transform keeps, so there is no
+    /// re-layout and therefore no moment at which the reader can be displaced.
+    /// The previous model committed a new layout width here and had to
+    /// re-anchor the scroll offset to compensate — an assignment evaluated
+    /// against a content size that had not grown yet, and silently clamped
+    /// against it. That is the defect this model removes by construction.
+    private var magnifyGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let previous = renderedScale
+                if gestureScale == nil { magnifyFocal = value.startAnchor }
+                let next = ReaderZoom.rubberBanded(zoomScale * value.magnification)
+                applyFocalPoint(from: previous, to: next)
+                gestureScale = next
+            }
+            .onEnded { value in
+                let previous = renderedScale
+                let settled = ReaderZoom.settled(zoomScale * value.magnification)
+                applyFocalPoint(from: previous, to: settled)
+                zoomScale = settled
+                gestureScale = nil
+                handVerticalPanToScrollView(at: settled)
+            }
+    }
+
+    /// Dragging sideways to see the rest of a magnified page.
+    ///
+    /// Reads only the horizontal component, so the scroll view keeps the
+    /// vertical one and the two compose instead of competing. Inert at full
+    /// width, where the pan limit is zero anyway, and while selecting, where
+    /// the drag belongs to the selection overlay.
+    private var panGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                guard !isSelecting, renderedScale > ReaderZoom.minScale else { return }
+                let base = panXAtDragStart ?? panX
+                panXAtDragStart = base
+                panX = ReaderZoom.clampedPan(
+                    base + value.translation.width,
+                    containerLength: containerWidth,
+                    scale: renderedScale
+                )
+            }
+            .onEnded { _ in panXAtDragStart = nil }
+    }
+
+    /// Moves the transform so that whatever is under the fingers stays under
+    /// the fingers as the scale changes.
+    ///
+    /// The two axes travel through different mechanisms and have to agree. The
+    /// horizontal half goes to the pan the reader owns. The vertical half goes
+    /// to `gesturePanY`, which the scroll view takes over from when the gesture
+    /// ends — and it is expressed against the *total* vertical shift, so that
+    /// the end-of-chapter shift changing with the scale is accounted for rather
+    /// than fighting it.
+    private func applyFocalPoint(from oldScale: CGFloat, to newScale: CGFloat) {
+        panX = ReaderZoom.clampedPan(
+            ReaderZoom.panKeepingFocalPoint(
+                focal: magnifyFocal.x,
+                containerLength: containerWidth,
+                previousPan: panX,
+                from: oldScale,
+                to: newScale
+            ),
+            containerLength: containerWidth,
+            scale: newScale
+        )
+
+        let totalPanY = ReaderZoom.panKeepingFocalPoint(
+            focal: magnifyFocal.y,
+            containerLength: containerHeight,
+            previousPan: endPan + gesturePanY,
+            from: oldScale,
+            to: newScale
+        )
+        let metrics = scrollMetrics.value
+        endPan = ReaderZoom.endOfChapterPan(
+            scrollOffset: metrics.offset.y,
+            contentHeight: metrics.contentSize.height,
+            containerHeight: containerHeight,
+            scale: newScale
+        )
+        gesturePanY = totalPanY - endPan
+    }
+
+    /// Converts the pinch's transient vertical shift into a scroll offset, so
+    /// that vertical movement ends up where it belongs.
+    ///
+    /// Exact, and therefore invisible: a point of scrolling moves the content
+    /// `scale` points on screen, and content size does not change with the
+    /// scale, so there is no stale size for the resulting offset to be clamped
+    /// against. The one place it can still clamp is against the ends of the
+    /// chapter itself, which is a real limit rather than a stale measurement.
+    private func handVerticalPanToScrollView(at scale: CGFloat) {
+        guard gesturePanY != 0 else { return }
+        let metrics = scrollMetrics.value
+        let maxOffset = max(0, metrics.contentSize.height - metrics.containerSize.height)
+        let delta = ReaderZoom.scrollOffsetDelta(replacingVerticalPan: gesturePanY, scale: scale)
+        let target = min(max(metrics.offset.y + delta, 0), maxOffset)
+        gesturePanY = 0
+        scrollPosition.scrollTo(point: CGPoint(x: 0, y: target))
+    }
+
     // MARK: - Controls
 
     private var controlsOverlay: some View {
@@ -403,6 +638,12 @@ private struct ReaderView: View {
             .padding(.horizontal, 15)
             .padding(.vertical, 12)
             .background(.ultraThinMaterial, ignoresSafeAreaEdges: .top)
+            // How much of the reader this bar covers. Selection mode forces the
+            // controls visible, so the selection cancel badge has to be placed
+            // below this or it is drawn correctly and still cannot be seen.
+            // Measured rather than assumed because the bar grows with Dynamic
+            // Type.
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlBarHeight = $0 }
 
             Spacer()
 
@@ -498,9 +739,16 @@ private struct ReaderView: View {
         // mostly placeholder-height rows, which is how a single false advance
         // became a run to the last chapter.
         pagesState = .loading
-        // The rebuilt scroll view starts idle; leaving this true would let its
-        // first geometry reading be read as a pull the reader never made.
+        // The rebuilt scroll view starts idle, and the incoming chapter starts
+        // at full width. Carrying either across would let the new chapter's very
+        // first geometry reading be taken for a pull the reader never made.
         isScrollDriven = false
+        zoomScale = ReaderZoom.minScale
+        gestureScale = nil
+        panX = 0
+        panXAtDragStart = nil
+        gesturePanY = 0
+        endPan = 0
         currentChapter = chapter
     }
 
@@ -527,8 +775,8 @@ private struct ReaderView: View {
             // to a 0-based index, clamped in case the chapter shrank since
             // that page number was recorded. `nil` starts at the top. On a
             // restart (auto-advance) we ignore both and force the top.
-            // Setting `topPage` in the same update that flips to `.loaded`
-            // positions the freshly built scroll view accordingly.
+            // Setting the scroll position in the same update that flips to
+            // `.loaded` positions the freshly built scroll view accordingly.
             let resumeIndex = readerStartIndex(
                 pageCount: urls.count,
                 restart: restart,
@@ -536,7 +784,10 @@ private struct ReaderView: View {
                 lastReadPage: chapter.lastReadPage
             )
             pagesState = .loaded(urls)
-            topPage = resumeIndex
+            // A rebuilt scroll view already starts at the top, so "no saved
+            // position" needs no instruction — just a position holding nothing.
+            scrollPosition = resumeIndex.map { ScrollPosition(id: $0, anchor: .top) }
+                ?? ScrollPosition(idType: Int.self)
             pageCount = urls.count
             reachedEnd = false
             // Fresh visibility set for the incoming chapter; the new pages
@@ -731,12 +982,67 @@ func medianHeightRatio(of ratios: [CGFloat]) -> CGFloat? {
     return sorted[middle]
 }
 
+// MARK: - Where the selection's cancel badge goes
+//
+// The badge exists so a selection can be abandoned mid-drag with one continuous
+// touch — drag into it and lift — which only works if it is on screen.
+
+/// The cancel badge's frame, in the page's own coordinate space.
+///
+/// `visibleRect` is the part of the page the reader can actually see, in the
+/// same coordinate space; `nil` — or a region that does not overlap the page at
+/// all — falls back to the page's own bounds, reproducing exactly the behaviour
+/// that was correct before zoom existed.
+///
+/// `topObstruction` is how much of the top of that visible region is covered by
+/// something drawn over the reader. Selection mode forces the reader's controls
+/// visible, and their bar is opaque material across the top, so without this the
+/// badge would be placed correctly and still be invisible underneath it.
+///
+/// The result is always kept within the page, so a sliver of a page showing at
+/// the edge of the screen cannot push the badge off it. Where the two cannot
+/// both hold — a sliver narrower than the badge — staying on the page wins; a
+/// reader is not selecting text on a 20pt strip of page.
+func selectionCancelZoneFrame(
+    displayFrameSize: CGSize,
+    visibleRect: CGRect?,
+    diameter: CGFloat,
+    inset: CGFloat,
+    topObstruction: CGFloat = 0
+) -> CGRect {
+    let pageBounds = CGRect(origin: .zero, size: displayFrameSize)
+
+    var anchorRegion = pageBounds
+    if let visibleRect {
+        let overlap = visibleRect.intersection(pageBounds)
+        if !overlap.isNull, !overlap.isEmpty {
+            anchorRegion = overlap
+        }
+    }
+
+    let maxOriginX = max(pageBounds.maxX - diameter, pageBounds.minX)
+    let maxOriginY = max(pageBounds.maxY - diameter, pageBounds.minY)
+
+    return CGRect(
+        x: min(max(anchorRegion.maxX - diameter - inset, pageBounds.minX), maxOriginX),
+        y: min(max(anchorRegion.minY + topObstruction + inset, pageBounds.minY), maxOriginY),
+        width: diameter,
+        height: diameter
+    )
+}
+
 /// Whether the reader has scrolled `overscroll` points past the bottom of the
 /// chapter — the shared inference behind both auto-advance (`overscroll` =
 /// `pullThreshold`, a deliberate pull *past* the end) and read-detection
 /// (`overscroll` = `-1`, merely reaching the end).
 ///
-/// `isScrollDriven` is the whole point of this function existing, and the
+/// `isScrollDriven` means what it says: whether the offset this was handed was
+/// produced by the reader rather than by a relayout. Zoom does not appear here
+/// at all — it is a transform over the viewport, so it cannot move content
+/// height — and the one place the two meet is at the auto-advance call site,
+/// which additionally declines to fire while magnified as a product rule.
+///
+/// That question is the whole point of this function existing, and the
 /// reason it takes the scroll phase rather than deriving everything from
 /// geometry. The three geometry numbers describe where the content sits, not
 /// how it got there, and the reader's content resizes on its own: pages outside
@@ -821,6 +1127,18 @@ private struct ReaderPage: View {
     /// Whether the Reader is in text-selection mode. Drives whether this page
     /// installs the drag-to-select overlay/gesture over its rendered image.
     let isSelecting: Bool
+    /// How much of the top of the reader the control bar covers. Selection mode
+    /// forces the controls visible, so the cancel badge is placed below this.
+    let controlBarHeight: CGFloat
+    /// The reader's settled magnification and how far its viewport is moved,
+    /// which together say which part of this page is on screen.
+    ///
+    /// The *settled* scale rather than the live one, deliberately: a pinch in
+    /// flight would otherwise invalidate every realised row on every frame, and
+    /// panning is disabled while selecting, so the badge only has to be right
+    /// once the fingers are off.
+    let magnification: CGFloat
+    let viewportPan: CGSize
     /// The width this page is laid out at, measured by the reader. `0` before
     /// the first layout, which means no height can be reserved yet.
     let reservedWidth: CGFloat
@@ -853,8 +1171,8 @@ private struct ReaderPage: View {
     /// when no drag is active.
     @State private var selectionRect: CGRect?
     /// Whether the drag's current location is inside the cancel zone (see
-    /// `cancelZoneFrame`), so the badge can visually confirm "release here to
-    /// cancel" before the finger lifts.
+    /// `selectionCancelZoneFrame`), so the badge can visually confirm "release
+    /// here to cancel" before the finger lifts.
     @State private var isHoveringCancelZone = false
     /// Read for this row alone — this page's own recorded proportions — the
     /// way `AuthorizedAsyncImage` reads the same cache for the image it draws.
@@ -863,11 +1181,17 @@ private struct ReaderPage: View {
     /// business rather than a row's.
     @Environment(\.pageImageCache) private var pageImageCache
 
-    /// Fixed-size "release here to cancel" zone anchored to a corner of the
-    /// displayed image, so cancelling is possible mid-drag with a single
-    /// continuous touch: drag into the badge and lift, instead of drawing a
-    /// selection and confirming it. See Ticket 03's cancel requirement.
+    /// Fixed-size "release here to cancel" zone, so cancelling is possible
+    /// mid-drag with a single continuous touch: drag into the badge and lift,
+    /// instead of drawing a selection and confirming it. See `ocr-recognition`
+    /// ticket 03's cancel requirement.
+    ///
+    /// Where it sits is `selectionCancelZoneFrame`'s business — the top-right of
+    /// the *visible* part of the page rather than of the page itself, since a
+    /// magnified page is far larger than the screen.
     private let cancelZoneDiameter: CGFloat = 44
+    /// How far the badge is held off the edges of the visible region.
+    private let cancelZoneInset: CGFloat = 12
 
     var body: some View {
         // Wrap the page so `.id(reloadToken)` re-keys only the inner image view.
@@ -889,7 +1213,24 @@ private struct ReaderPage: View {
                             // otherwise.
                             if isSelecting {
                                 GeometryReader { proxy in
-                                    selectionOverlay(displayFrameSize: proxy.size)
+                                    selectionOverlay(
+                                        displayFrameSize: proxy.size,
+                                        // What of this page the reader can
+                                        // actually see. At full width that is
+                                        // the whole viewport; magnified it is
+                                        // the 1/s band the transform puts on
+                                        // screen, which the scroll view knows
+                                        // nothing about — it is unmagnified at
+                                        // every scale — so it has to be derived
+                                        // rather than looked up.
+                                        visibleRect: proxy.bounds(of: .scrollView).map {
+                                            ReaderZoom.visibleRegion(
+                                                inViewport: $0,
+                                                scale: magnification,
+                                                pan: viewportPan
+                                            )
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -927,15 +1268,6 @@ private struct ReaderPage: View {
 
     // MARK: - Selection
 
-    private func cancelZoneFrame(in displayFrameSize: CGSize) -> CGRect {
-        CGRect(
-            x: displayFrameSize.width - cancelZoneDiameter - 12,
-            y: 12,
-            width: cancelZoneDiameter,
-            height: cancelZoneDiameter
-        )
-    }
-
     private func dragRect(_ value: DragGesture.Value) -> CGRect {
         CGRect(
             x: value.startLocation.x,
@@ -945,8 +1277,14 @@ private struct ReaderPage: View {
         ).standardized
     }
 
-    private func selectionOverlay(displayFrameSize: CGSize) -> some View {
-        let cancelZone = cancelZoneFrame(in: displayFrameSize)
+    private func selectionOverlay(displayFrameSize: CGSize, visibleRect: CGRect?) -> some View {
+        let cancelZone = selectionCancelZoneFrame(
+            displayFrameSize: displayFrameSize,
+            visibleRect: visibleRect,
+            diameter: cancelZoneDiameter,
+            inset: cancelZoneInset,
+            topObstruction: controlBarHeight
+        )
         return ZStack(alignment: .topLeading) {
             // Transparent, but shaped so it still receives the drag — this is
             // the hit-testable surface the gesture is attached to.
