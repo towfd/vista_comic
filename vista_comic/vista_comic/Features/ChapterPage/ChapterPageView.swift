@@ -20,18 +20,8 @@ struct ChapterPageView: View {
     @State private var hasLoadedOnce = false
 
     var body: some View {
-        // The refusal at the cap is reported here rather than on the row that
-        // caused it: one alert for the screen instead of one per chapter, and
-        // ticket 04 removes it along with refusing.
-        @Bindable var downloads = downloads
-
-        return content
+        content
             .task { await load() }
-            .alert("Download limit reached", isPresented: $downloads.limitAlertIsPresented) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("You can keep \(OfflineDownloadLimits.maxChapters) chapters on your device.")
-            }
             // Re-fetch when this screen is revealed again after the reader is
             // popped, so per-chapter read badges reflect saved progress. Gated on
             // `hasLoadedOnce` so it doesn't double-load on first appearance.
@@ -71,6 +61,14 @@ struct ChapterPageView: View {
                 .frame(width: 187, height: 187)
             Text(detail.title)
                 .font(AppFont.title)
+
+            // What the allowance is costing, stated before the reader spends it.
+            // The cap is never enforced by refusing — downloading a
+            // twenty-first chapter drops the oldest — so this is the only place
+            // that says the limit exists at all until 已下載 arrives.
+            Text("\(downloads.usedSlots)/\(OfflineDownloadLimits.maxChapters) downloaded")
+                .font(AppFont.caption)
+                .foregroundStyle(Color(.grayFont))
 
             ScrollView {
                 // Lazy now that each row loads its own cover: a comic with a
