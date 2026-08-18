@@ -184,6 +184,39 @@ final class ChapterDownloadManager {
         startRunnerIfNeeded()
     }
 
+    /// Queues several chapters in one action (ticket 06).
+    ///
+    /// **Admitted one at a time, deliberately.** There is no batch admission
+    /// path at all: five chapters take five slots and therefore evict exactly
+    /// five, which is the semantic ticket 04 settled. Admitting a batch as a
+    /// unit would be the obvious way around that, so the way is simply not
+    /// built.
+    ///
+    /// **A selection larger than the cap is refused rather than trimmed.** It
+    /// would otherwise evict its own earlier chapters as its later ones
+    /// arrived — thrashing the disk to arrive at the last twenty of whatever
+    /// was asked for, which is not what anyone asked for. Below that size the
+    /// batch cannot eat itself at all: eviction takes the oldest download, and
+    /// every chapter in the batch is newer than everything already there.
+    ///
+    /// Chapters already on the device are skipped, so a selection is measured
+    /// by what it would actually add.
+    ///
+    /// - Returns: `false` when the selection is too large and nothing was
+    ///   queued, so the screen can say so.
+    @discardableResult
+    func download(comic: Comic, chapters: [Chapter]) -> Bool {
+        let wanted = chapters.filter { chapter in
+            !completed.contains(DownloadedChapterID(comicID: comic.id, chapterID: chapter.id))
+        }
+        guard wanted.count <= store.chapterLimit else { return false }
+
+        for chapter in wanted {
+            download(comic: comic, chapter: chapter)
+        }
+        return true
+    }
+
     /// Stops this chapter and discards what it had downloaded.
     ///
     /// Cancelling is the reader changing their mind, so the partial chapter goes
