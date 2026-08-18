@@ -38,18 +38,23 @@ struct vista_comicApp: App {
         // needs a connection, as it always has.
         let snapshots: any CatalogSnapshotStore =
             (try? FileCatalogSnapshotStore()) ?? InMemoryCatalogSnapshotStore()
+        // Comic covers only, so 書庫 looks like itself with no connection
+        // (ticket 07). One file per comic, pruned to whatever the library
+        // currently holds.
+        let covers: any CoverCache = (try? FileCoverCache()) ?? InMemoryCoverCache()
 
         let repository = OfflineFallbackComicRepository(
             // The inner repository is the one that stores snapshots, because it
             // is the only thing that ever sees the raw response bytes.
             wrapping: APIComicRepository(snapshots: snapshots),
             snapshots: snapshots,
-            chapters: chapters
+            chapters: chapters,
+            covers: covers
         )
 
         self.offlineChapterStore = chapters
         self.repository = repository
-        self.pageImageCache = MemoryPageImageCache(offlineChapters: chapters)
+        self.pageImageCache = MemoryPageImageCache(offlineChapters: chapters, covers: covers)
         _downloads = State(
             initialValue: ChapterDownloadManager(store: chapters, repository: repository)
         )

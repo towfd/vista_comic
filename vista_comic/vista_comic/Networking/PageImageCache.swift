@@ -170,6 +170,10 @@ final class MemoryPageImageCache: PageImageCache {
     /// default, and what `shared` runs with — behaves exactly as this cache did
     /// before downloads existed.
     private let offlineChapters: (any OfflineChapterStore)?
+    /// Comic covers kept on the device (ticket 07). A different store from the
+    /// chapters on purpose — see `CoverCache` — and `nil` for everything but
+    /// the running app.
+    private let covers: (any CoverCache)?
     private let session: URLSession
     private let clientID: String?
     private let clientSecret: String?
@@ -198,9 +202,11 @@ final class MemoryPageImageCache: PageImageCache {
         clientID: String? = APIConfig.cfAccessClientID,
         clientSecret: String? = APIConfig.cfAccessClientSecret,
         byteLimit: Int = MemoryPageImageCache.defaultByteLimit,
-        offlineChapters: (any OfflineChapterStore)? = nil
+        offlineChapters: (any OfflineChapterStore)? = nil,
+        covers: (any CoverCache)? = nil
     ) {
         self.offlineChapters = offlineChapters
+        self.covers = covers
         self.session = session
         self.clientID = clientID
         self.clientSecret = clientSecret
@@ -255,6 +261,7 @@ final class MemoryPageImageCache: PageImageCache {
         let clientID = self.clientID
         let clientSecret = self.clientSecret
         let offlineChapters = self.offlineChapters
+        let covers = self.covers
 
         return { url in
             // The disk goes in front of the network, and nowhere else. Every
@@ -273,6 +280,15 @@ final class MemoryPageImageCache: PageImageCache {
                 return decoded
             }
 
+            // A comic cover already on the device, for the same reason and with
+            // the same effect. Consulted after the chapter store because a page
+            // is what the reader is usually waiting on.
+            if let data = covers?.data(for: url), let cover = UIImage(data: data) {
+                let decoded = Self.forcedToDecode(cover)
+                store.insert(decoded, for: url)
+                return decoded
+            }
+
             // `AuthorizedAsyncImage.fetchImage` stays the one place a media
             // request is built, so the Cloudflare Access behaviour — and the
             // regression tests guarding it — survive this change untouched.
@@ -283,10 +299,15 @@ final class MemoryPageImageCache: PageImageCache {
                 clientSecret: clientSecret
             )
             let decoded = Self.forcedToDecode(fetched.decodedImage)
-            // Nothing is written back to the disk store here, deliberately: a
-            // page merely read is not a page the reader chose to keep, and the
-            // moment it were, the download list, the cap and what is actually
-            // on the device would stop agreeing.
+            // Nothing is written back to the *chapter* store here, deliberately:
+            // a page merely read is not a page the reader chose to keep, and the
+            // moment it were, the download list, the cap and what is actually on
+            // the device would stop agreeing.
+            //
+            // The cover cache is a different store with none of those promises
+            // to keep, and it no-ops unless the catalog has said this URL is a
+            // comic's cover — so this line keeps covers, and only covers.
+            covers?.storeIfKnownCover(fetched.data, for: url)
             store.insert(decoded, for: url)
             return decoded
         }
