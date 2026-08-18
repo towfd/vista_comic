@@ -42,6 +42,11 @@ struct vista_comicApp: App {
         // (ticket 07). One file per comic, pruned to whatever the library
         // currently holds.
         let covers: any CoverCache = (try? FileCoverCache()) ?? InMemoryCoverCache()
+        // Reading positions that could not be sent (ticket 03). Persisted, so a
+        // reader who closes the app on the plane has not thrown their session
+        // away — landing is when it can finally be delivered.
+        let pending: any PendingProgressStore =
+            (try? FilePendingProgressStore()) ?? InMemoryPendingProgressStore()
 
         let repository = OfflineFallbackComicRepository(
             // The inner repository is the one that stores snapshots, because it
@@ -49,6 +54,7 @@ struct vista_comicApp: App {
             wrapping: APIComicRepository(snapshots: snapshots),
             snapshots: snapshots,
             chapters: chapters,
+            pending: pending,
             covers: covers
         )
 
