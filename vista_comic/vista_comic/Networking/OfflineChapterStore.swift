@@ -99,13 +99,10 @@ enum OfflineDownloadLimits {
 }
 
 enum OfflineDownloadError: Error, Equatable {
-    /// The device already holds `maxChapters`.
-    ///
-    /// **Temporary, and it is ticket 01 that makes it so.** Ticket 04 replaces
-    /// refusing with first-in-first-out eviction; this exists only so the device
-    /// cannot be filled with several gigabytes in the window between the two,
-    /// since eviction is the feature's only irreversible logic and deserves to
-    /// land on its own.
+    /// The device is full and there is nothing that may be evicted — which, at
+    /// a cap of twenty and exactly one chapter ever protected, means the cap is
+    /// one. Kept as an error rather than treated as impossible so that a store
+    /// configured small in a test says something honest.
     case chapterLimitReached
     /// Asked to update a chapter that was never admitted. A record is what
     /// reserves the slot, so writing one that never claimed a slot would let the
@@ -134,18 +131,36 @@ protocol OfflineChapterStore: Sendable {
 
     func downloadedChapter(_ id: DownloadedChapterID) -> DownloadedChapter?
 
-    /// Reserves a slot and writes the chapter's record.
+    /// Reserves a slot and writes the chapter's record, evicting the oldest
+    /// download if the device is already full.
     ///
     /// **A download occupies its slot from the moment it starts**, not when it
     /// finishes: otherwise queueing several at once would sail past the cap
     /// while every one of them was still in flight.
     ///
+    /// **Eviction is per chapter admitted**, so admitting five at the cap evicts
+    /// exactly five — the semantics ticket 06's batch download relies on,
+    /// settled here with the logic rather than discovered there.
+    ///
+    /// **Strict first-in-first-out by `startedAt`.** Read state is deliberately
+    /// not consulted: a rule the reader can predict without knowing what the app
+    /// thinks they have read is worth more than a cleverer one.
+    ///
     /// Admitting a chapter that is already admitted is a no-op rather than an
     /// error, so resuming an interrupted download does not consume a second
     /// slot — and does not reset `startedAt`, which is the eviction key.
     ///
-    /// - Throws: `OfflineDownloadError.chapterLimitReached` at the cap.
-    func admit(_ chapter: DownloadedChapter) throws
+    /// - Parameter protecting: a chapter that must not be evicted whatever its
+    ///   age — the one open in the Reader. Deleting the pages out from under
+    ///   someone who is reading them is never the right answer.
+    /// - Returns: the chapter evicted to make room, or `nil` if there was room.
+    /// - Throws: `OfflineDownloadError.chapterLimitReached` when the device is
+    ///   full and every chapter on it is protected.
+    @discardableResult
+    func admit(
+        _ chapter: DownloadedChapter,
+        protecting: DownloadedChapterID?
+    ) throws -> DownloadedChapterID?
 
     /// Rewrites an admitted chapter's record — the page URLs once the reader
     /// endpoint has answered, and the completion flag once every page is present.
@@ -180,6 +195,13 @@ protocol OfflineChapterStore: Sendable {
 
 extension OfflineChapterStore {
     var chapterLimit: Int { OfflineDownloadLimits.maxChapters }
+
+    /// Admits with nothing protected — for every caller that is not the download
+    /// engine, since the engine is the only one that knows what is being read.
+    @discardableResult
+    func admit(_ chapter: DownloadedChapter) throws -> DownloadedChapterID? {
+        try admit(chapter, protecting: nil)
+    }
 
     /// Whether every page of this chapter is present — the only definition of
     /// "readable offline" anything should use.
@@ -248,16 +270,28 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
         lock.withLock { records[id] }
     }
 
-    func admit(_ chapter: DownloadedChapter) throws {
+    @discardableResult
+    func admit(
+        _ chapter: DownloadedChapter,
+        protecting: DownloadedChapterID?
+    ) throws -> DownloadedChapterID? {
         try lock.withLock {
             // Already holds a slot: this is a resume, not a new download.
-            guard records[chapter.id] == nil else { return }
-            guard records.count < chapterLimit else {
-                throw OfflineDownloadError.chapterLimitReached
+            guard records[chapter.id] == nil else { return nil }
+
+            var evicted: DownloadedChapterID?
+            if records.count >= chapterLimit {
+                guard let victim = oldestEvictable(protecting: protecting) else {
+                    throw OfflineDownloadError.chapterLimitReached
+                }
+                try remove(victim)
+                evicted = victim
             }
+
             try writeRecord(chapter)
             records[chapter.id] = chapter
             index(chapter)
+            return evicted
         }
     }
 
@@ -273,13 +307,28 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
     }
 
     func delete(_ chapterID: DownloadedChapterID) throws {
-        try lock.withLock {
-            records[chapterID] = nil
-            pageOwners = pageOwners.filter { $0.value != chapterID }
-            let directory = directory(for: chapterID)
-            guard fileManager.fileExists(atPath: directory.path) else { return }
-            try fileManager.removeItem(at: directory)
-        }
+        try lock.withLock { try remove(chapterID) }
+    }
+
+    /// The chapter that has been on the device longest and may go.
+    ///
+    /// Strict first-in-first-out, and nothing else is consulted — not read
+    /// state, not size, not how recently it was opened.
+    private func oldestEvictable(protecting: DownloadedChapterID?) -> DownloadedChapterID? {
+        records.values
+            .filter { $0.id != protecting }
+            .min { $0.startedAt < $1.startedAt }?
+            .id
+    }
+
+    /// Removes a chapter's record and its files together. The caller holds the
+    /// lock; eviction and explicit deletion are the same act and must not drift.
+    private func remove(_ chapterID: DownloadedChapterID) throws {
+        records[chapterID] = nil
+        pageOwners = pageOwners.filter { $0.value != chapterID }
+        let directory = directory(for: chapterID)
+        guard fileManager.fileExists(atPath: directory.path) else { return }
+        try fileManager.removeItem(at: directory)
     }
 
     // MARK: Pages
@@ -436,13 +485,29 @@ final class InMemoryOfflineChapterStore: OfflineChapterStore, @unchecked Sendabl
         lock.withLock { records[id] }
     }
 
-    func admit(_ chapter: DownloadedChapter) throws {
+    @discardableResult
+    func admit(
+        _ chapter: DownloadedChapter,
+        protecting: DownloadedChapterID?
+    ) throws -> DownloadedChapterID? {
         try lock.withLock {
-            guard records[chapter.id] == nil else { return }
-            guard records.count < chapterLimit else {
-                throw OfflineDownloadError.chapterLimitReached
+            guard records[chapter.id] == nil else { return nil }
+
+            var evicted: DownloadedChapterID?
+            if records.count >= chapterLimit {
+                guard
+                    let victim = records.values
+                        .filter({ $0.id != protecting })
+                        .min(by: { $0.startedAt < $1.startedAt })?
+                        .id
+                else { throw OfflineDownloadError.chapterLimitReached }
+                records[victim] = nil
+                pages[victim] = nil
+                evicted = victim
             }
+
             records[chapter.id] = chapter
+            return evicted
         }
     }
 
