@@ -78,9 +78,15 @@ For every implementation increment:
 2. Build or run relevant SwiftUI previews when the environment supports it.
 3. Exercise the changed navigation path in an iOS simulator when available.
 4. **UI verification is mine, not yours.** Do not write XCUITest code, do not build-verify it, do not attempt to run it, and do not spend increment time deliberating whether some behaviour is assertable through the accessibility API. Instead, hand off a specific list of what I should look for on a real device — that list is the deliverable for any UI-facing behaviour a unit test cannot cover. (Separately, and regardless: this environment's simulator cannot reliably initialize XCUITest's accessibility runner — confirmed structurally broken across repeated attempts, not a configuration issue — so running them here would fail anyway.)
-5. Check at least one compact phone layout and one larger phone layout for UI changes.
-6. Verify relevant empty, loading, failure, and boundary states when the ticket requires them.
-7. Explain any verification that could not be completed because of environment limitations.
+5. **A test run has a five-minute budget and a stop rule.** A full unit run costs roughly 90 seconds to build and 95 seconds to execute, so anything past five minutes is a broken environment rather than a slow suite, and continuing to poke at it wastes my time and your tokens.
+   - Always pass `-test-timeouts-enabled YES -default-test-execution-time-allowance 60`, so a stuck test is aborted **and named** instead of hanging the whole run with nothing to read afterwards.
+   - Over budget: stop it **once**, report what was observed, and hand it back to me. Do not retry, do not try variations, and do not attempt to repair the machine.
+   - **The same symptom twice means stop.** Hand the verification to me rather than looking for a way through — this is rule 4's boundary showing up in a different disguise.
+   - Killing a run mid-flight is not routine: on this machine it wedges every later run at the same point until a restart, so it costs me an interruption every time. One kill, then hands off the keyboard.
+   - Note that `xcodebuild test` builds, installs and launches `vista_comicUITests-Runner.app` even when the invocation asks only for `-only-testing:vista_comicTests`. To keep well clear of it: `build-for-testing` once, remove the `vista_comicUITests` target from a copy of the generated `.xctestrun` kept **beside the original** (its paths resolve relative to the file's own location), then `test-without-building -xctestrun <that copy>`. Whether that avoids the hang is unproven; the budget above applies either way.
+6. Check at least one compact phone layout and one larger phone layout for UI changes.
+7. Verify relevant empty, loading, failure, and boundary states when the ticket requires them.
+8. Explain any verification that could not be completed because of environment limitations.
 
 ## Learning handoff
 
