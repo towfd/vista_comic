@@ -49,9 +49,14 @@ final class ChapterDownloadManager {
     /// In-flight state only — what is finished is the store's business.
     private(set) var active: [DownloadedChapterID: ChapterDownloadState] = [:]
 
-    /// Set when a download is refused at the cap, so the chapter list can say so.
-    /// Ticket 04 deletes this along with the refusal it reports.
-    var limitAlertIsPresented = false
+    /// How many of the twenty slots are in use, for the chapter list to show.
+    /// Mirrored from the store for the same reason `completed` is: the store is
+    /// read from `body` and therefore cannot be observable.
+    private(set) var usedSlots: Int
+
+    /// The chapter open in the Reader, which eviction must not touch. Set by the
+    /// Reader, because it is the only thing that knows.
+    private var openChapter: DownloadedChapterID?
 
     /// Completed chapters, mirrored from the store at init and kept current as
     /// downloads finish.
@@ -97,9 +102,21 @@ final class ChapterDownloadManager {
             clientID: clientID,
             clientSecret: clientSecret
         )
-        self.completed = Set(
-            store.downloadedChapters().filter(\.isComplete).map(\.id)
-        )
+        let downloaded = store.downloadedChapters()
+        self.completed = Set(downloaded.filter(\.isComplete).map(\.id))
+        self.usedSlots = downloaded.count
+    }
+
+    // MARK: What the Reader is holding open
+
+    /// Tells the engine which chapter is being read, so the cap never deletes
+    /// the pages out from under it. Cleared when the Reader closes.
+    func readerOpened(comicID: String, chapterID: String) {
+        openChapter = DownloadedChapterID(comicID: comicID, chapterID: chapterID)
+    }
+
+    func readerClosed() {
+        openChapter = nil
     }
 
     // MARK: What a row shows
@@ -117,14 +134,15 @@ final class ChapterDownloadManager {
 
     // MARK: Starting and stopping
 
-    /// Reserves a slot for this chapter and queues it.
+    /// Reserves a slot for this chapter and queues it, evicting the oldest
+    /// download if the device is already full.
     ///
     /// The chapter here is the *summary* the list screen holds, which carries no
     /// page URLs — those are resolved from the reader endpoint once the download
     /// starts. Its `pageCount` is enough to draw a ring in the meantime.
     ///
-    /// Refused at the cap: sets `limitAlertIsPresented` rather than throwing,
-    /// since the only caller is a button and the only response is to say so.
+    /// The reader is never stopped and asked to tidy up: downloading a
+    /// twenty-first chapter removes the one downloaded longest ago and proceeds.
     func download(comic: Comic, chapter: Chapter) {
         let id = DownloadedChapterID(comicID: comic.id, chapterID: chapter.id)
         guard active[id] == nil, !completed.contains(id) else { return }
@@ -142,14 +160,21 @@ final class ChapterDownloadManager {
         )
 
         do {
-            try store.admit(record)
-        } catch OfflineDownloadError.chapterLimitReached {
-            limitAlertIsPresented = true
-            return
+            let evicted = try store.admit(record, protecting: openChapter)
+            if let evicted {
+                // The evicted chapter is gone from the device, so every row that
+                // said so has to stop saying it.
+                completed.remove(evicted)
+                active[evicted] = nil
+            }
         } catch {
+            // The device is full and everything on it is protected, which cannot
+            // happen at a cap of twenty with one chapter open. Nothing is said,
+            // because there is nothing the reader could usefully do about it.
             active[id] = nil
             return
         }
+        usedSlots = store.downloadedChapters().count
 
         queue.append(record)
         // Shown as downloading from the moment it is queued: the reader tapped,
@@ -169,6 +194,7 @@ final class ChapterDownloadManager {
             queue.remove(at: index)
             active[chapterID] = nil
             try? store.delete(chapterID)
+            usedSlots = store.downloadedChapters().count
             return
         }
 
@@ -291,6 +317,7 @@ final class ChapterDownloadManager {
         if cancelled.remove(id) != nil {
             active[id] = nil
             try? store.delete(id)
+            usedSlots = store.downloadedChapters().count
             return
         }
 

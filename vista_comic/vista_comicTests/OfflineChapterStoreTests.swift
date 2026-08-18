@@ -83,24 +83,134 @@ struct OfflineChapterStoreTests {
         }
     }
 
-    @Test func admittingBeyondTheLimitIsRefused() throws {
+    // MARK: - The cap, and what it removes
+
+    @Test func admittingAtTheCapEvictsTheOldestDownload() throws {
         try withStore(chapterLimit: 2) { store, _ in
-            try store.admit(makeChapter(chapterID: "one"))
-            try store.admit(makeChapter(chapterID: "two"))
+            let oldest = makeChapter(chapterID: "oldest", startedAt: Date(timeIntervalSince1970: 100))
+            let middle = makeChapter(chapterID: "middle", startedAt: Date(timeIntervalSince1970: 200))
+            // Filling the device exactly to the cap costs nothing: the boundary
+            // is "one more than fits", not "as many as fit".
+            #expect(try store.admit(oldest) == nil)
+            #expect(try store.admit(middle) == nil)
+
+            let evicted = try store.admit(
+                makeChapter(chapterID: "newest", startedAt: Date(timeIntervalSince1970: 300))
+            )
+
+            // The reader is never stopped and asked to tidy up.
+            #expect(evicted == oldest.id)
+            #expect(store.downloadedChapters().map(\.chapterID) == ["middle", "newest"])
+            #expect(store.downloadedChapter(oldest.id) == nil)
+        }
+    }
+
+    @Test func evictionRemovesThePagesAndNotJustTheRecord() throws {
+        try withStore(chapterLimit: 1) { store, root in
+            let oldest = makeChapter(chapterID: "oldest", startedAt: Date(timeIntervalSince1970: 100))
+            try store.admit(oldest)
+            for page in oldest.pageURLs {
+                try store.writePage(Data("page bytes".utf8), for: page, of: oldest.id)
+            }
+
+            try store.admit(makeChapter(chapterID: "newest", startedAt: Date(timeIntervalSince1970: 200)))
+
+            // The space is genuinely freed — this is the only irreversible thing
+            // the feature does, so "gone" has to mean gone from the disk.
+            #expect(store.hasPage(oldest.pageURLs[0], of: oldest.id) == false)
+            #expect(store.pageData(for: oldest.pageURLs[0]) == nil)
+            let directories = try FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: nil
+            )
+            #expect(directories.count == 1)
+        }
+    }
+
+    @Test func evictionDoesNotConsultWhetherAChapterWasFinished() throws {
+        try withStore(chapterLimit: 1) { store, _ in
+            // Complete is the only state of a chapter the store knows at all,
+            // and it is deliberately not a factor: strict first-in-first-out is
+            // a rule the reader can predict without knowing what the app thinks
+            // they have read.
+            var finished = makeChapter(chapterID: "finished", startedAt: Date(timeIntervalSince1970: 100))
+            finished.isComplete = true
+            try store.admit(finished)
+
+            let evicted = try store.admit(
+                makeChapter(chapterID: "newer", startedAt: Date(timeIntervalSince1970: 200))
+            )
+
+            #expect(evicted == finished.id)
+        }
+    }
+
+    @Test func admittingFiveAtTheCapEvictsExactlyFive() throws {
+        try withStore(chapterLimit: 3) { store, _ in
+            for index in 0..<3 {
+                try store.admit(
+                    makeChapter(
+                        chapterID: "old-\(index)",
+                        startedAt: Date(timeIntervalSince1970: TimeInterval(100 + index))
+                    )
+                )
+            }
+
+            var evicted: [DownloadedChapterID] = []
+            for index in 0..<5 {
+                if let victim = try store.admit(
+                    makeChapter(
+                        chapterID: "new-\(index)",
+                        startedAt: Date(timeIntervalSince1970: TimeInterval(200 + index))
+                    )
+                ) {
+                    evicted.append(victim)
+                }
+            }
+
+            // Five in, five out — the semantics ticket 06's batch download
+            // relies on, settled here rather than discovered there.
+            #expect(evicted.count == 5)
+            #expect(store.downloadedChapters().count == 3)
+            #expect(store.downloadedChapters().map(\.chapterID) == ["new-2", "new-3", "new-4"])
+        }
+    }
+
+    @Test func theChapterBeingReadIsNeverTheOneEvicted() throws {
+        try withStore(chapterLimit: 2) { store, _ in
+            let beingRead = makeChapter(chapterID: "being-read", startedAt: Date(timeIntervalSince1970: 100))
+            let other = makeChapter(chapterID: "other", startedAt: Date(timeIntervalSince1970: 200))
+            try store.admit(beingRead)
+            try store.admit(other)
+
+            let evicted = try store.admit(
+                makeChapter(chapterID: "newest", startedAt: Date(timeIntervalSince1970: 300)),
+                protecting: beingRead.id
+            )
+
+            // It is the oldest, and it would have gone — but deleting the pages
+            // out from under someone who is reading them is never the answer.
+            #expect(evicted == other.id)
+            #expect(store.downloadedChapter(beingRead.id) != nil)
+        }
+    }
+
+    @Test func aFullDeviceWithNothingEvictableRefuses() throws {
+        try withStore(chapterLimit: 1) { store, _ in
+            let beingRead = makeChapter(chapterID: "being-read")
+            try store.admit(beingRead)
 
             #expect(throws: OfflineDownloadError.chapterLimitReached) {
-                try store.admit(makeChapter(chapterID: "three"))
+                try store.admit(makeChapter(chapterID: "newest"), protecting: beingRead.id)
             }
-            // Refused means refused: nothing was evicted to make room.
-            #expect(store.downloadedChapters().count == 2)
-            #expect(store.downloadedChapter(
-                DownloadedChapterID(comicID: "comic-1", chapterID: "three")
-            ) == nil)
+            #expect(store.downloadedChapters().map(\.chapterID) == ["being-read"])
         }
     }
 
     @Test func resumingAnInterruptedChapterDoesNotTakeASecondSlot() throws {
         try withStore(chapterLimit: 2) { store, _ in
+            // Re-admitting must not evict anything either: a resume is not a new
+            // download, so nothing has to make room for it.
             let started = Date(timeIntervalSince1970: 100)
             let chapter = makeChapter(startedAt: started)
             try store.admit(chapter)

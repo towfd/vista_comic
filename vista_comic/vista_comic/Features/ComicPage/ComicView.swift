@@ -214,6 +214,7 @@ private struct ReaderView: View {
     /// and where in it the reader currently is. `AuthorizedAsyncImage` reads
     /// the same cache separately for the row it is drawing.
     @Environment(\.pageImageCache) private var pageImageCache
+    @Environment(\.chapterDownloads) private var downloads
     @Environment(\.dismiss) private var dismiss
 
     /// How far the reader must be pulled *past* the bottom (points of overscroll)
@@ -259,8 +260,17 @@ private struct ReaderView: View {
         // Load the current chapter's pages on open, and reload whenever the
         // chapter changes (prev / next / chapter list / auto-advance).
         .task(id: currentChapter.id) { await loadPages() }
+        // Tell the download engine what is being read, so the download cap
+        // cannot evict the pages out from under it. Re-announced on every
+        // chapter change, since that is what "open" means here.
+        .onChange(of: currentChapter.id, initial: true) { _, _ in
+            downloads.readerOpened(comicID: comic.id, chapterID: currentChapter.id)
+        }
         // Save the last position when the reader is dismissed (back button).
-        .onDisappear { flushProgress() }
+        .onDisappear {
+            flushProgress()
+            downloads.readerClosed()
+        }
     }
 
     // MARK: - Pages

@@ -398,30 +398,101 @@ struct ChapterDownloadTests {
 
     // MARK: - The cap
 
-    @Test func aDownloadBeyondTheLimitIsRefusedAndFetchesNothing() async throws {
+    @Test func aDownloadBeyondTheCapEvictsTheOldestAndProceeds() async throws {
         let (store, root) = try makeStore(chapterLimit: 1)
         defer { try? FileManager.default.removeItem(at: root) }
         let pages = pageURLs(3)
-        let manager = makeManager(store: store, pages: pages)
 
-        try store.admit(
-            DownloadedChapter(
-                comicID: "comic-1",
-                comicTitle: "Alpha",
-                chapterID: "already-here",
-                chapterNumber: 9,
-                chapterTitle: "Nine",
-                pageCount: 1
-            )
+        let oldest = DownloadedChapter(
+            comicID: "comic-1",
+            comicTitle: "Alpha",
+            chapterID: "already-here",
+            chapterNumber: 9,
+            chapterTitle: "Nine",
+            pageURLs: [URL(string: "https://example.test/old-page.jpg")!],
+            pageCount: 1,
+            startedAt: Date(timeIntervalSince1970: 100),
+            isComplete: true
         )
+        try store.admit(oldest)
+        try store.writePage(Data("old bytes".utf8), for: oldest.pageURLs[0], of: oldest.id)
 
+        // Built after the store is populated, the way a launch on a device that
+        // already holds downloads goes.
+        let manager = makeManager(store: store, pages: pages)
         manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
         await manager.waitUntilIdle()
 
-        #expect(manager.limitAlertIsPresented)
-        #expect(manager.state(for: chapterID) == .notDownloaded)
-        // Refused, not evicted: the chapter already on the device is untouched.
-        #expect(store.downloadedChapters().map(\.chapterID) == ["already-here"])
-        #expect(DownloadStubURLProtocol.requests.isEmpty)
+        // The reader asked for a chapter and got one, rather than being stopped
+        // and asked to tidy up.
+        #expect(manager.state(for: chapterID) == .downloaded)
+        #expect(store.downloadedChapters().map(\.chapterID) == ["chapter-1"])
+        // And the row for what went away stops claiming to be downloaded.
+        #expect(manager.state(for: oldest.id) == .notDownloaded)
+        #expect(store.hasPage(oldest.pageURLs[0], of: oldest.id) == false)
+    }
+
+    @Test func theChapterOpenInTheReaderIsNotTheOneEvicted() async throws {
+        let (store, root) = try makeStore(chapterLimit: 2)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+
+        let beingRead = DownloadedChapter(
+            comicID: "comic-1",
+            comicTitle: "Alpha",
+            chapterID: "being-read",
+            chapterNumber: 8,
+            chapterTitle: "Eight",
+            pageCount: 1,
+            startedAt: Date(timeIntervalSince1970: 100),
+            isComplete: true
+        )
+        let other = DownloadedChapter(
+            comicID: "comic-1",
+            comicTitle: "Alpha",
+            chapterID: "other",
+            chapterNumber: 9,
+            chapterTitle: "Nine",
+            pageCount: 1,
+            startedAt: Date(timeIntervalSince1970: 200),
+            isComplete: true
+        )
+        try store.admit(beingRead)
+        try store.admit(other)
+        let manager = makeManager(store: store, pages: pages)
+
+        // The Reader announces what it is holding open; without that, the oldest
+        // of these two is exactly what the cap would take.
+        manager.readerOpened(comicID: "comic-1", chapterID: "being-read")
+        manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
+        await manager.waitUntilIdle()
+
+        #expect(store.downloadedChapter(beingRead.id) != nil)
+        #expect(store.downloadedChapter(other.id) == nil)
+        #expect(manager.state(for: beingRead.id) == .downloaded)
+        // And the row for what did go stops claiming to be downloaded.
+        #expect(manager.state(for: other.id) == .notDownloaded)
+    }
+
+    @Test func theSlotsInUseAreReportedFromTheMomentADownloadStarts() async throws {
+        let (store, root) = try makeStore(chapterLimit: 2)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(6)
+        let manager = makeManager(store: store, pages: pages)
+        DownloadStubURLProtocol.setDelay(0.2)
+
+        #expect(manager.usedSlots == 0)
+
+        manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
+
+        // Counted before a single page has arrived — which is what stops a queue
+        // of downloads sailing past the cap while they are all still in flight.
+        #expect(manager.usedSlots == 1)
+
+        await waitUntil { DownloadStubURLProtocol.requests.isEmpty == false }
+        manager.cancel(chapterID)
+        await manager.waitUntilIdle()
+
+        #expect(manager.usedSlots == 0)
     }
 }
