@@ -14,13 +14,24 @@ struct ChapterPageView: View {
     let comic: Comic
 
     @Environment(\.comicRepository) private var repository
+    @Environment(\.chapterDownloads) private var downloads
     @State private var state: LoadState<Comic> = .loading
     /// First load shows the full-screen spinner; later refreshes are silent.
     @State private var hasLoadedOnce = false
 
     var body: some View {
-        content
+        // The refusal at the cap is reported here rather than on the row that
+        // caused it: one alert for the screen instead of one per chapter, and
+        // ticket 04 removes it along with refusing.
+        @Bindable var downloads = downloads
+
+        return content
             .task { await load() }
+            .alert("Download limit reached", isPresented: $downloads.limitAlertIsPresented) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("You can keep \(OfflineDownloadLimits.maxChapters) chapters on your device.")
+            }
             // Re-fetch when this screen is revealed again after the reader is
             // popped, so per-chapter read badges reflect saved progress. Gated on
             // `hasLoadedOnce` so it doesn't double-load on first appearance.

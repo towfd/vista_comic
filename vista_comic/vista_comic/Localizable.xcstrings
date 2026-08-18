@@ -393,6 +393,72 @@
     },
     "Vocabulary & grammar" : {
 
+    },
+    "Download chapter" : {
+      "comment" : "Chapter row: start downloading this chapter for offline reading",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載章節"
+          }
+        }
+      }
+    },
+    "Cancel download" : {
+      "comment" : "Chapter row: cancel the download in progress",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消下載"
+          }
+        }
+      }
+    },
+    "Downloaded" : {
+      "comment" : "Chapter row: this chapter is on the device",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載"
+          }
+        }
+      }
+    },
+    "Retry download" : {
+      "comment" : "Chapter row: a download that did not finish",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重試下載"
+          }
+        }
+      }
+    },
+    "Download limit reached" : {
+      "comment" : "Chapter list: refused because the device already holds the maximum",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已達下載上限"
+          }
+        }
+      }
+    },
+    "You can keep %lld chapters on your device." : {
+      "comment" : "Chapter list: the download limit, explained",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裝置最多保留 %lld 章。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
