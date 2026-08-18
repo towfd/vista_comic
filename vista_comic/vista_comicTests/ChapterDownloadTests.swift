@@ -495,4 +495,75 @@ struct ChapterDownloadTests {
 
         #expect(manager.usedSlots == 0)
     }
+
+    // MARK: - Deleting what is on the device
+
+    @Test func deletingAChapterFreesItsSlotAndRevertsItsRow() async throws {
+        let (store, root) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(3)
+        let manager = makeManager(store: store, pages: pages)
+
+        manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
+        await manager.waitUntilIdle()
+        #expect(manager.state(for: chapterID) == .downloaded)
+
+        manager.delete(chapterID)
+
+        // The reader freeing the slot they want freed, rather than the one the
+        // clock chose — which is what makes first-in-first-out tolerable.
+        #expect(manager.state(for: chapterID) == .notDownloaded)
+        #expect(manager.usedSlots == 0)
+        #expect(store.downloadedChapter(chapterID) == nil)
+        for page in pages {
+            #expect(store.hasPage(page, of: chapterID) == false)
+        }
+    }
+
+    @Test func deletingADownloadInFlightStopsItAndDiscardsThePartialChapter() async throws {
+        let (store, root) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(8)
+        let manager = makeManager(store: store, pages: pages)
+        DownloadStubURLProtocol.setDelay(0.2)
+
+        manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
+        await waitUntil { DownloadStubURLProtocol.requests.isEmpty == false }
+
+        // Deleted rather than left to finish into a chapter nobody asked for:
+        // the work stops first, by the path that already knows how.
+        manager.delete(chapterID)
+        await manager.waitUntilIdle()
+
+        #expect(manager.state(for: chapterID) == .notDownloaded)
+        #expect(store.downloadedChapters().isEmpty)
+        #expect(manager.usedSlots == 0)
+    }
+
+    @Test func deletingEverythingClearsTheDevice() async throws {
+        let (store, root) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+        let manager = makeManager(store: store, pages: pages)
+
+        manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
+        await manager.waitUntilIdle()
+        try store.admit(
+            DownloadedChapter(
+                comicID: "comic-1",
+                comicTitle: "Alpha",
+                chapterID: "another",
+                chapterNumber: 2,
+                chapterTitle: "Two",
+                pageCount: 1
+            )
+        )
+
+        manager.deleteEverything()
+
+        #expect(store.downloadedChapters().isEmpty)
+        #expect(manager.state(for: chapterID) == .notDownloaded)
+        let directories = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+        #expect(directories.isEmpty)
+    }
 }

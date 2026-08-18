@@ -294,6 +294,26 @@ struct OfflineChapterStoreTests {
         }
     }
 
+    @Test func aChaptersSizeIsMeasuredFromItsFiles() throws {
+        try withStore { store, _ in
+            let chapter = makeChapter()
+            try store.admit(chapter)
+
+            // Measured, not remembered: a record is written before the first
+            // page arrives, and a partly downloaded chapter's size changes as it
+            // fills.
+            #expect(store.sizeOnDisk(of: chapter.id) == 0)
+
+            try store.writePage(Data(count: 1200), for: chapter.pageURLs[0], of: chapter.id)
+            try store.writePage(Data(count: 800), for: chapter.pageURLs[1], of: chapter.id)
+
+            #expect(store.sizeOnDisk(of: chapter.id) >= 2000)
+            #expect(store.sizeOnDisk(
+                of: DownloadedChapterID(comicID: "comic-1", chapterID: "never-downloaded")
+            ) == 0)
+        }
+    }
+
     // MARK: - Surviving a relaunch
 
     @Test func downloadsSurviveANewStoreOverTheSameDirectory() throws {

@@ -191,6 +191,14 @@ protocol OfflineChapterStore: Sendable {
 
     /// Removes the chapter's record and its page files together, freeing its slot.
     func delete(_ chapterID: DownloadedChapterID) throws
+
+    /// How many bytes this chapter occupies on the device (ticket 05).
+    ///
+    /// Measured rather than remembered: a record written before the first page
+    /// arrived cannot know, and a partly downloaded chapter's size changes as it
+    /// fills. Walks the chapter's files, so call it off the main thread — the
+    /// 已下載 screen does exactly that while it loads.
+    func sizeOnDisk(of chapterID: DownloadedChapterID) -> Int64
 }
 
 extension OfflineChapterStore {
@@ -310,6 +318,28 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
         try lock.withLock { try remove(chapterID) }
     }
 
+    func sizeOnDisk(of chapterID: DownloadedChapterID) -> Int64 {
+        // The pages, not the whole chapter directory: what the reader is being
+        // shown is what the content costs, and the record beside it is a few
+        // hundred bytes of bookkeeping they did not ask about. It also makes a
+        // just-admitted chapter honestly report nothing yet.
+        let directory = pagesDirectory(for: chapterID)
+        guard
+            let files = fileManager.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.fileSizeKey],
+                options: [.skipsHiddenFiles]
+            )
+        else { return 0 }
+
+        var total: Int64 = 0
+        for case let file as URL in files {
+            let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize
+            total += Int64(size ?? 0)
+        }
+        return total
+    }
+
     /// The chapter that has been on the device longest and may go.
     ///
     /// Strict first-in-first-out, and nothing else is consulted — not read
@@ -395,9 +425,12 @@ final class FileOfflineChapterStore: OfflineChapterStore, @unchecked Sendable {
     /// same way the memory cache is — which is what lets ticket 02 put the disk
     /// in front of the network with a single lookup.
     private func pageFile(for url: URL, of chapterID: DownloadedChapterID) -> URL {
-        directory(for: chapterID)
-            .appendingPathComponent("pages", isDirectory: true)
+        pagesDirectory(for: chapterID)
             .appendingPathComponent(Self.digest(url.absoluteString))
+    }
+
+    private func pagesDirectory(for chapterID: DownloadedChapterID) -> URL {
+        directory(for: chapterID).appendingPathComponent("pages", isDirectory: true)
     }
 
     private func writeRecord(_ chapter: DownloadedChapter) throws {
@@ -534,6 +567,12 @@ final class InMemoryOfflineChapterStore: OfflineChapterStore, @unchecked Sendabl
                 if let data = chapterPages[url] { return data }
             }
             return nil
+        }
+    }
+
+    func sizeOnDisk(of chapterID: DownloadedChapterID) -> Int64 {
+        lock.withLock {
+            Int64(pages[chapterID]?.values.reduce(0) { $0 + $1.count } ?? 0)
         }
     }
 
