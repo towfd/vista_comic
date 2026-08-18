@@ -66,6 +66,14 @@ private final class DownloadStubURLProtocol: URLProtocol {
         lock.withLock { recordedRequests }
     }
 
+    /// Forgets what has been requested so far, keeping the served bodies. Lets
+    /// a test ask "what was requested *from here on*", which is a sharper
+    /// question than a running total when the interesting event is in the
+    /// middle.
+    static func clearRequests() {
+        lock.withLock { recordedRequests = [] }
+    }
+
     static func requestCount(for url: URL) -> Int {
         lock.withLock { recordedRequests.filter { $0.url == url }.count }
     }
@@ -368,15 +376,24 @@ struct ChapterDownloadTests {
         #expect(store.downloadedChapter(chapterID) != nil)
         #expect(store.isComplete(chapterID) == false)
 
+        // Everything from here is the resumed half, which is the only half this
+        // test has a claim about. Counting across both halves instead made the
+        // assertion depend on exactly which fetches the pause interrupted —
+        // a page requested and then cancelled mid-flight is legitimately
+        // requested twice, and which pages those are is a matter of timing.
+        DownloadStubURLProtocol.clearRequests()
         DownloadStubURLProtocol.setDelay(0)
         manager.resume()
         await manager.waitUntilIdle()
 
         #expect(manager.state(for: chapterID) == .downloaded)
         for page in stored {
-            // Fetched exactly once across both halves: resume is page-level.
-            #expect(DownloadStubURLProtocol.requestCount(for: page) == 1)
+            // Not re-fetched: resume is page-level, so what is already on disk
+            // costs nothing.
+            #expect(DownloadStubURLProtocol.requestCount(for: page) == 0)
         }
+        // And it genuinely finished the job rather than finding nothing to do.
+        #expect(DownloadStubURLProtocol.requests.isEmpty == false)
     }
 
     // MARK: - The cap
