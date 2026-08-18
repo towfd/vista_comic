@@ -18,10 +18,22 @@ struct ChapterPageView: View {
     @State private var state: LoadState<Comic> = .loading
     /// First load shows the full-screen spinner; later refreshes are silent.
     @State private var hasLoadedOnce = false
+    /// Selection mode (`offline-download` ticket 06). `nil` when the list is
+    /// behaving normally, which is the state every other screen assumes.
+    @State private var selection: Set<String>?
+    /// Set when a selection is larger than the device can hold, since the
+    /// alternative — quietly downloading some of it — answers a question the
+    /// reader did not ask.
+    @State private var isShowingTooManyChapters = false
 
     var body: some View {
         content
             .task { await load() }
+            .alert("Too many chapters", isPresented: $isShowingTooManyChapters) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("You can download up to \(OfflineDownloadLimits.maxChapters) chapters at once.")
+            }
             // Re-fetch when this screen is revealed again after the reader is
             // popped, so per-chapter read badges reflect saved progress. Gated on
             // `hasLoadedOnce` so it doesn't double-load on first appearance.
@@ -57,6 +69,8 @@ struct ChapterPageView: View {
 
     private func loaded(_ detail: Comic) -> some View {
         VStack {
+            selectionControls(for: detail)
+
             CoverImage(url: detail.coverURL)
                 .frame(width: 187, height: 187)
             Text(detail.title)
@@ -76,11 +90,65 @@ struct ChapterPageView: View {
                 // full-resolution pages the moment the list appears.
                 LazyVStack(spacing: 0) {
                     ForEach(detail.chapters) { chapter in
-                        ChapterListView(comic: detail, chapter: chapter)
+                        ChapterListView(
+                            comic: detail,
+                            chapter: chapter,
+                            isSelecting: selection != nil,
+                            isSelected: selection?.contains(chapter.id) ?? false,
+                            onToggle: { toggle(chapter) }
+                        )
                     }
                 }
             }
         }
+    }
+
+    /// Enter, confirm, or leave selection mode.
+    ///
+    /// A row of buttons rather than a navigation-bar toolbar, because this
+    /// screen has no navigation bar of its own to put them in — it is pushed
+    /// with the library's, and its own title is drawn in the content.
+    @ViewBuilder
+    private func selectionControls(for detail: Comic) -> some View {
+        HStack {
+            if let selected = selection {
+                Button("Cancel") { selection = nil }
+                Spacer()
+                // Leaving without confirming downloads nothing: the whole
+                // selection is discarded with the mode.
+                Button("Download (\(selected.count))") {
+                    download(selected, from: detail)
+                }
+                .disabled(selected.isEmpty)
+            } else {
+                Spacer()
+                Button("Select") { selection = [] }
+            }
+        }
+        .font(AppFont.caption)
+        .padding(.horizontal)
+    }
+
+    private func toggle(_ chapter: Chapter) {
+        guard var selected = selection else { return }
+        if selected.contains(chapter.id) {
+            selected.remove(chapter.id)
+        } else {
+            selected.insert(chapter.id)
+        }
+        selection = selected
+    }
+
+    /// Hands the whole selection to the engine, which admits the chapters one
+    /// at a time — five in means exactly five out at the cap, and a batch can
+    /// never be admitted as a unit that dodges it.
+    private func download(_ selected: Set<String>, from detail: Comic) {
+        let chapters = detail.chapters.filter { selected.contains($0.id) }
+        guard downloads.download(comic: detail, chapters: chapters) else {
+            isShowingTooManyChapters = true
+            return
+        }
+        selection = nil
     }
 
     private func load() async {

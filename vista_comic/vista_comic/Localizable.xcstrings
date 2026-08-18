@@ -470,6 +470,50 @@
           }
         }
       }
+    },
+    "Select" : {
+      "comment" : "Chapter list: enter selection mode for batch download",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取"
+          }
+        }
+      }
+    },
+    "Download (%lld)" : {
+      "comment" : "Chapter list: download the selected chapters",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載 (%lld)"
+          }
+        }
+      }
+    },
+    "Too many chapters" : {
+      "comment" : "Chapter list: the selection is larger than the device can hold",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取的章節太多"
+          }
+        }
+      }
+    },
+    "You can download up to %lld chapters at once." : {
+      "comment" : "Chapter list: the batch limit, explained",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次最多下載 %lld 章。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
