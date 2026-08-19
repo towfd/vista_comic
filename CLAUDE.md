@@ -78,9 +78,14 @@ For every implementation increment:
 2. Build or run relevant SwiftUI previews when the environment supports it.
 3. Exercise the changed navigation path in an iOS simulator when available.
 4. **UI verification is mine, not yours.** Do not write XCUITest code, do not build-verify it, do not attempt to run it, and do not spend increment time deliberating whether some behaviour is assertable through the accessibility API. Instead, hand off a specific list of what I should look for on a real device — that list is the deliverable for any UI-facing behaviour a unit test cannot cover. (Separately, and regardless: this environment's simulator cannot reliably initialize XCUITest's accessibility runner — confirmed structurally broken across repeated attempts, not a configuration issue — so running them here would fail anyway.)
-5. Check at least one compact phone layout and one larger phone layout for UI changes.
-6. Verify relevant empty, loading, failure, and boundary states when the ticket requires them.
-7. Explain any verification that could not be completed because of environment limitations.
+5. **A test run has a five-minute budget and a stop rule.** A full unit run costs roughly 100 seconds to build and 95 seconds to execute, so anything past five minutes is a broken environment rather than a slow suite, and continuing to poke at it wastes my time and your tokens.
+   - Over budget: stop it **once**, report what was observed, and hand it back to me. Do not retry, do not try variations, and do not attempt to repair the machine.
+   - **The same symptom twice means stop.** Hand the verification to me rather than looking for a way through — this is rule 4's boundary showing up in a different disguise.
+   - **Killing a run mid-flight is what breaks the machine.** Afterwards every run stalls after the build, with `Testing started` never printed and no test executed. Measured against that: a plain `xcodebuild test -only-testing:vista_comicTests` works fine on a freshly restarted machine — 101 seconds to the first test, 222 of them across 30 suites — so neither the UI test runner nor the toolchain is what cannot start. The damage is done by the kill. Only a machine restart has ever cleared it; verified **not** sufficient are `simctl shutdown all` with the device confirmed `Shutdown`, `killall CoreSimulatorService`, `simctl delete unavailable`, quitting Xcode, clearing DerivedData, and running a hand-edited `.xctestrun` with the UI target removed.
+   - So the rule is really about not needing the kill: never leave a test able to hang, and when one hangs anyway, spend the single kill and hand back rather than the evening. That cost three restarts to learn.
+6. Check at least one compact phone layout and one larger phone layout for UI changes.
+7. Verify relevant empty, loading, failure, and boundary states when the ticket requires them.
+8. Explain any verification that could not be completed because of environment limitations.
 
 ## Learning handoff
 
