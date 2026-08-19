@@ -17,6 +17,7 @@ import SwiftUI
 
 struct RootTabView: View {
     @Environment(\.comprehensionRepository) private var repository
+    @Environment(\.studyRepository) private var studyRepository
     @Environment(\.scenePhase) private var scenePhase
 
     /// The badge lives here, not in `HistoryView` (ticket 22). A tab's content
@@ -52,12 +53,22 @@ struct RootTabView: View {
         // Catches whatever finished while the app was dead. The watch cannot:
         // it only knows about records enqueued in this run.
         .task { await badge.refresh(using: repository) }
+        // Refreshes the deck snapshot the already-collected marker reads. Here
+        // rather than in the reader, because the reader must not pay for a
+        // network call every time a selection sheet opens — and the shell is on
+        // screen the whole time, which is the same reason the badge lives here.
+        //
+        // Best-effort and unobserved: `cards()` stores the snapshot as a side
+        // effect of succeeding, and a failure just leaves the previous one in
+        // place, which is exactly what it is for.
+        .task { _ = try? await studyRepository.cards() }
         // Explanations land while the app is elsewhere — that is the whole
         // point of enqueueing them — so coming back is when the count is most
         // likely to be stale.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await badge.refresh(using: repository) }
+                Task { _ = try? await studyRepository.cards() }
             }
         }
     }

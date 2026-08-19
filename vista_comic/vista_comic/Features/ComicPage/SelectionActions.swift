@@ -291,3 +291,31 @@ func collectSelection(
         return .notCollected
     }
 }
+
+/// Finds the card the reader already has for `sourceText`, if any.
+///
+/// Pure, and takes the cards rather than a repository, so the rule can be
+/// tested without a network seam anywhere near it. The caller supplies whatever
+/// it knows locally — `StudyRepository.knownCards()` in the app, a literal
+/// array in tests.
+///
+/// Matching is on the **normalised key plus the target language**, exactly the
+/// identity the backend enforces (see `TextNormalization.swift`). Anything
+/// looser would claim the reader knows a word they have not collected;
+/// anything stricter would miss the line breaks OCR puts in.
+///
+/// **A miss means "not known", never "not sure".** The snapshot may be absent,
+/// stale, or from before a word was added, and none of that is worth telling
+/// the reader about — the marker is a courtesy on top of the translation they
+/// already have.
+func alreadyCollected(
+    _ sourceText: String,
+    targetLanguage: String,
+    in cards: [LearningCard]
+) -> LearningCard? {
+    let key = normalizedKey(sourceText)
+    guard !key.isEmpty else { return nil }
+    return cards.first {
+        $0.targetLanguage == targetLanguage && normalizedKey($0.sourceText) == key
+    }
+}

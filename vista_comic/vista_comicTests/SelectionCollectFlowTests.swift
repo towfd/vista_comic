@@ -51,7 +51,15 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
         return try collectResult.get()
     }
 
-    func cards() async throws -> [LearningCard] { [] }
+    var cardsResult: [LearningCard] = []
+    private(set) var cardsCallCount = 0
+    func cards() async throws -> [LearningCard] {
+        cardsCallCount += 1
+        return cardsResult
+    }
+
+    var known: [LearningCard] = []
+    func knownCards() -> [LearningCard] { known }
 
     private(set) var recordLookupCallCount = 0
     func recordLookup(id: Int) async throws { recordLookupCallCount += 1 }

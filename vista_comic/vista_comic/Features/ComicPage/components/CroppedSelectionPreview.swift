@@ -118,7 +118,12 @@ struct CroppedSelectionPreview: View {
     private enum CollectionState: Equatable {
         case idle
         case collecting
+        /// Added by this reader, just now.
         case collected
+        /// Found in the deck when the translation arrived — they collected this
+        /// before and are looking it up again, which is the one thing this app
+        /// can know that Anki and Duolingo cannot.
+        case alreadyKnown
         case failed
     }
 
@@ -402,6 +407,20 @@ struct CroppedSelectionPreview: View {
                 .foregroundStyle(.grayFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("collectedMarker")
+        case .alreadyKnown:
+            // Worded differently from `collected` on purpose. One says "kept";
+            // this one says "you kept this before, and here you are again" —
+            // which is the whole reward this feature is built around, and it is
+            // only true in this case.
+            //
+            // The translation above stays in full. Being told you have seen a
+            // word before is not a reason to withhold what it means; the reader
+            // is looking it up precisely because they did not remember.
+            Label("You've learned this before", systemImage: "checkmark.circle.fill")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("alreadyLearnedMarker")
         case .failed:
             VStack(alignment: .leading, spacing: 8) {
                 Text("Couldn't add this to your vocabulary.")
@@ -611,6 +630,21 @@ struct CroppedSelectionPreview: View {
         translationState = await translateSelection(
             editedText, to: selectedLanguage, using: translator
         )
+        // Checked here rather than on appear because this is the first moment
+        // the text is settled: recognition runs automatically and the reader
+        // corrects it afterwards, so anything earlier would be matching against
+        // a line they had not finished fixing.
+        //
+        // A local read of the last good response — no network, so it answers
+        // just as well on a train, which is where most of this reading happens.
+        if case .loaded = translationState,
+           alreadyCollected(
+               editedText,
+               targetLanguage: selectedLanguageID,
+               in: studyRepository.knownCards()
+           ) != nil {
+            collectionState = .alreadyKnown
+        }
     }
 
     /// Asks the backend for the deeper explanation of the translation currently

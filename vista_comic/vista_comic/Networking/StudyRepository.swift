@@ -22,6 +22,10 @@ import SwiftUI
 /// - `collect(...)`      → `POST /cards`
 /// - `cards()`           → `GET /cards`
 /// - `recordLookup(id:)` → `POST /cards/{id}/lookups`
+///
+/// `knownCards()` is the odd one out and has no route: it answers from the last
+/// good response rather than the network, which is what lets the
+/// already-collected marker work on a train.
 protocol StudyRepository {
     /// Collects one line, returning the card.
     ///
@@ -44,6 +48,15 @@ protocol StudyRepository {
 
     /// Notes that the reader looked an already-collected word up again.
     func recordLookup(id: Int) async throws
+
+    /// What is known locally, from the last good `cards()` response.
+    ///
+    /// Neither `async` nor `throws`, and that is the point: this is a local
+    /// read on the path of an action the reader is waiting on, and it must be
+    /// able to answer instantly with no connection. Nothing here is worth
+    /// interrupting them for, so an absent or unreadable snapshot is simply an
+    /// empty deck — the marker is a courtesy, never a correctness requirement.
+    func knownCards() -> [LearningCard]
 }
 
 // MARK: - Environment injection
