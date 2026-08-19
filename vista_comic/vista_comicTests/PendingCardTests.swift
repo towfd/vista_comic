@@ -30,7 +30,8 @@ private final class ScriptedStudyRepository: StudyRepository, @unchecked Sendabl
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
+        pageNumber: Int,
+        kind: CardKind?
     ) async throws -> CollectOutcome {
         defer { collectCallCount += 1 }
         offeredSourceTexts.append(sourceText)
@@ -174,7 +175,8 @@ struct OfflineCollectTests {
 
     private func collect(
         _ repository: OfflineFallbackStudyRepository,
-        _ sourceText: String = "大丈夫ですか"
+        _ sourceText: String = "大丈夫ですか",
+        kind: CardKind = .word
     ) async throws -> CollectOutcome {
         try await repository.collect(
             sourceText: sourceText,
@@ -182,7 +184,8 @@ struct OfflineCollectTests {
             targetLanguage: "zh-Hant",
             comicID: "comic-1",
             chapterID: "chapter-1",
-            pageNumber: 1
+            pageNumber: 1,
+            kind: kind
         )
     }
 
@@ -230,7 +233,7 @@ struct OfflineCollectTests {
 
         _ = try await collect(repo)
 
-        #expect(isQueued("大丈夫ですか", targetLanguage: "zh-Hant", in: repo.queuedLines()))
+        #expect(queuedEntry(for: "大丈夫ですか", targetLanguage: "zh-Hant", in: repo.queuedLines()) != nil)
         // Still not a *card*: the server has issued no id, so nothing can be
         // reported against it.
         #expect(repo.knownCards().isEmpty)
@@ -343,4 +346,48 @@ struct PendingCardFlusherTests {
 private actor Sent {
     private(set) var texts: [String] = []
     func record(_ text: String) { texts.append(text) }
+}
+
+
+@Suite("A queued line remembers which button was pressed")
+struct QueuedKindTests {
+
+    @Test("The kind survives being queued", arguments: CardKind.allCases)
+    func theKindSurvivesBeingQueued(_ kind: CardKind) async throws {
+        let inner = ScriptedStudyRepository()
+        inner.collectResults = [.failure(offline)]
+        let repo = OfflineFallbackStudyRepository(
+            wrapping: inner, pending: InMemoryPendingCardStore()
+        )
+
+        _ = try await repo.collect(
+            sourceText: "大丈夫ですか",
+            translation: "你還好嗎",
+            targetLanguage: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 1,
+            kind: kind
+        )
+
+        let queued = queuedEntry(
+            for: "大丈夫ですか", targetLanguage: "zh-Hant", in: repo.queuedLines()
+        )
+        #expect(queued?.kind == kind)
+    }
+
+    @Test("A queue written before kinds existed still decodes")
+    func anOlderQueueStillDecodes() throws {
+        // The field is optional precisely so a queue file from a previous build
+        // does not take the reader's offline words down with it.
+        let older = Data("""
+        [{"sourceText":"大丈夫ですか","translation":"你還好嗎","targetLanguage":"zh-Hant",
+          "comicID":"c","chapterID":"ch","pageNumber":1,"queuedAt":0}]
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode([PendingCard].self, from: older)
+
+        #expect(decoded.count == 1)
+        #expect(decoded.first?.kind == nil)
+    }
 }

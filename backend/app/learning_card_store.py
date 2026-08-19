@@ -25,6 +25,13 @@ from .normalization import normalized_key
 # Where a new card starts on stage 3's interval ladder. Written now, read there.
 INITIAL_LADDER_STAGE = 0
 
+# What the reader can say a line is, by which of the two save buttons they
+# pressed. Anything else is refused rather than stored: an unrecognised kind
+# would reach stage 3 as a card no question type knows how to ask about.
+KIND_WORD = "word"
+KIND_SENTENCE = "sentence"
+CARD_KINDS = frozenset({KIND_WORD, KIND_SENTENCE})
+
 # The longest line that can become a card. A guard against a stray whole-page
 # selection, not a feature: real speech bubbles are far shorter, and a card the
 # reader cannot read at a glance is not reviewable anyway.
@@ -40,6 +47,7 @@ def create_or_get(
     comic_id: str,
     chapter_id: str,
     page_number: int,
+    kind: Optional[str] = None,
     today: Optional[date] = None,
 ) -> Tuple[LearningCard, bool]:
     """Collect ``source_text``; return the card and whether it was new.
@@ -48,6 +56,11 @@ def create_or_get(
     offline queue replays whatever it could not send, blindly and possibly more
     than once, and a replay must not be an error — so an existing card comes
     back with ``created=False`` and the endpoint answers 200 instead of 409.
+
+    **An existing card keeps its ``kind``**, even when this call carries a
+    different one. Collecting the same line under the other button is not a
+    correction — the system does not silently rewrite something the reader
+    already approved. Changing it is done in 單字庫.
 
     An archived card is **revived** rather than returned as-is. The unique
     constraint spans archived rows, so without this the reader could press add,
@@ -76,6 +89,7 @@ def create_or_get(
         chapter_id=chapter_id,
         page_number=page_number,
         comprehension_record_id=None,
+        kind=kind,
         ladder_stage=INITIAL_LADDER_STAGE,
         due_on=today or datetime.now(timezone.utc).date(),
         lookup_count=0,

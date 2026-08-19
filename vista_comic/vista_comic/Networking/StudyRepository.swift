@@ -29,6 +29,11 @@ import SwiftUI
 protocol StudyRepository {
     /// Collects one line.
     ///
+    /// `kind` is what the reader said this is, by which button they pressed.
+    /// **An existing card keeps the kind it already had** — re-collecting under
+    /// the other button is not a correction, and the system does not silently
+    /// rewrite something the reader already approved.
+    ///
     /// **Idempotent**: collecting a line already in the deck returns the
     /// existing card rather than failing, because the backend answers 200 for a
     /// duplicate. The offline queue depends on that — it replays blindly — and
@@ -40,7 +45,8 @@ protocol StudyRepository {
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
+        pageNumber: Int,
+        kind: CardKind?
     ) async throws -> CollectOutcome
 
     /// Every card the reader still has, newest first.

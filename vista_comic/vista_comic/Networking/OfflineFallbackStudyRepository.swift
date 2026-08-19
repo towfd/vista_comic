@@ -39,7 +39,8 @@ struct OfflineFallbackStudyRepository: StudyRepository {
                 targetLanguage: card.targetLanguage,
                 comicID: card.comicID,
                 chapterID: card.chapterID,
-                pageNumber: card.pageNumber
+                pageNumber: card.pageNumber,
+                kind: card.kind
             )
         }
     }
@@ -55,7 +56,8 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
+        pageNumber: Int,
+        kind: CardKind?
     ) async throws -> CollectOutcome {
         do {
             let outcome = try await inner.collect(
@@ -64,7 +66,8 @@ struct OfflineFallbackStudyRepository: StudyRepository {
                 targetLanguage: targetLanguage,
                 comicID: comicID,
                 chapterID: chapterID,
-                pageNumber: pageNumber
+                pageNumber: pageNumber,
+                kind: kind
             )
             // A success is the proof the network is back, which is the cheapest
             // flush trigger there is — the same trick
@@ -86,7 +89,8 @@ struct OfflineFallbackStudyRepository: StudyRepository {
                     targetLanguage: targetLanguage,
                     comicID: comicID,
                     chapterID: chapterID,
-                    pageNumber: pageNumber
+                    pageNumber: pageNumber,
+                    kind: kind
                 )
             )
             return .queued

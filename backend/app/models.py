@@ -11,7 +11,7 @@ separate from the response models so we only expose contract fields.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -212,6 +212,11 @@ class LearningCardCreate(BaseModel):
     comicId: str
     chapterId: str
     pageNumber: int = Field(ge=1)
+    # Which of the two save buttons the reader pressed. Optional so a client
+    # that predates the buttons still works, and constrained so an unrecognised
+    # value is refused here rather than reaching stage 3 as a card no question
+    # type knows what to do with.
+    kind: Optional[Literal["word", "sentence"]] = None
 
 
 class LearningCardResponse(BaseModel):
@@ -224,6 +229,10 @@ class LearningCardResponse(BaseModel):
 
     ``lookupCount`` counts only times the reader looked this word up *again*.
     Its absence means nothing -- see ``db.LearningCard``.
+
+    ``kind`` is ``None`` for cards collected before the reader could say, and
+    for those it stays ``None`` until they say so in 單字庫. It is never
+    guessed.
     """
 
     id: int
@@ -233,6 +242,7 @@ class LearningCardResponse(BaseModel):
     comicId: str
     chapterId: str
     pageNumber: int
+    kind: Optional[str] = None
     ladderStage: int
     dueOn: str  # ISO-8601 date
     lookupCount: int

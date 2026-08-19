@@ -56,9 +56,10 @@ struct APIStudyRepository: StudyRepository {
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
+        pageNumber: Int,
+        kind: CardKind?
     ) async throws -> CollectOutcome {
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "sourceText": sourceText,
             "translation": translation,
             "targetLanguage": targetLanguage,
@@ -66,6 +67,9 @@ struct APIStudyRepository: StudyRepository {
             "chapterId": chapterID,
             "pageNumber": pageNumber,
         ]
+        // Omitted rather than sent as null when unanswered, so the field is
+        // absent for a client that has nothing to say about it.
+        if let kind { payload["kind"] = kind.rawValue }
         let body = try JSONSerialization.data(withJSONObject: payload)
         // 200 and 201 are both success here: the backend answers 200 when the
         // line was already collected. `validate` accepts the whole 2xx range,

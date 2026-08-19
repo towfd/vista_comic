@@ -32,6 +32,7 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
     private(set) var lastComicID: String?
     private(set) var lastChapterID: String?
     private(set) var lastPageNumber: Int?
+    private(set) var lastKind: CardKind?
 
     func collect(
         sourceText: String,
@@ -39,7 +40,8 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
+        pageNumber: Int,
+        kind: CardKind?
     ) async throws -> CollectOutcome {
         collectCallCount += 1
         lastSourceText = sourceText
@@ -48,6 +50,7 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
         lastComicID = comicID
         lastChapterID = chapterID
         lastPageNumber = pageNumber
+        lastKind = kind
         return try collectResult.get()
     }
 
@@ -72,8 +75,10 @@ extension LearningCard {
         id: Int = 1,
         sourceText: String = "大丈夫ですか",
         translation: String = "你還好嗎",
-        lookupCount: Int = 0
+        lookupCount: Int = 0,
+        kind: String? = nil
     ) -> LearningCard {
+        let kindJSON = kind.map { "\"\($0)\"" } ?? "null"
         let json = """
         {
             "id": \(id),
@@ -83,6 +88,7 @@ extension LearningCard {
             "comicId": "comic-1",
             "chapterId": "chapter-1",
             "pageNumber": 3,
+            "kind": \(kindJSON),
             "ladderStage": 0,
             "dueOn": "2026-08-19",
             "lookupCount": \(lookupCount),
@@ -102,7 +108,8 @@ struct SelectionCollectFlowTests {
     private func collect(
         repository: StubStudyRepository,
         sourceText: String = "大丈夫ですか",
-        translation: String = "你還好嗎"
+        translation: String = "你還好嗎",
+        kind: CardKind = .word
     ) async -> CollectionOutcome {
         await collectSelection(
             sourceText: sourceText,
@@ -111,6 +118,7 @@ struct SelectionCollectFlowTests {
             comicID: "comic-1",
             chapterID: "chapter-1",
             pageNumber: 3,
+            kind: kind,
             repository: repository
         )
     }
@@ -218,5 +226,48 @@ struct LearningCardDecodingTests {
         // A scheduling day is not a moment; decoding it as a `Date` would
         // invent a timezone the backend never chose. Stage 3 reads this.
         #expect(LearningCard.stub().dueOn == "2026-08-19")
+    }
+}
+
+
+@Suite("Saying whether it is a word or a sentence")
+struct CardKindTests {
+
+    @Test("Which button was pressed reaches the backend", arguments: CardKind.allCases)
+    func theChosenKindReachesTheBackend(_ kind: CardKind) async {
+        let repository = StubStudyRepository()
+
+        _ = await collectSelection(
+            sourceText: "大丈夫ですか",
+            translation: "你還好嗎",
+            targetLanguageCode: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 3,
+            kind: kind,
+            repository: repository
+        )
+
+        #expect(repository.lastKind == kind)
+    }
+
+    @Test("A card decodes the kind it was stored with")
+    func aCardDecodesItsKind() {
+        #expect(LearningCard.stub(kind: "word").kind == .word)
+        #expect(LearningCard.stub(kind: "sentence").kind == .sentence)
+    }
+
+    @Test("A card with no kind decodes as unanswered rather than failing")
+    func anAbsentKindIsUnanswered() {
+        // Cards predate the buttons. Losing the whole deck over that, or
+        // inventing an answer for them, would both be worse than nil.
+        #expect(LearningCard.stub().kind == nil)
+    }
+
+    @Test("A kind this build has never heard of is unanswered, not a crash")
+    func anUnknownKindIsUnanswered() {
+        // The backend owns this vocabulary. Following `ComprehensionStatus`,
+        // one unrecognised row must not cost the reader their whole list.
+        #expect(LearningCard.stub(kind: "paragraph").kind == nil)
     }
 }

@@ -843,6 +843,7 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
         comicId=row.comic_id,
         chapterId=row.chapter_id,
         pageNumber=row.page_number,
+        kind=row.kind,
         ladderStage=row.ladder_stage,
         dueOn=row.due_on.isoformat(),
         lookupCount=row.lookup_count,
@@ -881,6 +882,7 @@ def create_card(body: LearningCardCreate, response: Response) -> LearningCardRes
             comic_id=body.comicId,
             chapter_id=body.chapterId,
             page_number=body.pageNumber,
+            kind=body.kind,
         )
     if not created:
         response.status_code = 200

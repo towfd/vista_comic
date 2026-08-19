@@ -266,6 +266,10 @@ enum CollectionOutcome: Equatable {
 /// when they pressed add, since that is the one they judged correct. Nothing
 /// upgrades it afterwards.
 ///
+/// `kind` is not optional here, unlike on the repository: this function is only
+/// ever called from a button, and each button *is* an answer. Nothing in the
+/// reader's flow collects a line without saying which of the two it is.
+///
 /// A free function, mirroring `requestExplanation`'s reasoning: unit-testable
 /// against a stub `StudyRepository` conformer independent of any SwiftUI
 /// rendering.
@@ -276,6 +280,7 @@ func collectSelection(
     comicID: String,
     chapterID: String,
     pageNumber: Int,
+    kind: CardKind,
     repository: any StudyRepository
 ) async -> CollectionOutcome {
     do {
@@ -285,7 +290,8 @@ func collectSelection(
             targetLanguage: targetLanguageCode,
             comicID: comicID,
             chapterID: chapterID,
-            pageNumber: pageNumber
+            pageNumber: pageNumber,
+            kind: kind
         ) {
         case .collected(let card): return .collected(card)
         case .queued: return .queued
@@ -326,21 +332,21 @@ func alreadyCollected(
     }
 }
 
-/// Whether this line is already waiting to be sent.
+/// The queued entry for this line, if one is waiting to be sent.
 ///
 /// Separate from `alreadyCollected` rather than folded into it, because the two
 /// answers are worth different things. A card the server has can be reported
 /// against and scheduled; a queued line can only be recognised, so the caller
 /// has to be able to tell them apart even though the reader sees the same
 /// reassurance either way.
-func isQueued(
-    _ sourceText: String,
+func queuedEntry(
+    for sourceText: String,
     targetLanguage: String,
     in pending: [PendingCard]
-) -> Bool {
+) -> PendingCard? {
     let key = normalizedKey(sourceText)
-    guard !key.isEmpty else { return false }
-    return pending.contains {
+    guard !key.isEmpty else { return nil }
+    return pending.first {
         $0.identity == CardIdentity(key: key, targetLanguage: targetLanguage)
     }
 }

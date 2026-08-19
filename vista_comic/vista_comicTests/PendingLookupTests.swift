@@ -45,7 +45,8 @@ private final class LookupSpyRepository: StudyRepository, @unchecked Sendable {
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
+        pageNumber: Int,
+        kind: CardKind?
     ) async throws -> CollectOutcome { .collected(.stub()) }
 
     func cards() async throws -> [LearningCard] { [] }

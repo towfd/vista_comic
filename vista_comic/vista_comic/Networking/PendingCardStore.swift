@@ -33,6 +33,9 @@ struct PendingCard: Hashable, Sendable, Codable {
     let comicID: String
     let chapterID: String
     let pageNumber: Int
+    /// What the reader said this is. Optional so a queue written before this
+    /// existed still decodes — its entries simply have nothing to say.
+    let kind: CardKind?
     /// When this line was queued. Orders the flush, and decides what goes first
     /// when the queue is full.
     var queuedAt: Date
@@ -44,6 +47,7 @@ struct PendingCard: Hashable, Sendable, Codable {
         comicID: String,
         chapterID: String,
         pageNumber: Int,
+        kind: CardKind? = nil,
         queuedAt: Date = Date()
     ) {
         self.sourceText = sourceText
@@ -52,6 +56,7 @@ struct PendingCard: Hashable, Sendable, Codable {
         self.comicID = comicID
         self.chapterID = chapterID
         self.pageNumber = pageNumber
+        self.kind = kind
         self.queuedAt = queuedAt
     }
 

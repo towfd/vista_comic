@@ -308,3 +308,54 @@ def test_a_lookup_does_not_touch_the_schedule(client):
 def test_a_lookup_for_a_card_that_is_gone_is_a_404(client):
     """The app drops a 4xx from its queue rather than retrying it forever."""
     assert client.post("/cards/999999/lookups").status_code == 404
+
+
+# --- word or sentence, said by the reader (ticket 06) -----------------------
+
+
+def test_a_card_records_which_button_was_pressed(client):
+    word = _add(client, sourceText="ひとつ", kind="word").json()
+    sentence = _add(client, sourceText="ふたつ", kind="sentence").json()
+
+    assert word["kind"] == "word"
+    assert sentence["kind"] == "sentence"
+
+
+def test_a_card_collected_without_a_kind_has_none(client):
+    """Never guessed. A client that does not say leaves it unanswered."""
+    assert _add(client).json()["kind"] is None
+
+
+def test_an_unrecognised_kind_is_refused(client):
+    """It would reach stage 3 as a card no question type knows how to ask
+    about, which is worse than refusing it here."""
+    resp = _add(client, sourceText="みっつ", kind="paragraph")
+
+    assert resp.status_code == 422
+    assert client.get("/cards").json() == []
+
+
+def test_collecting_under_the_other_button_leaves_the_kind_alone(client):
+    """Re-collecting is not a correction.
+
+    The system does not silently rewrite something the reader already approved
+    — the same rule the stored translation follows. 單字庫 is where a mis-tap
+    gets fixed.
+    """
+    first = _add(client, kind="word").json()
+
+    again = _add(client, kind="sentence")
+
+    assert again.status_code == 200
+    assert again.json()["id"] == first["id"]
+    assert again.json()["kind"] == "word"
+    assert len(client.get("/cards").json()) == 1
+
+
+def test_kind_is_not_part_of_a_cards_identity(client):
+    """Otherwise the library would hold two visually identical rows, and the
+    lookup count that stages 3 and 4 read would be split across them."""
+    _add(client, kind="word")
+    _add(client, kind="sentence")
+
+    assert len(client.get("/cards").json()) == 1

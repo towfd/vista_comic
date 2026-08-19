@@ -127,8 +127,11 @@ struct CroppedSelectionPreview: View {
     private enum CollectionState: Equatable {
         case idle
         case collecting
-        /// Added by this reader, just now.
-        case collected
+        /// Added by this reader, just now, as the kind they chose. Carried so
+        /// the confirmation can name it: a mis-tap between two adjacent buttons
+        /// should be visible now, not weeks later when stage 3 asks the wrong
+        /// kind of question about it.
+        case collected(CardKind?)
         /// Found in the deck when the translation arrived — they collected this
         /// before and are looking it up again, which is the one thing this app
         /// can know that Anki and Duolingo cannot.
@@ -401,7 +404,7 @@ struct CroppedSelectionPreview: View {
     private var collectContent: some View {
         switch collectionState {
         case .idle:
-            collectButton
+            collectButtons
         case .collecting:
             HStack(spacing: 8) {
                 ProgressView()
@@ -410,8 +413,8 @@ struct CroppedSelectionPreview: View {
                     .foregroundStyle(.grayFont)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        case .collected:
-            Label("In your vocabulary", systemImage: "checkmark.circle.fill")
+        case .collected(let kind):
+            Label(collectedLabel(for: kind), systemImage: "checkmark.circle.fill")
                 .font(AppFont.caption)
                 .foregroundStyle(.grayFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,23 +438,59 @@ struct CroppedSelectionPreview: View {
                 Text("Couldn't add this to your vocabulary.")
                     .font(AppFont.caption)
                     .foregroundStyle(.grayFont)
-                // Still the same button, not a separate "retry": nothing was
+                // Still the same buttons, not a separate "retry": nothing was
                 // spent and nothing is half-done, so trying again is simply
-                // doing it again.
-                collectButton
+                // doing it again — and the reader picks the kind again too,
+                // rather than the screen acting on a choice that never took.
+                collectButtons
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var collectButton: some View {
-        Button("Add to vocabulary") {
-            Task { await collect() }
+    /// The two offers, side by side where the width allows.
+    ///
+    /// Two buttons rather than one button plus a type picker, because the
+    /// choice **is** the action: the reader knows which it is at the moment
+    /// they decide to keep it, and asking them to set a type first would put a
+    /// decision in front of the thing they came to do.
+    ///
+    /// `ViewThatFits` for the same reason `explanationPrompt` uses it — two
+    /// buttons overflow a compact phone, and a truncated label is worse than a
+    /// second row.
+    private var collectButtons: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                collectButton(.word)
+                collectButton(.sentence)
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                collectButton(.word)
+                collectButton(.sentence)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func collectButton(_ kind: CardKind) -> some View {
+        Button(kind == .word ? "Add as word" : "Add as sentence") {
+            Task { await collect(as: kind) }
         }
         .buttonStyle(.bordered)
         .disabled(!canTranslate)
-        .accessibilityIdentifier("addToVocabulary")
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier(kind == .word ? "addWord" : "addSentence")
+    }
+
+    /// Names what was kept, or stays vague when there is nothing to name — a
+    /// card collected before the two buttons existed has no answer, and
+    /// inventing one here would undo the point of asking.
+    private func collectedLabel(for kind: CardKind?) -> LocalizedStringKey {
+        switch kind {
+        case .word: "Added as a word"
+        case .sentence: "Added as a sentence"
+        case nil: "In your vocabulary"
+        }
     }
 
     /// Keeps the line the reader confirmed, with the translation they are
@@ -461,7 +500,7 @@ struct CroppedSelectionPreview: View {
     /// it, so the card stores exactly the wording on screen: the on-device one
     /// if they added straight after translating, the cloud's if they asked for
     /// an explanation and waited for it.
-    private func collect() async {
+    private func collect(as kind: CardKind) async {
         guard case .loaded(let translation) = translationState else { return }
 
         collectionState = .collecting
@@ -472,6 +511,7 @@ struct CroppedSelectionPreview: View {
             comicID: comicID,
             chapterID: chapterID,
             pageNumber: pageNumber,
+            kind: kind,
             repository: studyRepository
         )
         switch outcome {
@@ -479,7 +519,7 @@ struct CroppedSelectionPreview: View {
         // will be delivered; saying anything else would ask them to worry about
         // a connection on their behalf.
         case .collected, .queued:
-            collectionState = .collected
+            collectionState = .collected(kind)
         case .notCollected:
             collectionState = .failed
         }
@@ -672,15 +712,15 @@ struct CroppedSelectionPreview: View {
             ) {
                 collectionState = .alreadyKnown
                 await reportLookupIfNew(of: known)
-            } else if isQueued(
-                editedText,
+            } else if let queued = queuedEntry(
+                for: editedText,
                 targetLanguage: selectedLanguageID,
                 in: studyRepository.queuedLines()
             ) {
                 // Collected on this device but not yet delivered — so it is
                 // kept, but the reader has not "learned it before" in any sense
                 // worth claiming: they picked it minutes ago, offline.
-                collectionState = .collected
+                collectionState = .collected(queued.kind)
             }
         }
     }

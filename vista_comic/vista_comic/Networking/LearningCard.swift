@@ -20,6 +20,27 @@
 
 import Foundation
 
+/// What the reader said a framed line is, by which save button they pressed.
+///
+/// **Never inferred.** Which of the two a line is takes a tokeniser and some
+/// syntax to guess at — badly, for Japanese especially — and the reader knows
+/// instantly. One tap replaces all of it, and the answer decides which
+/// questions stage 3 asks and whether stage 4 writes a practice sentence *for*
+/// the card or treats the card as one.
+///
+/// `Codable`, unlike the display models around it, because it is also written
+/// to disk: the offline queue persists what the reader chose so a relaunch does
+/// not lose the answer along with the word.
+enum CardKind: String, Codable, Hashable, Sendable, CaseIterable {
+    /// A word or set phrase. Stage 4 generates a sentence containing it, and
+    /// it is what the blank replaces.
+    case word
+    /// A whole line. Already real language, so nothing is generated for it —
+    /// it *is* the practice sentence, and the blank comes from a deck word
+    /// inside it.
+    case sentence
+}
+
 /// One collected line: what the reader framed, what it meant, and where it was
 /// met.
 ///
@@ -44,6 +65,14 @@ struct LearningCard: Decodable, Identifiable, Hashable {
     let comicID: String
     let chapterID: String
     let pageNumber: Int
+    /// Which of the two the reader said this is, or `nil` for a card collected
+    /// before they could say.
+    ///
+    /// Decoded leniently: a value this build has never heard of becomes `nil`
+    /// rather than failing the whole list, following `ComprehensionStatus`'s
+    /// precedent. The backend owns this vocabulary, and losing the entire deck
+    /// over one unrecognised row would be a poor trade.
+    let kind: CardKind?
     /// Where the card sits on stage 3's interval ladder. Carried from the first
     /// release even though nothing reads it yet: the deck snapshot caches this
     /// response wholesale, and a field added later would be missing from every
@@ -68,6 +97,26 @@ struct LearningCard: Decodable, Identifiable, Hashable {
         case id, sourceText, translation, targetLanguage
         case comicID = "comicId"
         case chapterID = "chapterId"
-        case pageNumber, ladderStage, dueOn, lookupCount, lastLookedUpAt, createdAt
+        case pageNumber, kind, ladderStage, dueOn, lookupCount, lastLookedUpAt, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        sourceText = try container.decode(String.self, forKey: .sourceText)
+        translation = try container.decode(String.self, forKey: .translation)
+        targetLanguage = try container.decode(String.self, forKey: .targetLanguage)
+        comicID = try container.decode(String.self, forKey: .comicID)
+        chapterID = try container.decode(String.self, forKey: .chapterID)
+        pageNumber = try container.decode(Int.self, forKey: .pageNumber)
+        // The lenient step: absent, null, or unrecognised all mean "unanswered".
+        kind = (try? container.decodeIfPresent(String.self, forKey: .kind))
+            .flatMap { $0 }
+            .flatMap(CardKind.init(rawValue:))
+        ladderStage = try container.decode(Int.self, forKey: .ladderStage)
+        dueOn = try container.decode(String.self, forKey: .dueOn)
+        lookupCount = try container.decode(Int.self, forKey: .lookupCount)
+        lastLookedUpAt = try container.decodeIfPresent(Date.self, forKey: .lastLookedUpAt)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 }
