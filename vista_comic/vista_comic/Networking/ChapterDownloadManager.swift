@@ -237,6 +237,35 @@ final class ChapterDownloadManager {
         current?.task.cancel()
     }
 
+    /// Removes a chapter from the device, freeing its slot immediately
+    /// (ticket 05).
+    ///
+    /// This is what makes the cap's first-in-first-out tolerable: without it,
+    /// the reader's only influence over what is kept is the order they
+    /// downloaded things in. With it, eviction is a default they can override —
+    /// they free the slot they want freed rather than the one the clock chose.
+    ///
+    /// A download still running is **cancelled** rather than deleted underneath
+    /// itself, which discards the partial chapter by the path that already knows
+    /// how to stop the work first.
+    func delete(_ chapterID: DownloadedChapterID) {
+        guard active[chapterID] == nil else {
+            cancel(chapterID)
+            return
+        }
+        try? store.delete(chapterID)
+        completed.remove(chapterID)
+        usedSlots = store.downloadedChapters().count
+    }
+
+    /// Clears the device. The confirmation belongs to the screen; by the time
+    /// this is called the reader has already said yes to something irreversible.
+    func deleteEverything() {
+        for record in store.downloadedChapters() {
+            delete(record.id)
+        }
+    }
+
     /// Backgrounding stops the current chapter without giving up its slot or its
     /// pages; it goes back to the head of the queue and resumes on return.
     ///

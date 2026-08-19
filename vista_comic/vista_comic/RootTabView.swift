@@ -34,6 +34,14 @@ struct RootTabView: View {
                     Label("Library", systemImage: "books.vertical")
                 }
 
+            // 已下載 sits between them because it is the offline entry point
+            // (`offline-download` ticket 05): when 書庫 cannot be reached, this
+            // is the tab that is guaranteed to be about things that work.
+            DownloadsView()
+                .tabItem {
+                    Label("Downloads", systemImage: "arrow.down.circle")
+                }
+
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
