@@ -17,7 +17,16 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator, Optional
 
-from sqlalchemy import Boolean, Date, Engine, Integer, String, create_engine
+from sqlalchemy import (
+    Boolean,
+    Date,
+    Engine,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -108,6 +117,81 @@ class ComprehensionRecord(Base):
     usage_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
+    )
+
+
+class LearningCard(Base):
+    """One line the reader collected on purpose, to be reviewed later.
+
+    Not a revival of ``saved_translation``. That table stored whatever the app
+    decided to keep; a row here exists only because the reader pressed add,
+    having read the source text and the translation and judged them right.
+    **That press is the quality gate** — the source text is trustworthy because
+    they corrected the OCR before anything else happened, the translation is
+    not, and a deck built automatically would use spaced repetition to reinforce
+    the model's mistakes. See ``.scratch/vocabulary-review/prd.md``.
+
+    ``normalized_key`` is derived from ``source_text`` by ``normalization``
+    and, with ``target_language``, is the card's identity. **The comic is
+    deliberately not part of it**: the same word met in another work is the same
+    word, and splitting it would fragment the ``lookup_count`` that later stages
+    read as a forgetting signal.
+
+    ``translation`` is whatever the reader was looking at when they pressed add
+    -- on-device if they added straight after translating, Claude's if they
+    waited for an explanation first. Nothing upgrades it afterwards: the stored
+    wording is the one they actually read and approved.
+
+    ``comic_id``/``chapter_id``/``page_number`` record the *first* encounter and
+    are what the app's jump-to-source needs. No crop rectangle and no image, for
+    the reason ``ComprehensionRecord`` gives: the page is re-derivable from the
+    ids, and the reader's own framing is not worth a column.
+
+    ``ladder_stage`` and ``due_on`` are written here and given meaning in stage
+    3, where scheduling exists. Nothing in stage 1 reads them; they are present
+    now so the reviewing stages inherit a populated column instead of a
+    backfill.
+
+    ``lookup_count`` counts only the positive evidence -- the reader selecting a
+    line they had already collected, which proves they had forgotten it.
+    **Never the negative**: not looking a word up again is not evidence of
+    knowing it, since the reader may simply not have reached that page.
+    """
+
+    __tablename__ = "learning_card"
+    __table_args__ = (
+        UniqueConstraint(
+            "normalized_key", "target_language", name="uq_learning_card_identity"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_text: Mapped[str] = mapped_column(String, nullable=False)
+    normalized_key: Mapped[str] = mapped_column(String, nullable=False)
+    translation: Mapped[str] = mapped_column(String, nullable=False)
+    target_language: Mapped[str] = mapped_column(String, nullable=False)
+    comic_id: Mapped[str] = mapped_column(String, nullable=False)
+    chapter_id: Mapped[str] = mapped_column(String, nullable=False)
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Always NULL in stage 1. Set from stage 4, when a card can be picked out of
+    # an explanation's breakdown. ``SET NULL`` rather than cascade: deleting a
+    # history row must never delete something the reader deliberately kept.
+    comprehension_record_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("comprehension_record.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    ladder_stage: Mapped[int] = mapped_column(Integer, nullable=False)
+    due_on: Mapped[date] = mapped_column(Date, nullable=False)
+    lookup_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_looked_up_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    archived_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 

@@ -53,6 +53,8 @@ struct CroppedSelectionPreview: View {
     /// Same reasoning as `recognizer`/`translator` above, for the opt-in
     /// explanation request whose record the backend produces afterwards.
     let comprehensionRepository: any ComprehensionRepository
+    /// Same reasoning again, for the opt-in "加入單字庫" action.
+    let studyRepository: any StudyRepository
 
     @Environment(\.dismiss) private var dismiss
     /// The tab shell's unread count, handed this screen's record on the way out
@@ -63,8 +65,13 @@ struct CroppedSelectionPreview: View {
     /// for the explanation the reader is in the middle of reading.
     @Environment(\.unreadExplanationBadge) private var badge
     @State private var recognitionState: LoadState<String> = .loading
-    /// User-editable text, seeded from a successful recognition. Purely for
-    /// on-screen display/correction — never written anywhere.
+    /// User-editable text, seeded from a successful recognition, and the only
+    /// text in this flow the reader has actually confirmed.
+    ///
+    /// It used to be display-only. It is now what a collected card stores, so
+    /// correcting the OCR is no longer just tidying the screen: it is the step
+    /// that makes the source side of a card trustworthy, which is the premise
+    /// the whole of 單字庫 rests on (see `.scratch/vocabulary-review/prd.md`).
     @State private var editedText = ""
     /// On-device translation state, deliberately separate from
     /// `recognitionState`: recognition runs automatically on appear, this runs
@@ -97,6 +104,23 @@ struct CroppedSelectionPreview: View {
     /// would see the same id and not re-run, and the retried record would sit
     /// unwatched.
     @State private var pollGeneration = 0
+    /// Where the "加入單字庫" action has got to for the translation currently on
+    /// screen. Reset by `translate()`, because a re-translate means either the
+    /// text or the target language changed, and neither of those is the card
+    /// that was collected a moment ago.
+    @State private var collectionState: CollectionState = .idle
+
+    /// The add button's three states, plus the one the reader can act on.
+    ///
+    /// `collected` offers no removal: stage 1 ships without a management
+    /// screen, by decision, so this is deliberately a dead end rather than a
+    /// half-built toggle.
+    private enum CollectionState: Equatable {
+        case idle
+        case collecting
+        case collected
+        case failed
+    }
 
     var body: some View {
         NavigationStack {
@@ -339,11 +363,94 @@ struct CroppedSelectionPreview: View {
 
                     Divider()
 
+                    collectContent
+
+                    Divider()
+
                     explanationContent
                 }
             case .failed(let error):
                 translationFailureContent(for: error)
             }
+        }
+    }
+
+    // MARK: - Collecting into 單字庫
+
+    /// The "加入單字庫" offer, and what it becomes once taken.
+    ///
+    /// Sits above the explanation section rather than beside it because the two
+    /// cost different things and should not read as alternatives: collecting is
+    /// free, instant and the reader's own judgement; the explanation spends one
+    /// of today's requests and takes minutes.
+    @ViewBuilder
+    private var collectContent: some View {
+        switch collectionState {
+        case .idle:
+            collectButton
+        case .collecting:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Adding…")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .collected:
+            Label("In your vocabulary", systemImage: "checkmark.circle.fill")
+                .font(AppFont.caption)
+                .foregroundStyle(.grayFont)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("collectedMarker")
+        case .failed:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Couldn't add this to your vocabulary.")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+                // Still the same button, not a separate "retry": nothing was
+                // spent and nothing is half-done, so trying again is simply
+                // doing it again.
+                collectButton
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var collectButton: some View {
+        Button("Add to vocabulary") {
+            Task { await collect() }
+        }
+        .buttonStyle(.bordered)
+        .disabled(!canTranslate)
+        .accessibilityIdentifier("addToVocabulary")
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Keeps the line the reader confirmed, with the translation they are
+    /// looking at right now.
+    ///
+    /// `displayedTranslation` is read the same way the translation column reads
+    /// it, so the card stores exactly the wording on screen: the on-device one
+    /// if they added straight after translating, the cloud's if they asked for
+    /// an explanation and waited for it.
+    private func collect() async {
+        guard case .loaded(let translation) = translationState else { return }
+
+        collectionState = .collecting
+        let outcome = await collectSelection(
+            sourceText: editedText,
+            translation: record?.displayedTranslation ?? translation,
+            targetLanguageCode: selectedLanguageID,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber,
+            repository: studyRepository
+        )
+        switch outcome {
+        case .collected:
+            collectionState = .collected
+        case .notCollected:
+            collectionState = .failed
         }
     }
 
@@ -498,6 +605,9 @@ struct CroppedSelectionPreview: View {
         // it, and the badge still reports it if it was unfinished.
         explanationOutcome = nil
         record = nil
+        // The card that was collected belonged to the previous text/language
+        // pair, so the offer starts over rather than claiming this one is kept.
+        collectionState = .idle
         translationState = await translateSelection(
             editedText, to: selectedLanguage, using: translator
         )

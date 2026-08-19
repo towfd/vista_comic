@@ -73,19 +73,24 @@ def test_the_migrated_schema_matches_the_models(migration_engine):
     assert pending == [], f"models and migrations disagree: {pending}"
 
 
-def test_the_baseline_creates_every_table_the_app_uses(migration_engine):
+def test_migrating_creates_every_table_the_app_uses(migration_engine):
     db.upgrade_schema(_url_of(migration_engine))
 
     tables = set(inspect(migration_engine).get_table_names())
 
-    assert {"progress", "comprehension_record", "comprehend_usage"} <= tables
+    assert {
+        "progress",
+        "comprehension_record",
+        "comprehend_usage",
+        "learning_card",
+    } <= tables
     # Alembic's own bookkeeping, which is what makes a stamped database
     # distinguishable from an unmanaged one.
     assert "alembic_version" in tables
 
 
-def test_the_baseline_is_reversible(migration_engine):
-    """The first migration is not a one-way door.
+def test_the_migrations_are_reversible(migration_engine):
+    """The migrations are not a one-way door.
 
     Not because rolling back production is the plan — there is one environment
     and no runbook for that (see the spec's Out of Scope) — but because a
@@ -107,6 +112,7 @@ def test_the_baseline_is_reversible(migration_engine):
     assert "progress" not in tables
     assert "comprehension_record" not in tables
     assert "comprehend_usage" not in tables
+    assert "learning_card" not in tables
 
 
 # --- what the app does when migrating fails ---------------------------------

@@ -151,11 +151,36 @@ def comprehension_db(_progress_engine):
     Both, because the daily cap is *reserved* when a record is enqueued: a
     leftover count from a previous test would make cap assertions depend on
     execution order.
+
+    ``learning_card`` joins them in a single statement, and has to: it carries a
+    nullable foreign key to ``comprehension_record``, and Postgres refuses to
+    truncate a referenced table on its own. Naming both in one ``TRUNCATE`` is
+    preferred to ``CASCADE``, which would silently reach any table added later.
     """
     with _progress_engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE comprehension_record"))
+        conn.execute(text("TRUNCATE TABLE learning_card, comprehension_record"))
         conn.execute(text("TRUNCATE TABLE comprehend_usage"))
     return _progress_engine
+
+
+@pytest.fixture
+def learning_card_db(_progress_engine):
+    """Truncate the ``learning_card`` table before each test that uses it."""
+    with _progress_engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE learning_card"))
+    return _progress_engine
+
+
+@pytest.fixture
+def learning_card_session(learning_card_db):
+    """A standalone session against the truncated ``learning_card`` table."""
+    from app import db
+
+    session = db.new_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 @pytest.fixture

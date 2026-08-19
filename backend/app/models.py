@@ -192,6 +192,54 @@ class ComprehensionRecordResponse(BaseModel):
     createdAt: str  # ISO-8601 UTC
 
 
+class LearningCardCreate(BaseModel):
+    """Request body for ``POST /cards``.
+
+    ``translation`` is whatever the reader was looking at when they pressed add
+    -- the on-device wording if they added straight after translating, Claude's
+    if they waited for an explanation first. The server does not judge which:
+    the stored translation is the one the reader read and approved, and that
+    approval is the whole quality gate.
+
+    ``sourceText`` is capped rather than unbounded so a stray whole-page
+    selection cannot become a card. Text that normalises to nothing is refused
+    by the route, which the length cap alone cannot catch.
+    """
+
+    sourceText: str = Field(min_length=1, max_length=200)
+    translation: str
+    targetLanguage: str
+    comicId: str
+    chapterId: str
+    pageNumber: int = Field(ge=1)
+
+
+class LearningCardResponse(BaseModel):
+    """One collected card, as returned by every ``/cards`` route.
+
+    ``ladderStage`` and ``dueOn`` are carried from the first release even though
+    nothing reads them until stage 3: the app caches this response wholesale as
+    its deck snapshot, and a field added later would mean every cached snapshot
+    predating it is missing one.
+
+    ``lookupCount`` counts only times the reader looked this word up *again*.
+    Its absence means nothing -- see ``db.LearningCard``.
+    """
+
+    id: int
+    sourceText: str
+    translation: str
+    targetLanguage: str
+    comicId: str
+    chapterId: str
+    pageNumber: int
+    ladderStage: int
+    dueOn: str  # ISO-8601 date
+    lookupCount: int
+    lastLookedUpAt: Optional[str] = None  # ISO-8601 UTC
+    createdAt: str  # ISO-8601 UTC
+
+
 class ComprehensionRecordReadUpdate(BaseModel):
     """Request body for ``PATCH /comprehensions/{id}``.
 

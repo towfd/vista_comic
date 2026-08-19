@@ -21,6 +21,23 @@
         }
       }
     },
+    "%lld/%lld downloaded" : {
+      "comment" : "Chapter list: downloads in use against the cap",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載 %lld/%lld"
+          }
+        }
+      }
+    },
+    "Add to vocabulary" : {
+
+    },
+    "Adding…" : {
+
+    },
     "Back" : {
       "comment" : "Reader: back button",
       "localizations" : {
@@ -37,6 +54,17 @@
     },
     "Cancel" : {
 
+    },
+    "Cancel download" : {
+      "comment" : "Chapter row: cancel the download in progress",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消下載"
+          }
+        }
+      }
     },
     "Chapter list" : {
       "comment" : "Reader: open the chapter list",
@@ -56,6 +84,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "章節（%lld）"
+          }
+        }
+      }
+    },
+    "Chapters you download appear here, ready to read with no connection." : {
+      "comment" : "已下載: empty state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載的章節會出現在這裡，沒有網路也能閱讀。"
           }
         }
       }
@@ -102,6 +141,9 @@
         }
       }
     },
+    "Couldn't add this to your vocabulary." : {
+
+    },
     "Couldn't ask for this explanation again" : {
 
     },
@@ -139,6 +181,28 @@
     "Delete" : {
 
     },
+    "Delete all" : {
+      "comment" : "已下載: clear every download",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部刪除"
+          }
+        }
+      }
+    },
+    "Delete everything downloaded?" : {
+      "comment" : "已下載: confirmation title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除全部已下載的章節？"
+          }
+        }
+      }
+    },
     "Delete this record?" : {
 
     },
@@ -147,6 +211,72 @@
     },
     "Done" : {
 
+    },
+    "Download (%lld)" : {
+      "comment" : "Chapter list: download the selected chapters",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載 (%lld)"
+          }
+        }
+      }
+    },
+    "Download chapter" : {
+      "comment" : "Chapter row: start downloading this chapter for offline reading",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載章節"
+          }
+        }
+      }
+    },
+    "Downloaded" : {
+      "comment" : "Chapter row: this chapter is on the device",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載"
+          }
+        }
+      }
+    },
+    "Downloading" : {
+      "comment" : "已下載 row: started, page count not known yet",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載中"
+          }
+        }
+      }
+    },
+    "Downloading %lld/%lld" : {
+      "comment" : "已下載 row: pages fetched so far",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載中 %lld/%lld"
+          }
+        }
+      }
+    },
+    "Downloads" : {
+      "comment" : "Tab: downloaded chapters",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載"
+          }
+        }
+      }
     },
     "Drag here and release to cancel selection" : {
 
@@ -169,6 +299,20 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "歷史紀錄"
+          }
+        }
+      }
+    },
+    "In your vocabulary" : {
+
+    },
+    "Incomplete" : {
+      "comment" : "已下載 row: a download that did not finish",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完成"
           }
         }
       }
@@ -227,6 +371,17 @@
     "No text was found in the selected region. Try selecting a tighter area around the text." : {
 
     },
+    "Not downloaded" : {
+      "comment" : "Reader: the chapter is not on the device and there is no connection",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載"
+          }
+        }
+      }
+    },
     "not started yet" : {
       "comment" : "Library card: comic never opened",
       "localizations" : {
@@ -234,6 +389,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未開始"
+          }
+        }
+      }
+    },
+    "Nothing downloaded yet" : {
+      "comment" : "已下載: empty state title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載任何章節"
           }
         }
       }
@@ -306,6 +472,28 @@
         }
       }
     },
+    "Retry download" : {
+      "comment" : "Chapter row: a download that did not finish",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重試下載"
+          }
+        }
+      }
+    },
+    "Select" : {
+      "comment" : "Chapter list: enter selection mode for batch download",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取"
+          }
+        }
+      }
+    },
     "Select text" : {
 
     },
@@ -341,8 +529,30 @@
     "This can't be undone." : {
 
     },
+    "This chapter isn't on your device. Reconnect to read it, or download it while you're online." : {
+      "comment" : "Reader: what to do about a chapter that is not available offline",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這一章不在你的裝置上。重新連線後即可閱讀，或趁有網路時先下載。"
+          }
+        }
+      }
+    },
     "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
 
+    },
+    "This removes every downloaded chapter from this device. It can't be undone." : {
+      "comment" : "已下載: confirmation body",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會移除裝置上所有已下載的章節，且無法復原。"
+          }
+        }
+      }
     },
     "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄." : {
 
@@ -355,6 +565,17 @@
     },
     "Tone & register" : {
 
+    },
+    "Too many chapters" : {
+      "comment" : "Chapter list: the selection is larger than the device can hold",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取的章節太多"
+          }
+        }
+      }
     },
     "Traditional Chinese" : {
 
@@ -393,215 +614,6 @@
     },
     "Vocabulary & grammar" : {
 
-    },
-    "Download chapter" : {
-      "comment" : "Chapter row: start downloading this chapter for offline reading",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下載章節"
-          }
-        }
-      }
-    },
-    "Cancel download" : {
-      "comment" : "Chapter row: cancel the download in progress",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消下載"
-          }
-        }
-      }
-    },
-    "Downloaded" : {
-      "comment" : "Chapter row: this chapter is on the device",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已下載"
-          }
-        }
-      }
-    },
-    "Retry download" : {
-      "comment" : "Chapter row: a download that did not finish",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重試下載"
-          }
-        }
-      }
-    },
-    "Not downloaded" : {
-      "comment" : "Reader: the chapter is not on the device and there is no connection",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未下載"
-          }
-        }
-      }
-    },
-    "This chapter isn't on your device. Reconnect to read it, or download it while you're online." : {
-      "comment" : "Reader: what to do about a chapter that is not available offline",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這一章不在你的裝置上。重新連線後即可閱讀，或趁有網路時先下載。"
-          }
-        }
-      }
-    },
-    "%lld/%lld downloaded" : {
-      "comment" : "Chapter list: downloads in use against the cap",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已下載 %lld/%lld"
-          }
-        }
-      }
-    },
-    "Downloads" : {
-      "comment" : "Tab: downloaded chapters",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已下載"
-          }
-        }
-      }
-    },
-    "Nothing downloaded yet" : {
-      "comment" : "已下載: empty state title",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未下載任何章節"
-          }
-        }
-      }
-    },
-    "Chapters you download appear here, ready to read with no connection." : {
-      "comment" : "已下載: empty state",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下載的章節會出現在這裡，沒有網路也能閱讀。"
-          }
-        }
-      }
-    },
-    "Delete all" : {
-      "comment" : "已下載: clear every download",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全部刪除"
-          }
-        }
-      }
-    },
-    "Delete everything downloaded?" : {
-      "comment" : "已下載: confirmation title",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刪除全部已下載的章節？"
-          }
-        }
-      }
-    },
-    "This removes every downloaded chapter from this device. It can't be undone." : {
-      "comment" : "已下載: confirmation body",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這會移除裝置上所有已下載的章節，且無法復原。"
-          }
-        }
-      }
-    },
-    "Downloading %lld/%lld" : {
-      "comment" : "已下載 row: pages fetched so far",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下載中 %lld/%lld"
-          }
-        }
-      }
-    },
-    "Downloading" : {
-      "comment" : "已下載 row: started, page count not known yet",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下載中"
-          }
-        }
-      }
-    },
-    "Incomplete" : {
-      "comment" : "已下載 row: a download that did not finish",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未完成"
-          }
-        }
-      }
-    },
-    "Select" : {
-      "comment" : "Chapter list: enter selection mode for batch download",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選取"
-          }
-        }
-      }
-    },
-    "Download (%lld)" : {
-      "comment" : "Chapter list: download the selected chapters",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下載 (%lld)"
-          }
-        }
-      }
-    },
-    "Too many chapters" : {
-      "comment" : "Chapter list: the selection is larger than the device can hold",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選取的章節太多"
-          }
-        }
-      }
     },
     "You can download up to %lld chapters at once." : {
       "comment" : "Chapter list: the batch limit, explained",
