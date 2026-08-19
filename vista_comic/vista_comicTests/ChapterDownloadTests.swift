@@ -169,8 +169,8 @@ struct ChapterDownloadTests {
     }
 
     /// What the chapter list holds: a page count, and no pages.
-    private func summary(pageCount: Int) -> Chapter {
-        Chapter(id: "chapter-1", number: 1, title: "One", pageCount: pageCount)
+    private func summary(id: String = "chapter-1", number: Int = 1, pageCount: Int) -> Chapter {
+        Chapter(id: id, number: number, title: "Chapter \(number)", pageCount: pageCount)
     }
 
     private var chapterID: DownloadedChapterID {
@@ -494,6 +494,130 @@ struct ChapterDownloadTests {
         await manager.waitUntilIdle()
 
         #expect(manager.usedSlots == 0)
+    }
+
+    // MARK: - Downloading several at once
+
+    @Test func aBatchQueuesEveryChapterAndFinishesThemOneAfterAnother() async throws {
+        let (store, root) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+        let manager = makeManager(store: store, pages: pages)
+
+        let selected = (1...3).map { summary(id: "chapter-\($0)", number: $0, pageCount: pages.count) }
+        #expect(manager.download(comic: Self.comic, chapters: selected))
+        await manager.waitUntilIdle()
+
+        for chapter in selected {
+            #expect(manager.state(comicID: "comic-1", chapterID: chapter.id) == .downloaded)
+        }
+        #expect(store.downloadedChapters().count == 3)
+    }
+
+    @Test func aBatchLargerThanTheCapIsRefusedAndDownloadsNothing() async throws {
+        let (store, root) = try makeStore(chapterLimit: 2)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+        let manager = makeManager(store: store, pages: pages)
+
+        let selected = (1...3).map { summary(id: "chapter-\($0)", number: $0, pageCount: pages.count) }
+
+        // Trimming it, or letting it run, would have the batch evicting its own
+        // earlier chapters as its later ones arrived — thrashing the disk to
+        // arrive at the last two of the three that were asked for.
+        #expect(manager.download(comic: Self.comic, chapters: selected) == false)
+        await manager.waitUntilIdle()
+
+        #expect(store.downloadedChapters().isEmpty)
+        #expect(manager.usedSlots == 0)
+        #expect(DownloadStubURLProtocol.requests.isEmpty)
+    }
+
+    @Test func aBatchAtTheCapEvictsExactlyAsManyAsItAdds() async throws {
+        let (store, root) = try makeStore(chapterLimit: 3)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+
+        for index in 0..<3 {
+            try store.admit(
+                DownloadedChapter(
+                    comicID: "comic-1",
+                    comicTitle: "Alpha",
+                    chapterID: "old-\(index)",
+                    chapterNumber: 90 + index,
+                    chapterTitle: "Old",
+                    pageCount: 1,
+                    startedAt: Date(timeIntervalSince1970: TimeInterval(100 + index)),
+                    isComplete: true
+                )
+            )
+        }
+        let manager = makeManager(store: store, pages: pages)
+
+        let selected = (1...2).map { summary(id: "chapter-\($0)", number: $0, pageCount: pages.count) }
+        #expect(manager.download(comic: Self.comic, chapters: selected))
+        await manager.waitUntilIdle()
+
+        // Two in, two out — and the two that went are the two oldest.
+        #expect(store.downloadedChapters().map(\.chapterID) == ["old-2", "chapter-1", "chapter-2"])
+        #expect(manager.usedSlots == 3)
+    }
+
+    @Test func aBatchNeverEvictsItsOwnChapters() async throws {
+        // Exactly the cap, on a device that is already full: every eviction has
+        // to come out of what was there before, never out of what is arriving.
+        let (store, root) = try makeStore(chapterLimit: 2)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+
+        for index in 0..<2 {
+            try store.admit(
+                DownloadedChapter(
+                    comicID: "comic-1",
+                    comicTitle: "Alpha",
+                    chapterID: "old-\(index)",
+                    chapterNumber: 90 + index,
+                    chapterTitle: "Old",
+                    pageCount: 1,
+                    startedAt: Date(timeIntervalSince1970: TimeInterval(100 + index)),
+                    isComplete: true
+                )
+            )
+        }
+        let manager = makeManager(store: store, pages: pages)
+
+        let selected = (1...2).map { summary(id: "chapter-\($0)", number: $0, pageCount: pages.count) }
+        #expect(manager.download(comic: Self.comic, chapters: selected))
+        await manager.waitUntilIdle()
+
+        #expect(store.downloadedChapters().map(\.chapterID) == ["chapter-1", "chapter-2"])
+        for chapter in selected {
+            #expect(manager.state(comicID: "comic-1", chapterID: chapter.id) == .downloaded)
+        }
+    }
+
+    @Test func aBatchSkipsWhatIsAlreadyOnTheDevice() async throws {
+        let (store, root) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pages = pageURLs(2)
+        let manager = makeManager(store: store, pages: pages)
+
+        // One chapter downloaded already; the batch is then measured by what it
+        // would actually add.
+        manager.download(comic: Self.comic, chapter: summary(pageCount: pages.count))
+        await manager.waitUntilIdle()
+        let requestsBefore = DownloadStubURLProtocol.requests.count
+
+        let selected = [
+            summary(pageCount: pages.count),
+            summary(id: "chapter-2", number: 2, pageCount: pages.count),
+        ]
+        #expect(manager.download(comic: Self.comic, chapters: selected))
+        await manager.waitUntilIdle()
+
+        #expect(store.downloadedChapters().count == 2)
+        // The finished chapter was not fetched a second time.
+        #expect(DownloadStubURLProtocol.requests.count == requestsBefore + pages.count)
     }
 
     // MARK: - Deleting what is on the device
