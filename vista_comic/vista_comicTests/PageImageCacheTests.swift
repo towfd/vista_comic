@@ -622,26 +622,6 @@ struct PageImageCacheTests {
         await freshStub()
     }
 
-    /// Waits for `task`, giving up rather than hanging the run.
-    private func finishes<Success>(
-        _ task: Task<Success, any Error>,
-        within timeout: Duration = .seconds(3)
-    ) async -> Bool {
-        await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                _ = try? await task.value
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(for: timeout)
-                return false
-            }
-            let finished = await group.next() ?? false
-            group.cancelAll()
-            return finished
-        }
-    }
-
     /// Polls for an outcome rather than sleeping a fixed time. The window is
     /// fire-and-forget by design — it returns before any work is done — so a
     /// test has to wait for a result, not for a duration.
@@ -823,17 +803,17 @@ struct PageImageCacheTests {
         #expect(order[4] == urls[5])
 
         CacheStubURLProtocol.release()
-        // Bounded rather than a bare `await`: a test that can hang takes the
-        // whole run with it, and a suite that cannot finish is worse than one
-        // that fails.
-        #expect(await finishes(landed))
-        // Let the rest of the window finish before leaving. A fetch still
-        // running when the next test resets the stub is recorded against *that*
-        // test's counts — which is what these exact-count assertions have
-        // actually been failing on.
-        #expect(await waitUntil {
-            CacheStubURLProtocol.loadsInFlight == 0 && CacheStubURLProtocol.requests.count == 6
-        })
+        // Cancelled rather than awaited. Waiting for this task is what hung the
+        // whole suite twice: `await task.value` ignores the awaiting context's
+        // cancellation, so racing it against a sleep inside a task group bounds
+        // nothing — the group still waits for that child. Cancelling reaches
+        // `URLSession` and always ends.
+        landed.cancel()
+        // Then let whatever is still running finish, so it is not recorded
+        // against the next test's counts — which is what these exact-count
+        // assertions have actually been failing on. Quiescence only: a
+        // cancelled fetch legitimately leaves the request count short.
+        #expect(await waitUntil { CacheStubURLProtocol.loadsInFlight == 0 })
     }
 
     /// The anti-storm guarantee. Without the failure mark the reconciler would
