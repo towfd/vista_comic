@@ -33,18 +33,25 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from . import (
     comprehend_usage_store,
     comprehension_store,
+    learning_card_store,
     progress_store,
 )
 from .comprehension_worker import ComprehensionWorker
 from .config import get_library_root
-from .db import ComprehensionRecord, init_engine, new_session, upgrade_schema
+from .db import (
+    ComprehensionRecord,
+    LearningCard,
+    init_engine,
+    new_session,
+    upgrade_schema,
+)
 from .models import (
     ChapterDetail,
     ChapterSummary,
@@ -53,9 +60,12 @@ from .models import (
     ComprehensionRecordCreate,
     ComprehensionRecordReadUpdate,
     ComprehensionRecordResponse,
+    LearningCardCreate,
+    LearningCardResponse,
     ProgressResponse,
     ProgressUpdate,
 )
+from .normalization import normalized_key
 from .scanner import Catalog, ChapterEntry, ComicEntry, scan_library
 
 # Map a file extension (lowercased, with dot) to the Content-Type we serve.
@@ -427,16 +437,19 @@ _COMPREHENSION_STORE_UNAVAILABLE = "Comprehension store unavailable"
 
 
 @contextmanager
-def _comprehension_session():
-    """Yield a session for one comprehension-store operation, or 503.
+def _store_session(unavailable_detail: str, failure_log: str):
+    """Yield a session for one store operation, or 503.
 
-    Extracted because six routes need the identical open/rollback/close dance,
-    which the superseded ``/translations`` routes used to repeat inline three
-    times -- a shape that does not survive doubling. A store that
-    was never initialised and one that fails mid-request both surface as 503,
-    because these rows have no independent origin to fall back on -- reporting
-    "unreachable" as "you have no history" would be a lie the reader cannot
-    detect.
+    Extracted because six comprehension routes needed the identical
+    open/rollback/close dance, which the superseded ``/translations`` routes used
+    to repeat inline three times -- a shape that does not survive doubling. The
+    ``/cards`` routes are the third resource to want it, which is why the detail
+    string is a parameter now rather than a constant.
+
+    A store that was never initialised and one that fails mid-request both
+    surface as 503, because these rows have no independent origin to fall back
+    on -- reporting "unreachable" as "you have no history" (or "your vocabulary
+    is empty") would be a lie the reader cannot detect.
 
     Only ``SQLAlchemyError`` is converted; an ``HTTPException`` raised by the
     body (a 404, say) passes through untouched.
@@ -444,15 +457,24 @@ def _comprehension_session():
     try:
         session = new_session()
     except RuntimeError:
-        raise HTTPException(status_code=503, detail=_COMPREHENSION_STORE_UNAVAILABLE)
+        raise HTTPException(status_code=503, detail=unavailable_detail)
     try:
         yield session
     except SQLAlchemyError:
         session.rollback()
-        logger.warning("Comprehension store operation failed.", exc_info=True)
-        raise HTTPException(status_code=503, detail=_COMPREHENSION_STORE_UNAVAILABLE)
+        logger.warning(failure_log, exc_info=True)
+        raise HTTPException(status_code=503, detail=unavailable_detail)
     finally:
         session.close()
+
+
+@contextmanager
+def _comprehension_session():
+    """A store session whose failures are reported as the history store's."""
+    with _store_session(
+        _COMPREHENSION_STORE_UNAVAILABLE, "Comprehension store operation failed."
+    ) as session:
+        yield session
 
 
 def _titles_for(comic_id: str, chapter_id: str) -> tuple[Optional[str], Optional[str]]:
@@ -791,3 +813,107 @@ def rescan() -> dict:
         "comics": len(catalog.comics),
         "chapters": sum(c.chapter_count for c in catalog.comics),
     }
+
+
+# ---------------------------------------------------------------------------
+# Learning cards (vocabulary-review stage 1): the 單字庫 store. A row exists
+# only because the reader pressed add, having read the source text and the
+# translation and judged them right — see .scratch/vocabulary-review/prd.md.
+# ---------------------------------------------------------------------------
+
+
+_CARD_STORE_UNAVAILABLE = "Vocabulary store unavailable"
+
+
+@contextmanager
+def _card_session():
+    """A store session whose failures are reported as the vocabulary store's."""
+    with _store_session(
+        _CARD_STORE_UNAVAILABLE, "Vocabulary store operation failed."
+    ) as session:
+        yield session
+
+
+def _to_card_response(row: LearningCard) -> LearningCardResponse:
+    return LearningCardResponse(
+        id=row.id,
+        sourceText=row.source_text,
+        translation=row.translation,
+        targetLanguage=row.target_language,
+        comicId=row.comic_id,
+        chapterId=row.chapter_id,
+        pageNumber=row.page_number,
+        ladderStage=row.ladder_stage,
+        dueOn=row.due_on.isoformat(),
+        lookupCount=row.lookup_count,
+        lastLookedUpAt=(
+            progress_store.iso_utc(row.last_looked_up_at)
+            if row.last_looked_up_at is not None
+            else None
+        ),
+        createdAt=progress_store.iso_utc(row.created_at),
+    )
+
+
+@app.post("/cards", response_model=LearningCardResponse, status_code=201)
+def create_card(body: LearningCardCreate, response: Response) -> LearningCardResponse:
+    """Collect one line. 201 when it is new, **200 when it was already there**.
+
+    Idempotent rather than conflicting, because the app queues what it could not
+    send while offline and replays the queue blindly on reconnect. A replay is
+    the expected case, not a client error, so answering 409 would turn normal
+    operation into something the client has to special-case.
+
+    Text that normalises to nothing is refused here rather than in the model:
+    the length cap cannot catch a string of spaces, and storing a card with an
+    empty identity would collide with every other empty one.
+    """
+    if not normalized_key(body.sourceText):
+        raise HTTPException(
+            status_code=422, detail="sourceText contains nothing to learn"
+        )
+    with _card_session() as session:
+        row, created = learning_card_store.create_or_get(
+            session,
+            source_text=body.sourceText,
+            translation=body.translation,
+            target_language=body.targetLanguage,
+            comic_id=body.comicId,
+            chapter_id=body.chapterId,
+            page_number=body.pageNumber,
+        )
+    if not created:
+        response.status_code = 200
+    return _to_card_response(row)
+
+
+@app.get("/cards", response_model=list[LearningCardResponse])
+def list_cards() -> list[LearningCardResponse]:
+    """Every card the reader still has, newest first.
+
+    Unpaginated on purpose: this is one person's hand-picked vocabulary, and the
+    app caches the whole response as the snapshot it matches against offline.
+    Paginating it would mean the snapshot is a guess about which page mattered.
+    """
+    with _card_session() as session:
+        rows = learning_card_store.list_active(session)
+    return [_to_card_response(row) for row in rows]
+
+
+@app.post("/cards/{card_id}/lookups", status_code=204)
+def record_card_lookup(card_id: int) -> Response:
+    """Note that the reader looked an already-collected word up again.
+
+    The cleanest forgetting signal this system gets: they just proved they had
+    not retained it. Only the positive is recorded — *not* looking a word up
+    again says nothing, since the reader may simply not have reached that page.
+
+    Its own endpoint rather than a PATCH, because the client is reporting an
+    event rather than proposing a value, and the count is not something it is
+    allowed to set.
+    """
+    with _card_session() as session:
+        found = learning_card_store.record_lookup(session, card_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Learning card not found")
+    return Response(status_code=204)

@@ -236,3 +236,58 @@ func awaitExplanation(
     }
     return record
 }
+
+/// The result of collecting a selection into 單字庫 — the third, opt-in action
+/// on the result sheet.
+///
+/// Deliberately not `LoadState`: there is nothing being *loaded*, and the
+/// failure here costs the reader nothing they already had. The translation
+/// stays on screen either way; what a failure costs is the card.
+enum CollectionOutcome: Equatable {
+    /// In the deck. Also the answer when the line was **already** there — the
+    /// backend returns the existing card rather than an error, and from the
+    /// reader's side "it is collected" is the same fact in both cases.
+    case collected(LearningCard)
+    /// It did not reach the backend. Ticket 02 offers another tap; ticket 04
+    /// replaces this with a queue, at which point failing at all becomes rare.
+    case notCollected
+}
+
+/// Runs the "加入單字庫" action: keep this line for review later.
+///
+/// Takes the `translation` currently on screen rather than producing one,
+/// because **which** translation that is carries meaning. The reader may be
+/// looking at the on-device wording, or at the cloud's if they asked for an
+/// explanation and waited; the card stores whichever they were actually reading
+/// when they pressed add, since that is the one they judged correct. Nothing
+/// upgrades it afterwards.
+///
+/// A free function, mirroring `requestExplanation`'s reasoning: unit-testable
+/// against a stub `StudyRepository` conformer independent of any SwiftUI
+/// rendering.
+func collectSelection(
+    sourceText: String,
+    translation: String,
+    targetLanguageCode: String,
+    comicID: String,
+    chapterID: String,
+    pageNumber: Int,
+    repository: any StudyRepository
+) async -> CollectionOutcome {
+    do {
+        let card = try await repository.collect(
+            sourceText: sourceText,
+            translation: translation,
+            targetLanguage: targetLanguageCode,
+            comicID: comicID,
+            chapterID: chapterID,
+            pageNumber: pageNumber
+        )
+        return .collected(card)
+    } catch {
+        // No case split, unlike `requestExplanation`'s quota versus transient:
+        // collecting spends nothing, so there is no failure here a reader
+        // could only fix by waiting until tomorrow.
+        return .notCollected
+    }
+}

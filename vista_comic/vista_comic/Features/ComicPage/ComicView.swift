@@ -208,6 +208,7 @@ private struct ReaderView: View {
     @Environment(\.ocrRecognizer) private var ocrRecognizer
     @Environment(\.translator) private var translator
     @Environment(\.comprehensionRepository) private var comprehensionRepository
+    @Environment(\.studyRepository) private var studyRepository
     @Environment(\.comicRepository) private var repository
     /// Read here rather than in `ReaderPage` because the *window* is the
     /// reader's business: only this view knows the chapter's whole page list
@@ -254,7 +255,8 @@ private struct ReaderView: View {
                 pageNumber: selection.pageNumber,
                 recognizer: ocrRecognizer,
                 translator: translator,
-                comprehensionRepository: comprehensionRepository
+                comprehensionRepository: comprehensionRepository,
+                studyRepository: studyRepository
             )
         }
         // Load the current chapter's pages on open, and reload whenever the
