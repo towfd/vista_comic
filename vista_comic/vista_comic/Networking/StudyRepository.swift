@@ -27,12 +27,12 @@ import SwiftUI
 /// good response rather than the network, which is what lets the
 /// already-collected marker work on a train.
 protocol StudyRepository {
-    /// Collects one line, returning the card.
+    /// Collects one line.
     ///
     /// **Idempotent**: collecting a line already in the deck returns the
     /// existing card rather than failing, because the backend answers 200 for a
-    /// duplicate. Ticket 04's offline queue depends on that, and callers here
-    /// benefit from it too — a double tap is not an error worth showing.
+    /// duplicate. The offline queue depends on that — it replays blindly — and
+    /// callers benefit too, since a double tap is not an error worth showing.
     @discardableResult
     func collect(
         sourceText: String,
@@ -41,13 +41,20 @@ protocol StudyRepository {
         comicID: String,
         chapterID: String,
         pageNumber: Int
-    ) async throws -> LearningCard
+    ) async throws -> CollectOutcome
 
     /// Every card the reader still has, newest first.
     func cards() async throws -> [LearningCard]
 
     /// Notes that the reader looked an already-collected word up again.
     func recordLookup(id: Int) async throws
+
+    /// Lines collected but not yet accepted by the server.
+    ///
+    /// Empty for any repository that has no queue, which is why it has a
+    /// default rather than being a second protocol: only the offline decorator
+    /// has an answer, and no caller should have to ask which one it holds.
+    func queuedLines() -> [PendingCard]
 
     /// What is known locally, from the last good `cards()` response.
     ///
@@ -59,6 +66,25 @@ protocol StudyRepository {
     func knownCards() -> [LearningCard]
 }
 
+extension StudyRepository {
+    func queuedLines() -> [PendingCard] { [] }
+}
+
+/// What became of a collect.
+///
+/// A queued line is deliberately **not** a `LearningCard`: the server has not
+/// given it an id, so nothing can be reported against it and nothing can
+/// schedule it. Inventing one would put a number in the data model that no
+/// backend ever issued, and every later stage would have to know which ids were
+/// real.
+enum CollectOutcome: Equatable {
+    /// The server has it. Also the answer when the line was already collected —
+    /// `POST /cards` returns the existing card rather than an error.
+    case collected(LearningCard)
+    /// Kept on the device until the backend can be reached.
+    case queued
+}
+
 // MARK: - Environment injection
 
 private struct StudyRepositoryKey: EnvironmentKey {
@@ -66,7 +92,11 @@ private struct StudyRepositoryKey: EnvironmentKey {
     /// `ComprehensionRepositoryKey`'s precedent for a network-backed seam:
     /// `#Preview`s that need one inject a stub, and those that never touch it
     /// never reach the network either.
-    static let defaultValue: any StudyRepository = APIStudyRepository()
+    static let defaultValue: any StudyRepository = OfflineFallbackStudyRepository(
+        wrapping: APIStudyRepository(),
+        pending: (try? FilePendingCardStore()) ?? InMemoryPendingCardStore(),
+        pendingLookups: (try? FilePendingLookupStore()) ?? InMemoryPendingLookupStore()
+    )
 }
 
 extension EnvironmentValues {

@@ -248,8 +248,12 @@ enum CollectionOutcome: Equatable {
     /// backend returns the existing card rather than an error, and from the
     /// reader's side "it is collected" is the same fact in both cases.
     case collected(LearningCard)
-    /// It did not reach the backend. Ticket 02 offers another tap; ticket 04
-    /// replaces this with a queue, at which point failing at all becomes rare.
+    /// Kept on the device, waiting for a connection. **Not a failure**: the
+    /// reader's choice was recorded and will be delivered, so the screen says
+    /// the same thing it says for `collected`.
+    case queued
+    /// The backend was reached and refused it. The only case left now that a
+    /// missing connection is handled — rare, and the one worth showing.
     case notCollected
 }
 
@@ -275,15 +279,17 @@ func collectSelection(
     repository: any StudyRepository
 ) async -> CollectionOutcome {
     do {
-        let card = try await repository.collect(
+        switch try await repository.collect(
             sourceText: sourceText,
             translation: translation,
             targetLanguage: targetLanguageCode,
             comicID: comicID,
             chapterID: chapterID,
             pageNumber: pageNumber
-        )
-        return .collected(card)
+        ) {
+        case .collected(let card): return .collected(card)
+        case .queued: return .queued
+        }
     } catch {
         // No case split, unlike `requestExplanation`'s quota versus transient:
         // collecting spends nothing, so there is no failure here a reader
@@ -317,5 +323,24 @@ func alreadyCollected(
     guard !key.isEmpty else { return nil }
     return cards.first {
         $0.targetLanguage == targetLanguage && normalizedKey($0.sourceText) == key
+    }
+}
+
+/// Whether this line is already waiting to be sent.
+///
+/// Separate from `alreadyCollected` rather than folded into it, because the two
+/// answers are worth different things. A card the server has can be reported
+/// against and scheduled; a queued line can only be recognised, so the caller
+/// has to be able to tell them apart even though the reader sees the same
+/// reassurance either way.
+func isQueued(
+    _ sourceText: String,
+    targetLanguage: String,
+    in pending: [PendingCard]
+) -> Bool {
+    let key = normalizedKey(sourceText)
+    guard !key.isEmpty else { return false }
+    return pending.contains {
+        $0.identity == CardIdentity(key: key, targetLanguage: targetLanguage)
     }
 }

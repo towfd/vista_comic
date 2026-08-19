@@ -24,7 +24,7 @@ import Testing
 /// Records what it was asked to collect and returns (or throws) what the test
 /// tells it to.
 private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
-    var collectResult: Result<LearningCard, Error> = .success(.stub())
+    var collectResult: Result<CollectOutcome, Error> = .success(.collected(.stub()))
     private(set) var collectCallCount = 0
     private(set) var lastSourceText: String?
     private(set) var lastTranslation: String?
@@ -40,7 +40,7 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
         comicID: String,
         chapterID: String,
         pageNumber: Int
-    ) async throws -> LearningCard {
+    ) async throws -> CollectOutcome {
         collectCallCount += 1
         lastSourceText = sourceText
         lastTranslation = translation
@@ -118,7 +118,7 @@ struct SelectionCollectFlowTests {
     @Test("A collected line comes back as a card")
     func collectedLineReturnsACard() async {
         let repository = StubStudyRepository()
-        repository.collectResult = .success(.stub(id: 42))
+        repository.collectResult = .success(.collected(.stub(id: 42)))
 
         let outcome = await collect(repository: repository)
 
@@ -165,7 +165,7 @@ struct SelectionCollectFlowTests {
         // the repository returns rather than throws — and from the reader's
         // side "it is in your vocabulary" is the same fact either way.
         let repository = StubStudyRepository()
-        repository.collectResult = .success(.stub(id: 7, lookupCount: 3))
+        repository.collectResult = .success(.collected(.stub(id: 7, lookupCount: 3)))
 
         let outcome = await collect(repository: repository)
 

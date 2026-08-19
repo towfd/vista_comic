@@ -57,7 +57,7 @@ struct APIStudyRepository: StudyRepository {
         comicID: String,
         chapterID: String,
         pageNumber: Int
-    ) async throws -> LearningCard {
+    ) async throws -> CollectOutcome {
         let payload: [String: Any] = [
             "sourceText": sourceText,
             "translation": translation,
@@ -83,7 +83,7 @@ struct APIStudyRepository: StudyRepository {
         // deliberately best-effort — a failed refresh must never turn a
         // successful add into a failure the reader sees.
         _ = try? await cards()
-        return card
+        return .collected(card)
     }
 
     func cards() async throws -> [LearningCard] {

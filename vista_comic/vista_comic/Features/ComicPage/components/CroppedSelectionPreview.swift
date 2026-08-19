@@ -109,6 +109,15 @@ struct CroppedSelectionPreview: View {
     /// text or the target language changed, and neither of those is the card
     /// that was collected a moment ago.
     @State private var collectionState: CollectionState = .idle
+    /// Cards this sheet has already reported a re-lookup for.
+    ///
+    /// The reader can tap Translate more than once on one selection — a
+    /// different target language, or the same one again after an edit — and
+    /// each of those re-runs the check. Only the first sighting per card is an
+    /// event: the rest are the same forgetting, counted repeatedly, which would
+    /// weight the reviewing stages by how often the reader taps rather than by
+    /// how often they forget.
+    @State private var reportedLookups: Set<Int> = []
 
     /// The add button's three states, plus the one the reader can act on.
     ///
@@ -466,11 +475,29 @@ struct CroppedSelectionPreview: View {
             repository: studyRepository
         )
         switch outcome {
-        case .collected:
+        // Queued is not a lesser success. The reader's choice was recorded and
+        // will be delivered; saying anything else would ask them to worry about
+        // a connection on their behalf.
+        case .collected, .queued:
             collectionState = .collected
         case .notCollected:
             collectionState = .failed
         }
+    }
+
+    /// Tells the backend the reader looked this collected word up again.
+    ///
+    /// The cleanest forgetting signal this system gets: they have just proved
+    /// they did not retain it. Nothing in stage 1 displays the number — it is
+    /// recorded now because it **cannot be recorded retroactively**, and stages
+    /// 2 through 4 all read it.
+    ///
+    /// Deliberately unobserved and unable to fail the screen. The reader asked
+    /// for a translation and they have it; a bookkeeping call is not worth a
+    /// spinner, an error, or a moment of their attention.
+    private func reportLookupIfNew(of card: LearningCard) async {
+        guard reportedLookups.insert(card.id).inserted else { return }
+        try? await studyRepository.recordLookup(id: card.id)
     }
 
     // MARK: - Deeper explanation
@@ -637,13 +664,24 @@ struct CroppedSelectionPreview: View {
         //
         // A local read of the last good response — no network, so it answers
         // just as well on a train, which is where most of this reading happens.
-        if case .loaded = translationState,
-           alreadyCollected(
-               editedText,
-               targetLanguage: selectedLanguageID,
-               in: studyRepository.knownCards()
-           ) != nil {
-            collectionState = .alreadyKnown
+        if case .loaded = translationState {
+            if let known = alreadyCollected(
+                editedText,
+                targetLanguage: selectedLanguageID,
+                in: studyRepository.knownCards()
+            ) {
+                collectionState = .alreadyKnown
+                await reportLookupIfNew(of: known)
+            } else if isQueued(
+                editedText,
+                targetLanguage: selectedLanguageID,
+                in: studyRepository.queuedLines()
+            ) {
+                // Collected on this device but not yet delivered — so it is
+                // kept, but the reader has not "learned it before" in any sense
+                // worth claiming: they picked it minutes ago, offline.
+                collectionState = .collected
+            }
         }
     }
 
