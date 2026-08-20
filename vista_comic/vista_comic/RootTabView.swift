@@ -34,6 +34,13 @@ struct RootTabView: View {
                     Label("Downloads", systemImage: "arrow.down.circle")
                 }
 
+            // 練習 sits before 單字庫 because it is the point of the whole
+            // system, where 單字庫 is a workshop the reader should rarely need.
+            PracticeView()
+                .tabItem {
+                    Label("Practice", systemImage: "gamecontroller")
+                }
+
             // 單字庫 takes the slot 歷史紀錄 held (vocabulary stage 2). That
             // tab was the second attempt at somewhere to look back at what had
             // been read, after 單字本, and went unused like the first. What

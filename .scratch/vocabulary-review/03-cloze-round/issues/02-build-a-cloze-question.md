@@ -12,14 +12,44 @@ A card carries a cloze when it is a **sentence** and at least one deck word occu
 
 **Blocked by:** 01.
 
-**Status:** not started.
+**Status:** implemented on branch `feat/cloze-round`, 2026-08-20. Pure functions; nothing user-visible.
 
-- [ ] A sentence card containing a deck word produces a cloze whose blank is that word
-- [ ] Where several deck words occur, the least familiar is blanked
-- [ ] A sentence card containing no deck word produces no question
-- [ ] A word card produces no question
-- [ ] Distractors are other cards, never the answer, and never repeated inside one question
-- [ ] Fewer than four cards produces no four-choice question
-- [ ] A typed answer is judged after the same normalisation: punctuation and spacing are ignored, spelling and tones are not
-- [ ] A typed answer with a changed tone is wrong
-- [ ] Question building is pure — cards in, questions out, no repository
+- [x] A sentence card containing a deck word produces a cloze whose blank is that word
+- [x] Where several deck words occur, the least familiar is blanked
+- [x] A sentence card containing no deck word produces no question
+- [x] A word card produces no question
+- [x] Distractors are other cards, never the answer, and never repeated inside one question
+- [x] Fewer than four cards produces no four-choice question
+- [x] A typed answer is judged after the same normalisation: punctuation and spacing are ignored, spelling and tones are not
+- [x] A typed answer with a changed tone is wrong
+- [x] Question building is pure — cards in, questions out, no repository
+
+## What was built
+
+`Features/Study/ClozeQuestion.swift` — `makeCloze(from:deck:)`, `distractors(for:from:count:)` and
+`isCorrectClozeAnswer(_:for:)`.
+
+**Three guards came from looking at the real deck rather than from imagining edge cases:**
+
+1. **A blank must leave something to read**, and getting this right took two attempts. The first
+   rule excluded the card itself — and the test written from the real deck failed, because the
+   deck holds three *near-identical* copies of one sentence, so a **different** card still matched
+   the whole thing and produced a question that was nothing but a blank. The rule is therefore
+   about what the blank covers, not about which row it came from: a match spanning the sentence is
+   discarded whoever owns it.
+
+   Worth recording because a fixture would never have caught it. One sentence card and a few
+   unrelated words — the obvious test data — passes happily, and the defect would have surfaced on
+   the device as a question showing a single underscore.
+2. **A distractor equal to the answer after normalisation is refused.** The deck holds cards
+   differing only in spacing and case; offered as an option, the question would have two right
+   answers.
+3. **Ties break on position.** Every card sits on rung 0 until stage 4, so *everything* ties on
+   familiarity — without a second key the blank would move between runs and no test could state
+   where it lands.
+
+## Verification
+
+17 tests: which word is removed and why, every reason a card produces no question (word card,
+unclassified card, no deck word, self-match), distractor selection, and typed judging — where a
+changed tone is wrong, and an empty answer is wrong rather than vacuously right.

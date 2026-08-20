@@ -16,15 +16,39 @@ Three rules, each established by running them on the real deck:
 
 **Blocked by:** nothing.
 
-**Status:** not started.
+**Status:** implemented on branch `feat/cloze-round`, 2026-08-20 — `exit 0`, 393 passed, zero failures. Backend untouched; nothing user-visible.
 
-- [ ] A deck word in a sentence is returned with a range that blanks it exactly, leaving the rest of the sentence byte-for-byte intact
-- [ ] Case differences do not prevent a match
-- [ ] Doubled spaces and line breaks inside the sentence do not prevent a match, and the range still maps to the original — `Sau  khi\nthông` matches a card holding `SAU KHI`
-- [ ] Full-width and half-width forms match, following `normalizedKey`
-- [ ] `AN` does **not** match inside `THÂN`
-- [ ] A card holding `THÂN THỂ` does not match `THÂN THÊ` — different tones are different words, exactly as the deck's identity already treats them
-- [ ] A word occurring twice returns two ranges
-- [ ] A sentence containing no deck word returns nothing, and that is not an error
-- [ ] A card whose text normalises to empty matches nothing
-- [ ] The function takes cards and a sentence and touches no repository, so it is testable with literals
+- [x] A deck word in a sentence is returned with a range that blanks it exactly, leaving the rest of the sentence byte-for-byte intact
+- [x] Case differences do not prevent a match
+- [x] Doubled spaces and line breaks inside the sentence do not prevent a match, and the range still maps to the original — `Sau  khi\nthông` matches a card holding `SAU KHI`
+- [x] Full-width and half-width forms match, following `normalizedKey`
+- [x] `AN` does **not** match inside `THÂN`
+- [x] A card holding `THÂN THỂ` does not match `THÂN THÊ` — different tones are different words, exactly as the deck's identity already treats them
+- [x] A word occurring twice returns two ranges
+- [x] A sentence containing no deck word returns nothing, and that is not an error
+- [x] A card whose text normalises to empty matches nothing
+- [x] The function takes cards and a sentence and touches no repository, so it is testable with literals
+
+## What was built
+
+`Features/Study/DeckWordMatching.swift` — `deckWords(in:from:)` returning matches as ranges in the
+original sentence, plus `String.blanking(_:)`.
+
+The index map is the load-bearing part. Comparison happens on a whitespace-stripped form, so a hit
+at offset *i* there is not offset *i* in the sentence; without the map a blank lands in the wrong
+place the moment the source has a doubled space — which the reader's own cards already do.
+
+## Verification
+
+14 tests, and **the cases are not invented**. They came from running the rule against the real
+30-card deck before the Swift existed, so a regression shows up as something that stopped working
+on real data:
+
+- `AN` does not match inside `THÂN` — the specific failure the boundary test exists for.
+- `THÂN THỂ` does not match `THÂN THÊ`, and a suite of sentences taken verbatim from the deck
+  yields exactly the blanks the spike found.
+- One real sentence yields nothing, because OCR read `XÂM PHẠM` as `XÂM PHAM`. **The test asserts
+  the refusal**, with a comment saying the fix is correcting the card in 單字庫 — not loosening
+  the rule until wrong words match. Tones are part of a Vietnamese word: `cấm` (forbid) is not
+  `câm` (mute).
+- Punctuation counts as a boundary, since real sentences end in full stops.
