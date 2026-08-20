@@ -24,7 +24,7 @@ import Testing
 /// Records what it was asked to collect and returns (or throws) what the test
 /// tells it to.
 private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
-    var collectResult: Result<LearningCard, Error> = .success(.stub())
+    var collectResult: Result<CollectOutcome, Error> = .success(.collected(.stub()))
     private(set) var collectCallCount = 0
     private(set) var lastSourceText: String?
     private(set) var lastTranslation: String?
@@ -32,6 +32,7 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
     private(set) var lastComicID: String?
     private(set) var lastChapterID: String?
     private(set) var lastPageNumber: Int?
+    private(set) var lastKind: CardKind?
 
     func collect(
         sourceText: String,
@@ -39,8 +40,9 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
         targetLanguage: String,
         comicID: String,
         chapterID: String,
-        pageNumber: Int
-    ) async throws -> LearningCard {
+        pageNumber: Int,
+        kind: CardKind?
+    ) async throws -> CollectOutcome {
         collectCallCount += 1
         lastSourceText = sourceText
         lastTranslation = translation
@@ -48,12 +50,40 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
         lastComicID = comicID
         lastChapterID = chapterID
         lastPageNumber = pageNumber
+        lastKind = kind
         return try collectResult.get()
     }
 
-    func cards() async throws -> [LearningCard] { [] }
+    var cardsResult: [LearningCard] = []
+    private(set) var cardsCallCount = 0
+    func cards() async throws -> [LearningCard] {
+        cardsCallCount += 1
+        return cardsResult
+    }
+
+    var known: [LearningCard] = []
+    func knownCards() -> [LearningCard] { known }
 
     private(set) var recordLookupCallCount = 0
+    var updateResult: Result<LearningCard, Error> = .success(.stub())
+    private(set) var updatedID: Int?
+    private(set) var updatedTranslation: String?
+    private(set) var updatedKind: CardKind?
+    @discardableResult
+    func update(id: Int, translation: String, kind: CardKind?) async throws -> LearningCard {
+        updatedID = id
+        updatedTranslation = translation
+        updatedKind = kind
+        return try updateResult.get()
+    }
+
+    var deleteResult: Result<Void, Error> = .success(())
+    private(set) var deletedID: Int?
+    func delete(id: Int) async throws {
+        deletedID = id
+        try deleteResult.get()
+    }
+
     func recordLookup(id: Int) async throws { recordLookupCallCount += 1 }
 }
 
@@ -64,8 +94,10 @@ extension LearningCard {
         id: Int = 1,
         sourceText: String = "大丈夫ですか",
         translation: String = "你還好嗎",
-        lookupCount: Int = 0
+        lookupCount: Int = 0,
+        kind: String? = nil
     ) -> LearningCard {
+        let kindJSON = kind.map { "\"\($0)\"" } ?? "null"
         let json = """
         {
             "id": \(id),
@@ -75,6 +107,9 @@ extension LearningCard {
             "comicId": "comic-1",
             "chapterId": "chapter-1",
             "pageNumber": 3,
+            "comicTitle": "marrymyhusband",
+            "chapterTitle": "bai1",
+            "kind": \(kindJSON),
             "ladderStage": 0,
             "dueOn": "2026-08-19",
             "lookupCount": \(lookupCount),
@@ -94,7 +129,8 @@ struct SelectionCollectFlowTests {
     private func collect(
         repository: StubStudyRepository,
         sourceText: String = "大丈夫ですか",
-        translation: String = "你還好嗎"
+        translation: String = "你還好嗎",
+        kind: CardKind = .word
     ) async -> CollectionOutcome {
         await collectSelection(
             sourceText: sourceText,
@@ -103,6 +139,7 @@ struct SelectionCollectFlowTests {
             comicID: "comic-1",
             chapterID: "chapter-1",
             pageNumber: 3,
+            kind: kind,
             repository: repository
         )
     }
@@ -110,7 +147,7 @@ struct SelectionCollectFlowTests {
     @Test("A collected line comes back as a card")
     func collectedLineReturnsACard() async {
         let repository = StubStudyRepository()
-        repository.collectResult = .success(.stub(id: 42))
+        repository.collectResult = .success(.collected(.stub(id: 42)))
 
         let outcome = await collect(repository: repository)
 
@@ -157,7 +194,7 @@ struct SelectionCollectFlowTests {
         // the repository returns rather than throws — and from the reader's
         // side "it is in your vocabulary" is the same fact either way.
         let repository = StubStudyRepository()
-        repository.collectResult = .success(.stub(id: 7, lookupCount: 3))
+        repository.collectResult = .success(.collected(.stub(id: 7, lookupCount: 3)))
 
         let outcome = await collect(repository: repository)
 
@@ -210,5 +247,48 @@ struct LearningCardDecodingTests {
         // A scheduling day is not a moment; decoding it as a `Date` would
         // invent a timezone the backend never chose. Stage 3 reads this.
         #expect(LearningCard.stub().dueOn == "2026-08-19")
+    }
+}
+
+
+@Suite("Saying whether it is a word or a sentence")
+struct CardKindTests {
+
+    @Test("Which button was pressed reaches the backend", arguments: CardKind.allCases)
+    func theChosenKindReachesTheBackend(_ kind: CardKind) async {
+        let repository = StubStudyRepository()
+
+        _ = await collectSelection(
+            sourceText: "大丈夫ですか",
+            translation: "你還好嗎",
+            targetLanguageCode: "zh-Hant",
+            comicID: "comic-1",
+            chapterID: "chapter-1",
+            pageNumber: 3,
+            kind: kind,
+            repository: repository
+        )
+
+        #expect(repository.lastKind == kind)
+    }
+
+    @Test("A card decodes the kind it was stored with")
+    func aCardDecodesItsKind() {
+        #expect(LearningCard.stub(kind: "word").kind == .word)
+        #expect(LearningCard.stub(kind: "sentence").kind == .sentence)
+    }
+
+    @Test("A card with no kind decodes as unanswered rather than failing")
+    func anAbsentKindIsUnanswered() {
+        // Cards predate the buttons. Losing the whole deck over that, or
+        // inventing an answer for them, would both be worse than nil.
+        #expect(LearningCard.stub().kind == nil)
+    }
+
+    @Test("A kind this build has never heard of is unanswered, not a crash")
+    func anUnknownKindIsUnanswered() {
+        // The backend owns this vocabulary. Following `ComprehensionStatus`,
+        // one unrecognised row must not cost the reader their whole list.
+        #expect(LearningCard.stub(kind: "paragraph").kind == nil)
     }
 }

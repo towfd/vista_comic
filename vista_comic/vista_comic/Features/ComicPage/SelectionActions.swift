@@ -188,11 +188,12 @@ func requestExplanation(
 /// terminal status, which is why `sleep` is injected: it makes the loop testable
 /// in real time instead of in real minutes.
 ///
-/// Two callers wait on the same thing from different places, and they differ in
-/// exactly one respect, which is why this loop is separate from
-/// `awaitExplanation`: the result screen's wait means the reader is watching, so
-/// an arrival counts as read; the badge's wait (`UnreadExplanationBadge.watch`)
-/// means they are not, so it must not.
+/// Kept separate from `awaitExplanation` because the two answer different
+/// questions: this one waits, that one waits *and* marks the record read. The
+/// split existed for a second caller — the unread badge, which watched without
+/// the reader looking — and outlived it when 歷史紀錄 was removed. It stays
+/// because marking read is a claim about the reader, not about the poll, and
+/// folding them together would bury that.
 ///
 /// Returns `nil` when cancelled before the record finished.
 func awaitRecordFinishing(
@@ -248,8 +249,12 @@ enum CollectionOutcome: Equatable {
     /// backend returns the existing card rather than an error, and from the
     /// reader's side "it is collected" is the same fact in both cases.
     case collected(LearningCard)
-    /// It did not reach the backend. Ticket 02 offers another tap; ticket 04
-    /// replaces this with a queue, at which point failing at all becomes rare.
+    /// Kept on the device, waiting for a connection. **Not a failure**: the
+    /// reader's choice was recorded and will be delivered, so the screen says
+    /// the same thing it says for `collected`.
+    case queued
+    /// The backend was reached and refused it. The only case left now that a
+    /// missing connection is handled — rare, and the one worth showing.
     case notCollected
 }
 
@@ -262,6 +267,10 @@ enum CollectionOutcome: Equatable {
 /// when they pressed add, since that is the one they judged correct. Nothing
 /// upgrades it afterwards.
 ///
+/// `kind` is not optional here, unlike on the repository: this function is only
+/// ever called from a button, and each button *is* an answer. Nothing in the
+/// reader's flow collects a line without saying which of the two it is.
+///
 /// A free function, mirroring `requestExplanation`'s reasoning: unit-testable
 /// against a stub `StudyRepository` conformer independent of any SwiftUI
 /// rendering.
@@ -272,22 +281,73 @@ func collectSelection(
     comicID: String,
     chapterID: String,
     pageNumber: Int,
+    kind: CardKind,
     repository: any StudyRepository
 ) async -> CollectionOutcome {
     do {
-        let card = try await repository.collect(
+        switch try await repository.collect(
             sourceText: sourceText,
             translation: translation,
             targetLanguage: targetLanguageCode,
             comicID: comicID,
             chapterID: chapterID,
-            pageNumber: pageNumber
-        )
-        return .collected(card)
+            pageNumber: pageNumber,
+            kind: kind
+        ) {
+        case .collected(let card): return .collected(card)
+        case .queued: return .queued
+        }
     } catch {
         // No case split, unlike `requestExplanation`'s quota versus transient:
         // collecting spends nothing, so there is no failure here a reader
         // could only fix by waiting until tomorrow.
         return .notCollected
+    }
+}
+
+/// Finds the card the reader already has for `sourceText`, if any.
+///
+/// Pure, and takes the cards rather than a repository, so the rule can be
+/// tested without a network seam anywhere near it. The caller supplies whatever
+/// it knows locally — `StudyRepository.knownCards()` in the app, a literal
+/// array in tests.
+///
+/// Matching is on the **normalised key plus the target language**, exactly the
+/// identity the backend enforces (see `TextNormalization.swift`). Anything
+/// looser would claim the reader knows a word they have not collected;
+/// anything stricter would miss the line breaks OCR puts in.
+///
+/// **A miss means "not known", never "not sure".** The snapshot may be absent,
+/// stale, or from before a word was added, and none of that is worth telling
+/// the reader about — the marker is a courtesy on top of the translation they
+/// already have.
+func alreadyCollected(
+    _ sourceText: String,
+    targetLanguage: String,
+    in cards: [LearningCard]
+) -> LearningCard? {
+    let key = normalizedKey(sourceText)
+    guard !key.isEmpty else { return nil }
+    return cards.first {
+        $0.targetLanguage == targetLanguage && normalizedKey($0.sourceText) == key
+    }
+}
+
+/// The queued entry for this line, if one is waiting to be sent.
+///
+/// Separate from `alreadyCollected` rather than folded into it, because the two
+/// answers are worth different things. A card the server has can be reported
+/// against and scheduled; a queued line can only be recognised, so the caller
+/// has to be able to tell them apart even though the reader sees the same
+/// reassurance either way.
+func queuedEntry(
+    for sourceText: String,
+    targetLanguage: String,
+    in pending: [PendingCard]
+) -> PendingCard? {
+    let key = normalizedKey(sourceText)
+    guard !key.isEmpty else { return nil }
+    return pending.first {
+        $0.identity == CardIdentity(key: key, targetLanguage: targetLanguage)
     }
 }

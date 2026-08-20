@@ -54,7 +54,7 @@ the developer can find out whether this works for him before anything larger is 
 | Scope | Inside vista_comic. One iOS app. No accounts, no extension, no language profiles |
 | How cards enter the deck | **Manual.** Tapping "add" *is* the quality gate — it means the reader has read the source text and the translation and judged them right |
 | Collection entry point | OCR -> correct -> Translate -> "Add to vocabulary" appears beside the translation result |
-| Card atom | The text the reader selected and corrected — a word or a sentence, whichever they framed |
+| Card atom | The text the reader selected and corrected, **and which of the two it is**: two save buttons, 加入單字 and 加入句子. The reader knows instantly what a tokeniser would have to guess at, and the answer decides which questions stage 3 asks and whether stage 4 generates a sentence for it (stage 1 ticket 06, added 2026-08-19) |
 | Source location | `comicID` / `chapterID` / `pageNumber` only, matching the existing peek route. **No crop rectangle** |
 | Scheduling | Fixed-interval ladder: 1 / 3 / 7 / 21 / 60 days. Correct advances one rung, wrong drops to the first. Correctness only — no speed or hint signals |
 | Review log | Recorded in full (timestamp, question type, correct, elapsed ms) so swapping in FSRS later is an algorithm change, not a data migration |
@@ -64,7 +64,8 @@ the developer can find out whether this works for him before anything larger is 
 | Cloze target | The blank is always a word that is in the deck. Generated sentences necessarily contain words that are not, and those are never blanked. Where several deck words appear in one sentence, blank the least familiar |
 | Reading feedback | After OCR (when online), match against the deck. On a hit: mark "already learned", still show the meaning, increment `lookup_count`, and reschedule the card to the near term. **The negative is never inferred** — not looking a word up again is not evidence of knowing it |
 | Game layer | Daily streak + daily completion; per-comic mastery progress; XP and levels. No ability scores |
-| History tab | Removed in stage 5 |
+| History tab | Removed in **stage 2**, alongside the tab that replaces it (moved from stage 5, 2026-08-19) |
+| Archiving a card | **Not built.** A word on the ladder's top rung is already scheduled once every 60 days, which is what "I know this, stop testing me" would have meant. `archived_at` stays unused |
 | Offline | Stages 1–5 are online-only. Offline review is deferred to a later "download pack" approach |
 
 ### Why the source text is trustworthy and the translation is not
@@ -203,11 +204,14 @@ Two consequences the specs must handle rather than assume away:
 iOS: each word or phrase in the explanation breakdown becomes individually addable, alongside
 adding the whole sentence. Cloze and typed-answer screens.
 
-### 5. Game layer, and History goes
+### 5. Game layer
 `daily_completion`, streak, XP and levels. Per-comic mastery — how many words collected from
 this comic, how many have reached a stable rung, how many were hit while reading this week — is
-**optional and the lowest priority in this PRD**; drop it if the stage runs long. Remove `Features/History/` (1,089 lines), reduce `RootTabView` to
-Library / Downloads / Study, and clean up the associated tests.
+**optional and the lowest priority in this PRD**; drop it if the stage runs long.
+
+Removing `Features/History/` **moved to stage 2** (2026-08-19). That stage already reshapes the
+same part of the tab bar, and leaving 歷史紀錄 in place would have meant weeks of carrying a
+dead tab beside its replacement, and then editing the tab bar twice.
 
 ## Verification
 
@@ -236,10 +240,10 @@ Each stage is its own folder under `.scratch/vocabulary-review/`, holding a `spe
 | Folder | Contents | Depends on |
 |---|---|---|
 | `01-card-storage/` | `learning_card`, `/cards` endpoints, add button, offline queue, local deck snapshot and lookup marker | — |
-| `02-card-library/` | Vocabulary library tab: list, familiarity, lookup count, edit, delete/archive, peek | 01 |
+| `02-card-library/` | Vocabulary tab: grouped list, search, edit the translation, delete, peek — **and the removal of 歷史紀錄** | 01 |
 | `03-matching-review/` | `card_review`, ladder scheduling, daily lesson, matching pairs | 02 |
 | `04-sentence-generation/` | Structured vocabulary tool field, `introduction.txt`, generation job, cloze and typing | 03 |
-| `05-game-layer/` | Streak, XP and levels, per-comic mastery, History removal | 03 |
+| `05-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 03 |
 
 Each spec is finalised only after the previous stage has shipped and been used, so its details
 come from real experience rather than guesses about experience that has not happened yet.

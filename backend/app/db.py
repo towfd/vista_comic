@@ -152,6 +152,19 @@ class LearningCard(Base):
     now so the reviewing stages inherit a populated column instead of a
     backfill.
 
+    ``kind`` is the reader's own answer to "is this a word or a sentence",
+    given by which of the two save buttons they pressed. **Not inferred**: which
+    one a framed line is takes a tokeniser and some syntax to guess at, badly
+    for Japanese especially, and the reader knows instantly. It decides which
+    questions stage 3 asks and whether stage 4 generates a practice sentence
+    for the card or treats the card as one.
+
+    **Nullable, and deliberately so.** Cards collected before the column existed
+    have no answer, and backfilling one would mean guessing — precisely what the
+    two buttons exist to abolish. It is **not** part of the card's identity
+    either: splitting on it would fragment ``lookup_count`` and put two visually
+    identical rows in the library.
+
     ``lookup_count`` counts only the positive evidence -- the reader selecting a
     line they had already collected, which proves they had forgotten it.
     **Never the negative**: not looking a word up again is not evidence of
@@ -181,6 +194,7 @@ class LearningCard(Base):
         ForeignKey("comprehension_record.id", ondelete="SET NULL"),
         nullable=True,
     )
+    kind: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     ladder_stage: Mapped[int] = mapped_column(Integer, nullable=False)
     due_on: Mapped[date] = mapped_column(Date, nullable=False)
     lookup_count: Mapped[int] = mapped_column(Integer, nullable=False)

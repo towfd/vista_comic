@@ -11,7 +11,7 @@ separate from the response models so we only expose contract fields.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -212,6 +212,11 @@ class LearningCardCreate(BaseModel):
     comicId: str
     chapterId: str
     pageNumber: int = Field(ge=1)
+    # Which of the two save buttons the reader pressed. Optional so a client
+    # that predates the buttons still works, and constrained so an unrecognised
+    # value is refused here rather than reaching stage 3 as a card no question
+    # type knows what to do with.
+    kind: Optional[Literal["word", "sentence"]] = None
 
 
 class LearningCardResponse(BaseModel):
@@ -224,6 +229,17 @@ class LearningCardResponse(BaseModel):
 
     ``lookupCount`` counts only times the reader looked this word up *again*.
     Its absence means nothing -- see ``db.LearningCard``.
+
+    ``kind`` is ``None`` for cards collected before the reader could say, and
+    for those it stays ``None`` until they say so in 單字庫. It is never
+    guessed.
+
+    ``comicTitle``/``chapterTitle`` are joined from the in-memory catalog at
+    read time rather than stored, exactly as ``ComprehensionRecordResponse``
+    does: the card holds path-hash ids, which are correct as keys and useless as
+    labels. A ``None`` comic title is also the client's cue that jumping back to
+    the page would fail, because the join is what proves the comic is still in
+    the library.
     """
 
     id: int
@@ -233,11 +249,37 @@ class LearningCardResponse(BaseModel):
     comicId: str
     chapterId: str
     pageNumber: int
+    comicTitle: Optional[str] = None
+    chapterTitle: Optional[str] = None
+    kind: Optional[str] = None
     ladderStage: int
     dueOn: str  # ISO-8601 date
     lookupCount: int
     lastLookedUpAt: Optional[str] = None  # ISO-8601 UTC
     createdAt: str  # ISO-8601 UTC
+
+
+class LearningCardUpdate(BaseModel):
+    """Request body for ``PATCH /cards/{id}``.
+
+    **Exactly two fields, and refusing the rest is the point.** ``sourceText``
+    is half the card's identity and ``targetLanguage`` is the other half;
+    changing either could collide with another card under the unique constraint,
+    and changing the source would detach the row from the
+    ``comicId``/``chapterId``/``pageNumber`` still pointing at where that exact
+    line was read. The source reference is a fact about the past. A field that
+    is accepted and then quietly changes which card this *is* would be a trap
+    for whoever touches this next.
+
+    **A null ``kind`` is a value, not an omission.** Cards collected before the
+    two save buttons existed have none, and the reader must be able to clear a
+    wrong answer as well as set one -- so the route reads ``model_fields_set``
+    rather than testing for ``None``. This is the one place in this feature
+    where "absent" and "present and null" mean different things.
+    """
+
+    translation: Optional[str] = Field(default=None, min_length=1)
+    kind: Optional[Literal["word", "sentence"]] = None
 
 
 class ComprehensionRecordReadUpdate(BaseModel):

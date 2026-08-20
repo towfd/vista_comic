@@ -308,3 +308,237 @@ def test_a_lookup_does_not_touch_the_schedule(client):
 def test_a_lookup_for_a_card_that_is_gone_is_a_404(client):
     """The app drops a 4xx from its queue rather than retrying it forever."""
     assert client.post("/cards/999999/lookups").status_code == 404
+
+
+# --- word or sentence, said by the reader (ticket 06) -----------------------
+
+
+def test_a_card_records_which_button_was_pressed(client):
+    word = _add(client, sourceText="ひとつ", kind="word").json()
+    sentence = _add(client, sourceText="ふたつ", kind="sentence").json()
+
+    assert word["kind"] == "word"
+    assert sentence["kind"] == "sentence"
+
+
+def test_a_card_collected_without_a_kind_has_none(client):
+    """Never guessed. A client that does not say leaves it unanswered."""
+    assert _add(client).json()["kind"] is None
+
+
+def test_an_unrecognised_kind_is_refused(client):
+    """It would reach stage 3 as a card no question type knows how to ask
+    about, which is worse than refusing it here."""
+    resp = _add(client, sourceText="みっつ", kind="paragraph")
+
+    assert resp.status_code == 422
+    assert client.get("/cards").json() == []
+
+
+def test_collecting_under_the_other_button_leaves_the_kind_alone(client):
+    """Re-collecting is not a correction.
+
+    The system does not silently rewrite something the reader already approved
+    — the same rule the stored translation follows. 單字庫 is where a mis-tap
+    gets fixed.
+    """
+    first = _add(client, kind="word").json()
+
+    again = _add(client, kind="sentence")
+
+    assert again.status_code == 200
+    assert again.json()["id"] == first["id"]
+    assert again.json()["kind"] == "word"
+    assert len(client.get("/cards").json()) == 1
+
+
+def test_kind_is_not_part_of_a_cards_identity(client):
+    """Otherwise the library would hold two visually identical rows, and the
+    lookup count that stages 3 and 4 read would be split across them."""
+    _add(client, kind="word")
+    _add(client, kind="sentence")
+
+    assert len(client.get("/cards").json()) == 1
+
+
+# --- fixing a card (spec-02 ticket 01) --------------------------------------
+
+
+def test_the_translation_can_be_corrected(client):
+    card = _add(client).json()
+
+    resp = client.patch(f"/cards/{card['id']}", json={"translation": "你沒事吧"})
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["translation"] == "你沒事吧"
+    assert client.get("/cards").json()[0]["translation"] == "你沒事吧"
+
+
+def test_the_kind_can_be_set_changed_and_cleared(client):
+    """Clearing matters: a card collected before the two buttons has no kind,
+    and a mis-tap is corrected here because re-collecting leaves it alone."""
+    card = _add(client).json()
+    assert card["kind"] is None
+
+    assert client.patch(f"/cards/{card['id']}", json={"kind": "word"}).json()["kind"] == "word"
+    assert client.patch(f"/cards/{card['id']}", json={"kind": "sentence"}).json()["kind"] == "sentence"
+    assert client.patch(f"/cards/{card['id']}", json={"kind": None}).json()["kind"] is None
+
+
+def test_a_patch_that_changes_nothing_is_refused(client):
+    """A client bug should surface as an error, not as a save that quietly did
+    not happen."""
+    card = _add(client).json()
+
+    assert client.patch(f"/cards/{card['id']}", json={}).status_code == 422
+
+
+def test_a_patch_cannot_move_the_cards_identity(client):
+    """The columns that decide *which card this is* are not the client's.
+
+    Asserted rather than assumed: the failure this guards against is a field
+    silently accepted, which no amount of reading the handler would reveal.
+    """
+    card = _add(client).json()
+
+    client.patch(
+        f"/cards/{card['id']}",
+        json={
+            "translation": "你沒事吧",
+            "sourceText": "まったく違う",
+            "targetLanguage": "en",
+            "comicId": "somewhere-else",
+            "pageNumber": 999,
+        },
+    )
+
+    after = client.get("/cards").json()[0]
+    assert after["sourceText"] == _BODY["sourceText"]
+    assert after["targetLanguage"] == _BODY["targetLanguage"]
+    assert after["comicId"] == _BODY["comicId"]
+    assert after["pageNumber"] == _BODY["pageNumber"]
+
+
+def test_a_patch_leaves_the_reviewing_columns_alone(client):
+    """Scheduling is stage 3's business, and the lookup count is evidence."""
+    card = _add(client).json()
+    client.post(f"/cards/{card['id']}/lookups")
+
+    client.patch(f"/cards/{card['id']}", json={"translation": "你沒事吧"})
+
+    after = client.get("/cards").json()[0]
+    assert after["ladderStage"] == card["ladderStage"]
+    assert after["dueOn"] == card["dueOn"]
+    assert after["lookupCount"] == 1
+    assert after["createdAt"] == card["createdAt"]
+
+
+def test_an_unrecognised_kind_is_refused_on_patch(client):
+    card = _add(client).json()
+
+    assert client.patch(f"/cards/{card['id']}", json={"kind": "paragraph"}).status_code == 422
+
+
+def test_an_empty_translation_is_refused(client):
+    card = _add(client).json()
+
+    assert client.patch(f"/cards/{card['id']}", json={"translation": ""}).status_code == 422
+
+
+def test_patching_a_card_that_is_gone_is_a_404(client):
+    assert client.patch("/cards/999999", json={"translation": "x"}).status_code == 404
+
+
+def test_a_card_can_be_deleted(client):
+    card = _add(client).json()
+
+    assert client.delete(f"/cards/{card['id']}").status_code == 204
+    assert client.get("/cards").json() == []
+
+
+def test_deleting_twice_is_a_404(client):
+    card = _add(client).json()
+
+    client.delete(f"/cards/{card['id']}")
+
+    assert client.delete(f"/cards/{card['id']}").status_code == 404
+
+
+def test_a_deleted_line_can_be_collected_again_as_a_new_card(client):
+    """A real delete, so nothing lingers to be revived — the new card starts
+    from zero, which is the honest answer after the old one was thrown away."""
+    first = _add(client).json()
+    client.post(f"/cards/{first['id']}/lookups")
+    client.delete(f"/cards/{first['id']}")
+
+    again = _add(client)
+
+    assert again.status_code == 201
+    assert again.json()["id"] != first["id"]
+    assert again.json()["lookupCount"] == 0
+
+
+# --- titles joined at read time (spec-02 ticket 03) -------------------------
+
+
+def _catalog_with(comic_id: str, chapter_id: str):
+    """The smallest catalog that resolves one card's source."""
+    from pathlib import Path
+
+    from app.models import ChapterEntry, ComicEntry
+    from app.scanner import Catalog, ScanReport
+
+    return Catalog.build(
+        comics=[
+            ComicEntry(
+                id=comic_id,
+                title="marrymyhusband",
+                cover_path=None,
+                chapters=[
+                    ChapterEntry(
+                        id=chapter_id, number=1, title="bai1", page_paths=["a.jpg"]
+                    )
+                ],
+            )
+        ],
+        report=ScanReport(),
+        root=Path("/library"),
+    )
+
+
+def test_cards_carry_titles_joined_from_the_catalog(client, monkeypatch):
+    """The row holds path-hash ids, which are keys, not labels."""
+    monkeypatch.setattr(
+        main.state, "catalog", _catalog_with(_BODY["comicId"], _BODY["chapterId"])
+    )
+
+    card = _add(client).json()
+
+    assert card["comicTitle"] == "marrymyhusband"
+    assert card["chapterTitle"] == "bai1"
+    assert client.get("/cards").json()[0]["comicTitle"] == "marrymyhusband"
+
+
+def test_a_card_whose_comic_is_gone_has_null_titles(client, monkeypatch):
+    """Not a failure: the card stays perfectly readable, and the null title is
+    what tells the app that jumping back to the page would not work."""
+    monkeypatch.setattr(main.state, "catalog", _catalog_with("other", "other"))
+
+    card = _add(client).json()
+
+    assert card["comicTitle"] is None
+    assert card["chapterTitle"] is None
+
+
+def test_cards_are_still_listable_when_the_catalog_is_unavailable(
+    client, monkeypatch
+):
+    """Titles are decoration; the deck is the data. A library scan that has not
+    happened must not cost the reader their vocabulary."""
+    monkeypatch.setattr(main.state, "catalog", None)
+
+    _add(client)
+
+    listed = client.get("/cards")
+    assert listed.status_code == 200
+    assert listed.json()[0]["comicTitle"] is None
