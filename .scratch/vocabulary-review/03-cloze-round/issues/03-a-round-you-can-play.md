@@ -14,7 +14,7 @@ For the same reason a wrong answer is simply shown as wrong and the round contin
 
 **Blocked by:** 02.
 
-**Status:** implemented on branch `feat/cloze-round`, 2026-08-20. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** done — exit 0 with zero failures, and **device-verified by the repo owner, 2026-08-20**. The entry screen was reworked during the pass (see *Changed during the device pass*).
 
 - [x] A 練習 tab exists; the tab bar has four tabs
 - [x] A round presents five questions and ends when all five are answered
@@ -75,3 +75,23 @@ The deck holds 30 cards — 22 words, 7 sentences — of which **6 sentence card
 9. Check the backend afterwards — **no rows were written by playing**.
 10. Both phone sizes: a long sentence with a blank wraps rather than truncating, and the four
     option buttons do not overflow.
+
+## Changed during the device pass
+
+Everything passed; the objection was to how it looked.
+
+**The entry screen became a card.** It had been a line of grey text and a button. It now shows
+five dots for five questions, then what the round is made of, then Play — a shape stage 4 can
+fill in as progress and stage 8 can hang a streak on, rather than one to redesign twice.
+
+**Every figure on it is real, and that constraint did most of the work.** A card layout is exactly
+what invites a `🔥 0` in the corner: it would look right and mean nothing, permanently, because
+this stage has no counter behind it. What it shows instead is the deck — and "sentences ready"
+counts sentences that can carry a blank rather than sentences owned, because the real deck holds
+seven and one is OCR-mangled past matching. Showing seven would promise a question that never
+appears.
+
+**`AppFont` gained two sizes**, `prompt` (22) and `statistic` (28). There was nothing between a
+list row at 14 and a screen heading at 36, which is why the practice sentence had been rendering
+at list-row size. **That half is still outstanding** — the sentence in a question is still 14pt,
+pending the repo owner saying what they want the question screen to feel like.
