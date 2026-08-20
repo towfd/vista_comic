@@ -51,7 +51,7 @@ The list reads through the repository and falls back to the deck snapshot when t
 
 **Blocked by:** 02 — Free the jump-to-source route from 歷史紀錄.
 
-**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-20 — backend `226 passed`, iOS `TEST BUILD SUCCEEDED`. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** done — backend `226 passed`, iOS exit 0 with zero failures, and **device-verified by the repo owner, 2026-08-20**. The tab bar is 書庫 / 已下載 / Vocabulary; 歷史紀錄 is gone.
 
 - [x] A 單字庫 tab replaces 歷史紀錄; the tab bar still has three tabs
 - [x] Cards are grouped by familiarity, and a deck all on one rung renders one section rather than several empty ones

@@ -16,7 +16,7 @@ This is narrower than stage 1's collecting, and the reason is not effort. Every 
 
 **Blocked by:** 01 — Edit and delete on the backend; 03 — 單字庫 takes the tab.
 
-**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-20. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** done — iOS exit 0 with zero failures, and **device-verified by the repo owner, 2026-08-20**, including two changes they asked for during the pass (see *Changed during the device pass*).
 
 - [x] The translation can be edited and the change persists
 - [x] The kind can be set, changed, and cleared, including on cards that never had one
@@ -60,3 +60,17 @@ Two suites of unit tests. The structural one is worth naming: **`update` takes a
 7. **Delete one of the three duplicate Vietnamese cards**, then re-frame that same line in the reader: it offers to add rather than claiming you already learned it — the marker's snapshot was refreshed.
 8. **Airplane mode**: editing and deleting both refuse and say a connection is needed. Nothing appears to succeed, and what you typed is still there.
 9. A card whose comic has left the library shows "no longer in your library" instead of a link.
+
+## Changed during the device pass
+
+Both the repo owner's, both kept with their reasoning in the spec.
+
+**Grouped by kind, not familiarity.** The spec's grouping was a mistake I did not catch when
+writing it: stage 1 writes rung 0 and nothing advances it until stage 3, so familiarity bands
+would have been one heading over everything for weeks. Kind varies today, and Unclassified is a
+list of cards needing work — a workshop's natural first question. Familiarity moved to the card's
+own screen, and appears on a row only once a card has actually advanced.
+
+**Deleting asks a question.** It was a confirmation sheet whose only choice was the destructive
+one — tap Delete, then tap Delete again. Now an alert with Cancel and Delete, so the reader
+answers rather than being handed a button that finishes what the first one started.
