@@ -297,7 +297,9 @@ class CardReviewCreate(BaseModel):
     retroactively.
     """
 
-    questionType: Literal["cloze_choice", "cloze_typed"]
+    questionType: Literal[
+        "cloze_choice", "cloze_typed", "sentence_rearranged", "sentence_typed"
+    ]
     isCorrect: bool
     clientToken: str = Field(min_length=1, max_length=100)
     elapsedMs: Optional[int] = Field(default=None, ge=0)

@@ -79,3 +79,23 @@ func toneInsensitiveKey(_ text: String) -> String {
         .filter { !(0x0300...0x036F).contains($0.value) }
     return String(String.UnicodeScalarView(stripped))
 }
+
+
+/// `text` with punctuation removed too, on top of `normalizedKey`.
+///
+/// **Only for judging what the reader produced.** `normalizedKey` deliberately
+/// keeps punctuation, because it backs card identity and two lines differing by
+/// a full stop are two things the reader framed differently. Judging wants the
+/// opposite: the deck's sentences end in `.` and `,` (`CHO BẢN THÂN.`,
+/// `MÌNH NỮA,`), and marking a perfect answer wrong over a missing full stop
+/// would be charging for punctuation rather than testing recall.
+///
+/// The gap this closes was found by a test written from the spec: the spec had
+/// been saying "punctuation and spacing never matter" since stage 3, and only
+/// spacing was ever true.
+func punctuationInsensitiveKey(_ text: String) -> String {
+    String(normalizedKey(text).unicodeScalars.filter {
+        !CharacterSet.punctuationCharacters.contains($0)
+            && !CharacterSet.symbols.contains($0)
+    })
+}

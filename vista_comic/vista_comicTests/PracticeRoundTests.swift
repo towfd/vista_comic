@@ -35,33 +35,9 @@ private let usableDeck: [LearningCard] = [
 @Suite("Building a round")
 struct PracticeRoundTests {
 
-    @Test("A round is five questions")
-    func aRoundIsFiveQuestions() throws {
-        let items = try makeRound(from: usableDeck).get()
-
-        #expect(items.count == practiceRoundLength)
-    }
-
-    @Test("A round exercises both ways of answering")
-    func aRoundUsesBothAnswerModes() throws {
-        // Alternating rather than random: nothing yet knows how familiar a card
-        // is, so nothing can choose — and a random pick would sometimes give
-        // five of one, leaving an interface untested.
-        let items = try makeRound(from: usableDeck).get()
-
-        #expect(items.contains { $0.mode == .choosing })
-        #expect(items.contains { $0.mode == .typing })
-    }
-
-    @Test("A question with too small a deck behind it is typed, whatever the alternation says")
-    func aQuestionWithoutChoicesIsTyped() throws {
-        // Two cards can make a question but not four options. Showing two and
-        // calling it a choice would be worse than asking them to type.
-        let small = [sentence(100, "TRONG KHI MÌNH BỊ"), word(1, "TRONG KHI")]
-
-        let items = try makeRound(from: small).get()
-
-        #expect(items.allSatisfy { $0.mode == .typing })
+    @Test("A round is ten questions")
+    func aRoundIsTenQuestions() throws {
+        #expect(try makeRound(from: usableDeck).get().count == practiceRoundLength)
     }
 
     @Test("A short deck repeats cards rather than shortening the round")
@@ -70,27 +46,161 @@ struct PracticeRoundTests {
         // there is to practise.
         let one = [sentence(100, "TRONG KHI MÌNH BỊ"), word(1, "TRONG KHI")]
 
-        let items = try makeRound(from: one).get()
-
-        #expect(items.count == practiceRoundLength)
-        #expect(Set(items.map(\.question.card.id)) == [100])
+        #expect(try makeRound(from: one).get().count == practiceRoundLength)
     }
 
-    @Test("Every item is answerable")
-    func everyItemIsAnswerable() throws {
+    @Test("A card never appears twice in a row")
+    func aCardNeverAppearsTwiceInARow() throws {
+        // The guard against the deadlock pure unfamiliarity ordering creates:
+        // the least familiar card always wins, and getting it wrong makes it
+        // win harder.
         let items = try makeRound(from: usableDeck).get()
 
-        for item in items {
-            #expect(!item.question.prompt.isEmpty)
-            #expect(!item.question.removed.isEmpty)
-            // A blank must actually be a blank — the prompt cannot still
-            // contain the word it is asking for.
-            #expect(item.question.prompt.contains("____"))
-            if item.mode == .choosing {
-                #expect(item.question.choices.count == clozeChoiceCount)
+        for (previous, next) in zip(items, items.dropFirst()) {
+            #expect(previous.card.id != next.card.id)
+        }
+    }
+
+    @Test("Every item can actually be answered")
+    func everyItemIsAnswerable() throws {
+        for item in try makeRound(from: usableDeck).get() {
+            #expect(!item.prompt.isEmpty)
+            switch item.mode {
+            case .choosing:
+                #expect(item.question?.choices.count == clozeChoiceCount)
+            case .typing:
+                #expect(item.question != nil)
+            case .rearranging:
+                #expect(canRearrange(item.card))
+            case .translating:
+                #expect(!item.card.sourceText.isEmpty)
             }
         }
     }
+}
+
+@Suite("Difficulty follows the rung")
+struct AskedDifficultyTests {
+
+    @Test("The bottom rungs ask for recognition", arguments: [0, 1])
+    func bottomRungsAskForRecognition(_ rung: Int) {
+        #expect(askedDifficulty(forRung: rung) == [.choosing])
+    }
+
+    @Test("The middle rungs ask for production with support", arguments: [2, 3])
+    func middleRungsAskForSupportedProduction(_ rung: Int) {
+        #expect(askedDifficulty(forRung: rung) == [.typing, .rearranging])
+    }
+
+    @Test("The top rung asks for production from nothing")
+    func theTopRungAsksForProduction() {
+        #expect(askedDifficulty(forRung: 4) == [.translating])
+    }
+
+    @Test("The whole deck at rung zero means every question is four-choice")
+    func aFreshDeckIsAllRecognition() throws {
+        // Worth pinning, because it is what the reader will actually see on the
+        // first day and it looks like the difficulty curve is not working.
+        let items = try makeRound(from: usableDeck).get()
+        let sentences = items.filter { $0.card.kind == .sentence }
+
+        #expect(sentences.allSatisfy { $0.mode == .choosing })
+    }
+
+    @Test("A card's two appearances in one round are the same difficulty")
+    func twoAppearancesShareADifficulty() throws {
+        // The reason difficulty follows the rung rather than the day: using the
+        // day would make the second appearance harder purely because the first
+        // went well.
+        let deck = [sentence(100, "TRONG KHI MÌNH BỊ"), word(1, "TRONG KHI")]
+        let items = try makeRound(from: deck).get()
+
+        // Every mode offered comes from the same rung, so a card's appearances
+        // are the same *difficulty* even where the band offers two ways of
+        // asking — which is the point: the second is not harder because the
+        // first went well.
+        let asked = Set(items.filter { $0.card.id == 100 }.map(\.mode))
+        let band = Set(askableModes(for: deck[0], deck: deck))
+
+        #expect(asked.isSubset(of: band))
+    }
+}
+
+@Suite("Every card can be asked something")
+struct AskableModeTests {
+
+    @Test("A word card in no sentence is still askable — it is translated")
+    func anOrphanWordCardIsAskable() {
+        // Eleven of the deck's twenty-two word cards are like this. Before
+        // this stage they were collected, listed, counted on the practice card,
+        // and never asked about.
+        let orphan = word(1, "QUỐC HỘI")
+        let deck = [orphan, sentence(100, "TRONG KHI MÌNH BỊ"), word(2, "TRONG KHI")]
+
+        #expect(askableModes(for: orphan, deck: deck) == [.translating])
+    }
+
+    @Test("A word card never gets a cloze, at any rung", arguments: [0, 2, 4])
+    func aWordCardNeverGetsACloze(_ rung: Int) {
+        let card = LearningCard.preview(id: 1, sourceText: "QUỐC HỘI", kind: "word", ladderStage: rung)
+
+        let modes = askableModes(for: card, deck: [card])
+
+        #expect(!modes.contains(.choosing))
+        #expect(!modes.contains(.typing))
+    }
+
+    @Test("A sentence with no deck word in it falls back rather than vanishing")
+    func anUnmatchedSentenceFallsBack() {
+        // Its rung asks for a cloze and it cannot carry one — but it can still
+        // be translated, so it stays in the round.
+        let lonely = sentence(100, "NGAY CẢ KHI HỌC SINH XÂM PHAM")
+        let deck = [lonely, word(1, "XÂM PHẠM")]
+
+        let modes = askableModes(for: lonely, deck: deck)
+
+        // Rearranging as well as typing: the fallback offers everything the
+        // card can do, easiest first, and a multi-word sentence can be
+        // assembled from pieces even when no deck word sits inside it.
+        #expect(modes == [.rearranging, .translating])
+        #expect(!modes.contains(.choosing))
+    }
+
+    @Test("A card at the top rung is asked to be translated")
+    func aTopRungCardIsTranslated() {
+        let card = LearningCard.preview(
+            id: 100, sourceText: "TRONG KHI MÌNH BỊ", kind: "sentence", ladderStage: 4
+        )
+
+        #expect(askableModes(for: card, deck: [card]) == [.translating])
+    }
+
+    @Test("A middle-rung sentence is typed or rearranged, never four-choice")
+    func aMiddleRungSentenceProduces() {
+        let card = LearningCard.preview(
+            id: 100, sourceText: "TRONG KHI MÌNH BỊ", kind: "sentence", ladderStage: 2
+        )
+        let deck = [card, word(1, "TRONG KHI"), word(2, "XẤU"), word(3, "VÀI"), word(4, "CHỊU")]
+
+        let modes = askableModes(for: card, deck: deck)
+
+        #expect(modes.contains(.typing))
+        #expect(modes.contains(.rearranging))
+        #expect(!modes.contains(.choosing))
+    }
+
+    @Test("Nothing is askable from a card with no text to ask for")
+    func anEmptyCardIsNotAskable() {
+        // The only case worth excluding a card for, since typed translation
+        // asks for the card itself and always applies otherwise.
+        let blank = LearningCard.preview(id: 1, sourceText: "   ", kind: "word")
+
+        #expect(makeRound(from: [blank, word(2, "XẤU")]).isFailure == false)
+    }
+}
+
+extension Result {
+    var isFailure: Bool { if case .failure = self { true } else { false } }
 }
 
 @Suite("When a round cannot be built")
@@ -106,27 +216,36 @@ struct RoundUnavailableTests {
         #expect(makeRound(from: [word(1, "TRONG KHI")]) == .failure(.tooFewCards(needed: 1)))
     }
 
-    @Test("Cards but no usable sentence is a different problem, worded differently")
-    func noUsableSentenceIsItsOwnProblem() {
-        // This reader has plenty of words. Telling them to collect more would
-        // send them to the wrong action — what they lack is a sentence holding
-        // a word they already have.
+    @Test("A deck of only words can now be practised")
+    func aDeckOfOnlyWordsCanBePractised() throws {
+        // Changed by stage 5, deliberately. This assertion used to be that a
+        // deck with no usable sentence could build no round — true when cloze
+        // was the only question type, and the reason eleven of the deck's word
+        // cards were never asked about. A word card can be *translated*, which
+        // needs no sentence.
         let wordsOnly = [word(1, "TRONG KHI"), word(2, "ĂN MÒN"), word(3, "XẤU")]
 
-        #expect(makeRound(from: wordsOnly) == .failure(.noSentencesWithKnownWords))
+        let items = try makeRound(from: wordsOnly).get()
+
+        #expect(items.count == practiceRoundLength)
+        #expect(items.allSatisfy { $0.mode == .translating })
     }
 
-    @Test("A sentence with none of the reader's words is not usable")
-    func anUnrelatedSentenceIsNotUsable() {
-        // Exactly the real deck's one dud: OCR read `XÂM PHẠM` as `XÂM PHAM`,
-        // so nothing in it matches a card.
+    @Test("A sentence with none of the reader's words is still askable")
+    func anUnmatchedSentenceIsStillAskable() throws {
+        // The real deck's one dud: OCR read `XÂM PHẠM` as `XÂM PHAM`, so no
+        // card matches inside it and it can carry no cloze. It can still be
+        // produced from its meaning, which is what keeps it in the round.
         let deck = [
             sentence(100, "NGAY CẢ KHI HỌC SINH CÓ HÀNH VI XÂM PHAM"),
             word(1, "XÂM PHẠM"),
             word(2, "THẨM QUYỀN"),
         ]
 
-        #expect(makeRound(from: deck) == .failure(.noSentencesWithKnownWords))
+        let items = try makeRound(from: deck).get()
+
+        #expect(items.contains { $0.card.id == 100 })
+        #expect(items.filter { $0.card.id == 100 }.allSatisfy { $0.question == nil })
     }
 }
 

@@ -10,13 +10,29 @@ It is the same normalisation the deck already agrees on: punctuation and spacing
 
 **Blocked by:** nothing.
 
-**Status:** not started.
+**Status:** implemented on branch `feat/sentence-translation`, 2026-08-20 — backend `282 passed`; iOS covered by `SentenceAnswerTests`.
 
-- [ ] The exact sentence is correct
-- [ ] Case, spacing and punctuation differences are still correct
-- [ ] A missing or wrong tone is correct-and-named, matching cloze's existing verdict type
-- [ ] The right words in the wrong order are **wrong** — this is the point of the question type
-- [ ] A different word is wrong
-- [ ] An empty answer is wrong rather than vacuously right
-- [ ] A word card's single word is judged by the same function, with no special case
-- [ ] Nothing here changes `normalizedKey` or what `deckWords` matches
+- [x] The exact sentence is correct
+- [x] Case, spacing and punctuation differences are still correct
+- [x] A missing or wrong tone is correct-and-named, matching cloze's existing verdict type
+- [x] The right words in the wrong order are **wrong** — this is the point of the question type
+- [x] A different word is wrong
+- [x] An empty answer is wrong rather than vacuously right
+- [x] A word card's single word is judged by the same function, with no special case
+- [x] Nothing here changes `normalizedKey` or what `deckWords` matches
+
+## What was built
+
+`Features/Study/SentenceAnswer.swift` — `judgeSentenceAnswer`, and
+`punctuationInsensitiveKey` in `TextNormalization.swift`.
+
+**A test written from the spec found the spec wrong.** It had claimed since stage 3 that
+"punctuation and spacing" were both ignored — and only spacing ever was. `normalizedKey` keeps
+punctuation on purpose, because it backs card identity and two lines differing by a full stop are
+two things the reader framed differently.
+
+Judging wants the opposite: the deck's sentences end in `.` and `,` (`CHO BẢN THÂN.`,
+`MÌNH NỮA,`), so marking a perfect answer wrong over a missing full stop would charge for
+punctuation rather than test recall. So punctuation is stripped **in judging only**, layered on
+top of `normalizedKey` exactly as tone-forgiveness already is — and the spec is corrected rather
+than the claim quietly left standing.

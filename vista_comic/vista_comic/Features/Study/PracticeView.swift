@@ -212,6 +212,9 @@ private struct RoundView: View {
     @State private var queue: [PracticeItem] = []
     @State private var asked = 0
     @State private var typed = ""
+    /// The rearrangement in progress: what has been placed, and what is left.
+    @State private var assembled: [String] = []
+    @State private var available: [String] = []
     /// `nil` while the question is open; set once answered, and what the screen
     /// shows instead of accepting another answer.
     @State private var verdict: TypedVerdict?
@@ -226,7 +229,10 @@ private struct RoundView: View {
         // Seeded here rather than in an initialiser so the queue survives the
         // view being rebuilt, which SwiftUI does freely.
         Color.clear.frame(height: 0).task {
-            if queue.isEmpty && asked == 0 { queue = items }
+            if queue.isEmpty && asked == 0 {
+                queue = items
+                seedPieces()
+            }
         }
     }
 
@@ -239,8 +245,10 @@ private struct RoundView: View {
                 .font(AppFont.caption)
                 .foregroundStyle(.grayFont)
 
-            Text(item.question.prompt)
-                .font(AppFont.rowTitle)
+            // The two whole-sentence modes show the meaning and ask for the
+            // Vietnamese; the cloze modes show the sentence with a gap in it.
+            Text(item.prompt)
+                .font(AppFont.prompt)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let verdict {
@@ -248,7 +256,8 @@ private struct RoundView: View {
             } else {
                 switch item.mode {
                 case .choosing: choices(item)
-                case .typing: typing(item)
+                case .typing, .translating: typing(item)
+                case .rearranging: rearranging(item)
                 }
             }
 
@@ -260,9 +269,9 @@ private struct RoundView: View {
 
     private func choices(_ item: PracticeItem) -> some View {
         VStack(spacing: 8) {
-            ForEach(item.question.choices) { choice in
+            ForEach(item.question?.choices ?? []) { choice in
                 Button {
-                    answer(choice.id == item.question.answer.id ? .correct : .wrong)
+                    answer(choice.id == item.question?.answer.id ? .correct : .wrong)
                 } label: {
                     Text(choice.sourceText)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -280,11 +289,58 @@ private struct RoundView: View {
                 .textInputAutocapitalization(.never)
                 .accessibilityIdentifier("clozeAnswerField")
             Button("Check") {
-                answer(judgeClozeAnswer(typed, for: item.question))
+                // A cloze asks for the missing word; a translation asks for
+                // the card itself. Same normalisation either way.
+                answer(
+                    item.question.map { judgeClozeAnswer(typed, for: $0) }
+                        ?? judgeSentenceAnswer(typed, for: item.card)
+                )
             }
             .buttonStyle(.borderedProminent)
             .tint(.primaryRed)
             .disabled(typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    /// Pieces to put in order, and the sentence being built from them.
+    private func rearranging(_ item: PracticeItem) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // The answer so far, on its own line so it reads as a sentence
+            // rather than as a row of buttons.
+            Text(assembled.joined(separator: " "))
+                .font(AppFont.prompt)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            // Wrapping, because a sentence splits into twelve to fifteen pieces
+            // and one scrolling row would hide most of them.
+            ScrollView {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 72), spacing: 8)],
+                    spacing: 8
+                ) {
+                    ForEach(Array(available.enumerated()), id: \.offset) { index, piece in
+                        Button(piece) { assembled.append(available.remove(at: index)) }
+                            .buttonStyle(.bordered)
+                    }
+                }
+            }
+            .frame(maxHeight: 180)
+
+            HStack {
+                Button("Check") { answer(judgeArrangement(assembled, for: item.card)) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.primaryRed)
+                    .disabled(assembled.isEmpty)
+
+                // Undoing one piece rather than starting over: a misplacement
+                // near the end of fifteen should not cost the other fourteen.
+                Button("Take back") { available.append(assembled.removeLast()) }
+                    .buttonStyle(.bordered)
+                    .disabled(assembled.isEmpty)
+            }
         }
     }
 
@@ -297,7 +353,7 @@ private struct RoundView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(
                 verdict == .wrong
-                    ? "The answer was \(item.question.removed)"
+                    ? "The answer was \(item.question?.removed ?? item.card.sourceText)"
                     : "Correct",
                 systemImage: verdict == .wrong ? "xmark.circle.fill" : "checkmark.circle.fill"
             )
@@ -308,13 +364,13 @@ private struct RoundView: View {
             // knew the word — but a lesson that said nothing here would be
             // teaching that Vietnamese tones are decoration.
             if verdict == .correctApartFromTones {
-                Text("Watch the tones: \(item.question.removed)")
+                Text("Watch the tones: \(item.question?.removed ?? item.card.sourceText)")
                     .font(AppFont.caption)
                     .foregroundStyle(.grayFont)
                     .accessibilityIdentifier("toneHint")
             }
 
-            Text(item.question.card.translation)
+            Text(item.card.translation)
                 .font(AppFont.caption)
                 .foregroundStyle(.grayFont)
 
@@ -367,7 +423,7 @@ private struct RoundView: View {
     /// gave stands on screen either way.
     private func submit(_ item: PracticeItem, correct: Bool) async {
         let result = try? await repository.recordReview(
-            cardID: item.question.card.id,
+            cardID: item.card.id,
             questionType: item.questionType,
             isCorrect: correct,
             clientToken: item.token,
@@ -376,7 +432,7 @@ private struct RoundView: View {
         )
         outcome.record(
             correct: correct,
-            cardID: item.question.card.id,
+            cardID: item.card.id,
             step: result?.step ?? .unknown
         )
     }
@@ -390,6 +446,7 @@ private struct RoundView: View {
         if verdict == .wrong {
             queue.append(
                 PracticeItem(
+                    card: finished.card,
                     question: finished.question,
                     mode: finished.mode,
                     isDue: finished.isDue
@@ -398,6 +455,19 @@ private struct RoundView: View {
         }
         typed = ""
         verdict = nil
+        seedPieces()
+    }
+
+    /// Fills the piece rows for a rearrangement, and empties them otherwise so
+    /// a stale arrangement cannot be checked against the next question.
+    private func seedPieces() {
+        guard let item = queue.first, item.mode == .rearranging else {
+            assembled = []
+            available = []
+            return
+        }
+        assembled = []
+        available = shuffledPieces(of: item.card)
     }
 }
 

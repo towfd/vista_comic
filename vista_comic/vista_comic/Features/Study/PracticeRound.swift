@@ -25,20 +25,54 @@ import Foundation
 /// PRD asks for.
 let practiceRoundLength = 10
 
-/// How the reader answers one question.
+/// What the reader is asked to do.
 ///
-/// Which one appears is **alternated**, not chosen: nothing yet knows how
-/// familiar a card is, so nothing can decide. Stage 4 replaces the alternation
-/// with a real difficulty ladder; until then alternating at least gets both
-/// interfaces exercised.
+/// Chosen by the card's **ladder rung** — how well it is known over weeks —
+/// rather than by its position in today's three steps. Using the day would put
+/// every card back to four choices each morning, including words learned months
+/// ago, and would make a card's two appearances in one round differ in
+/// difficulty purely because the first went well.
+///
+/// Stage 3 alternated between the first two because nothing then knew how
+/// familiar a card was. That was always a placeholder for this.
 enum AnswerMode: Hashable {
+    /// Cloze, four choices. Recognition.
     case choosing
+    /// Cloze, typed. Production with the sentence still in front of the reader.
     case typing
+    /// The whole sentence, from scrambled pieces. Production with support.
+    case rearranging
+    /// The whole sentence, typed, from the meaning alone.
+    case translating
+}
+
+/// The difficulty band a rung falls in.
+///
+/// Three bands over five rungs, not five: the ladder is an interval schedule and
+/// the question types are a difficulty curve, and they do not have to agree on
+/// how many steps they have.
+///
+/// **The whole deck sits on rung 0 today**, so every question will be
+/// four-choice until cards start climbing. That is the design working, not a
+/// defect — but it is worth expecting rather than reporting.
+func askedDifficulty(forRung rung: Int) -> [AnswerMode] {
+    switch rung {
+    case ..<2: [.choosing]
+    case 2...3: [.typing, .rearranging]
+    default: [.translating]
+    }
 }
 
 /// One question, and how it is to be answered.
+///
+/// `question` is `nil` for the two whole-sentence modes: they ask for the card
+/// itself, so there is no blank and nothing to build. That is also how a **word
+/// card** enters a round at all — eleven of the deck's twenty-two appear in no
+/// sentence, so no cloze can ever be made from them, and before this they were
+/// collected and counted and never asked about.
 struct PracticeItem: Identifiable, Hashable {
-    let question: ClozeQuestion
+    let card: LearningCard
+    let question: ClozeQuestion?
     let mode: AnswerMode
     /// Whether this card was actually due.
     ///
@@ -51,10 +85,20 @@ struct PracticeItem: Identifiable, Hashable {
     /// answer carries the same token and cannot count twice.
     let token = UUID().uuidString
 
-    var id: String { "\(question.id)-\(mode)-\(token)" }
+    /// What the reader is shown to work from.
+    var prompt: String {
+        question?.prompt ?? card.translation
+    }
+
+    var id: String { "\(card.id)-\(mode)-\(token)" }
 
     var questionType: ReviewQuestionType {
-        mode == .choosing ? .clozeChoice : .clozeTyped
+        switch mode {
+        case .choosing: .clozeChoice
+        case .typing: .clozeTyped
+        case .rearranging: .sentenceRearranged
+        case .translating: .sentenceTyped
+        }
     }
 }
 
@@ -88,8 +132,12 @@ func makeRound(
         return .failure(.tooFewCards(needed: 2 - deck.count))
     }
 
-    let questions = deck.compactMap { makeCloze(from: $0, deck: deck) }
-    guard !questions.isEmpty else {
+    // Every card that can be asked *something*. A card unaskable at its own
+    // rung falls back rather than being dropped — question types follow from
+    // what a card supports, and a card supporting nothing at all is the only
+    // reason to leave it out.
+    let askable = deck.filter { !askableModes(for: $0, deck: deck).isEmpty }
+    guard !askable.isEmpty else {
         return .failure(.noSentencesWithKnownWords)
     }
 
@@ -98,10 +146,10 @@ func makeRound(
     // argument about discouragement does not apply; and a card at 熟悉 needs
     // one more correct answer where a card at 不熟 needs two, so favouring the
     // nearly-learned would flatter the round's numbers while teaching less.
-    let ordered = questions.sorted { lhs, rhs in
-        let lhsDue = isDue(lhs.card, on: today), rhsDue = isDue(rhs.card, on: today)
+    let ordered = askable.sorted { lhs, rhs in
+        let lhsDue = isDue(lhs, on: today), rhsDue = isDue(rhs, on: today)
         if lhsDue != rhsDue { return lhsDue }
-        return lhs.card.ladderStage < rhs.card.ladderStage
+        return lhs.ladderStage < rhs.ladderStage
     }
 
     var items: [PracticeItem] = []
@@ -113,32 +161,29 @@ func makeRound(
         // creates — the least familiar card always wins, and getting it wrong
         // makes it win harder.
         let candidates = ordered.filter {
-            $0.card.id != lastCardID && appearances[$0.card.id, default: 0] < 2
+            $0.id != lastCardID && appearances[$0.id, default: 0] < 2
         }
         // Nothing left that has not already appeared twice: the deck is smaller
         // than the round, so let the limits go rather than cut the round short.
         // A shorter round would quietly hide how little there is to practise.
-        let pool = candidates.isEmpty
-            ? ordered.filter { $0.card.id != lastCardID }
-            : candidates
-        guard let question = pool.first ?? ordered.first else { break }
+        let pool = candidates.isEmpty ? ordered.filter { $0.id != lastCardID } : candidates
+        guard let card = pool.first ?? ordered.first else { break }
 
-        let seen = appearances[question.card.id, default: 0]
-        // A card's second appearance uses the other mode, so it is asked two
-        // different ways — which is also the only route to 通過 inside one
-        // round, since passing needs two correct answers.
-        let mode: AnswerMode = seen.isMultiple(of: 2) ? .choosing : .typing
+        let modes = askableModes(for: card, deck: deck)
+        // A card's two appearances use different modes where its band offers
+        // two, so it is asked two ways rather than the same way twice — which
+        // is also the only route to 通過 inside one round.
+        let mode = modes[appearances[card.id, default: 0] % modes.count]
         items.append(
             PracticeItem(
-                question: question,
-                // A deck too small for four options cannot offer a choice, so
-                // it is typed whatever the alternation says.
-                mode: question.choices.isEmpty ? .typing : mode,
-                isDue: isDue(question.card, on: today)
+                card: card,
+                question: mode.needsCloze ? makeCloze(from: card, deck: deck) : nil,
+                mode: mode,
+                isDue: isDue(card, on: today)
             )
         )
-        appearances[question.card.id, default: 0] += 1
-        lastCardID = question.card.id
+        appearances[card.id, default: 0] += 1
+        lastCardID = card.id
     }
     return .success(items)
 }
@@ -209,4 +254,43 @@ struct RoundOutcome: Hashable {
             passed.remove(cardID)
         }
     }
+}
+
+
+extension AnswerMode {
+    /// Whether this mode needs a sentence with a blank in it.
+    var needsCloze: Bool { self == .choosing || self == .typing }
+}
+
+/// What `card` can actually be asked, at the difficulty its rung calls for.
+///
+/// The rung decides the band; the card decides what of that band is possible.
+/// **A card falls back rather than being dropped**: a word card has no cloze, a
+/// sentence with no deck word in it has none either, and a deck too small for
+/// four options cannot offer a choice. Question types follow from what a card
+/// supports, which is the rule since stage 3 — and it is what lets the eleven
+/// word cards that appear in no sentence be asked at all.
+///
+/// Returns empty only when nothing at all can be asked, which is the one case
+/// worth excluding a card for.
+func askableModes(for card: LearningCard, deck: [LearningCard]) -> [AnswerMode] {
+    let cloze = makeCloze(from: card, deck: deck)
+    let possible = askedDifficulty(forRung: card.ladderStage).filter { mode in
+        switch mode {
+        case .choosing: cloze.map { !$0.choices.isEmpty } ?? false
+        case .typing: cloze != nil
+        case .rearranging: canRearrange(card)
+        case .translating: true
+        }
+    }
+    if !possible.isEmpty { return possible }
+
+    // Nothing in its own band fits, so take whatever the card can do. Typed
+    // translation always can — it asks for the card itself — which is why a
+    // card is only ever excluded when it has no translation to ask for.
+    var fallback: [AnswerMode] = []
+    if let cloze, !cloze.choices.isEmpty { fallback.append(.choosing) }
+    if canRearrange(card) { fallback.append(.rearranging) }
+    fallback.append(.translating)
+    return fallback
 }

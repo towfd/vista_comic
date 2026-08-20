@@ -54,8 +54,16 @@ would have been much easier to build and worth much less.
 
 ### Judged by the deck's own normalisation, tones forgiven and named
 
-Punctuation and spacing never matter; spelling and word order do. That is `normalizedKey`, which
-the deck's identity, 單字庫's search and cloze's typed answers already use.
+Punctuation and spacing never matter; spelling and word order do.
+
+**Spacing is `normalizedKey`, which the deck's identity, 單字庫's search and cloze's typed answers
+already use. Punctuation is stripped separately, on top of it.** That distinction was found by a
+test written from this spec: the spec had been claiming since stage 3 that "punctuation and
+spacing" were both ignored, and only spacing ever was. `normalizedKey` keeps punctuation on
+purpose — it backs card identity, and two lines differing by a full stop are two things the reader
+framed differently. Judging wants the opposite, and the deck's sentences end in `.` and `,`, so
+marking a perfect answer wrong over a missing full stop would charge for punctuation rather than
+test recall.
 
 **A missing tone counts and is called out**, exactly as stage 3 settled for cloze: typing tones
 on a phone is laborious, and rejecting an otherwise perfect answer over one charges the reader

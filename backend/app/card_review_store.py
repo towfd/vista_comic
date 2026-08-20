@@ -28,7 +28,14 @@ from .db import CardReview, LearningCard
 # anything that later weighs difficulty.
 QUESTION_CLOZE_CHOICE = "cloze_choice"
 QUESTION_CLOZE_TYPED = "cloze_typed"
-QUESTION_TYPES = frozenset({QUESTION_CLOZE_CHOICE, QUESTION_CLOZE_TYPED})
+QUESTION_SENTENCE_REARRANGED = "sentence_rearranged"
+QUESTION_SENTENCE_TYPED = "sentence_typed"
+QUESTION_TYPES = frozenset({
+    QUESTION_CLOZE_CHOICE,
+    QUESTION_CLOZE_TYPED,
+    QUESTION_SENTENCE_REARRANGED,
+    QUESTION_SENTENCE_TYPED,
+})
 
 
 def record(
