@@ -250,6 +250,29 @@ class LearningCardResponse(BaseModel):
     createdAt: str  # ISO-8601 UTC
 
 
+class LearningCardUpdate(BaseModel):
+    """Request body for ``PATCH /cards/{id}``.
+
+    **Exactly two fields, and refusing the rest is the point.** ``sourceText``
+    is half the card's identity and ``targetLanguage`` is the other half;
+    changing either could collide with another card under the unique constraint,
+    and changing the source would detach the row from the
+    ``comicId``/``chapterId``/``pageNumber`` still pointing at where that exact
+    line was read. The source reference is a fact about the past. A field that
+    is accepted and then quietly changes which card this *is* would be a trap
+    for whoever touches this next.
+
+    **A null ``kind`` is a value, not an omission.** Cards collected before the
+    two save buttons existed have none, and the reader must be able to clear a
+    wrong answer as well as set one -- so the route reads ``model_fields_set``
+    rather than testing for ``None``. This is the one place in this feature
+    where "absent" and "present and null" mean different things.
+    """
+
+    translation: Optional[str] = Field(default=None, min_length=1)
+    kind: Optional[Literal["word", "sentence"]] = None
+
+
 class ComprehensionRecordReadUpdate(BaseModel):
     """Request body for ``PATCH /comprehensions/{id}``.
 

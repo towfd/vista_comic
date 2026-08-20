@@ -15,7 +15,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete as delete_stmt, func, select
+from sqlalchemy import update as update_stmt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -145,6 +146,53 @@ def get(session: Session, card_id: int) -> Optional[LearningCard]:
     return session.get(LearningCard, card_id)
 
 
+def update(
+    session: Session,
+    card_id: int,
+    *,
+    translation: Optional[str] = None,
+    kind: Optional[str] = None,
+    set_kind: bool = False,
+) -> bool:
+    """Change what the reader is allowed to change; report whether a row existed.
+
+    ``set_kind`` exists because ``None`` is a legitimate new value here: a card
+    collected before the two save buttons has no kind, and clearing a wrong
+    answer has to be possible. The caller decides whether ``kind`` was *given*;
+    this function does not try to infer it from the value.
+
+    Nothing else is touched. ``ladder_stage``, ``due_on``, ``lookup_count`` and
+    ``created_at`` are the reviewing stages' business, and the identity columns
+    are nobody's -- see ``models.LearningCardUpdate``.
+    """
+    values = {}
+    if translation is not None:
+        values["translation"] = translation
+    if set_kind:
+        values["kind"] = kind
+    if not values:
+        return session.get(LearningCard, card_id) is not None
+
+    result = session.execute(
+        update_stmt(LearningCard).where(LearningCard.id == card_id).values(**values)
+    )
+    session.commit()
+    return result.rowcount > 0
+
+
+def delete(session: Session, card_id: int) -> bool:
+    """Remove one card; report whether it was there.
+
+    A real delete, not a flag. Archiving was considered and dropped: a word on
+    the ladder's top rung is already scheduled once every 60 days, which is what
+    "I know this one" would have meant, so a second concept saying the same
+    thing would have had no consumer.
+    """
+    result = session.execute(delete_stmt(LearningCard).where(LearningCard.id == card_id))
+    session.commit()
+    return result.rowcount > 0
+
+
 def record_lookup(session: Session, card_id: int) -> bool:
     """Note that the reader looked this word up again; report whether it exists.
 
@@ -153,7 +201,7 @@ def record_lookup(session: Session, card_id: int) -> bool:
     rescheduling on a hit belongs to stage 3, where scheduling exists at all.
     """
     result = session.execute(
-        update(LearningCard)
+        update_stmt(LearningCard)
         .where(LearningCard.id == card_id)
         .values(
             lookup_count=LearningCard.lookup_count + 1,

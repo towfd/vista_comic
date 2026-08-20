@@ -34,38 +34,23 @@ extension ComprehensionRecord {
         status == .ok && hasExplanation && !isRead
     }
 
-    /// Whether jumping back to the page this record came from can actually
-    /// work.
-    ///
-    /// The titles are joined by the backend from its live catalog, so a `nil`
-    /// comic title *is* the statement that the comic has left the library — the
-    /// stored ids would still resolve to a route, and that route would fail.
-    /// The record itself stays perfectly readable; only the navigation is
-    /// withdrawn, which is why this is a separate question from whether the
-    /// record can be shown at all.
-    ///
-    /// The chapter is not consulted: a comic present with a chapter missing is
-    /// the reader having reorganised files under one comic, and the reader
-    /// route resolves the chapter itself — so gating on the comic is both the
-    /// honest signal and the one the backend actually gives.
-    var canJumpToSource: Bool {
-        comicTitle != nil
-    }
-
-    /// Where jumping back goes: the exact page, read-only.
-    ///
-    /// Lives beside `canJumpToSource` rather than on the screen that pushes it,
-    /// so the route and the rule guarding it cannot drift apart. `isPeek` is
-    /// what keeps re-reading an old scene from moving where the reader actually
-    /// is — the same peek 單字本 used.
-    var sourceRoute: ReaderRoute {
-        ReaderRoute(
+    /// Where this record was read, as the shared type — see
+    /// `Shared/SourceReference.swift`. A learning card answers the same
+    /// question, and one answer serving both is why the rules moved there.
+    var source: SourceReference {
+        SourceReference(
             comicID: comicID,
             chapterID: chapterID,
-            targetPage: pageNumber,
-            isPeek: true
+            pageNumber: pageNumber,
+            comicTitle: comicTitle
         )
     }
+
+    /// Whether jumping back to the page this record came from can work.
+    var canJumpToSource: Bool { source.canJumpToSource }
+
+    /// Where jumping back goes: the exact page, read-only.
+    var sourceRoute: ReaderRoute { source.peekRoute }
 
     /// Whether the detail screen offers a retry.
     ///

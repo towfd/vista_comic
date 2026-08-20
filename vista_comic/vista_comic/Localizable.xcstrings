@@ -32,7 +32,16 @@
         }
       }
     },
-    "Add to vocabulary" : {
+    "Add as sentence" : {
+
+    },
+    "Add as word" : {
+
+    },
+    "Added as a sentence" : {
+
+    },
+    "Added as a word" : {
 
     },
     "Adding…" : {

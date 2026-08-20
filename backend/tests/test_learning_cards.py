@@ -359,3 +359,120 @@ def test_kind_is_not_part_of_a_cards_identity(client):
     _add(client, kind="sentence")
 
     assert len(client.get("/cards").json()) == 1
+
+
+# --- fixing a card (spec-02 ticket 01) --------------------------------------
+
+
+def test_the_translation_can_be_corrected(client):
+    card = _add(client).json()
+
+    resp = client.patch(f"/cards/{card['id']}", json={"translation": "你沒事吧"})
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["translation"] == "你沒事吧"
+    assert client.get("/cards").json()[0]["translation"] == "你沒事吧"
+
+
+def test_the_kind_can_be_set_changed_and_cleared(client):
+    """Clearing matters: a card collected before the two buttons has no kind,
+    and a mis-tap is corrected here because re-collecting leaves it alone."""
+    card = _add(client).json()
+    assert card["kind"] is None
+
+    assert client.patch(f"/cards/{card['id']}", json={"kind": "word"}).json()["kind"] == "word"
+    assert client.patch(f"/cards/{card['id']}", json={"kind": "sentence"}).json()["kind"] == "sentence"
+    assert client.patch(f"/cards/{card['id']}", json={"kind": None}).json()["kind"] is None
+
+
+def test_a_patch_that_changes_nothing_is_refused(client):
+    """A client bug should surface as an error, not as a save that quietly did
+    not happen."""
+    card = _add(client).json()
+
+    assert client.patch(f"/cards/{card['id']}", json={}).status_code == 422
+
+
+def test_a_patch_cannot_move_the_cards_identity(client):
+    """The columns that decide *which card this is* are not the client's.
+
+    Asserted rather than assumed: the failure this guards against is a field
+    silently accepted, which no amount of reading the handler would reveal.
+    """
+    card = _add(client).json()
+
+    client.patch(
+        f"/cards/{card['id']}",
+        json={
+            "translation": "你沒事吧",
+            "sourceText": "まったく違う",
+            "targetLanguage": "en",
+            "comicId": "somewhere-else",
+            "pageNumber": 999,
+        },
+    )
+
+    after = client.get("/cards").json()[0]
+    assert after["sourceText"] == _BODY["sourceText"]
+    assert after["targetLanguage"] == _BODY["targetLanguage"]
+    assert after["comicId"] == _BODY["comicId"]
+    assert after["pageNumber"] == _BODY["pageNumber"]
+
+
+def test_a_patch_leaves_the_reviewing_columns_alone(client):
+    """Scheduling is stage 3's business, and the lookup count is evidence."""
+    card = _add(client).json()
+    client.post(f"/cards/{card['id']}/lookups")
+
+    client.patch(f"/cards/{card['id']}", json={"translation": "你沒事吧"})
+
+    after = client.get("/cards").json()[0]
+    assert after["ladderStage"] == card["ladderStage"]
+    assert after["dueOn"] == card["dueOn"]
+    assert after["lookupCount"] == 1
+    assert after["createdAt"] == card["createdAt"]
+
+
+def test_an_unrecognised_kind_is_refused_on_patch(client):
+    card = _add(client).json()
+
+    assert client.patch(f"/cards/{card['id']}", json={"kind": "paragraph"}).status_code == 422
+
+
+def test_an_empty_translation_is_refused(client):
+    card = _add(client).json()
+
+    assert client.patch(f"/cards/{card['id']}", json={"translation": ""}).status_code == 422
+
+
+def test_patching_a_card_that_is_gone_is_a_404(client):
+    assert client.patch("/cards/999999", json={"translation": "x"}).status_code == 404
+
+
+def test_a_card_can_be_deleted(client):
+    card = _add(client).json()
+
+    assert client.delete(f"/cards/{card['id']}").status_code == 204
+    assert client.get("/cards").json() == []
+
+
+def test_deleting_twice_is_a_404(client):
+    card = _add(client).json()
+
+    client.delete(f"/cards/{card['id']}")
+
+    assert client.delete(f"/cards/{card['id']}").status_code == 404
+
+
+def test_a_deleted_line_can_be_collected_again_as_a_new_card(client):
+    """A real delete, so nothing lingers to be revived — the new card starts
+    from zero, which is the honest answer after the old one was thrown away."""
+    first = _add(client).json()
+    client.post(f"/cards/{first['id']}/lookups")
+    client.delete(f"/cards/{first['id']}")
+
+    again = _add(client)
+
+    assert again.status_code == 201
+    assert again.json()["id"] != first["id"]
+    assert again.json()["lookupCount"] == 0

@@ -62,6 +62,7 @@ from .models import (
     ComprehensionRecordResponse,
     LearningCardCreate,
     LearningCardResponse,
+    LearningCardUpdate,
     ProgressResponse,
     ProgressUpdate,
 )
@@ -900,6 +901,53 @@ def list_cards() -> list[LearningCardResponse]:
     with _card_session() as session:
         rows = learning_card_store.list_active(session)
     return [_to_card_response(row) for row in rows]
+
+
+@app.patch("/cards/{card_id}", response_model=LearningCardResponse)
+def update_card(card_id: int, body: LearningCardUpdate) -> LearningCardResponse:
+    """Correct what the reader is allowed to correct: the translation, the kind.
+
+    Two fields, and the refusal of everything else is deliberate — the identity
+    columns and the source reference are not the client's to move (see
+    ``models.LearningCardUpdate``).
+
+    ``kind`` is read from ``model_fields_set`` rather than by testing for
+    ``None``, because clearing a kind is a real thing to want: a card collected
+    before the two save buttons existed has none, and a mis-tapped one is
+    corrected here since re-collecting deliberately leaves it alone.
+
+    A body that changes nothing is refused rather than answered with a
+    no-op, so a client bug shows up as an error instead of as a save that
+    quietly did not happen.
+    """
+    fields = body.model_fields_set
+    if not fields:
+        raise HTTPException(
+            status_code=422, detail="Provide translation, kind, or both"
+        )
+
+    with _card_session() as session:
+        found = learning_card_store.update(
+            session,
+            card_id,
+            translation=body.translation,
+            kind=body.kind,
+            set_kind="kind" in fields,
+        )
+        row = learning_card_store.get(session, card_id) if found else None
+    if row is None:
+        raise HTTPException(status_code=404, detail="Learning card not found")
+    return _to_card_response(row)
+
+
+@app.delete("/cards/{card_id}", status_code=204)
+def delete_card(card_id: int) -> Response:
+    """Remove one card. A real delete, not a flag — see ``learning_card_store``."""
+    with _card_session() as session:
+        deleted = learning_card_store.delete(session, card_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Learning card not found")
+    return Response(status_code=204)
 
 
 @app.post("/cards/{card_id}/lookups", status_code=204)
