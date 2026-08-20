@@ -174,11 +174,34 @@ struct ClozeTypedAnswerTests {
         #expect(isCorrectClozeAnswer("  Trong  Khi ", for: question()))
     }
 
-    @Test("A changed tone is wrong")
-    func aChangedToneIsWrong() {
-        // In Vietnamese a tone is part of the word — cấm is not câm. Accepting
-        // this would teach the reader that tones are optional.
-        #expect(isCorrectClozeAnswer("TRONG KHÍ", for: question()) == false)
+    @Test("A missing tone counts, and is named")
+    func aMissingToneCountsAndIsNamed() {
+        // Typing tones on a phone is laborious, and rejecting an otherwise
+        // perfect answer over one charges the reader for typing rather than
+        // testing recall. It is still called out, so nothing here teaches that
+        // Vietnamese tones are decoration.
+        let line = sentence(100, "XÂM PHẠM ĐẾN THẨM QUYỀN")
+        let q = makeCloze(from: line, deck: [line, word(1, "XÂM PHẠM")])!
+
+        #expect(judgeClozeAnswer("xam pham", for: q) == .correctApartFromTones)
+        #expect(isCorrectClozeAnswer("xam pham", for: q))
+    }
+
+    @Test("Exact spelling is plain correct, with no hint")
+    func exactSpellingIsPlainCorrect() {
+        #expect(judgeClozeAnswer("TRONG KHI", for: question()) == .correct)
+    }
+
+    @Test("Leniency reaches typing only, never the deck")
+    func leniencyReachesTypingOnly() {
+        // The rule this guards: two words differing only by tone are two words.
+        // Folding tones into identity would collapse cards the deck holds
+        // separately, and a card for CẤM matching CÂM inside a sentence would
+        // ask the reader to fill in a word that sentence does not contain.
+        #expect(normalizedKey("CẤM") != normalizedKey("CÂM"))
+
+        let sentenceWithCam = "ĐẠO LUẬT CÂM TRỪNG PHẠT"
+        #expect(deckWords(in: sentenceWithCam, from: [word(1, "CẤM")]).isEmpty)
     }
 
     @Test("A different word is wrong")

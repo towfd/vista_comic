@@ -102,8 +102,18 @@ A card can carry a cloze when it is a **sentence** and at least one deck word oc
 generation — and the distractors are themselves revision, since choosing correctly means reading
 all four. A deck of fewer than four cards cannot form this question.
 
-**Typed**, judged after the same normalisation, so punctuation and spacing do not matter but
-spelling and tones do.
+**Typed**, judged after the same normalisation, so punctuation and spacing never matter.
+
+**Tones are forgiven and then named** (changed 2026-08-20, during the device pass). Typing tones on
+a phone is laborious, and rejecting an otherwise perfect answer over one charges the reader for
+typing rather than testing recall — so a missing tone counts as correct and the screen shows the
+right spelling underneath. Silently accepting it would teach that Vietnamese tones are decoration.
+
+**That leniency lives in judging and nowhere else.** Card identity and the search for deck words
+inside a sentence stay strict, and the difference is not stylistic: the deck already holds cards
+that differ only by tone, so folding tones into identity would collapse them, and a card for `CẤM`
+matching `CÂM` inside a sentence would ask the reader for a word that sentence does not contain. A
+test asserts both boundaries so the leniency cannot spread upstream.
 
 Which one appears is not decided by familiarity yet — there is nothing to decide it with until
 the ladder exists. **Stage 3 alternates**, so both interfaces get used and tested; stage 4 makes

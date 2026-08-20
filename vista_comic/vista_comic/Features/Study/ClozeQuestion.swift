@@ -117,14 +117,45 @@ func distractors(
     return Array(pool.shuffled().prefix(count))
 }
 
-/// Whether a typed answer is right.
+/// How a typed answer came out.
+enum TypedVerdict: Hashable {
+    /// Spelled exactly right.
+    case correct
+    /// Right word, but the tone marks were missing or wrong. Counted as correct
+    /// — the reader knew it — while still naming the spelling, so nothing here
+    /// teaches that tones are optional.
+    case correctApartFromTones
+    case wrong
+
+    var isCorrect: Bool { self != .wrong }
+}
+
+/// Judges what the reader typed.
 ///
-/// Judged after the deck's own normalisation, so punctuation and spacing do not
-/// matter and spelling does — tones included. `XÂM PHAM` is not `XÂM PHẠM`, for
-/// the same reason those are two different cards.
-func isCorrectClozeAnswer(_ typed: String, for question: ClozeQuestion) -> Bool {
+/// Punctuation and spacing never matter, because the deck's own normalisation
+/// removes them. **Tones are forgiven but named**: typing them on a phone is
+/// laborious, and rejecting an otherwise perfect answer over one charges the
+/// reader for typing rather than testing recall — but a lesson that silently
+/// accepted `xam pham` would be teaching that Vietnamese tones are decoration.
+///
+/// This leniency lives here and nowhere else. Card identity and the search for
+/// deck words inside a sentence stay strict, since two words differing only by
+/// tone are two words.
+func judgeClozeAnswer(_ typed: String, for question: ClozeQuestion) -> TypedVerdict {
     let given = normalizedKey(typed)
-    guard !given.isEmpty else { return false }
-    return given == normalizedKey(question.removed)
-        || given == normalizedKey(question.answer.sourceText)
+    guard !given.isEmpty else { return .wrong }
+
+    let exact = [normalizedKey(question.removed), normalizedKey(question.answer.sourceText)]
+    if exact.contains(given) { return .correct }
+
+    let loose = [
+        toneInsensitiveKey(question.removed),
+        toneInsensitiveKey(question.answer.sourceText),
+    ]
+    return loose.contains(toneInsensitiveKey(typed)) ? .correctApartFromTones : .wrong
+}
+
+/// Whether a typed answer counts as right.
+func isCorrectClozeAnswer(_ typed: String, for question: ClozeQuestion) -> Bool {
+    judgeClozeAnswer(typed, for: question).isCorrect
 }

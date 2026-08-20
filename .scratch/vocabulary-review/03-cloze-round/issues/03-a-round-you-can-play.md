@@ -63,8 +63,9 @@ The deck holds 30 cards — 22 words, 7 sentences — of which **6 sentence card
 2. Tap 練習, then Start practice. Five questions, numbered 1/5 through 5/5.
 3. **Both answer styles appear** — some questions offer four options, others a text field.
 4. The four options are all your own words, and one of them is right.
-5. Type an answer with the Vietnamese keyboard. Correct with different capitalisation still
-   passes; a wrong tone does not.
+5. Type an answer with the Vietnamese keyboard. Different capitalisation passes silently.
+   **Type it without the tones** — `xam pham` for `XÂM PHẠM`: it counts as correct **and** shows
+   "Watch the tones", naming the right spelling. A genuinely different word is still wrong.
 6. Answer one wrong on purpose: it names the right word and the round continues — **no repeat
    until correct**, which is stage 4.
 7. Finish the round: the summary says either "All correct" or a score, and Done returns to the

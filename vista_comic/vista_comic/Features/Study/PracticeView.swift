@@ -123,7 +123,7 @@ private struct RoundView: View {
     @State private var typed = ""
     /// `nil` while the question is open; set once answered, and what the screen
     /// shows instead of accepting another answer.
-    @State private var verdict: Bool?
+    @State private var verdict: TypedVerdict?
     @State private var outcome = RoundOutcome()
 
     var body: some View {
@@ -145,7 +145,7 @@ private struct RoundView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let verdict {
-                answered(item, correct: verdict)
+                answered(item, verdict: verdict)
             } else {
                 switch item.mode {
                 case .choosing: choices(item)
@@ -163,7 +163,7 @@ private struct RoundView: View {
         VStack(spacing: 8) {
             ForEach(item.question.choices) { choice in
                 Button {
-                    answer(choice.id == item.question.answer.id)
+                    answer(choice.id == item.question.answer.id ? .correct : .wrong)
                 } label: {
                     Text(choice.sourceText)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,7 +181,7 @@ private struct RoundView: View {
                 .textInputAutocapitalization(.never)
                 .accessibilityIdentifier("clozeAnswerField")
             Button("Check") {
-                answer(isCorrectClozeAnswer(typed, for: item.question))
+                answer(judgeClozeAnswer(typed, for: item.question))
             }
             .buttonStyle(.borderedProminent)
             .tint(.primaryRed)
@@ -194,14 +194,26 @@ private struct RoundView: View {
     /// A wrong answer names the right one and the round carries on. Repeating
     /// until correct belongs with the three-step day, in stage 4 — here it would
     /// be a rule with nothing behind it.
-    private func answered(_ item: PracticeItem, correct: Bool) -> some View {
+    private func answered(_ item: PracticeItem, verdict: TypedVerdict) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(
-                correct ? "Correct" : "The answer was \(item.question.removed)",
-                systemImage: correct ? "checkmark.circle.fill" : "xmark.circle.fill"
+                verdict == .wrong
+                    ? "The answer was \(item.question.removed)"
+                    : "Correct",
+                systemImage: verdict == .wrong ? "xmark.circle.fill" : "checkmark.circle.fill"
             )
             .font(AppFont.caption)
             .foregroundStyle(.grayFont)
+
+            // Named rather than waved through. The answer counted — the reader
+            // knew the word — but a lesson that said nothing here would be
+            // teaching that Vietnamese tones are decoration.
+            if verdict == .correctApartFromTones {
+                Text("Watch the tones: \(item.question.removed)")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+                    .accessibilityIdentifier("toneHint")
+            }
 
             Text(item.question.card.translation)
                 .font(AppFont.caption)
@@ -226,9 +238,9 @@ private struct RoundView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func answer(_ correct: Bool) {
-        verdict = correct
-        outcome.record(correct: correct)
+    private func answer(_ result: TypedVerdict) {
+        verdict = result
+        outcome.record(correct: result.isCorrect)
     }
 
     private func advance() {
