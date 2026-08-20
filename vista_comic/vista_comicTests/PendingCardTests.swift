@@ -45,6 +45,25 @@ private final class ScriptedStudyRepository: StudyRepository, @unchecked Sendabl
         return try cardsResult.get()
     }
 
+    var updateResult: Result<LearningCard, Error> = .success(.stub())
+    private(set) var updatedID: Int?
+    private(set) var updatedTranslation: String?
+    private(set) var updatedKind: CardKind?
+    @discardableResult
+    func update(id: Int, translation: String, kind: CardKind?) async throws -> LearningCard {
+        updatedID = id
+        updatedTranslation = translation
+        updatedKind = kind
+        return try updateResult.get()
+    }
+
+    var deleteResult: Result<Void, Error> = .success(())
+    private(set) var deletedID: Int?
+    func delete(id: Int) async throws {
+        deletedID = id
+        try deleteResult.get()
+    }
+
     func recordLookup(id: Int) async throws {}
     func knownCards() -> [LearningCard] { [] }
 }

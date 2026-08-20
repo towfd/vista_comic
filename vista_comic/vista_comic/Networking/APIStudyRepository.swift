@@ -113,6 +113,39 @@ struct APIStudyRepository: StudyRepository {
         return (try? decoder.decode([LearningCard].self, from: data)) ?? []
     }
 
+    @discardableResult
+    func update(
+        id: Int,
+        translation: String,
+        kind: CardKind?
+    ) async throws -> LearningCard {
+        // `kind` is sent explicitly as null when unanswered, unlike `collect`
+        // where it is omitted. The two cases genuinely differ: omitting it on a
+        // create means "nothing to say", while omitting it here would mean
+        // "leave it alone" — and clearing a classification has to be possible.
+        let payload: [String: Any] = [
+            "translation": translation,
+            "kind": kind?.rawValue as Any? ?? NSNull(),
+        ]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let card = try await send(
+            LearningCard.self, method: "PATCH", at: "\(resourcePath)/\(id)", body: body
+        )
+        // The snapshot the already-collected marker reads must not go on
+        // showing a translation that has just been corrected.
+        _ = try? await cards()
+        return card
+    }
+
+    func delete(id: Int) async throws {
+        let request = makeRequest(method: "DELETE", at: "\(resourcePath)/\(id)")
+        let (_, response) = try await session.data(for: request)
+        try validate(response)
+        // Likewise: the marker must not go on answering from a card that no
+        // longer exists.
+        _ = try? await cards()
+    }
+
     func recordLookup(id: Int) async throws {
         let request = makeRequest(method: "POST", at: "\(resourcePath)/\(id)/lookups")
         let (_, response) = try await session.data(for: request)

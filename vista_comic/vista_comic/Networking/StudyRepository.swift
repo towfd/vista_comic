@@ -52,6 +52,32 @@ protocol StudyRepository {
     /// Every card the reader still has, newest first.
     func cards() async throws -> [LearningCard]
 
+    /// Corrects a card, returning it as it now stands.
+    ///
+    /// Both fields are always sent, because the screen behind this is a form
+    /// showing both — which sidesteps the "did they mean *don't change it* or
+    /// *set it to nothing*" question entirely. A `nil` kind therefore **clears**
+    /// the classification rather than leaving it alone, which is a thing to
+    /// want: it is how a card mis-tapped into the wrong kind gets put back to
+    /// unanswered.
+    ///
+    /// The source text, target language and source reference are not here, and
+    /// their absence is the API. Two of them are the card's identity and the
+    /// third is a fact about the past.
+    @discardableResult
+    func update(
+        id: Int,
+        translation: String,
+        kind: CardKind?
+    ) async throws -> LearningCard
+
+    /// Removes a card.
+    ///
+    /// A real delete. Whatever it knew — how often it had been forgotten, how
+    /// far up the ladder it had climbed — goes with it, which is why the screen
+    /// confirms first.
+    func delete(id: Int) async throws
+
     /// Notes that the reader looked an already-collected word up again.
     func recordLookup(id: Int) async throws
 

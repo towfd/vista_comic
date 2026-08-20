@@ -122,6 +122,38 @@ struct OfflineFallbackStudyRepository: StudyRepository {
     /// nothing they could do about it. A refusal is dropped for the same reason
     /// the flusher drops one — the card is gone from the server, and no amount
     /// of retrying will change that.
+    /// Passed straight through, and **not queued** when it fails.
+    ///
+    /// Everything this decorator queues only ever *adds*. Editing and deleting
+    /// are the first operations that can cancel each other out — a card deleted
+    /// with no connection and then re-collected with no connection has no
+    /// obviously correct outcome, and the rule for it would be invented rather
+    /// than derived.
+    ///
+    /// What that gives up is correcting a translation on a plane, which does
+    /// not happen: noticing a bad translation happens while reading, and
+    /// reading a downloaded chapter is exactly when the reader is not also
+    /// proofreading their deck.
+    @discardableResult
+    func update(
+        id: Int,
+        translation: String,
+        kind: CardKind?
+    ) async throws -> LearningCard {
+        let card = try await inner.update(id: id, translation: translation, kind: kind)
+        // A success proves the connection is back, so anything waiting can go.
+        await flusher.flush()
+        await lookupFlusher.flush()
+        return card
+    }
+
+    /// Passed straight through, for the same reason as `update`.
+    func delete(id: Int) async throws {
+        try await inner.delete(id: id)
+        await flusher.flush()
+        await lookupFlusher.flush()
+    }
+
     func recordLookup(id: Int) async throws {
         do {
             try await inner.recordLookup(id: id)

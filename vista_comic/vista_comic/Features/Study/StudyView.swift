@@ -18,7 +18,10 @@
 //  the only two ways a reader arrives: "I just mis-tapped" (it is at the top)
 //  and "I remember one of these being wrong" (search for it).
 //
-//  Editing and deleting are ticket 04. This screen finds; that one acts.
+//  This screen finds; `CardDetailView` acts. Tapping a row opens the card
+//  rather than jumping straight to the page it came from — in a workshop the
+//  reason to tap something is to work on it, and the jump is still one tap
+//  further in.
 //
 
 import SwiftUI
@@ -36,6 +39,16 @@ struct StudyView: View {
     var body: some View {
         NavigationStack {
             content
+                .navigationDestination(for: LearningCard.self) { card in
+                    CardDetailView(
+                        card: card,
+                        onChanged: { replace($0) },
+                        onDeleted: { remove($0) }
+                    )
+                }
+                // The detail screen's jump-back pushes onto *this* tab's stack,
+                // exactly as 歷史紀錄's did: each tab is its own navigation
+                // context, so peeking at an old page never touches 書庫's.
                 .navigationDestination(for: ReaderRoute.self) { route in
                     ComicView(
                         comicID: route.comicID,
@@ -110,17 +123,29 @@ struct StudyView: View {
 
     private func rows(_ cards: [LearningCard]) -> some View {
         ForEach(cards) { card in
-            // Only offered when the comic is still in the library: the route
-            // would resolve from the stored ids and then fail, so a row for a
-            // comic that has gone is shown plainly rather than as a dead link.
-            if card.source.canJumpToSource {
-                NavigationLink(value: card.source.peekRoute) {
-                    CardRow(card: card)
-                }
-            } else {
+            NavigationLink(value: card) {
                 CardRow(card: card)
             }
         }
+    }
+
+    /// Swaps one card in place after the detail screen corrected it, so the
+    /// list neither reloads nor scrolls out from under the reader on their way
+    /// back.
+    private func replace(_ updated: LearningCard) {
+        guard case .loaded(var cards) = state,
+              let index = cards.firstIndex(where: { $0.id == updated.id })
+        else { return }
+        cards[index] = updated
+        state = .loaded(cards)
+    }
+
+    /// Drops a deleted card from the displayed list in place. A failed delete
+    /// never reaches here, because the card is still on the backend.
+    private func remove(_ deleted: LearningCard) {
+        guard case .loaded(var cards) = state else { return }
+        cards.removeAll { $0.id == deleted.id }
+        state = .loaded(cards)
     }
 
     private var emptyDeck: some View {

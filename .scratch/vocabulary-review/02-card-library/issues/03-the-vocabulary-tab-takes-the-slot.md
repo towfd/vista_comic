@@ -98,8 +98,11 @@ the asynchronous design existed to avoid.
 Reported to the repo owner rather than absorbed silently. Three options were put to them: accept
 it (waiting is what happens in practice anyway, and it stops forgotten requests burning quota);
 keep 歷史紀錄 after all; or attach the explanation to the card, for which
-`learning_card.comprehension_record_id` already exists and is always NULL. The third is stage 4
-territory and could be brought forward.
+`learning_card.comprehension_record_id` already exists and is always NULL.
+
+**Decision, 2026-08-20: accepted.** 深入解釋 is an "ask and wait" action from here. Attaching
+explanations to cards stays available as stage 4 work if waiting turns out to be a nuisance in
+practice, and the foreign key is already in place for it.
 
 ## Device checklist for the repo owner
 

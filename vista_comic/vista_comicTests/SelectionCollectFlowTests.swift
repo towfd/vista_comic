@@ -65,6 +65,25 @@ private final class StubStudyRepository: StudyRepository, @unchecked Sendable {
     func knownCards() -> [LearningCard] { known }
 
     private(set) var recordLookupCallCount = 0
+    var updateResult: Result<LearningCard, Error> = .success(.stub())
+    private(set) var updatedID: Int?
+    private(set) var updatedTranslation: String?
+    private(set) var updatedKind: CardKind?
+    @discardableResult
+    func update(id: Int, translation: String, kind: CardKind?) async throws -> LearningCard {
+        updatedID = id
+        updatedTranslation = translation
+        updatedKind = kind
+        return try updateResult.get()
+    }
+
+    var deleteResult: Result<Void, Error> = .success(())
+    private(set) var deletedID: Int?
+    func delete(id: Int) async throws {
+        deletedID = id
+        try deleteResult.get()
+    }
+
     func recordLookup(id: Int) async throws { recordLookupCallCount += 1 }
 }
 
