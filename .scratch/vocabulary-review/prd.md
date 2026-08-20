@@ -56,7 +56,7 @@ the developer can find out whether this works for him before anything larger is 
 | Collection entry point | OCR -> correct -> Translate -> "Add to vocabulary" appears beside the translation result |
 | Card atom | The text the reader selected and corrected, **and which of the two it is**: two save buttons, 加入單字 and 加入句子. The reader knows instantly what a tokeniser would have to guess at, and the answer decides which questions stage 3 asks and whether stage 4 generates a sentence for it (stage 1 ticket 06, added 2026-08-19) |
 | Source location | `comicID` / `chapterID` / `pageNumber` only, matching the existing peek route. **No crop rectangle** |
-| Scheduling | Fixed-interval ladder: 1 / 3 / 7 / 21 / 60 days. Correct advances one rung, wrong drops to the first. Correctness only — no speed or hint signals |
+| Scheduling | Fixed-interval ladder: 1 / 3 / 7 / 21 / 60 days. Correct advances one rung, wrong drops to the first — **confirmed against a contradiction that appeared during stage 4 planning**, where it had drifted to dropping by one. Correctness only — no speed or hint signals |
 | Review log | Recorded in full (timestamp, question type, correct, elapsed ms) so swapping in FSRS later is an algorithm change, not a data migration |
 | Question types | Matching pairs; sentence cloze; sentence translation; typing. **Where each one lives changed on 2026-08-20** — see *The lesson architecture* |
 | Practice sentence corpus | Context comes from a user-authored `introduction.txt` in each comic folder (3,000 characters max; on launch the app tells the reader which comics are missing one) |
