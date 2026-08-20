@@ -302,3 +302,51 @@ def test_a_listed_review_says_nothing_about_the_card(client, card_id):
 
     assert "step" not in row
     assert "ladderStage" not in row
+
+
+def test_the_two_sentence_question_types_are_accepted(client, card_id):
+    """Stage 5 adds producing the whole sentence, typed or rearranged.
+
+    Recorded distinctly rather than folded into the cloze types, because what
+    was asked is not recoverable afterwards if it was never written down — and
+    anything that later weighs difficulty will want it.
+    """
+    for token, kind in [("a", "sentence_typed"), ("b", "sentence_rearranged")]:
+        resp = client.post(
+            f"/cards/{card_id}/reviews",
+            json={
+                "questionType": kind,
+                "isCorrect": True,
+                "clientToken": token,
+                "localDate": _TODAY,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["review"]["questionType"] == kind
+
+
+def test_two_sentence_answers_pass_the_day_like_any_other(client, card_id):
+    """The three-step day counts answers, not question types. A card produced
+    correctly twice has been recalled twice, whichever way it was asked."""
+    for token in ("a", "b"):
+        client.post(
+            f"/cards/{card_id}/reviews",
+            json={
+                "questionType": "sentence_typed",
+                "isCorrect": True,
+                "clientToken": token,
+                "localDate": _TODAY,
+            },
+        )
+
+    outcome = client.post(
+        f"/cards/{card_id}/reviews",
+        json={
+            "questionType": "sentence_rearranged",
+            "isCorrect": True,
+            "clientToken": "c",
+            "localDate": _TODAY,
+        },
+    ).json()
+
+    assert outcome["ladderStage"] == 1

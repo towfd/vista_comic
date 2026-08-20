@@ -57,4 +57,6 @@ struct ReviewOutcome: Decodable, Hashable {
 enum ReviewQuestionType: String, Encodable {
     case clozeChoice = "cloze_choice"
     case clozeTyped = "cloze_typed"
+    case sentenceRearranged = "sentence_rearranged"
+    case sentenceTyped = "sentence_typed"
 }
