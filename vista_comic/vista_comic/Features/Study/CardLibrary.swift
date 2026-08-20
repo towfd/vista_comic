@@ -18,13 +18,14 @@ import SwiftUI
 /// How well a card is known, as a heading the reader can scan.
 ///
 /// A coarsening of `ladderStage`, not a second scale: the ladder is
-/// 1/3/7/21/60 days and five headings for five rungs would be a list of
-/// intervals rather than a sense of progress.
+/// 1/3/7/21/60 days and five labels for five rungs would be a list of intervals
+/// rather than a sense of progress.
 ///
 /// **Every card sits in `.new` until stage 3 ships**, because nothing advances
-/// `ladderStage` yet. That is why `groupedByFamiliarity` drops empty bands
-/// rather than rendering the full set — today this must look like one plain
-/// list, and grow headings by itself once scheduling exists.
+/// `ladderStage` yet. That is why this is shown one card at a time rather than
+/// used to group the list, and why a row mentions it only once a card has
+/// actually moved: six identical badges would be noise, and the same six become
+/// worth reading the moment they start to differ.
 enum Familiarity: Int, CaseIterable, Hashable {
     case new
     case learning
@@ -45,28 +46,57 @@ enum Familiarity: Int, CaseIterable, Hashable {
         case .familiar: "Familiar"
         }
     }
+
+    /// Whether this is worth putting on a list row.
+    ///
+    /// `.new` is not: it is where every card starts and, before stage 3, where
+    /// every card still is.
+    var isWorthShowing: Bool { self != .new }
 }
 
 /// One heading and the cards under it.
-struct FamiliarityGroup: Identifiable, Hashable {
-    let familiarity: Familiarity
+struct CardGroup: Identifiable, Hashable {
+    /// `nil` is the unclassified section — cards collected before the reader
+    /// could say which they were, and mis-taps waiting to be corrected.
+    let kind: CardKind?
     let cards: [LearningCard]
 
-    var id: Int { familiarity.rawValue }
+    var id: String { kind?.rawValue ?? "unclassified" }
+
+    var title: LocalizedStringKey {
+        switch kind {
+        case .word: "Words"
+        case .sentence: "Sentences"
+        case nil: "Unclassified"
+        }
+    }
 }
 
-/// Groups `cards` into the bands that actually contain something, newest first
-/// within each.
+/// Groups `cards` by what the reader said each one is, newest first within each.
 ///
-/// **Empty bands are dropped**, which is what keeps this honest before stage 3:
-/// a screen showing "Learning (0)" and "Familiar (0)" above every card the
-/// reader owns would be describing a system that does not exist yet.
-func groupedByFamiliarity(_ cards: [LearningCard]) -> [FamiliarityGroup] {
-    Familiarity.allCases.compactMap { band in
+/// **By kind rather than by familiarity**, because kind is what actually varies
+/// today: `ladderStage` is written as 0 by stage 1 and nothing advances it until
+/// stage 3, so familiarity bands would be one heading over everything for weeks.
+/// Kind also matches what this screen is for — the unclassified section is a
+/// list of cards needing work, which is a workshop's natural first question.
+///
+/// Familiarity has not gone away; it moved to where it can be read one card at a
+/// time (`CardDetailView`), and appears on a row only once a card has actually
+/// advanced.
+///
+/// **Empty sections are dropped**: a deck of only words should not carry an
+/// empty "Sentences" heading.
+///
+/// Unclassified sorts last. It is the section with work in it, and a heading
+/// that put the reader's mistakes at the top every time they opened the tab
+/// would nag rather than help.
+func groupedByKind(_ cards: [LearningCard]) -> [CardGroup] {
+    let order: [CardKind?] = [.word, .sentence, nil]
+    return order.compactMap { kind in
         let members = cards
-            .filter { Familiarity(ladderStage: $0.ladderStage) == band }
+            .filter { $0.kind == kind }
             .sorted { $0.createdAt > $1.createdAt }
-        return members.isEmpty ? nil : FamiliarityGroup(familiarity: band, cards: members)
+        return members.isEmpty ? nil : CardGroup(kind: kind, cards: members)
     }
 }
 

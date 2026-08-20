@@ -36,11 +36,16 @@ struct CardRow: View {
                         .lineLimit(1)
                 }
 
-                if card.kind == nil {
-                    // Visible because ticket 04 is where it gets fixed, and the
-                    // reader needs to be able to find the ones that need it.
-                    Label("Unclassified", systemImage: "questionmark.circle")
-                        .labelStyle(.titleAndIcon)
+                // Familiarity appears only once a card has actually moved.
+                // Before stage 3 every card is `.new`, and a badge repeated on
+                // every row would be noise — the same six become worth reading
+                // the moment they start to differ. The full picture is in the
+                // card's own screen.
+                if Familiarity(ladderStage: card.ladderStage).isWorthShowing {
+                    Label(
+                        Familiarity(ladderStage: card.ladderStage).title,
+                        systemImage: "chart.line.uptrend.xyaxis"
+                    )
                 }
 
                 // Only ever counted upward, and only on a real re-lookup, so a
@@ -62,6 +67,7 @@ struct CardRow: View {
         CardRow(card: .preview())
         CardRow(card: .preview(kind: nil, lookupCount: 3))
         CardRow(card: .preview(comicTitle: nil))
+        CardRow(card: .preview(ladderStage: 3))
     }
     .listStyle(.plain)
 }

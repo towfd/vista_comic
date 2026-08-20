@@ -16,69 +16,66 @@ import Testing
 
 @testable import vista_comic
 
-@Suite("Grouping the deck by familiarity")
-struct FamiliarityGroupingTests {
+@Suite("Grouping the deck by what each card is")
+struct CardGroupingTests {
 
-    @Test("Every card is new until scheduling exists, so there is one section")
-    func oneRungMakesOneSection() {
-        // Stage 1 writes ladderStage 0 and nothing advances it yet. Headings
-        // for bands the reader cannot reach would describe a system that does
-        // not exist.
+    @Test("Cards land under the kind the reader chose")
+    func cardsLandUnderTheirKind() {
         let deck = [
-            LearningCard.preview(id: 1, ladderStage: 0),
-            LearningCard.preview(id: 2, ladderStage: 0),
+            LearningCard.preview(id: 1, kind: "word"),
+            LearningCard.preview(id: 2, kind: "sentence"),
+            LearningCard.preview(id: 3, kind: nil),
         ]
 
-        let groups = groupedByFamiliarity(deck)
+        let groups = groupedByKind(deck)
 
-        #expect(groups.count == 1)
-        #expect(groups.first?.familiarity == .new)
-        #expect(groups.first?.cards.count == 2)
+        #expect(groups.map(\.kind) == [.word, .sentence, nil])
+        #expect(groups.map { $0.cards.map(\.id) } == [[1], [2], [3]])
     }
 
-    @Test("Bands appear as cards reach them, in order")
-    func bandsAppearAsCardsReachThem() {
+    @Test("Unclassified sorts last")
+    func unclassifiedSortsLast() {
+        // It is the section with work in it, and putting the reader's mistakes
+        // at the top every time they open the tab would nag rather than help.
         let deck = [
-            LearningCard.preview(id: 1, ladderStage: 4),
-            LearningCard.preview(id: 2, ladderStage: 0),
-            LearningCard.preview(id: 3, ladderStage: 2),
+            LearningCard.preview(id: 1, kind: nil),
+            LearningCard.preview(id: 2, kind: "word"),
         ]
 
-        let groups = groupedByFamiliarity(deck)
-
-        #expect(groups.map(\.familiarity) == [.new, .learning, .familiar])
+        #expect(groupedByKind(deck).map(\.kind) == [.word, nil])
     }
 
-    @Test("An empty band is dropped rather than shown as empty")
-    func emptyBandsAreDropped() {
-        let deck = [LearningCard.preview(ladderStage: 4)]
+    @Test("An empty section is dropped rather than shown empty")
+    func emptySectionsAreDropped() {
+        // A deck of only words should not carry an empty "Sentences" heading.
+        let deck = [LearningCard.preview(kind: "word")]
 
-        let groups = groupedByFamiliarity(deck)
-
-        #expect(groups.map(\.familiarity) == [.familiar])
+        #expect(groupedByKind(deck).map(\.kind) == [.word])
     }
 
-    @Test("Newest first within a band")
-    func newestFirstWithinABand() {
-        let deck = [
-            LearningCard.preview(id: 1, createdAt: "2026-08-01T10:00:00Z"),
-            LearningCard.preview(id: 2, createdAt: "2026-08-19T10:00:00Z"),
-            LearningCard.preview(id: 3, createdAt: "2026-08-10T10:00:00Z"),
-        ]
-
-        let groups = groupedByFamiliarity(deck)
-
+    @Test("Newest first within a section")
+    func newestFirstWithinASection() {
         // "I just mis-tapped" is one of the only two ways into this screen, and
         // it is answered by the newest card being at the top.
-        #expect(groups.first?.cards.map(\.id) == [2, 3, 1])
+        let deck = [
+            LearningCard.preview(id: 1, kind: "word", createdAt: "2026-08-01T10:00:00Z"),
+            LearningCard.preview(id: 2, kind: "word", createdAt: "2026-08-19T10:00:00Z"),
+            LearningCard.preview(id: 3, kind: "word", createdAt: "2026-08-10T10:00:00Z"),
+        ]
+
+        #expect(groupedByKind(deck).first?.cards.map(\.id) == [2, 3, 1])
     }
 
-    @Test("An empty deck has no groups at all")
-    func anEmptyDeckHasNoGroups() {
-        #expect(groupedByFamiliarity([]).isEmpty)
+    @Test("An empty deck has no sections at all")
+    func anEmptyDeckHasNoSections() {
+        #expect(groupedByKind([]).isEmpty)
     }
+}
 
-    @Test("Each ladder rung lands in the band it belongs to", arguments: [
+@Suite("How well a card is known")
+struct FamiliarityTests {
+
+    @Test("Each ladder rung maps to a band", arguments: [
         (0, Familiarity.new),
         (1, Familiarity.learning),
         (2, Familiarity.learning),
@@ -87,6 +84,16 @@ struct FamiliarityGroupingTests {
     ])
     func rungsMapToBands(_ pair: (Int, Familiarity)) {
         #expect(Familiarity(ladderStage: pair.0) == pair.1)
+    }
+
+    @Test("A new card says nothing on a row")
+    func aNewCardSaysNothingOnARow() {
+        // Every card is `.new` until stage 3 ships. Six identical badges down a
+        // screen would be noise; the same six become worth reading the moment
+        // they differ.
+        #expect(Familiarity.new.isWorthShowing == false)
+        #expect(Familiarity.learning.isWorthShowing)
+        #expect(Familiarity.familiar.isWorthShowing)
     }
 }
 

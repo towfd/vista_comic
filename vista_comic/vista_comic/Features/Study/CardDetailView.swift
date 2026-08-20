@@ -114,6 +114,15 @@ struct CardDetailView: View {
                 }
             }
 
+            // Shown here rather than used to group the list: before stage 3
+            // every card reads "New", so this belongs where the reader is
+            // looking at one card on purpose, not repeated down a screen.
+            Section("How well you know it") {
+                LabeledContent("Familiarity") {
+                    Text(Familiarity(ladderStage: card.ladderStage).title)
+                }
+            }
+
             Section {
                 Button("Delete", role: .destructive) { isConfirmingDelete = true }
                     .accessibilityIdentifier("deleteCard")
@@ -129,13 +138,13 @@ struct CardDetailView: View {
             }
         }
         .disabled(isSaving)
-        // Deleting is the one irreversible action here, and there is no undo:
-        // the lookup count and ladder position go with the row.
-        .confirmationDialog(
-            "Delete this card?",
-            isPresented: $isConfirmingDelete,
-            titleVisibility: .visible
-        ) {
+        // An alert with two named choices, rather than an action sheet whose
+        // only button is the destructive one. Deleting is irreversible and has
+        // no undo — the lookup count and ladder position go with the row — so
+        // the reader should be answering a question, not being handed a second
+        // button that finishes what the first one started.
+        .alert("Delete this card?", isPresented: $isConfirmingDelete) {
+            Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) { Task { await remove() } }
         } message: {
             Text("How often you've looked it up goes too. You can collect it again later.")

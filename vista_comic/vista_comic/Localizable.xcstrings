@@ -1,13 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "·" : {
-
-    },
     "#%lld" : {
-
-    },
-    "%@ · %@ · page %lld" : {
 
     },
     "%@ · last read" : {
@@ -20,6 +14,19 @@
           }
         }
       }
+    },
+    "%@ · p.%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · p.%2$lld"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
     },
     "%lld/%lld downloaded" : {
       "comment" : "Chapter list: downloads in use against the cap",
@@ -75,6 +82,9 @@
         }
       }
     },
+    "Card" : {
+
+    },
     "Chapter list" : {
       "comment" : "Reader: open the chapter list",
       "localizations" : {
@@ -119,9 +129,6 @@
         }
       }
     },
-    "Check your connection and try again." : {
-
-    },
     "Cloud" : {
 
     },
@@ -153,9 +160,6 @@
     "Couldn't add this to your vocabulary." : {
 
     },
-    "Couldn't ask for this explanation again" : {
-
-    },
     "Couldn't connect" : {
       "comment" : "Error state: title when a fetch fails",
       "localizations" : {
@@ -167,7 +171,7 @@
         }
       }
     },
-    "Couldn't delete this record. Check your connection and try again." : {
+    "Couldn't delete. This needs a connection." : {
 
     },
     "Couldn't load this page" : {
@@ -180,6 +184,9 @@
           }
         }
       }
+    },
+    "Couldn't save. This needs a connection." : {
+
     },
     "Deeper" : {
 
@@ -212,7 +219,7 @@
         }
       }
     },
-    "Delete this record?" : {
+    "Delete this card?" : {
 
     },
     "Depth" : {
@@ -299,10 +306,17 @@
     "Explain in depth" : {
 
     },
+    "Familiar" : {
+
+    },
+    "Familiarity" : {
+
+    },
     "French" : {
 
     },
     "History" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
@@ -311,6 +325,12 @@
           }
         }
       }
+    },
+    "How often you've looked it up goes too. You can collect it again later." : {
+
+    },
+    "How well you know it" : {
+
     },
     "In your vocabulary" : {
 
@@ -329,10 +349,10 @@
     "Japanese" : {
 
     },
-    "Jump to source page" : {
+    "Korean" : {
 
     },
-    "Korean" : {
+    "Learning" : {
 
     },
     "Library" : {
@@ -346,7 +366,13 @@
         }
       }
     },
-    "Lines you ask for a deeper explanation of are kept here." : {
+    "Looked up again" : {
+
+    },
+    "Meaning" : {
+
+    },
+    "New" : {
 
     },
     "Next chapter" : {
@@ -374,10 +400,10 @@
     "No explanation was written for this selection. Trying again would return the same answer." : {
 
     },
-    "No longer in your library" : {
+    "No text was found in the selected region. Try selecting a tighter area around the text." : {
 
     },
-    "No text was found in the selected region. Try selecting a tighter area around the text." : {
+    "No words yet" : {
 
     },
     "Not downloaded" : {
@@ -412,9 +438,6 @@
           }
         }
       }
-    },
-    "Nothing here yet" : {
-
     },
     "OK" : {
 
@@ -467,9 +490,6 @@
     "Recognizing text…" : {
 
     },
-    "Record" : {
-
-    },
     "Retry" : {
       "comment" : "Error state: retry the failed fetch",
       "localizations" : {
@@ -492,6 +512,12 @@
         }
       }
     },
+    "Save" : {
+
+    },
+    "Search words and meanings" : {
+
+    },
     "Select" : {
       "comment" : "Chapter list: enter selection mode for batch download",
       "localizations" : {
@@ -507,6 +533,15 @@
 
     },
     "Selected text" : {
+
+    },
+    "Sentence" : {
+
+    },
+    "Sentences" : {
+
+    },
+    "Showing what was saved on this device." : {
 
     },
     "Spanish" : {
@@ -535,9 +570,6 @@
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
 
     },
-    "This can't be undone." : {
-
-    },
     "This chapter isn't on your device. Reconnect to read it, or download it while you're online." : {
       "comment" : "Reader: what to do about a chapter that is not available offline",
       "localizations" : {
@@ -548,6 +580,9 @@
           }
         }
       }
+    },
+    "This comic is no longer in your library." : {
+
     },
     "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
 
@@ -567,9 +602,6 @@
 
     },
     "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
-
-    },
-    "Today's explanation limit is used up. The limit resets tomorrow." : {
 
     },
     "Tone & register" : {
@@ -592,6 +624,9 @@
     "Translate" : {
 
     },
+    "Translate a line while reading, then add it as a word or a sentence." : {
+
+    },
     "Translate to" : {
 
     },
@@ -605,6 +640,12 @@
 
     },
     "Translation failed. You can try again." : {
+
+    },
+    "Type" : {
+
+    },
+    "Unclassified" : {
 
     },
     "unread" : {
@@ -621,7 +662,19 @@
     "Uses one of today's requests, and saves this line to 歷史紀錄." : {
 
     },
+    "Vocabulary" : {
+
+    },
     "Vocabulary & grammar" : {
+
+    },
+    "Where it came from" : {
+
+    },
+    "Word" : {
+
+    },
+    "Words" : {
 
     },
     "You can download up to %lld chapters at once." : {

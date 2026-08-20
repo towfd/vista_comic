@@ -87,7 +87,7 @@ struct StudyView: View {
 
     private func list(_ cards: [LearningCard]) -> some View {
         let matches = cardsMatching(query, in: cards)
-        let groups = groupedByFamiliarity(matches)
+        let groups = groupedByKind(matches)
 
         return Group {
             if matches.isEmpty {
@@ -102,15 +102,12 @@ struct StudyView: View {
                             .font(AppFont.caption)
                             .foregroundStyle(.grayFont)
                     }
+                    // Headings always, even for a single section — unlike
+                    // familiarity, one kind is a fact about this deck rather
+                    // than about the feature being unfinished, so "Words"
+                    // above a list of only words is worth saying.
                     ForEach(groups) { group in
-                        // A single band gets no heading. Everything sits in
-                        // `New` until stage 3 ships, and a header above a list
-                        // where every card says the same thing is furniture.
-                        if groups.count > 1 {
-                            Section(group.familiarity.title) { rows(group.cards) }
-                        } else {
-                            rows(group.cards)
-                        }
+                        Section(group.title) { rows(group.cards) }
                     }
                 }
                 .listStyle(.plain)
