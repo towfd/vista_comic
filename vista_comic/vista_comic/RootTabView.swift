@@ -16,17 +16,8 @@
 import SwiftUI
 
 struct RootTabView: View {
-    @Environment(\.comprehensionRepository) private var repository
     @Environment(\.studyRepository) private var studyRepository
     @Environment(\.scenePhase) private var scenePhase
-
-    /// The badge lives here, not in `HistoryView` (ticket 22). A tab's content
-    /// does not appear until the tab is selected, so a badge owned by 歷史紀錄
-    /// could only ever learn an explanation had arrived at the moment the reader
-    /// opened the tab it was meant to send them to. The shell is on screen the
-    /// whole time, so it is the only thing that can speak while the reader is
-    /// somewhere else.
-    @State private var badge = UnreadExplanationBadge()
 
     var body: some View {
         TabView {
@@ -43,31 +34,30 @@ struct RootTabView: View {
                     Label("Downloads", systemImage: "arrow.down.circle")
                 }
 
-            HistoryView()
+            // 單字庫 takes the slot 歷史紀錄 held (vocabulary stage 2). That
+            // tab was the second attempt at somewhere to look back at what had
+            // been read, after 單字本, and went unused like the first. What
+            // replaces it is not a third place to browse — it is where a bad
+            // card gets fixed.
+            StudyView()
                 .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
+                    Label("Vocabulary", systemImage: "text.book.closed")
                 }
-                .badge(badge.count)
         }
-        .environment(\.unreadExplanationBadge, badge)
-        // Catches whatever finished while the app was dead. The watch cannot:
-        // it only knows about records enqueued in this run.
-        .task { await badge.refresh(using: repository) }
         // Refreshes the deck snapshot the already-collected marker reads. Here
         // rather than in the reader, because the reader must not pay for a
         // network call every time a selection sheet opens — and the shell is on
-        // screen the whole time, which is the same reason the badge lives here.
+        // screen the whole time.
         //
         // Best-effort and unobserved: `cards()` stores the snapshot as a side
         // effect of succeeding, and a failure just leaves the previous one in
         // place, which is exactly what it is for.
         .task { _ = try? await studyRepository.cards() }
-        // Explanations land while the app is elsewhere — that is the whole
-        // point of enqueueing them — so coming back is when the count is most
-        // likely to be stale.
+        // Words are collected in the reader and can be queued offline, so
+        // returning to the foreground is when the snapshot is most likely to be
+        // behind what the reader has actually kept.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await badge.refresh(using: repository) }
                 Task { _ = try? await studyRepository.cards() }
             }
         }

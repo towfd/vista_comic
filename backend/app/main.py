@@ -836,6 +836,10 @@ def _card_session():
 
 
 def _to_card_response(row: LearningCard) -> LearningCardResponse:
+    # Same join, same function, same degradation as the history rows: titles are
+    # decoration and the cards are the data, so an unavailable catalog costs the
+    # labels rather than the request.
+    comic_title, chapter_title = _titles_for(row.comic_id, row.chapter_id)
     return LearningCardResponse(
         id=row.id,
         sourceText=row.source_text,
@@ -844,6 +848,8 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
         comicId=row.comic_id,
         chapterId=row.chapter_id,
         pageNumber=row.page_number,
+        comicTitle=comic_title,
+        chapterTitle=chapter_title,
         kind=row.kind,
         ladderStage=row.ladder_stage,
         dueOn=row.due_on.isoformat(),

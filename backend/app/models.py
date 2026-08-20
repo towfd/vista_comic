@@ -233,6 +233,13 @@ class LearningCardResponse(BaseModel):
     ``kind`` is ``None`` for cards collected before the reader could say, and
     for those it stays ``None`` until they say so in 單字庫. It is never
     guessed.
+
+    ``comicTitle``/``chapterTitle`` are joined from the in-memory catalog at
+    read time rather than stored, exactly as ``ComprehensionRecordResponse``
+    does: the card holds path-hash ids, which are correct as keys and useless as
+    labels. A ``None`` comic title is also the client's cue that jumping back to
+    the page would fail, because the join is what proves the comic is still in
+    the library.
     """
 
     id: int
@@ -242,6 +249,8 @@ class LearningCardResponse(BaseModel):
     comicId: str
     chapterId: str
     pageNumber: int
+    comicTitle: Optional[str] = None
+    chapterTitle: Optional[str] = None
     kind: Optional[str] = None
     ladderStage: int
     dueOn: str  # ISO-8601 date

@@ -88,6 +88,8 @@ extension LearningCard {
             "comicId": "comic-1",
             "chapterId": "chapter-1",
             "pageNumber": 3,
+            "comicTitle": "marrymyhusband",
+            "chapterTitle": "bai1",
             "kind": \(kindJSON),
             "ladderStage": 0,
             "dueOn": "2026-08-19",

@@ -476,3 +476,69 @@ def test_a_deleted_line_can_be_collected_again_as_a_new_card(client):
     assert again.status_code == 201
     assert again.json()["id"] != first["id"]
     assert again.json()["lookupCount"] == 0
+
+
+# --- titles joined at read time (spec-02 ticket 03) -------------------------
+
+
+def _catalog_with(comic_id: str, chapter_id: str):
+    """The smallest catalog that resolves one card's source."""
+    from pathlib import Path
+
+    from app.models import ChapterEntry, ComicEntry
+    from app.scanner import Catalog, ScanReport
+
+    return Catalog.build(
+        comics=[
+            ComicEntry(
+                id=comic_id,
+                title="marrymyhusband",
+                cover_path=None,
+                chapters=[
+                    ChapterEntry(
+                        id=chapter_id, number=1, title="bai1", page_paths=["a.jpg"]
+                    )
+                ],
+            )
+        ],
+        report=ScanReport(),
+        root=Path("/library"),
+    )
+
+
+def test_cards_carry_titles_joined_from_the_catalog(client, monkeypatch):
+    """The row holds path-hash ids, which are keys, not labels."""
+    monkeypatch.setattr(
+        main.state, "catalog", _catalog_with(_BODY["comicId"], _BODY["chapterId"])
+    )
+
+    card = _add(client).json()
+
+    assert card["comicTitle"] == "marrymyhusband"
+    assert card["chapterTitle"] == "bai1"
+    assert client.get("/cards").json()[0]["comicTitle"] == "marrymyhusband"
+
+
+def test_a_card_whose_comic_is_gone_has_null_titles(client, monkeypatch):
+    """Not a failure: the card stays perfectly readable, and the null title is
+    what tells the app that jumping back to the page would not work."""
+    monkeypatch.setattr(main.state, "catalog", _catalog_with("other", "other"))
+
+    card = _add(client).json()
+
+    assert card["comicTitle"] is None
+    assert card["chapterTitle"] is None
+
+
+def test_cards_are_still_listable_when_the_catalog_is_unavailable(
+    client, monkeypatch
+):
+    """Titles are decoration; the deck is the data. A library scan that has not
+    happened must not cost the reader their vocabulary."""
+    monkeypatch.setattr(main.state, "catalog", None)
+
+    _add(client)
+
+    listed = client.get("/cards")
+    assert listed.status_code == 200
+    assert listed.json()[0]["comicTitle"] is None

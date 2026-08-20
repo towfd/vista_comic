@@ -65,6 +65,15 @@ struct LearningCard: Decodable, Identifiable, Hashable {
     let comicID: String
     let chapterID: String
     let pageNumber: Int
+    /// Joined by the backend from its live catalog at read time rather than
+    /// stored, exactly as `ComprehensionRecord` does it. The card holds
+    /// path-hash ids, which are correct as keys and useless as labels.
+    ///
+    /// A `nil` comic title is not a missing fetch — it is the backend saying
+    /// that comic has left the library, and therefore that jumping back to the
+    /// page would fail. See `Shared/SourceReference.swift`.
+    let comicTitle: String?
+    let chapterTitle: String?
     /// Which of the two the reader said this is, or `nil` for a card collected
     /// before they could say.
     ///
@@ -97,7 +106,8 @@ struct LearningCard: Decodable, Identifiable, Hashable {
         case id, sourceText, translation, targetLanguage
         case comicID = "comicId"
         case chapterID = "chapterId"
-        case pageNumber, kind, ladderStage, dueOn, lookupCount, lastLookedUpAt, createdAt
+        case pageNumber, comicTitle, chapterTitle, kind
+        case ladderStage, dueOn, lookupCount, lastLookedUpAt, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -109,6 +119,8 @@ struct LearningCard: Decodable, Identifiable, Hashable {
         comicID = try container.decode(String.self, forKey: .comicID)
         chapterID = try container.decode(String.self, forKey: .chapterID)
         pageNumber = try container.decode(Int.self, forKey: .pageNumber)
+        comicTitle = try container.decodeIfPresent(String.self, forKey: .comicTitle)
+        chapterTitle = try container.decodeIfPresent(String.self, forKey: .chapterTitle)
         // The lenient step: absent, null, or unrecognised all mean "unanswered".
         kind = (try? container.decodeIfPresent(String.self, forKey: .kind))
             .flatMap { $0 }

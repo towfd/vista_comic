@@ -51,20 +51,63 @@ The list reads through the repository and falls back to the deck snapshot when t
 
 **Blocked by:** 02 — Free the jump-to-source route from 歷史紀錄.
 
-**Status:** not started.
+**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-20 — backend `226 passed`, iOS `TEST BUILD SUCCEEDED`. **Awaiting the repo owner's device pass** (checklist below).
 
-- [ ] A 單字庫 tab replaces 歷史紀錄; the tab bar still has three tabs
-- [ ] Cards are grouped by familiarity, and a deck all on one rung renders one section rather than several empty ones
-- [ ] Search matches source text and translation, and uses the deck's existing normalisation rather than a second rule
-- [ ] Search with no matches says so, distinctly from an empty deck
-- [ ] An empty deck says something useful about how to fill it
-- [ ] `GET /cards` returns `comicTitle` and `chapterTitle`, joined at read time by the existing `_titles_for`
-- [ ] A card whose comic has left the library returns null titles rather than failing
-- [ ] Each row shows source, translation, source comic, familiarity and lookup count
-- [ ] A card whose comic is gone shows the jump as unavailable rather than offering one that fails
-- [ ] Cards with no kind are visibly unclassified
-- [ ] Tapping a row jumps to the page it came from, using the route moved in ticket 02
-- [ ] With no connection the list still renders from the snapshot, and says the data may be stale rather than pretending otherwise
-- [ ] `Features/History/` and its tests are gone, and nothing else imports them
-- [ ] Asking for an explanation still works, and still writes a record
-- [ ] No XCUITest is written; a device checklist is handed to the repo owner
+- [x] A 單字庫 tab replaces 歷史紀錄; the tab bar still has three tabs
+- [x] Cards are grouped by familiarity, and a deck all on one rung renders one section rather than several empty ones
+- [x] Search matches source text and translation, and uses the deck's existing normalisation rather than a second rule
+- [x] Search with no matches says so, distinctly from an empty deck
+- [x] An empty deck says something useful about how to fill it
+- [x] `GET /cards` returns `comicTitle` and `chapterTitle`, joined at read time by the existing `_titles_for`
+- [x] A card whose comic has left the library returns null titles rather than failing
+- [x] Each row shows source, translation, source comic, familiarity and lookup count
+- [x] A card whose comic is gone shows the jump as unavailable rather than offering one that fails
+- [x] Cards with no kind are visibly unclassified
+- [x] Tapping a row jumps to the page it came from, using the route moved in ticket 02
+- [x] With no connection the list still renders from the snapshot, and says the data may be stale rather than pretending otherwise
+- [x] `Features/History/` and its tests are gone, and nothing else imports them
+- [x] Asking for an explanation still works, and still writes a record
+- [x] No XCUITest is written; a device checklist is handed to the repo owner
+
+## What was built
+
+- Backend: `GET /cards` now carries `comicTitle`/`chapterTitle`, joined at read time by the existing `_titles_for`, with the same degradation — an unavailable catalog costs the labels, not the request.
+- `Features/Study/CardLibrary.swift` — `Familiarity`, `groupedByFamiliarity`, `cardsMatching`, and `LearningCard.source`/`sourceLabel`. Free functions, testable without rendering.
+- `Features/Study/StudyView.swift` and `components/CardRow.swift`.
+- `RootTabView` — 單字庫 in 歷史紀錄's slot; still three tabs.
+- `Features/History/` deleted (1,089 lines), with its unit tests, its UI tests, and the unread badge.
+
+**Three decisions worth review:**
+
+1. **A single band gets no heading.** Every card sits in `New` until stage 3 ships, and a header above a list where every row says the same thing is furniture. Bands appear by themselves as cards reach them.
+2. **Search reuses `normalizedKey`** rather than a second matching rule. There is one definition of "the same text" in this app — the one the deck's identity is built on — and a search that disagreed with it would find nothing for a word the reader can plainly see.
+3. **A card whose comic has left the library is shown without a link**, not as a link that fails. One signal (`comicTitle == nil`) withdraws both the label and the jump.
+
+Offline, the list falls back to the deck snapshot and says so. It is only a `failed` state when nothing is cached either — showing the reader their own vocabulary beats showing them an error about it.
+
+## A consequence the spec did not record
+
+Removing 歷史紀錄 also removed `UnreadExplanationBadge`, which the selection sheet handed its
+record to on dismissal. **So an explanation that arrives after the sheet is closed is now
+written, charged against the daily cap, and unobservable.**
+
+The spec recorded only that a *failed* explanation can no longer be retried. This is broader:
+深入解釋 changes from "ask and come back later" to "ask and wait", and waiting was exactly what
+the asynchronous design existed to avoid.
+
+Reported to the repo owner rather than absorbed silently. Three options were put to them: accept
+it (waiting is what happens in practice anyway, and it stops forgotten requests burning quota);
+keep 歷史紀錄 after all; or attach the explanation to the card, for which
+`learning_card.comprehension_record_id` already exists and is always NULL. The third is stage 4
+territory and could be brought forward.
+
+## Device checklist for the repo owner
+
+1. The tab bar reads **書庫 / 已下載 / Vocabulary**, still three tabs, and 歷史紀錄 is gone.
+2. Vocabulary lists every card, newest first, with **no section header** — everything is on rung 0 today, and one heading above one list would be noise.
+3. Each row shows the source text, translation, which comic it came from, and a re-lookup count where one exists. The cards collected before ticket 06 show as **Unclassified**.
+4. Search a word in the source text, then search part of a **translation** — both find it. Search something absent: it says "no results", worded differently from an empty deck.
+5. Tap a row: it opens the page that line came from, and **leaving does not change where you were actually reading** (it is a peek).
+6. Airplane mode, open the tab: the list still renders and says it is showing what was saved on this device.
+7. Ask for a 深入解釋 and **stay on the sheet**: it still arrives and reads exactly as before. The record is still written — only the browsing screen is gone.
+8. Both phone sizes: rows do not truncate awkwardly, and the search field behaves.

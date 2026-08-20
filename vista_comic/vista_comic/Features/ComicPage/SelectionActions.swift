@@ -188,11 +188,12 @@ func requestExplanation(
 /// terminal status, which is why `sleep` is injected: it makes the loop testable
 /// in real time instead of in real minutes.
 ///
-/// Two callers wait on the same thing from different places, and they differ in
-/// exactly one respect, which is why this loop is separate from
-/// `awaitExplanation`: the result screen's wait means the reader is watching, so
-/// an arrival counts as read; the badge's wait (`UnreadExplanationBadge.watch`)
-/// means they are not, so it must not.
+/// Kept separate from `awaitExplanation` because the two answer different
+/// questions: this one waits, that one waits *and* marks the record read. The
+/// split existed for a second caller — the unread badge, which watched without
+/// the reader looking — and outlived it when 歷史紀錄 was removed. It stays
+/// because marking read is a claim about the reader, not about the poll, and
+/// folding them together would bury that.
 ///
 /// Returns `nil` when cancelled before the record finished.
 func awaitRecordFinishing(
