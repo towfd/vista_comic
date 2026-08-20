@@ -146,6 +146,42 @@ struct APIStudyRepository: StudyRepository {
         _ = try? await cards()
     }
 
+    @discardableResult
+    func recordReview(
+        cardID: Int,
+        questionType: ReviewQuestionType,
+        isCorrect: Bool,
+        clientToken: String,
+        localDate: Date,
+        elapsedMs: Int?
+    ) async throws -> ReviewOutcome {
+        var payload: [String: Any] = [
+            "questionType": questionType.rawValue,
+            "isCorrect": isCorrect,
+            "clientToken": clientToken,
+            "localDate": Self.dayFormatter.string(from: localDate),
+        ]
+        if let elapsedMs { payload["elapsedMs"] = elapsedMs }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        return try await send(
+            ReviewOutcome.self,
+            method: "POST",
+            at: "\(resourcePath)/\(cardID)/reviews",
+            body: body
+        )
+    }
+
+    /// Formats the reader's local day. Deliberately **not** UTC: the backend
+    /// groups a practice day by what this sends, and the reader's day ends at
+    /// their midnight rather than at Greenwich's.
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     func recordLookup(id: Int) async throws {
         let request = makeRequest(method: "POST", at: "\(resourcePath)/\(id)/lookups")
         let (_, response) = try await session.data(for: request)

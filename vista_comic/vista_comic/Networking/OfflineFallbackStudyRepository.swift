@@ -115,6 +115,31 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         return try await inner.cards()
     }
 
+    /// Passed straight through, and **not queued** on failure.
+    ///
+    /// A round needs the backend, as stage 3's did. Queueing answers would mean
+    /// replaying them later against a ladder that has since moved — and the
+    /// once-a-day rule makes the order they arrive in load-bearing, which a
+    /// queue cannot promise.
+    @discardableResult
+    func recordReview(
+        cardID: Int,
+        questionType: ReviewQuestionType,
+        isCorrect: Bool,
+        clientToken: String,
+        localDate: Date,
+        elapsedMs: Int?
+    ) async throws -> ReviewOutcome {
+        try await inner.recordReview(
+            cardID: cardID,
+            questionType: questionType,
+            isCorrect: isCorrect,
+            clientToken: clientToken,
+            localDate: localDate,
+            elapsedMs: elapsedMs
+        )
+    }
+
     /// Notes a re-lookup, keeping it if the backend cannot be reached.
     ///
     /// **Never throws.** The reader is looking at a translation they asked for;

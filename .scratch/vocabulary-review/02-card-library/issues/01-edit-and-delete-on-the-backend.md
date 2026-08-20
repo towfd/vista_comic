@@ -17,16 +17,16 @@ It goes first because it is the only part of this stage that can be **fully veri
 
 **Blocked by:** nothing.
 
-**Status:** not started.
+**Status:** done — backend `223 passed`; shipped in `43ae9f0`, merged in PR [#81](https://github.com/towfd/vista_comic/pull/81). Backend only, so no device pass applied.
 
-- [ ] `PATCH /cards/{id}` updates the translation and returns the whole card
-- [ ] `PATCH` updates the kind, and accepts an explicit null to clear one
-- [ ] `PATCH` with neither field is refused rather than silently doing nothing
-- [ ] `PATCH` rejects an unrecognised kind
-- [ ] `PATCH` cannot change source text, normalised key, target language, or the source reference — asserted, not assumed
-- [ ] `PATCH` does not touch `ladder_stage`, `due_on`, `lookup_count` or `created_at`
-- [ ] `PATCH` on an unknown id is 404
-- [ ] `DELETE /cards/{id}` removes the row and returns 204
-- [ ] `DELETE` twice is 404 the second time
-- [ ] After a delete, collecting the same line again creates a **new** card with a fresh lookup count
-- [ ] Both routes surface a store failure as 503, matching the resource's existing shape
+- [x] `PATCH /cards/{id}` updates the translation and returns the whole card
+- [x] `PATCH` updates the kind, and accepts an explicit null to clear one
+- [x] `PATCH` with neither field is refused rather than silently doing nothing
+- [x] `PATCH` rejects an unrecognised kind
+- [x] `PATCH` cannot change source text, normalised key, target language, or the source reference — asserted, not assumed
+- [x] `PATCH` does not touch `ladder_stage`, `due_on`, `lookup_count` or `created_at`
+- [x] `PATCH` on an unknown id is 404
+- [x] `DELETE /cards/{id}` removes the row and returns 204
+- [x] `DELETE` twice is 404 the second time
+- [x] After a delete, collecting the same line again creates a **new** card with a fresh lookup count
+- [x] Both routes surface a store failure as 503, matching the resource's existing shape
