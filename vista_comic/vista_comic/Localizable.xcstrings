@@ -28,6 +28,19 @@
     "%lld" : {
 
     },
+    "%lld / %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld questions" : {
+
+    },
     "%lld/%lld downloaded" : {
       "comment" : "Chapter list: downloads in use against the cap",
       "localizations" : {
@@ -38,6 +51,9 @@
           }
         }
       }
+    },
+    "Add a sentence that contains one of your words, and it becomes a question." : {
+
     },
     "Add as sentence" : {
 
@@ -52,6 +68,9 @@
 
     },
     "Adding…" : {
+
+    },
+    "All correct" : {
 
     },
     "Back" : {
@@ -118,6 +137,9 @@
         }
       }
     },
+    "Check" : {
+
+    },
     "Check that the server is running and try again." : {
       "comment" : "Error state: description when a fetch fails",
       "localizations" : {
@@ -130,6 +152,9 @@
       }
     },
     "Cloud" : {
+
+    },
+    "Collect %lld more while reading, then come back." : {
 
     },
     "Comics you add will appear here." : {
@@ -156,6 +181,9 @@
           }
         }
       }
+    },
+    "Correct" : {
+
     },
     "Couldn't add this to your vocabulary." : {
 
@@ -312,6 +340,9 @@
     "Familiarity" : {
 
     },
+    "Finish" : {
+
+    },
     "French" : {
 
     },
@@ -375,6 +406,9 @@
     "New" : {
 
     },
+    "Next" : {
+
+    },
     "Next chapter" : {
       "comment" : "Reader: next chapter",
       "localizations" : {
@@ -417,6 +451,9 @@
         }
       }
     },
+    "Not enough words yet" : {
+
+    },
     "not started yet" : {
       "comment" : "Library card: comic never opened",
       "localizations" : {
@@ -439,6 +476,9 @@
         }
       }
     },
+    "Nothing to practise yet" : {
+
+    },
     "OK" : {
 
     },
@@ -446,6 +486,12 @@
 
     },
     "Original" : {
+
+    },
+    "Play" : {
+
+    },
+    "Practice" : {
 
     },
     "Preview — progress won't be saved" : {
@@ -541,6 +587,9 @@
     "Sentences" : {
 
     },
+    "sentences ready" : {
+
+    },
     "Showing what was saved on this device." : {
 
     },
@@ -564,7 +613,13 @@
     "Text recognition failed unexpectedly." : {
 
     },
+    "The answer was %@" : {
+
+    },
     "The explanation couldn't be written. Your translation above is unaffected." : {
+
+    },
+    "The missing word" : {
 
     },
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
@@ -602,6 +657,9 @@
 
     },
     "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
+
+    },
+    "TODAY'S ROUND" : {
 
     },
     "Tone & register" : {
@@ -668,6 +726,9 @@
     "Vocabulary & grammar" : {
 
     },
+    "Watch the tones: %@" : {
+
+    },
     "Where it came from" : {
 
     },
@@ -675,6 +736,9 @@
 
     },
     "Words" : {
+
+    },
+    "words collected" : {
 
     },
     "You can download up to %lld chapters at once." : {

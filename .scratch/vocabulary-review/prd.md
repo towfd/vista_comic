@@ -58,7 +58,7 @@ the developer can find out whether this works for him before anything larger is 
 | Source location | `comicID` / `chapterID` / `pageNumber` only, matching the existing peek route. **No crop rectangle** |
 | Scheduling | Fixed-interval ladder: 1 / 3 / 7 / 21 / 60 days. Correct advances one rung, wrong drops to the first. Correctness only — no speed or hint signals |
 | Review log | Recorded in full (timestamp, question type, correct, elapsed ms) so swapping in FSRS later is an algorithm change, not a data migration |
-| Question types | Matching pairs; sentence cloze; type the source text from the translation. Typed answers are judged **exact-match only** |
+| Question types | Matching pairs; sentence cloze; sentence translation; typing. **Where each one lives changed on 2026-08-20** — see *The lesson architecture* |
 | Practice sentence corpus | Context comes from a user-authored `introduction.txt` in each comic folder (3,000 characters max; on launch the app tells the reader which comics are missing one) |
 | Practice sentence budget | **5–10 sentences per day in total**, not one per card. The budget is allocated by familiarity and card age: low rungs and recently added cards weigh more. Generation keeps running on days when nothing is collected, and pauses only after **seven consecutive days with no new card**, resuming on the next one. The stock balances itself out over time |
 | Cloze target | The blank is always a word that is in the deck. Generated sentences necessarily contain words that are not, and those are never blanked. Where several deck words appear in one sentence, blank the least familiar |
@@ -136,6 +136,59 @@ On iOS, each stage adds a `Decodable` model plus a `StudyRepository` protocol an
 `ComprehensionRepository.swift` / `APIComprehensionRepository.swift`. Testable actions are free
 functions, as in `HistoryActions.swift`.
 
+## The lesson architecture
+
+Settled 2026-08-20, after stage 2 shipped, and **materially different from what the stage list
+below originally said**. It came out of asking how a lesson actually runs, and the answer turned
+out to have three separate places rather than one.
+
+```
+每日關卡  ── the ladder lives here, and only here
+├── 克漏字        → moves the ladder
+├── 翻牌          → does NOT move the ladder
+└── 句子翻譯      → moves the ladder
+
+錯題區            → outside the ladder entirely
+單字練習          → outside the ladder entirely
+├── 翻牌
+└── 打字
+```
+
+**Matching sits inside the daily level without counting.** It is there to remind the reader of
+the words between the two demanding question types — a warm-up, not an assessment. Selection for
+it, and for both areas outside, is by familiarity and how often a word has come up recently
+rather than by anything the ladder knows.
+
+### Two clocks, deliberately
+
+**The ladder moves at most once per day per card**, up or down, and what moves it is whether the
+card reached 通過 in that day's level — not any individual answer.
+
+Within a day a card climbs its own three-step ladder, which resets daily:
+
+| Now | Correct → | Wrong → |
+|---|---|---|
+| first appearance | **熟悉** (skips 不熟) | 不熟 |
+| 不熟 | 熟悉 | 不熟 |
+| 熟悉 | **通過** | 不熟 |
+
+So a card needs **two correct answers in a row to pass for the day**, and a round of five
+questions is not five distinct words — a word appears until it passes or the round ends.
+
+### 錯題區 is its own thing, and is allowed to grow
+
+A wrong answer anywhere puts a card here. Answering it correctly first try removes it; anything
+else leaves it. **It does not touch the ladder in either direction**, and letting it pile up is
+normal rather than a failure state — the developer's call, following how Duolingo separates
+practice from progress.
+
+### The selection problem this creates
+
+Weighting purely by familiarity deadlocks: the least familiar card always wins, so the same word
+appears over and over while others never come up, and getting it wrong makes it more likely
+still. Every list outside the ladder therefore needs **recent appearances to suppress weight** as
+well as unfamiliarity to raise it. Named here because it is one rule shared by three places.
+
 ## Stages
 
 ### 1. Store the word
@@ -155,63 +208,36 @@ A new tab under `Features/Study/` with its own `NavigationStack`. Lists source t
 translation, source comic, familiarity (ladder rung) and lookup count. Delete, archive, and
 jump back to the page via the existing peek route.
 
-### 3. Matching game and the memory curve
-Backend: `card_review` table, ladder advancement, `GET /study/session` (today's due cards),
-`POST /study/reviews`.
-
-iOS: the daily lesson screen — source text in a left column, translations shuffled in a right
-column, matched by the reader. Distractors are drawn from the reader's own other cards, so no
-dictionary and no generation is involved. A deck of fewer than three cards cannot form a round;
-the screen says how many more words are needed rather than showing an unplayable lesson.
-
-### 4. Sentence generation, then cloze and typing
+### 3. Word breakdown
 Backend: extend the `comprehension_client.py` forced tool with a structured `vocabulary` array
 (surface form, reading, meaning in this context, part of speech, span in the source sentence).
-This ripple runs DB -> Pydantic -> Swift `Decodable` -> UI, and is the largest single piece of
+The ripple runs DB -> Pydantic -> Swift `Decodable` -> UI, and it is the largest single piece of
 backend work in this PRD.
 
-Backend: `scanner.py` reads `introduction.txt` from each comic root into `ComicEntry` — UTF-8,
-capped at 3,000 characters, and absent without error. A comic with no file still works: it falls
-back to the reader's own collected sentences as the only context. The app surfaces which comics
-are missing one on launch, so the gap is visible rather than silent.
+Nothing is playable when this lands, which is the cost of doing it first. Everything after it
+depends on a sentence knowing which words it is made of: cloze cannot choose a blank without it,
+and generated practice sentences cannot be checked against the word they were written for.
 
-Backend: practice-sentence generation as another job type on the existing
-`comprehension_worker` queue — no cron.
+### 4. The daily level
+Backend: `card_review`, the ladder, the three-step day, and the endpoints a level runs on.
 
-**The generation policy is a daily budget, not a per-card guarantee.** Each day the job produces
-5–10 sentences in total and decides which cards receive them, weighting by:
+iOS: 每日關卡 — cloze, then matching as a warm-up between, then sentence translation. A card
+passes the day by reaching 通過; the ladder moves at most once per day on that outcome, never on
+a single answer. Matching never moves it at all.
 
-- **Familiarity** — cards on low ladder rungs, and cards recently answered wrong, weigh most.
-  Hard words accumulate more sentences over time, which is the point.
-- **Card age** — newly added cards weigh high, so a word collected this week gets a sentence
-  soon rather than waiting behind the backlog.
-- **Existing stock** — a card that already has several sentences yields to one that has none.
+`introduction.txt` and practice-sentence generation belong here too: cloze on a **word** card
+needs a sentence containing that word, and only a **sentence** card already has one.
 
-A day with no new card is not itself a reason to skip generation — the existing deck still has
-hard and under-covered words worth writing for. Generation pauses only after **seven consecutive
-days without a new card**, and resumes the day one is added. So a quiet week still deepens the
-deck, while a genuine break costs nothing. Over time supply and demand settle: hard and new
-words stay covered, easy and stale ones stop consuming budget.
+### 5. Practice areas
+錯題區 and 單字練習, both outside the ladder and both selecting by familiarity suppressed by
+recent appearances. 單字練習 holds words only, as matching and typing.
 
-Two consequences the specs must handle rather than assume away:
-
-1. Sentences accumulate gradually. A card with no sentence yet can only appear as a matching
-   question, so the daily lesson must mix question types by what each card actually has.
-2. The generator must report which deck words appear in each sentence it writes (`deck_spans`),
-   because the blank is chosen at question time from the deck words present, least familiar
-   first.
-
-iOS: each word or phrase in the explanation breakdown becomes individually addable, alongside
-adding the whole sentence. Cloze and typed-answer screens.
-
-### 5. Game layer
+### 6. Game layer
 `daily_completion`, streak, XP and levels. Per-comic mastery — how many words collected from
 this comic, how many have reached a stable rung, how many were hit while reading this week — is
 **optional and the lowest priority in this PRD**; drop it if the stage runs long.
 
-Removing `Features/History/` **moved to stage 2** (2026-08-19). That stage already reshapes the
-same part of the tab bar, and leaving 歷史紀錄 in place would have meant weeks of carrying a
-dead tab beside its replacement, and then editing the tab bar twice.
+Removing `Features/History/` **moved to stage 2** (2026-08-19), and shipped there.
 
 ## Verification
 
@@ -241,9 +267,38 @@ Each stage is its own folder under `.scratch/vocabulary-review/`, holding a `spe
 |---|---|---|
 | `01-card-storage/` | `learning_card`, `/cards` endpoints, add button, offline queue, local deck snapshot and lookup marker | — |
 | `02-card-library/` | Vocabulary tab: grouped list, search, edit the translation, delete, peek — **and the removal of 歷史紀錄** | 01 |
-| `03-matching-review/` | `card_review`, ladder scheduling, daily lesson, matching pairs | 02 |
-| `04-sentence-generation/` | Structured vocabulary tool field, `introduction.txt`, generation job, cloze and typing | 03 |
-| `05-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 03 |
+| `03-cloze-round/` | Deck-word matching, cloze questions, and a round that can be played. No ladder yet | 02 |
+| `04-the-ladder/` | The ladder and the three-step day turn a round into 每日關卡 | 03 |
+| `05-sentence-translation/` | The second question type, typed and rearranged, and how it is judged | 04 |
+| `06-practice-sentences/` | Generation, so a **word** card can carry a cloze too | 05 |
+| `07-practice-areas/` | 錯題區 and 單字練習, both outside the ladder | 04 |
+| `08-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 04 |
+
+**Reordered twice on 2026-08-20.** First, once the lesson architecture above was settled: what
+had been stage 3 — matching plus the ladder — turned out not to be buildable first, because
+matching is the one question type that deliberately does not count, and cloze is what the ladder
+responds to.
+
+Then again, after a spike. Cloze had been blocked on an LLM breakdown of each sentence into
+words, scheduled two stages later. **It turned out not to need one**: the blank in a cloze is
+always a word the reader has collected, so finding it is a search against a deck we already hold
+rather than tokenisation. That removed a whole stage and moved a large piece of LLM work
+(`06-practice-sentences/`) to the end, where the developer put it — the deck's own sentence cards
+carry real sentences already, so generation buys variety rather than viability.
+
+### Answer modes, settled 2026-08-20
+
+| Question | How it is answered |
+|---|---|
+| Cloze | Four choices, or typed |
+| Sentence translation | Typed, or rearranged from scrambled words |
+| Matching | Tap to pair |
+
+Sentence translation runs **Chinese → Vietnamese**: producing the target language is the harder
+and more valuable direction, and the developer types Vietnamese comfortably. Judging strips
+punctuation and whitespace and then requires an exact match, so word order and spelling — tones
+included — must be right. That reuses the deck's existing normalisation rather than inventing a
+second idea of "the same text".
 
 Each spec is finalised only after the previous stage has shipped and been used, so its details
 come from real experience rather than guesses about experience that has not happened yet.

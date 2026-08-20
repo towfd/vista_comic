@@ -48,3 +48,34 @@ func normalizedKey(_ text: String) -> String {
         // not get a different key for the same word than the server computed.
         .lowercased()
 }
+
+
+/// `text` with its tone and vowel marks removed, on top of `normalizedKey`.
+///
+/// **Only ever for judging what the reader typed.** It must not reach card
+/// identity or the search for deck words inside a sentence, and the difference
+/// is not stylistic:
+///
+/// - Two cards whose text differs only by tone are two words. Folding tones into
+///   the identity would collapse them into one, and the deck already holds cards
+///   that differ exactly that way.
+/// - A card for `CẤM` matching `CÂM` inside a sentence would ask the reader to
+///   fill in a word that sentence does not contain.
+///
+/// What it *is* right for is input. Tones are laborious to type on a phone, and
+/// a lesson that rejects an otherwise perfect answer over one of them is
+/// charging for typing rather than testing recall. The screen accepts it and
+/// then shows the correct spelling, so the reader is never taught that tones do
+/// not matter — they simply are not made to prove it every time.
+///
+/// Implemented by decomposing to NFD and dropping the combining marks, which is
+/// what carries Vietnamese tones; `đ`/`Đ` is a distinct letter rather than a
+/// marked `d`, so it is mapped explicitly.
+func toneInsensitiveKey(_ text: String) -> String {
+    let stripped = normalizedKey(text)
+        .replacingOccurrences(of: "đ", with: "d")
+        .decomposedStringWithCanonicalMapping
+        .unicodeScalars
+        .filter { !(0x0300...0x036F).contains($0.value) }
+    return String(String.UnicodeScalarView(stripped))
+}
