@@ -19,14 +19,22 @@ Whichever happens first is the day's move, and the other cannot happen afterward
 
 **Blocked by:** 02.
 
-**Status:** not started.
+**Status:** implemented on branch `feat/review-log`, 2026-08-20 — 17 tests on the ladder itself, plus nine on what an answer does through the endpoint.
 
-- [ ] Reaching 通過 advances one rung and sets the due date from the rung reached
-- [ ] A wrong answer drops to the first rung from any height, including the top
-- [ ] Wrong, then 通過 on the same day, leaves the rung dropped
-- [ ] 通過, then a wrong answer on the same day, leaves the rung advanced
-- [ ] A second 通過 on the same day moves nothing
-- [ ] The top rung clamps rather than overflowing; the bottom rung clamps on a drop
-- [ ] A card with no reviews keeps its rung and its due date, after one day or thirty
-- [ ] A card answered while not yet due moves nothing, in either direction
-- [ ] Due dates are computed from the day the move happened, not from the previous due date
+- [x] Reaching 通過 advances one rung and sets the due date from the rung reached
+- [x] A wrong answer drops to the first rung from any height, including the top
+- [x] Wrong, then 通過 on the same day, leaves the rung dropped
+- [x] 通過, then a wrong answer on the same day, leaves the rung advanced
+- [x] A second 通過 on the same day moves nothing
+- [x] The top rung clamps rather than overflowing; the bottom rung clamps on a drop
+- [x] A card with no reviews keeps its rung and its due date, after one day or thirty
+- [x] A card answered while not yet due moves nothing, in either direction
+- [x] Due dates are computed from the day the move happened, not from the previous due date
+
+## What was built
+
+`app/ladder.py` and `card_review_store.apply_ladder_move`, applied after every answer and refused for the rest of the day once it has happened — so a replayed submission cannot move a rung twice even if a duplicate row appeared.
+
+`ReviewOutcome` carries `ladderMoved`, so "at most once per day" reaches the app as a fact rather than as something to infer from a rung that did not change.
+
+**A modelling error was fixed on the way.** `GET /reviews` was returning a `step` on every row, including rows from last week, where it is meaningless — it describes the card now, not the answer then. Split into `CardReviewResponse` (the answer) and `ReviewOutcome` (what recording it changed, returned only by POST).

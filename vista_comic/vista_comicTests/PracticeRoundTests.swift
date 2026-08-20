@@ -39,7 +39,7 @@ struct PracticeRoundTests {
     func aRoundIsFiveQuestions() throws {
         let items = try makeRound(from: usableDeck).get()
 
-        #expect(items.count == 5)
+        #expect(items.count == practiceRoundLength)
     }
 
     @Test("A round exercises both ways of answering")
@@ -72,7 +72,7 @@ struct PracticeRoundTests {
 
         let items = try makeRound(from: one).get()
 
-        #expect(items.count == 5)
+        #expect(items.count == practiceRoundLength)
         #expect(Set(items.map(\.question.card.id)) == [100])
     }
 
@@ -133,29 +133,69 @@ struct RoundUnavailableTests {
 @Suite("How a round went")
 struct RoundOutcomeTests {
 
-    @Test("A clean round is all correct")
-    func aCleanRoundIsAllCorrect() {
+    @Test("It reports cards passed, not answers right")
+    func itReportsCardsPassed() {
+        // The figure that means something. A round can be answered perfectly
+        // and pass nothing — if every card was seen once — and a reader told
+        // "10 / 10" would reasonably think they had finished something.
         var outcome = RoundOutcome()
-        for _ in 0..<5 { outcome.record(correct: true) }
+        outcome.record(correct: true, cardID: 1, step: .familiar)
+        outcome.record(correct: true, cardID: 2, step: .familiar)
 
-        #expect(outcome.allCorrect)
-        #expect(outcome.correct == 5)
+        #expect(outcome.correct == 2)
+        #expect(outcome.passed.isEmpty)
     }
 
-    @Test("One wrong answer is enough to not be clean")
-    func oneWrongIsEnough() {
+    @Test("A card that reaches 通過 is counted once, however many answers it took")
+    func aPassedCardIsCountedOnce() {
         var outcome = RoundOutcome()
-        outcome.record(correct: true)
-        outcome.record(correct: false)
+        outcome.record(correct: true, cardID: 1, step: .familiar)
+        outcome.record(correct: true, cardID: 1, step: .passed)
+        outcome.record(correct: true, cardID: 1, step: .passed)
 
-        #expect(outcome.allCorrect == false)
+        #expect(outcome.passed == [1])
+    }
+
+    @Test("A card that falls back out of 通過 is no longer claimed")
+    func aCardThatFallsBackIsNotClaimed() {
+        // It can happen inside one round: pass a card, then meet it again in
+        // the other answer mode and miss it. The summary must not still be
+        // saying it is done.
+        var outcome = RoundOutcome()
+        outcome.record(correct: true, cardID: 1, step: .familiar)
+        outcome.record(correct: true, cardID: 1, step: .passed)
+        outcome.record(correct: false, cardID: 1, step: .unfamiliar)
+
+        #expect(outcome.passed.isEmpty)
+    }
+
+    @Test("An unreachable backend leaves the count honest rather than optimistic")
+    func anUnknownStepCountsNothing() {
+        // A failed submission yields `.unknown`. Counting it as a pass would
+        // tell the reader they finished something the server never heard about.
+        var outcome = RoundOutcome()
+        outcome.record(correct: true, cardID: 1, step: .unknown)
+
+        #expect(outcome.correct == 1)
+        #expect(outcome.passed.isEmpty)
+    }
+
+    @Test("Wrong answers are still counted as answers")
+    func wrongAnswersAreCounted() {
+        var outcome = RoundOutcome()
+        outcome.record(correct: true, cardID: 1, step: .familiar)
+        outcome.record(correct: false, cardID: 2, step: .unfamiliar)
+
         #expect(outcome.total == 2)
+        #expect(outcome.allCorrect == false)
     }
 
-    @Test("An untouched round is not 'all correct'")
-    func anUntouchedRoundIsNotAllCorrect() {
-        // Zero wrong out of zero answered must not read as a perfect score.
+    @Test("An untouched round claims nothing")
+    func anUntouchedRoundClaimsNothing() {
+        // Zero wrong out of zero answered is easy to write as a perfect score,
+        // and the reader would open the tab to be congratulated for nothing.
         #expect(RoundOutcome().allCorrect == false)
+        #expect(RoundOutcome().passed.isEmpty)
     }
 }
 

@@ -44,7 +44,7 @@ struct PracticeView: View {
             ErrorStateView { Task { await load() } }
         case .loaded:
             if let round {
-                RoundView(items: round) { self.round = nil }
+                RoundView(items: round, repository: repository) { self.round = nil }
             } else {
                 start
             }
@@ -79,9 +79,22 @@ struct PracticeView: View {
         }
     }
 
+    /// The reader's local day, as the backend groups practice by.
+    ///
+    /// Deliberately not UTC: on UTC+8 a UTC boundary would reset the day at
+    /// eight in the morning, so a card passed before breakfast could be passed
+    /// again after it.
+    static func today() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
     private func begin() {
         guard case .loaded(let deck) = state else { return }
-        switch makeRound(from: deck) {
+        switch makeRound(from: deck, today: Self.today()) {
         case .success(let items): round = items
         case .failure(let reason): unavailable = reason
         }
@@ -99,7 +112,8 @@ struct PracticeView: View {
         }
         // Checked once here so the start screen can say which of the two
         // problems the reader actually has, before they tap anything.
-        if case .loaded(let deck) = state, case .failure(let reason) = makeRound(from: deck) {
+        if case .loaded(let deck) = state,
+           case .failure(let reason) = makeRound(from: deck, today: Self.today()) {
             unavailable = reason
         } else {
             unavailable = nil
@@ -187,9 +201,16 @@ private struct RoundCard: View {
 /// One round, from the first question to the summary.
 private struct RoundView: View {
     let items: [PracticeItem]
+    let repository: any StudyRepository
     let onFinish: () -> Void
 
-    @State private var index = 0
+    /// The order still to be asked. A wrong answer goes back on the end rather
+    /// than being dropped, so the round ends only when everything has been
+    /// answered correctly once — the reader never leaves having simply failed
+    /// at something, which is also why the ladder can afford to be strict about
+    /// that first wrong answer.
+    @State private var queue: [PracticeItem] = []
+    @State private var asked = 0
     @State private var typed = ""
     /// `nil` while the question is open; set once answered, and what the screen
     /// shows instead of accepting another answer.
@@ -197,16 +218,24 @@ private struct RoundView: View {
     @State private var outcome = RoundOutcome()
 
     var body: some View {
-        if index >= items.count {
-            summary
+        if let current = queue.first {
+            question(current)
         } else {
-            question(items[index])
+            summary
+        }
+        // Seeded here rather than in an initialiser so the queue survives the
+        // view being rebuilt, which SwiftUI does freely.
+        Color.clear.frame(height: 0).task {
+            if queue.isEmpty && asked == 0 { queue = items }
         }
     }
 
     private func question(_ item: PracticeItem) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("\(index + 1) / \(items.count)")
+            // Counts what is left rather than where the reader is, because a
+            // requeued item makes the second number move — and a progress
+            // readout that goes backwards reads as a bug.
+            Text("\(items.count - queue.count + 1) of \(items.count)")
                 .font(AppFont.caption)
                 .foregroundStyle(.grayFont)
 
@@ -289,7 +318,7 @@ private struct RoundView: View {
                 .font(AppFont.caption)
                 .foregroundStyle(.grayFont)
 
-            Button(index + 1 == items.count ? "Finish" : "Next") { advance() }
+            Button(queue.count == 1 ? "Finish" : "Next") { advance() }
                 .buttonStyle(.borderedProminent)
                 .tint(.primaryRed)
                 .accessibilityIdentifier("nextQuestion")
@@ -298,8 +327,19 @@ private struct RoundView: View {
 
     private var summary: some View {
         VStack(spacing: 16) {
-            Text(outcome.allCorrect ? "All correct" : "\(outcome.correct) / \(outcome.total)")
+            // What passed, not what was tapped. A round can be answered
+            // perfectly and pass nothing, if every card was seen once — and a
+            // reader told "10 / 10" would reasonably think they had finished
+            // something.
+            Text("\(outcome.passed.count)")
                 .font(AppFont.title)
+            Text(
+                outcome.passed.count == 1
+                    ? "word done for today"
+                    : "words done for today"
+            )
+            .font(AppFont.caption)
+            .foregroundStyle(.grayFont)
             Button("Done") { onFinish() }
                 .buttonStyle(.borderedProminent)
                 .tint(.primaryRed)
@@ -310,11 +350,52 @@ private struct RoundView: View {
 
     private func answer(_ result: TypedVerdict) {
         verdict = result
-        outcome.record(correct: result.isCorrect)
+        asked += 1
+        guard let item = queue.first else { return }
+        Task { await submit(item, correct: result.isCorrect) }
+    }
+
+    /// Records the answer, and lets the backend say what it changed.
+    ///
+    /// The step and the rung are **read from the response** rather than
+    /// recomputed here: both sides could derive them from the same rules, and a
+    /// second implementation is exactly how the two come to disagree about
+    /// whether the reader passed something.
+    ///
+    /// A failure costs the record, not the round. The reader is mid-question
+    /// and there is nothing they could do about it; the answer they already
+    /// gave stands on screen either way.
+    private func submit(_ item: PracticeItem, correct: Bool) async {
+        let result = try? await repository.recordReview(
+            cardID: item.question.card.id,
+            questionType: item.questionType,
+            isCorrect: correct,
+            clientToken: item.token,
+            localDate: Date(),
+            elapsedMs: nil
+        )
+        outcome.record(
+            correct: correct,
+            cardID: item.question.card.id,
+            step: result?.step ?? .unknown
+        )
     }
 
     private func advance() {
-        index += 1
+        guard let finished = queue.first else { return }
+        queue.removeFirst()
+        // Wrong answers come back. A fresh item, so its token differs and the
+        // second attempt is recorded as its own answer rather than swallowed as
+        // a replay of the first.
+        if verdict == .wrong {
+            queue.append(
+                PracticeItem(
+                    question: finished.question,
+                    mode: finished.mode,
+                    isDue: finished.isDue
+                )
+            )
+        }
         typed = ""
         verdict = nil
     }

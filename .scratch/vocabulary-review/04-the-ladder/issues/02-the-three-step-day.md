@@ -18,14 +18,22 @@ A pure function over reviews, so it is testable without a database or a screen.
 
 **Blocked by:** 01.
 
-**Status:** not started.
+**Status:** implemented on branch `feat/review-log`, 2026-08-20 — 16 tests, all transitions covered.
 
-- [ ] Every transition in the table, asserted individually
-- [ ] A first correct answer reaches 熟悉, skipping 不熟
-- [ ] Two correct in a row reaches 通過
-- [ ] Correct, wrong, correct does **not** reach 通過 — it ends at 熟悉
-- [ ] A wrong answer from 熟悉 returns to 不熟, not to first-appearance
-- [ ] Yesterday's reviews do not affect today's position, however many there were
-- [ ] A card with no reviews today is at first appearance, not at 不熟
-- [ ] Reviews are replayed in order; the same rows shuffled give the same answer only when the order is the same
-- [ ] The function takes rows and a date, touching no repository
+- [x] Every transition in the table, asserted individually
+- [x] A first correct answer reaches 熟悉, skipping 不熟
+- [x] Two correct in a row reaches 通過
+- [x] Correct, wrong, correct does **not** reach 通過 — it ends at 熟悉
+- [x] A wrong answer from 熟悉 returns to 不熟, not to first-appearance
+- [x] Yesterday's reviews do not affect today's position, however many there were
+- [x] A card with no reviews today is at first appearance, not at 不熟
+- [x] Reviews are replayed in order; the same rows shuffled give the same answer only when the order is the same
+- [x] The function takes rows and a date, touching no repository
+
+## What was built
+
+`app/daily_progress.py` — `DailyStep`, `step_after`, `step_today`, `passed_today`. Pure functions over one day's answers.
+
+**`unseen` and `unfamiliar` are different states.** A card never asked is not a card just failed; collapsing them would make every untouched card look like a failure, and a reader returning after a week would find their whole deck at the bottom.
+
+The test worth reading is `test_correct_wrong_correct_does_not_pass`: passing needs two correct **in a row**, not two correct. Counting them would pass a card the reader missed in between — precisely the card the day exists to catch — and would do it silently.

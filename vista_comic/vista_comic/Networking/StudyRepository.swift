@@ -78,6 +78,25 @@ protocol StudyRepository {
     /// confirms first.
     func delete(id: Int) async throws
 
+    /// Records one answer and reports what it changed.
+    ///
+    /// `clientToken` is generated once per answer and makes a resubmission
+    /// idempotent: a tapped button on a slow connection is exactly how one
+    /// answer becomes two, and a duplicated wrong answer would drop a rung the
+    /// reader never lost.
+    ///
+    /// `localDate` is the **reader's** day, not the server's. Grouping a UTC+8
+    /// reader's day by a UTC boundary would reset it at eight in the morning.
+    @discardableResult
+    func recordReview(
+        cardID: Int,
+        questionType: ReviewQuestionType,
+        isCorrect: Bool,
+        clientToken: String,
+        localDate: Date,
+        elapsedMs: Int?
+    ) async throws -> ReviewOutcome
+
     /// Notes that the reader looked an already-collected word up again.
     func recordLookup(id: Int) async throws
 

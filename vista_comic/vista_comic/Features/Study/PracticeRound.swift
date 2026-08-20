@@ -17,7 +17,13 @@
 import Foundation
 
 /// How many questions a round asks.
-let practiceRoundLength = 5
+///
+/// **Ten, not five.** A card appears at most once per answer mode, so five
+/// questions would let at most two cards pass the day — and with a deck sitting
+/// on the first rung, that is fifteen rounds to get through thirty cards once.
+/// Ten lets four or five pass while staying inside the two-or-three minutes the
+/// PRD asks for.
+let practiceRoundLength = 10
 
 /// How the reader answers one question.
 ///
@@ -34,8 +40,22 @@ enum AnswerMode: Hashable {
 struct PracticeItem: Identifiable, Hashable {
     let question: ClozeQuestion
     let mode: AnswerMode
+    /// Whether this card was actually due.
+    ///
+    /// A round tops itself up when too few are, and **a topped-up card's answer
+    /// moves no rung** in either direction. The reader cannot tell them apart,
+    /// and that is fine: the difference is about scheduling correctness, not
+    /// about their experience.
+    let isDue: Bool
+    /// Generated once, when the item is built, so a resubmission of the same
+    /// answer carries the same token and cannot count twice.
+    let token = UUID().uuidString
 
-    var id: String { "\(question.id)-\(mode)" }
+    var id: String { "\(question.id)-\(mode)-\(token)" }
+
+    var questionType: ReviewQuestionType {
+        mode == .choosing ? .clozeChoice : .clozeTyped
+    }
 }
 
 /// Why a round could not be built.
@@ -61,6 +81,7 @@ enum RoundUnavailable: Hashable, Error {
 /// round that quietly hides how little there is to practise.
 func makeRound(
     from deck: [LearningCard],
+    today: String = "",
     length: Int = practiceRoundLength
 ) -> Result<[PracticeItem], RoundUnavailable> {
     guard deck.count >= 2 else {
@@ -72,24 +93,63 @@ func makeRound(
         return .failure(.noSentencesWithKnownWords)
     }
 
+    // Due first, least familiar first within that — the reader's worst words
+    // come up first. A wrong answer is not a dead end here, so the usual
+    // argument about discouragement does not apply; and a card at 熟悉 needs
+    // one more correct answer where a card at 不熟 needs two, so favouring the
+    // nearly-learned would flatter the round's numbers while teaching less.
+    let ordered = questions.sorted { lhs, rhs in
+        let lhsDue = isDue(lhs.card, on: today), rhsDue = isDue(rhs.card, on: today)
+        if lhsDue != rhsDue { return lhsDue }
+        return lhs.card.ladderStage < rhs.card.ladderStage
+    }
+
     var items: [PracticeItem] = []
-    var pool: [ClozeQuestion] = []
+    var appearances: [Int: Int] = [:]
+    var lastCardID: Int?
+
     while items.count < length {
-        if pool.isEmpty { pool = questions.shuffled() }
-        let question = pool.removeFirst()
-        // Alternating rather than random, so a round always exercises both
-        // interfaces instead of occasionally showing five of one.
-        let mode: AnswerMode = items.count.isMultiple(of: 2) ? .choosing : .typing
-        // A question with too small a deck behind it cannot offer choices, so
-        // it is typed whatever the alternation says.
+        // Two guards against the deadlock that pure unfamiliarity ordering
+        // creates — the least familiar card always wins, and getting it wrong
+        // makes it win harder.
+        let candidates = ordered.filter {
+            $0.card.id != lastCardID && appearances[$0.card.id, default: 0] < 2
+        }
+        // Nothing left that has not already appeared twice: the deck is smaller
+        // than the round, so let the limits go rather than cut the round short.
+        // A shorter round would quietly hide how little there is to practise.
+        let pool = candidates.isEmpty
+            ? ordered.filter { $0.card.id != lastCardID }
+            : candidates
+        guard let question = pool.first ?? ordered.first else { break }
+
+        let seen = appearances[question.card.id, default: 0]
+        // A card's second appearance uses the other mode, so it is asked two
+        // different ways — which is also the only route to 通過 inside one
+        // round, since passing needs two correct answers.
+        let mode: AnswerMode = seen.isMultiple(of: 2) ? .choosing : .typing
         items.append(
             PracticeItem(
                 question: question,
-                mode: question.choices.isEmpty ? .typing : mode
+                // A deck too small for four options cannot offer a choice, so
+                // it is typed whatever the alternation says.
+                mode: question.choices.isEmpty ? .typing : mode,
+                isDue: isDue(question.card, on: today)
             )
         )
+        appearances[question.card.id, default: 0] += 1
+        lastCardID = question.card.id
     }
     return .success(items)
+}
+
+/// Whether `card` is due on or before `today`.
+///
+/// An empty `today` means "do not distinguish" — which is what the stage 3
+/// callers and the previews want, and keeps a date out of code that has no
+/// business knowing one.
+func isDue(_ card: LearningCard, on today: String) -> Bool {
+    today.isEmpty || card.dueOn <= today
 }
 
 /// What the reader has, and what a round would be made of.
@@ -123,16 +183,30 @@ struct DeckSummary: Hashable {
 
 /// How a round went, for the summary at the end.
 ///
-/// Counts only — nothing is written anywhere, and this value dies with the
-/// screen.
+/// The answers themselves are recorded on the backend as they happen; this is
+/// only what the summary screen reads, and it dies with the screen.
 struct RoundOutcome: Hashable {
     private(set) var correct = 0
     private(set) var wrong = 0
+    /// Cards that reached 通過 during the round.
+    ///
+    /// Reported instead of — not as well as — a score, because it is the figure
+    /// that means something: a round can be all-correct while passing nothing,
+    /// if every card was seen once. **"Two of your words are done for today"**
+    /// is a fact about learning; "8 / 10" is a fact about tapping.
+    private(set) var passed: Set<Int> = []
 
     var total: Int { correct + wrong }
     var allCorrect: Bool { wrong == 0 && correct > 0 }
 
-    mutating func record(correct isCorrect: Bool) {
+    mutating func record(correct isCorrect: Bool, cardID: Int, step: DailyStep) {
         if isCorrect { correct += 1 } else { wrong += 1 }
+        if step == .passed {
+            passed.insert(cardID)
+        } else {
+            // A card can fall back out of 通過 by being answered wrong later in
+            // the same round, and the summary should not still be claiming it.
+            passed.remove(cardID)
+        }
     }
 }
