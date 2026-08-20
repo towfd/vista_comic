@@ -232,6 +232,20 @@ needs a sentence containing that word, and only a **sentence** card already has 
 錯題區 and 單字練習, both outside the ladder and both selecting by familiarity suppressed by
 recent appearances. 單字練習 holds words only, as matching and typing.
 
+### Practice sentences — parked, not numbered
+
+**Parked on 2026-08-20, before any of it was written**, at the developer's decision: not a
+necessary feature, and whether to build it at all is a question for after this PRD is finished
+rather than a stage inside it.
+
+What it would have bought is cloze on **word** cards, which have no sentence to blank. Sentence
+cards already carry real sentences the reader collected themselves, so the deck can be practised
+without it — generation buys variety, not viability. It is also the largest LLM investment in the
+plan, and parking it keeps that spend behind evidence that the loop is worth spending on.
+
+The foundations stay in place and cost nothing while unused: `introduction.txt` is a convention
+`scanner.py` can pick up whenever, and `learning_card.comprehension_record_id` already exists.
+
 ### 6. Game layer
 `daily_completion`, streak, XP and levels. Per-comic mastery — how many words collected from
 this comic, how many have reached a stable rung, how many were hit while reading this week — is
@@ -270,9 +284,9 @@ Each stage is its own folder under `.scratch/vocabulary-review/`, holding a `spe
 | `03-cloze-round/` | Deck-word matching, cloze questions, and a round that can be played. No ladder yet | 02 |
 | `04-the-ladder/` | The ladder and the three-step day turn a round into 每日關卡 | 03 |
 | `05-sentence-translation/` | The second question type, typed and rearranged, and how it is judged | 04 |
-| `06-practice-sentences/` | Generation, so a **word** card can carry a cloze too | 05 |
-| `07-practice-areas/` | 錯題區 and 單字練習, both outside the ladder | 04 |
-| `08-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 04 |
+| ~~`06-practice-sentences/`~~ | **Parked, 2026-08-20.** Generation, so a word card could carry a cloze too | — |
+| `06-practice-areas/` | 錯題區 and 單字練習, both outside the ladder | 04 |
+| `07-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 04 |
 
 **Reordered twice on 2026-08-20.** First, once the lesson architecture above was settled: what
 had been stage 3 — matching plus the ladder — turned out not to be buildable first, because
