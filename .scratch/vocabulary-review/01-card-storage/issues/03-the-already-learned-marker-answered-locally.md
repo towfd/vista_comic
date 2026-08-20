@@ -12,7 +12,7 @@ The marker is a courtesy, never a correctness requirement: when the snapshot is 
 
 **Blocked by:** 02.
 
-**Status:** implemented on branch `feat/learning-card-store`, 2026-08-19 — `BUILD SUCCEEDED`, `TEST SUCCEEDED` across `vista_comicTests`, 22 new tests passing. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** implemented on branch `feat/learning-card-store`, 2026-08-19 — `BUILD SUCCEEDED`, `TEST SUCCEEDED` across `vista_comicTests`, 22 new tests passing. **Device-verified by the repo owner, 2026-08-20.** The marker appears with no connection, answered from the snapshot on disk, with the translation still shown in full — which is the whole point of the ticket.
 
 - [x] The snapshot stores raw response bytes rather than re-encoded models
 - [x] Swift normalisation passes `spec.md`'s vector table verbatim, matching ticket 01's Python results

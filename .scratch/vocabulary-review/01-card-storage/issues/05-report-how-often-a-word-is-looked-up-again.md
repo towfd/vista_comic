@@ -12,7 +12,7 @@ Nothing displays this number in stage 1. It is collected now because it cannot b
 
 **Blocked by:** 03, 04.
 
-**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-19 — `TEST BUILD SUCCEEDED`, and `xcodebuild test` exited 0 with zero test-case failures across `vista_comicTests`. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-19 — `TEST BUILD SUCCEEDED`, and `xcodebuild test` exited 0 with zero test-case failures across `vista_comicTests`. **Device-verified by the repo owner, 2026-08-20.** One card's `lookup_count` went 0 → 3 across three separate re-lookups: the queue does not collapse repeats, which is the property this ticket exists for. Had it deduplicated, three forgettings would have been recorded as one.
 
 - [x] A hit reports once per selection — not once per keystroke, re-render, or re-translate of the same selection
 - [x] The report is queued when offline and sent on reconnect, using the same flusher discipline as ticket 04

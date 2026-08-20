@@ -12,7 +12,7 @@ This is the first ticket a reader can see, and the first time a selection leaves
 
 **Blocked by:** 01.
 
-**Status:** implemented on branch `feat/learning-card-store`, 2026-08-19 — `BUILD SUCCEEDED`, `TEST SUCCEEDED` on the whole `vista_comicTests` target, 9 new tests passing. **Device-verified by the repo owner, 2026-08-19, with one item outstanding** — see *What the device pass actually established*.
+**Status:** implemented on branch `feat/learning-card-store`, 2026-08-19 — `BUILD SUCCEEDED`, `TEST SUCCEEDED` on the whole `vista_comicTests` target, 9 new tests passing. **Device-verified by the repo owner. The outstanding item was closed on 2026-08-20** — see *Closing item 5(a)*.
 
 - [x] The button appears only under a loaded translation, and is disabled when the corrected text trims to empty
 - [x] Tapping it creates a card carrying the corrected source text, the translation currently displayed, the target language, and comic / chapter / page
@@ -97,3 +97,21 @@ item; one holding the former is a real defect.
 This is worth closing rather than waving through: "the card keeps the wording
 the reader approved" is the behaviour the whole manual-add quality gate rests
 on, and it is invisible from the screen.
+
+## Closing item 5(a)
+
+Verified against the database on 2026-08-20, on a line whose two translations differ
+unmistakably:
+
+| | |
+|---|---|
+| On-device | 在2011年透過**懲罰屍體**的法律後 |
+| Cloud | 在2011年通過**禁止體罰**法律之後 |
+| **Stored on the card** | **在2011年通過禁止體罰法律之後** — the cloud wording |
+
+A second card collected straight after translating, with no explanation requested, holds the
+on-device wording. Both halves of the rule are now shown.
+
+The example also happens to justify the rule: on-device read `THÂN THỂ` (body) as 屍體 (corpse),
+turning the line into "through the law punishing corpses". Storing that would have had spaced
+repetition drill a nonsense translation for weeks.

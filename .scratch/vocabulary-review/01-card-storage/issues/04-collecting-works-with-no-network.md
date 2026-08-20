@@ -12,7 +12,7 @@ A queued card counts as collected for ticket 03's local marker. Duplicate protec
 
 **Blocked by:** 02.
 
-**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-19 — `BUILD SUCCEEDED`, `TEST SUCCEEDED` across the whole `vista_comicTests` target. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-19 — `BUILD SUCCEEDED`, `TEST SUCCEEDED` across the whole `vista_comicTests` target. **Device-verified by the repo owner, 2026-08-20**: a word collected in airplane mode survived a force-quit and relaunch, and arrived on the server exactly once after reconnecting — carrying its `kind`, so the whole queue round trip preserves what the reader chose.
 
 - [x] An add that cannot reach the backend is queued rather than lost, and the button still shows collected
 - [x] Enqueueing the same normalised key twice queues one entry

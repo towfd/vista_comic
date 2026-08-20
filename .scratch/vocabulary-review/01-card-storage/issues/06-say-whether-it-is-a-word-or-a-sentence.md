@@ -22,7 +22,7 @@ Sentence cards therefore also cost less: they need no LLM call to become usable.
 
 **Blocked by:** 02 — Add a word from the selection sheet.
 
-**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-19 — backend `212 passed`, iOS `TEST BUILD SUCCEEDED` and `xcodebuild test` exit 0 with zero test-case failures. **Awaiting the repo owner's device pass** (checklist below).
+**Status:** implemented on branch `feat/deck-lookup-marker`, 2026-08-19 — backend `212 passed`, iOS `TEST BUILD SUCCEEDED` and `xcodebuild test` exit 0 with zero test-case failures. **Device-verified by the repo owner, 2026-08-20**: both buttons lay out without truncation on a compact phone, a collected card records the kind chosen, the kind survives the offline queue, and **every card predating the column still has NULL** rather than a guessed value.
 
 - [x] An Alembic revision adds a nullable `kind` to `learning_card`, and downgrades cleanly
 - [x] `POST /cards` accepts `kind` of `word` or `sentence`; an unrecognised value is rejected rather than stored
@@ -71,3 +71,17 @@ No XCUITest was written, built, or run.
 6. Clear the text: **both** buttons disable together.
 7. **Airplane mode**: collect one of each, force-quit, relaunch, reconnect. Both arrive with the right kind — check `SELECT source_text, kind FROM learning_card`.
 8. Your two existing cards still show as collected and their `kind` is **NULL**, not guessed.
+
+## A finding from the device pass, not a defect
+
+Three cards in the deck are the same Vietnamese sentence, kept apart by OCR reading the
+diacritics differently each time (`CẤM`/`CÂM`, `THÂN THÊ`/`THÂN THẾ`).
+
+**The system behaved correctly** — the keys genuinely differ, and no duplicate key exists. And
+normalisation must **not** fold diacritics away: in Vietnamese they distinguish words outright
+(`cấm` forbid, `câm` mute), so stripping them would merge cards that are not the same word at
+all, which is worse than the duplicates.
+
+So this is OCR accuracy, not deduplication. The correction already exists — the reader edits the
+recognised text before saving — and spec-02's delete clears whatever slipped through. Recorded
+so the next person meeting three near-identical cards does not "fix" the normalisation.
