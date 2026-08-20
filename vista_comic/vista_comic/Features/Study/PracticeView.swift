@@ -73,16 +73,9 @@ struct PracticeView: View {
                 )
             )
         case nil:
-            VStack(spacing: 16) {
-                Text("Ready when you are.")
-                    .font(AppFont.caption)
-                    .foregroundStyle(.grayFont)
-                Button("Start practice") { begin() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.primaryRed)
-                    .accessibilityIdentifier("startPractice")
+            if case .loaded(let deck) = state {
+                RoundCard(summary: DeckSummary(deck: deck), play: begin)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -110,6 +103,83 @@ struct PracticeView: View {
             unavailable = reason
         } else {
             unavailable = nil
+        }
+    }
+}
+
+/// The card the reader sees before playing, and the thing they tap.
+///
+/// **Every figure on it is real.** Nothing here is a streak, a score or a daily
+/// goal: this stage records nothing, so anything of that sort would be
+/// decoration dressed as progress — and this app has already shipped two
+/// features that were looked at rather than used.
+///
+/// It is a card rather than a bare button because the round has properties
+/// worth seeing before committing to it, and because the things stage 4 and
+/// stage 8 will add — how familiar these words are, how many days in a row —
+/// belong in the same frame rather than scattered around it.
+private struct RoundCard: View {
+    let summary: DeckSummary
+    let play: () -> Void
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(alignment: .leading, spacing: 20) {
+                Text("TODAY'S ROUND")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+                    .kerning(1.5)
+
+                // Five dots for five questions: the round's size, shown rather
+                // than stated. In stage 4 these become the reader's progress
+                // through it.
+                HStack(spacing: 10) {
+                    ForEach(0..<practiceRoundLength, id: \.self) { _ in
+                        Circle()
+                            .fill(Color.primaryRed)
+                            .frame(width: 12, height: 12)
+                    }
+                }
+
+                Text("\(practiceRoundLength) questions")
+                    .font(AppFont.prompt)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    figure("\(summary.usableSentences)", "sentences ready")
+                    figure("\(summary.words)", "words collected")
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+            .padding(.horizontal)
+
+            Spacer()
+
+            Button {
+                play()
+            } label: {
+                Label("Play", systemImage: "play.fill")
+                    .font(AppFont.prompt)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primaryRed)
+            .padding(.horizontal)
+            .padding(.bottom)
+            .accessibilityIdentifier("startPractice")
+        }
+    }
+
+    private func figure(_ value: String, _ label: LocalizedStringKey) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(value).font(AppFont.statistic)
+            Text(label).font(AppFont.caption).foregroundStyle(.grayFont)
         }
     }
 }

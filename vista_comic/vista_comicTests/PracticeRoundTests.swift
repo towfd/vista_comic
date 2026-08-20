@@ -158,3 +158,71 @@ struct RoundOutcomeTests {
         #expect(RoundOutcome().allCorrect == false)
     }
 }
+
+@Suite("What the entry card says")
+struct DeckSummaryTests {
+
+    @Test("It counts words and sentences separately")
+    func itCountsWordsAndSentencesSeparately() {
+        let deck = [
+            sentence(100, "TRONG KHI MÌNH BỊ"), sentence(101, "TÌNH HÌNH XẤU"),
+            word(1, "TRONG KHI"), word(2, "XẤU"), word(3, "VÀI"),
+        ]
+
+        let summary = DeckSummary(deck: deck)
+
+        #expect(summary.words == 3)
+        #expect(summary.sentences == 2)
+    }
+
+    @Test("Only sentences that can carry a blank count as ready")
+    func onlyUsableSentencesCountAsReady() {
+        // The figure on the card has to mean "you can practise this many",
+        // not "you own this many" — the real deck holds a sentence card OCR
+        // mangled beyond matching, and counting it would promise a question
+        // that never appears.
+        let deck = [
+            sentence(100, "TRONG KHI MÌNH BỊ"),
+            sentence(101, "NGAY CẢ KHI HỌC SINH XÂM PHAM"),
+            word(1, "TRONG KHI"),
+            word(2, "XÂM PHẠM"),
+        ]
+
+        let summary = DeckSummary(deck: deck)
+
+        #expect(summary.sentences == 2)
+        #expect(summary.usableSentences == 1)
+    }
+
+    @Test("Blanks are counted across every usable sentence")
+    func blanksAreCountedAcrossSentences() {
+        let deck = [
+            sentence(100, "TRONG KHI MÌNH BỊ TẾ BÀO UNG THƯ ĂN MÒN"),
+            word(1, "TRONG KHI"), word(2, "ĂN MÒN"),
+        ]
+
+        #expect(DeckSummary(deck: deck).availableBlanks == 2)
+    }
+
+    @Test("An empty deck reports zeroes rather than crashing")
+    func anEmptyDeckReportsZeroes() {
+        let summary = DeckSummary(deck: [])
+
+        #expect(summary.words == 0)
+        #expect(summary.usableSentences == 0)
+        #expect(summary.availableBlanks == 0)
+    }
+
+    @Test("Unclassified cards are counted as neither")
+    func unclassifiedCardsAreCountedAsNeither() {
+        // Cards predating the two save buttons have no kind, and guessing one
+        // for a figure on a card would be the same invention the buttons exist
+        // to avoid.
+        let deck = [LearningCard.preview(id: 1, sourceText: "SAU KHI", kind: nil)]
+
+        let summary = DeckSummary(deck: deck)
+
+        #expect(summary.words == 0)
+        #expect(summary.sentences == 0)
+    }
+}

@@ -92,6 +92,35 @@ func makeRound(
     return .success(items)
 }
 
+/// What the reader has, and what a round would be made of.
+///
+/// Real counts only. Nothing here is a streak, a score, or a daily goal —
+/// this stage records nothing, so anything of that sort would be decoration
+/// dressed as progress.
+struct DeckSummary: Hashable {
+    let words: Int
+    let sentences: Int
+    /// Sentence cards that actually contain a word the reader has collected,
+    /// which is what decides whether a round can be built at all.
+    let usableSentences: Int
+    /// Every blank that could be asked, across those sentences.
+    let availableBlanks: Int
+
+    init(deck: [LearningCard]) {
+        words = deck.filter { $0.kind == .word }.count
+        sentences = deck.filter { $0.kind == .sentence }.count
+
+        let usable = deck.filter { card in
+            card.kind == .sentence && makeCloze(from: card, deck: deck) != nil
+        }
+        usableSentences = usable.count
+        availableBlanks = usable.reduce(0) { total, card in
+            let others = deck.filter { $0.id != card.id }
+            return total + deckWords(in: card.sourceText, from: others).count
+        }
+    }
+}
+
 /// How a round went, for the summary at the end.
 ///
 /// Counts only — nothing is written anywhere, and this value dies with the

@@ -38,6 +38,9 @@
         }
       }
     },
+    "%lld questions" : {
+
+    },
     "%lld/%lld downloaded" : {
       "comment" : "Chapter list: downloads in use against the cap",
       "localizations" : {
@@ -485,6 +488,9 @@
     "Original" : {
 
     },
+    "Play" : {
+
+    },
     "Practice" : {
 
     },
@@ -523,9 +529,6 @@
           }
         }
       }
-    },
-    "Ready when you are." : {
-
     },
     "Recognition failed. You can try again." : {
 
@@ -584,6 +587,9 @@
     "Sentences" : {
 
     },
+    "sentences ready" : {
+
+    },
     "Showing what was saved on this device." : {
 
     },
@@ -591,9 +597,6 @@
 
     },
     "Standard" : {
-
-    },
-    "Start practice" : {
 
     },
     "Tap to retry" : {
@@ -654,6 +657,9 @@
 
     },
     "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
+
+    },
+    "TODAY'S ROUND" : {
 
     },
     "Tone & register" : {
@@ -720,6 +726,9 @@
     "Vocabulary & grammar" : {
 
     },
+    "Watch the tones: %@" : {
+
+    },
     "Where it came from" : {
 
     },
@@ -727,6 +736,9 @@
 
     },
     "Words" : {
+
+    },
+    "words collected" : {
 
     },
     "You can download up to %lld chapters at once." : {
