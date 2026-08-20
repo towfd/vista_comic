@@ -38,6 +38,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from . import (
+    card_review_store,
+    daily_progress,
     comprehend_usage_store,
     comprehension_store,
     learning_card_store,
@@ -53,6 +55,9 @@ from .db import (
     upgrade_schema,
 )
 from .models import (
+    CardReviewCreate,
+    CardReviewResponse,
+    ReviewOutcome,
     ChapterDetail,
     ChapterSummary,
     ComicDetail,
@@ -954,6 +959,70 @@ def delete_card(card_id: int) -> Response:
     if not deleted:
         raise HTTPException(status_code=404, detail="Learning card not found")
     return Response(status_code=204)
+
+
+def _to_review_response(row) -> CardReviewResponse:
+    return CardReviewResponse(
+        id=row.id,
+        cardId=row.card_id,
+        questionType=row.question_type,
+        isCorrect=row.is_correct,
+        elapsedMs=row.elapsed_ms,
+        reviewedAt=progress_store.iso_utc(row.reviewed_at),
+    )
+
+
+@app.post("/cards/{card_id}/reviews", response_model=ReviewOutcome, status_code=201)
+def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
+    """Record one answer.
+
+    **Idempotent on ``clientToken``**, and a replay answers 200 rather than
+    failing: the app will retry a submission it is unsure of, and a duplicated
+    wrong answer would drop a rung the reader never lost.
+
+    The card is checked before writing, so an answer for something deleted is a
+    404 rather than a row pointing at nothing.
+    """
+    with _card_session() as session:
+        if not card_review_store.card_exists(session, card_id):
+            raise HTTPException(status_code=404, detail="Learning card not found")
+        row, _ = card_review_store.record(
+            session,
+            card_id=card_id,
+            question_type=body.questionType,
+            is_correct=body.isCorrect,
+            client_token=body.clientToken,
+            local_date=body.localDate,
+            elapsed_ms=body.elapsedMs,
+        )
+        # Attempted after every answer and refused for the rest of the day once
+        # it has happened, so a replayed submission cannot move a rung twice.
+        moved = card_review_store.apply_ladder_move(
+            session, card_id, today=body.localDate
+        )
+        answers = [
+            r.is_correct
+            for r in card_review_store.on_day(session, card_id, body.localDate)
+        ]
+        card = learning_card_store.get(session, card_id)
+        step = daily_progress.step_today(answers).value
+    return ReviewOutcome(
+        review=_to_review_response(row),
+        step=step,
+        ladderStage=card.ladder_stage,
+        dueOn=card.due_on.isoformat(),
+        ladderMoved=moved,
+    )
+
+
+@app.get("/cards/{card_id}/reviews", response_model=list[CardReviewResponse])
+def list_reviews(card_id: int) -> list[CardReviewResponse]:
+    """One card's answers, oldest first — the order a day is replayed in."""
+    with _card_session() as session:
+        if not card_review_store.card_exists(session, card_id):
+            raise HTTPException(status_code=404, detail="Learning card not found")
+        rows = card_review_store.for_card(session, card_id)
+    return [_to_review_response(row) for row in rows]
 
 
 @app.post("/cards/{card_id}/lookups", status_code=204)

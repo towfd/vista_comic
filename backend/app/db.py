@@ -201,11 +201,68 @@ class LearningCard(Base):
     last_looked_up_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Enforces "the ladder moves at most once per day". It cannot be derived
+    # from the reviews, because a review does not know whether it was the one
+    # that moved the rung.
+    last_ladder_move_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
     archived_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class CardReview(Base):
+    """One answer, exactly as it happened.
+
+    The unit everything in the reviewing stages is computed from. A card's
+    position in the three-step day is derived by replaying **today's** rows in
+    order rather than stored, which is what makes a gap in practice cost
+    nothing: there is no settlement moment, so nothing runs late, nothing runs
+    three times, and a day the reader skipped is simply a day with no rows in
+    it.
+
+    ``elapsed_ms`` is written and read by nothing. The PRD keeps the log
+    complete so that swapping the fixed ladder for FSRS later is an algorithm
+    change rather than a data migration, and response time is the signal FSRS
+    wants. Collecting it costs a column; collecting it **retroactively** is
+    impossible -- the same reasoning that put ``lookup_count`` in from the first
+    release.
+
+    ``client_token`` exists so a resubmitted answer cannot count twice. A tapped
+    button on a slow connection is exactly how one answer becomes two, and a
+    duplicated wrong answer would drop a rung the reader never lost.
+
+    Rows are deleted with their card: they describe a card, and once it is gone
+    they describe nothing.
+    """
+
+    __tablename__ = "card_review"
+    __table_args__ = (
+        UniqueConstraint("client_token", name="uq_card_review_client_token"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    card_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("learning_card.id", ondelete="CASCADE"), nullable=False
+    )
+    question_type: Mapped[str] = mapped_column(String, nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    elapsed_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    client_token: Mapped[str] = mapped_column(String, nullable=False)
+    #: Which of the **reader's** days this answer belonged to, sent by the app.
+    #:
+    #: Kept alongside ``reviewed_at`` rather than derived from it, because they
+    #: answer different questions and the difference is not cosmetic:
+    #: ``reviewed_at`` is the server clock, and grouping a UTC+8 reader's day by
+    #: it would put everything before 08:00 on the previous day. The three-step
+    #: day is grouped by this column.
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    #: When the answer reached the server. Orders a replay, and is the timestamp
+    #: FSRS would want later.
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
     )
 
 

@@ -158,7 +158,9 @@ def comprehension_db(_progress_engine):
     preferred to ``CASCADE``, which would silently reach any table added later.
     """
     with _progress_engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE learning_card, comprehension_record"))
+        conn.execute(
+            text("TRUNCATE TABLE card_review, learning_card, comprehension_record")
+        )
         conn.execute(text("TRUNCATE TABLE comprehend_usage"))
     return _progress_engine
 
@@ -167,7 +169,11 @@ def comprehension_db(_progress_engine):
 def learning_card_db(_progress_engine):
     """Truncate the ``learning_card`` table before each test that uses it."""
     with _progress_engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE learning_card"))
+        # `card_review` joins it because it references `learning_card`, and
+        # Postgres refuses to truncate a referenced table on its own. Naming
+        # both is preferred to CASCADE, which would silently reach whatever is
+        # added later.
+        conn.execute(text("TRUNCATE TABLE card_review, learning_card"))
     return _progress_engine
 
 
