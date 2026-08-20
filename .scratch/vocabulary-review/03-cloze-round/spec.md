@@ -1,4 +1,4 @@
-Status: draft
+Status: ready-for-agent
 
 # Vocabulary stage 3: a round of cloze you can actually play
 
