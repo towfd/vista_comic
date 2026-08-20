@@ -30,7 +30,7 @@ carrying two tabs — one dead, one its replacement — and then editing the tab
 ## Solution
 
 1. A **單字庫** tab, in the slot 歷史紀錄 currently occupies.
-2. Cards **grouped by familiarity**, with search across source text and translation.
+2. Cards **grouped by kind** — Words, Sentences, Unclassified — with search across source text and translation.
 3. **Edit the translation and the kind. Delete the card.** Nothing else is editable.
 4. Jump back to the page a card came from.
 5. `Features/History/` removed.
@@ -68,6 +68,13 @@ which is why collecting is manual in the first place. A wrong source text means 
 wrong from the start, and deleting and re-collecting is both cleaner and cheap — one more
 selection.
 
+### Deleting asks a question
+
+An alert with Cancel and Delete, not a confirmation sheet whose only choice is the destructive
+one. Changed after the device pass: the sheet handed the reader a second button that finished
+what the first one started, where an irreversible action with no undo deserves a question they
+answer.
+
 ### Delete, and no archive
 
 Archiving was considered and dropped, on the developer's own reasoning: **a word at the top
@@ -80,14 +87,23 @@ had no visible difference in stage 2 and no separate consumer in stage 3.
 *Recorded for stage 3*: the top rung is 60 days, not never. If a word ever needs to genuinely
 retire, that is a rung on the ladder, not an archive flag bolted on afterwards.
 
-### The list is grouped by familiarity, and has search
+### The list is grouped by kind, and has search
 
-Grouped by ladder stage, with search over source text and translation.
+Grouped by what the reader said each card is — Words, Sentences, Unclassified — with search over
+source text and translation.
 
-**Until stage 3 ships there is exactly one group**, holding every card: `ladder_stage` is
-written as 0 by stage 1 and nothing advances it yet. The grouping is built now so it fills in
-by itself when scheduling arrives; it must degrade to a single unremarkable section rather than
-rendering four empty headers.
+**Changed from grouping by familiarity after the device pass, 2026-08-20.** Familiarity is
+written as 0 by stage 1 and nothing advances it until stage 3, so those bands would have been one
+heading over everything for weeks. Kind varies today, and the unclassified section is a list of
+cards needing work — which is a workshop's natural first question.
+
+Familiarity did not go away: it moved to `CardDetailView`, where the reader is looking at one
+card on purpose, and appears on a list row only once a card has actually advanced. Six identical
+badges down a screen would be noise; the same six become worth reading the moment they differ.
+
+Empty sections are dropped — a deck of only words carries no empty "Sentences" heading. Unlike
+familiarity, a **single** kind section still gets its heading: one kind is a fact about this
+deck, where one familiarity band was only a fact about the feature being unfinished.
 
 Search is the workshop's real entrance — "I remember one of these being translated oddly" is
 answered by search, and by nothing else once the deck outgrows a screenful.
@@ -163,7 +179,7 @@ Backend (pytest):
 
 iOS (`vista_comicTests`):
 
-- Grouping: cards land in the right sections; a deck all on one rung renders one section, not
+- Grouping: cards land under the kind they were given; unclassified sorts last; empty sections are dropped; newest first within a section.
   four with three empty.
 - Search: matches source text, matches translation, is case- and width-insensitive (it should
   reuse the normalisation the deck already agrees on rather than inventing a second rule),
