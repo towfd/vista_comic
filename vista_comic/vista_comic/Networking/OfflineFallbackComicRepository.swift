@@ -267,10 +267,16 @@ struct OfflineFallbackComicRepository: ComicRepository {
     /// server is there and something is wrong; quietly serving yesterday's
     /// library instead would look perfectly fine on screen while being silently
     /// out of date, and nothing would ever tell the reader. Only a transport
-    /// failure — `URLError`, which is what airplane mode, a dead tunnel and a
-    /// timeout all produce — counts as "offline".
+    /// failure counts, plus the gateway statuses that say the same thing in a
+    /// different shape.
+    ///
+    /// `URLError` is airplane mode, a refused connection, a timeout. But with
+    /// the tunnel up and the backend down, **"unreachable" arrives as a
+    /// response**: Cloudflare answers 530 and `URLSession` succeeds, so a check
+    /// for transport failure alone concluded the server had answered — and a
+    /// reader with a full cache on their phone was left on a connection error.
     private static func isUnreachable(_ error: any Error) -> Bool {
-        error is URLError
+        APIConfig.isOriginUnreachable(error)
     }
 }
 

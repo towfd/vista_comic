@@ -28,12 +28,12 @@
     "%lld" : {
 
     },
-    "%lld / %lld" : {
+    "%lld of %lld" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld / %2$lld"
+            "value" : "%1$lld of %2$lld"
           }
         }
       }
@@ -68,9 +68,6 @@
 
     },
     "Adding…" : {
-
-    },
-    "All correct" : {
 
     },
     "Back" : {
@@ -599,6 +596,9 @@
     "Standard" : {
 
     },
+    "Take back" : {
+
+    },
     "Tap to retry" : {
       "comment" : "Reader: retry loading a single page that failed",
       "localizations" : {
@@ -735,10 +735,16 @@
     "Word" : {
 
     },
+    "word done for today" : {
+
+    },
     "Words" : {
 
     },
     "words collected" : {
+
+    },
+    "words done for today" : {
 
     },
     "You can download up to %lld chapters at once." : {
