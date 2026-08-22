@@ -107,7 +107,9 @@ struct PracticeView: View {
         do {
             state = .loaded(try await repository.cards())
         } catch {
-            let cached = repository.knownCards()
+            // Same rule as 單字庫 and the catalog: degrade when nothing was
+            // reached, report when the server answered badly.
+            let cached = APIConfig.isOriginUnreachable(error) ? repository.knownCards() : []
             state = cached.isEmpty ? .failed(error) : .loaded(cached)
         }
         // Checked once here so the start screen can say which of the two

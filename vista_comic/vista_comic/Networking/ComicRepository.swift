@@ -98,6 +98,42 @@ enum APIConfig {
         return value
     }
 
+    /// HTTP statuses that mean **the origin was never reached**, as opposed to
+    /// reached and unhappy.
+    ///
+    /// A gateway answering 502/503/504 — or Cloudflare answering 530 — is
+    /// telling the app there is nothing behind it. That is the same fact as a
+    /// dropped connection, and the reader is equally unable to do anything
+    /// about it, so it should degrade to whatever is cached rather than showing
+    /// an error.
+    ///
+    /// **This exists because the tunnel makes "unreachable" arrive as a
+    /// response.** Reproduced against the live tunnel: with the backend down it
+    /// answers 502, and with `cloudflared` itself down it answers 530. Both are
+    /// perfectly valid HTTP responses, so `URLSession` succeeds, no `URLError`
+    /// is thrown, and a check for transport failure alone concludes the server
+    /// answered — leaving a reader with a full cache on their phone staring at
+    /// a connection error.
+    ///
+    /// Kept narrow on purpose. A 500 means the server is there and its code
+    /// broke; a 401 or 403 means Access rejected the request. Both are live
+    /// failures, and quietly serving yesterday's data for them would look
+    /// perfectly normal on screen while being silently wrong.
+    static let originUnreachableStatuses: Set<Int> = [502, 503, 504, 530]
+
+    /// Whether `error` means nothing was reached, as opposed to reached and
+    /// unhappy.
+    ///
+    /// The one place this question is answered, so the catalog, the deck and
+    /// the practice round cannot drift apart about what "offline" means.
+    static func isOriginUnreachable(_ error: any Error) -> Bool {
+        if error is URLError { return true }
+        if case APIError.httpStatus(let code) = error {
+            return originUnreachableStatuses.contains(code)
+        }
+        return false
+    }
+
     /// Builds a request for an arbitrary absolute URL, attaching the
     /// Cloudflare Access Service Token headers when both credentials are
     /// present. Shared by `APIComicRepository` (JSON endpoints) and

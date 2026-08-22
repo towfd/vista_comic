@@ -164,7 +164,11 @@ struct StudyView: View {
             state = .loaded(try await repository.cards())
             isOffline = false
         } catch {
-            let cached = repository.knownCards()
+            // Only degrade when nothing was reached. A 500 or a rejected token
+            // means the server is there and something is wrong — serving the
+            // snapshot for those would look perfectly normal while being
+            // silently out of date, and nothing would ever say so.
+            let cached = APIConfig.isOriginUnreachable(error) ? repository.knownCards() : []
             if cached.isEmpty {
                 state = .failed(error)
                 isOffline = false
