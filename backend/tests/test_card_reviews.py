@@ -240,12 +240,13 @@ def test_a_wrong_answer_drops_to_the_bottom_and_is_due_tomorrow(client, card_id)
     assert outcome["dueOn"] == "2026-08-22"
 
 
-def test_the_rung_moves_at_most_once_a_day(client, card_id):
-    """The case that will feel unfair, and is deliberate.
+def test_a_card_answered_wrong_can_still_be_recovered_the_same_day(client, card_id):
+    """What a wrong first answer used to cost: the whole day.
 
-    Answering wrong resolves the day. Drilling the card to 通過 an hour later
-    still passes it *for the day* — but the ladder already recorded that the
-    reader met this word and did not have it, and that is what it measures.
+    A fresh deck is thirty cards on rung 0 and first encounters are mostly
+    wrong, so the lock meant nothing ever climbed — and the rungs where typing
+    and rearranging live were unreachable. The reader who ends the session
+    knowing the word now gets the rung for it.
     """
     dropped = _answer(client, card_id, correct=False, token="a")
     assert dropped["ladderMoved"] is True
@@ -255,17 +256,35 @@ def test_the_rung_moves_at_most_once_a_day(client, card_id):
     recovered = _answer(client, card_id, correct=True, token="c")
 
     assert recovered["step"] == "passed"
-    assert recovered["ladderMoved"] is False
-    assert recovered["ladderStage"] == 0
+    assert recovered["ladderMoved"] is True
+    assert recovered["ladderStage"] == 1
 
 
-def test_passing_twice_in_one_day_moves_the_rung_once(client, card_id):
+def test_drilling_a_passed_card_cannot_ratchet_it_up(client, card_id):
+    """Why free movement is safe: the rung follows **transitions**, not states.
+
+    A card already at 通過 stays at 通過 however many more answers it gets, so
+    there is no transition to move on — otherwise ten correct answers in one
+    round would carry a card from the bottom of the ladder to the top of it.
+    """
     for token in ("a", "b"):
         _answer(client, card_id, correct=True, token=token)
-    again = _answer(client, card_id, correct=True, token="c")
 
-    assert again["ladderStage"] == 1
-    assert again["ladderMoved"] is False
+    for token in ("c", "d", "e"):
+        again = _answer(client, card_id, correct=True, token=token)
+        assert again["ladderMoved"] is False
+        assert again["ladderStage"] == 1
+
+
+def test_falling_twice_reports_no_second_move(client, card_id):
+    """The bottom is the bottom. A second wrong answer changes no column, and
+    saying otherwise would put a move on screen that did not happen."""
+    first = _answer(client, card_id, correct=False, token="a")
+    second = _answer(client, card_id, correct=False, token="b")
+
+    assert first["ladderMoved"] is True
+    assert second["ladderMoved"] is False
+    assert second["ladderStage"] == 0
 
 
 def test_a_new_day_can_move_the_rung_again(client, card_id):
@@ -292,8 +311,11 @@ def test_yesterdays_answers_do_not_count_towards_today(client, card_id):
 
 
 def test_a_replayed_submission_cannot_move_the_rung_twice(client, card_id):
-    """The two guards meet here: idempotency stops a second row, and the
-    once-a-day rule stops a second move even if one appeared."""
+    """**The only guard left**, now that the ladder moves freely within a day.
+
+    A replay stores no row, so the endpoint does not even attempt a move. Before
+    the lock came off, this was belt and braces; it is now the belt.
+    """
     _answer(client, card_id, correct=True, token="a")
     first = _answer(client, card_id, correct=True, token="b")
     replay = _answer(client, card_id, correct=True, token="b")

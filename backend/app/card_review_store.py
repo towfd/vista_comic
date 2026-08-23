@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import ladder
-from .daily_progress import passed_today
+from .daily_progress import DailyStep, step_today
 from .db import CardReview, LearningCard
 
 # What kind of question produced an answer. Recorded rather than inferred, since
@@ -125,16 +125,26 @@ def card_exists(session: Session, card_id: int) -> bool:
 
 
 def apply_ladder_move(session: Session, card_id: int, *, today: date) -> bool:
-    """Move the card's rung if today's answers call for it; report whether it moved.
+    """Move the card's rung if the last answer calls for it; report whether it did.
 
-    Run after each answer, and idempotent for the rest of the day by design:
-    ``ladder.move`` refuses a second move once ``last_ladder_move_on`` is today,
-    so this can be called on every submission without counting twice.
+    **Transitions, not states.** The question is not "where does today stand"
+    but "did this answer change where today stands", and the difference is the
+    whole of why free movement is safe. Once a card is at 通過 a further correct
+    answer leaves it at 通過 — no transition, no move — so drilling a passed card
+    cannot ratchet it up the ladder. Two answers move it:
 
-    **The day's first resolution decides it.** A wrong answer resolves the day
-    immediately; a correct one resolves it only on reaching 通過, since one
-    correct answer is not yet a pass. Anything in between leaves the card open
-    and the rung untouched.
+    * a **wrong** one, which drops it to the bottom. Idempotent by nature, since
+      the bottom is the bottom however many times it is reached.
+    * the one that **reaches 通過** from anywhere below, which climbs one rung.
+
+    Between them a card can fall and climb back within a single day, which is
+    the point: locking the day on its first resolution left a fresh deck unable
+    to climb at all. See ``ladder.move``.
+
+    Call this only for an answer that was actually **recorded** — a replayed
+    submission stores no row and must therefore change nothing, and that is now
+    the only thing standing between a retry and a second rung. The caller owns
+    that check because only the caller knows whether the row was new.
     """
     card = session.get(LearningCard, card_id)
     if card is None:
@@ -144,18 +154,21 @@ def apply_ladder_move(session: Session, card_id: int, *, today: date) -> bool:
     if not answers:
         return False
 
-    passed = passed_today(answers)
-    # Nothing has resolved yet: still climbing, and not yet fallen.
-    if not passed and all(answers):
+    before = step_today(answers[:-1])
+    after = step_today(answers)
+    if not answers[-1]:
+        passed = False
+    elif after is DailyStep.PASSED and before is not DailyStep.PASSED:
+        passed = True
+    else:
+        # Still climbing, or already passed and being drilled. Neither is news.
         return False
 
-    outcome = ladder.move(
-        rung=card.ladder_stage,
-        last_move_on=card.last_ladder_move_on,
-        today=today,
-        passed=passed,
-    )
-    if outcome is None:
+    outcome = ladder.move(rung=card.ladder_stage, today=today, passed=passed)
+    # A card already at the bottom and already due tomorrow has nowhere to fall,
+    # and reporting a move that changed no column would be a lie the app shows
+    # to the reader.
+    if outcome == (card.ladder_stage, card.due_on):
         return False
 
     card.ladder_stage, card.due_on = outcome

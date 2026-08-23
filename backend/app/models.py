@@ -356,9 +356,11 @@ class ReviewOutcome(BaseModel):
     step: str
     ladderStage: int
     dueOn: str
-    #: Whether this answer was the one that moved the rung. False for every
-    #: answer after the day's first resolution, which is how "at most once per
-    #: day" is visible to the app rather than inferred.
+    #: Whether this answer was the one that moved the rung. False for a correct
+    #: answer that changed no step -- drilling a card already at 通過, or a
+    #: first correct answer that has not reached it yet -- and for a card that
+    #: was already at the bottom and fell again. The app is told rather than
+    #: left to work it out from a rung that did not change.
     ladderMoved: bool
 
 

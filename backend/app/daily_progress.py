@@ -79,7 +79,3 @@ def step_today(answers: Iterable[bool]) -> DailyStep:
         step = step_after(step, correct)
     return step
 
-
-def passed_today(answers: Iterable[bool]) -> bool:
-    """Whether the card cleared the day."""
-    return step_today(answers) is DailyStep.PASSED

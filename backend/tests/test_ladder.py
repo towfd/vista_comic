@@ -76,49 +76,41 @@ def test_a_failure_returns_to_the_bottom_from_any_height():
 
 
 def test_a_failed_card_is_due_tomorrow():
-    result = move(rung=TOP_RUNG, last_move_on=None, today=TODAY, passed=False)
+    result = move(rung=TOP_RUNG, today=TODAY, passed=False)
 
     assert result == (FIRST_RUNG, TODAY + timedelta(days=1))
 
 
-# --- once a day --------------------------------------------------------------
+# --- moving freely -----------------------------------------------------------
 
 
-def test_the_first_resolution_of_the_day_is_the_only_one():
-    already = move(rung=2, last_move_on=TODAY, today=TODAY, passed=True)
+def test_a_card_can_fall_and_climb_back_the_same_day():
+    """The lock this replaced said the day's first resolution was its only one.
 
-    assert already is None
-
-
-def test_wrong_then_passed_on_the_same_day_leaves_the_rung_dropped():
-    """The case that will feel unfair, and is deliberate.
-
-    The reader *did* end the session knowing the word — but the gap already
-    happened: they met it today and did not have it. Letting an afternoon of
-    drilling erase that would make the ladder a record of effort rather than of
-    memory, and the interval it schedules would stop meaning anything. Passing
-    it later still counts for the *day*; it does not count here.
+    It was defensible about memory and fatal in practice: a whole deck on rung
+    0, first encounters mostly wrong, one wrong answer sealing the day. Nothing
+    ever climbed, so the middle rungs — and the question types that live on them
+    — were unreachable.
     """
-    dropped = move(rung=3, last_move_on=None, today=TODAY, passed=False)
+    dropped = move(rung=3, today=TODAY, passed=False)
     assert dropped == (FIRST_RUNG, TODAY + timedelta(days=1))
 
-    # …and the same card reaching 通過 an hour later moves nothing.
-    assert move(rung=FIRST_RUNG, last_move_on=TODAY, today=TODAY, passed=True) is None
+    # …and the same card reaching 通過 an hour later climbs again.
+    assert move(rung=FIRST_RUNG, today=TODAY, passed=True) == (
+        1,
+        TODAY + timedelta(days=3),
+    )
 
 
-def test_passed_then_wrong_on_the_same_day_leaves_the_rung_advanced():
-    """The mirror image, and it follows from the same rule rather than from a
-    second one: whichever resolution came first is the day's move."""
-    advanced = move(rung=1, last_move_on=None, today=TODAY, passed=True)
+def test_a_card_can_climb_and_fall_back_the_same_day():
+    """The mirror image, from the same rule rather than a second one."""
+    advanced = move(rung=1, today=TODAY, passed=True)
     assert advanced == (2, TODAY + timedelta(days=7))
 
-    assert move(rung=2, last_move_on=TODAY, today=TODAY, passed=False) is None
-
-
-def test_a_new_day_moves_again():
-    tomorrow = TODAY + timedelta(days=1)
-
-    assert move(rung=1, last_move_on=TODAY, today=tomorrow, passed=True) is not None
+    assert move(rung=2, today=TODAY, passed=False) == (
+        FIRST_RUNG,
+        TODAY + timedelta(days=1),
+    )
 
 
 def test_a_gap_of_weeks_is_not_a_backlog():
@@ -130,7 +122,7 @@ def test_a_gap_of_weeks_is_not_a_backlog():
     """
     weeks_later = TODAY + timedelta(days=21)
 
-    assert move(rung=2, last_move_on=TODAY, today=weeks_later, passed=True) == (
+    assert move(rung=2, today=weeks_later, passed=True) == (
         3,
         weeks_later + timedelta(days=21),
     )
