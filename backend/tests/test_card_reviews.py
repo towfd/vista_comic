@@ -188,16 +188,26 @@ def test_one_cards_reviews_are_not_anothers(client):
 # --- what an answer does to the card (ticket 03) -----------------------------
 
 
-def _answer(client, card_id, *, correct: bool, token: str, day: str = _TODAY):
-    return client.post(
-        f"/cards/{card_id}/reviews",
-        json={
-            "questionType": "cloze_typed",
-            "isCorrect": correct,
-            "clientToken": token,
-            "localDate": day,
-        },
-    ).json()
+def _answer(
+    client,
+    card_id,
+    *,
+    correct: bool,
+    token: str,
+    day: str = _TODAY,
+    counts: bool | None = None,
+):
+    body = {
+        "questionType": "cloze_typed",
+        "isCorrect": correct,
+        "clientToken": token,
+        "localDate": day,
+    }
+    # Omitted rather than sent as True when unset, so the default path — the one
+    # an older build takes — is what most of these tests exercise.
+    if counts is not None:
+        body["countsTowardLadder"] = counts
+    return client.post(f"/cards/{card_id}/reviews", json=body).json()
 
 
 def test_one_correct_answer_is_not_yet_a_pass(client, card_id):
@@ -349,4 +359,49 @@ def test_two_sentence_answers_pass_the_day_like_any_other(client, card_id):
         },
     ).json()
 
+    assert outcome["ladderStage"] == 1
+
+
+
+def test_a_card_that_was_not_due_is_recorded_but_moves_no_rung(client, card_id):
+    """A round tops itself up when too few cards are due.
+
+    Answering one of those is worth logging and worth nothing to the schedule:
+    the ladder asks whether a word survives a gap, and a card answered before
+    its gap has elapsed has not been asked that question.
+    """
+    _answer(client, card_id, correct=True, token="a", counts=False)
+    outcome = _answer(client, card_id, correct=True, token="b", counts=False)
+
+    # Today still resolved — the reader did pass it — but the interval did not
+    # learn anything from a gap that never happened.
+    assert outcome["step"] == "passed"
+    assert outcome["ladderMoved"] is False
+    assert outcome["ladderStage"] == 0
+
+    # And the answers themselves are all there: the log stays complete.
+    listed = client.get(f"/cards/{card_id}/reviews").json()
+    assert len(listed) == 2
+
+
+def test_a_card_that_was_not_due_cannot_lose_a_rung_either(client, card_id):
+    """Both directions, because the reason is about evidence, not about mercy."""
+    for token in ("a", "b"):
+        _answer(client, card_id, correct=True, token=token)
+    # Rung 1, due in three days. Answered wrong the next day anyway, unprompted.
+    outcome = _answer(
+        client, card_id, correct=False, token="c", day="2026-08-21", counts=False
+    )
+
+    assert outcome["ladderMoved"] is False
+    assert outcome["ladderStage"] == 1
+    assert outcome["dueOn"] == "2026-08-23"
+
+
+def test_an_omitted_flag_still_moves_the_rung(client, card_id):
+    """The default an older build relies on, pinned so it cannot drift."""
+    _answer(client, card_id, correct=True, token="a")
+    outcome = _answer(client, card_id, correct=True, token="b")
+
+    assert outcome["ladderMoved"] is True
     assert outcome["ladderStage"] == 1

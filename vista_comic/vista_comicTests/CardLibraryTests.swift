@@ -86,14 +86,23 @@ struct FamiliarityTests {
         #expect(Familiarity(ladderStage: pair.0) == pair.1)
     }
 
-    @Test("A new card says nothing on a row")
-    func aNewCardSaysNothingOnARow() {
-        // Every card is `.new` until stage 3 ships. Six identical badges down a
-        // screen would be noise; the same six become worth reading the moment
-        // they differ.
-        #expect(Familiarity.new.isWorthShowing == false)
-        #expect(Familiarity.learning.isWorthShowing)
-        #expect(Familiarity.familiar.isWorthShowing)
+    @Test("Every band shows on a row, including the bottom one", arguments: Familiarity.allCases)
+    func everyBandShowsOnARow(_ band: Familiarity) {
+        // Reversed by stage 4, deliberately. `.new` was hidden while nothing
+        // could move a card off it and six identical badges would have been
+        // noise. Now that practice moves cards, an absent badge and a card
+        // still at the bottom looked the same on screen — and telling those two
+        // apart is the reason a reader opens this list after a round.
+        #expect(band.isWorthShowing)
+    }
+
+    @Test("The top rung matches the backend\'s ladder")
+    func theTopRungMatchesTheBackend() {
+        // `LADDER_INTERVALS` in `backend/app/ladder.py` has five entries, and
+        // this is shown to the reader as a denominator. Two constants, one
+        // fact — so it is pinned here rather than left to be noticed.
+        #expect(ladderTopRung == 4)
+        #expect(Familiarity(ladderStage: ladderTopRung) == .familiar)
     }
 }
 

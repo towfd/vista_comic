@@ -36,11 +36,12 @@ struct CardRow: View {
                         .lineLimit(1)
                 }
 
-                // Familiarity appears only once a card has actually moved.
-                // Before stage 3 every card is `.new`, and a badge repeated on
-                // every row would be noise — the same six become worth reading
-                // the moment they start to differ. The full picture is in the
-                // card's own screen.
+                // Familiarity on every row, including `New`. It was hidden at
+                // the bottom band while nothing could move a card off it; now
+                // that practice does, an absent badge and a card still at the
+                // bottom looked identical, which is the one comparison a reader
+                // opens this list to make. The rung itself is in the card's own
+                // screen — three bands is the right resolution to scan.
                 if Familiarity(ladderStage: card.ladderStage).isWorthShowing {
                     Label(
                         Familiarity(ladderStage: card.ladderStage).title,

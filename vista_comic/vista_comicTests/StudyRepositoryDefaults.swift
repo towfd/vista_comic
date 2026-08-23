@@ -28,7 +28,8 @@ extension StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?
+        elapsedMs: Int?,
+        countsTowardLadder: Bool
     ) async throws -> ReviewOutcome {
         ReviewOutcome(step: .familiar, ladderStage: 0, dueOn: "2026-08-21", ladderMoved: false)
     }

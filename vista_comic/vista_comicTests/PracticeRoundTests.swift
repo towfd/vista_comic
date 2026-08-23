@@ -79,6 +79,59 @@ struct PracticeRoundTests {
     }
 }
 
+@Suite("Which cards a round picks")
+struct RoundSelectionTests {
+
+    /// Twelve words, all equally due and all on rung 0 — the shape of a fresh
+    /// deck, where neither ordering key decides anything.
+    private var flatDeck: [LearningCard] {
+        (1...12).map { word($0, "W\($0)") }
+    }
+
+    @Test("Two rounds over an undifferentiated deck are not the same six cards")
+    func roundsVaryOnAFlatDeck() throws {
+        // What the reader hit: every card due, every card on rung 0, so the
+        // order fell through to whatever `GET /cards` returned and a round was
+        // the six most recently collected cards every time.
+        //
+        // Repeated rather than run once, because two runs can coincide by
+        // chance: with 12 cards drawn 6 at a time that is about one in 900, and
+        // a test that flakes that often is worse than no test.
+        let deck = flatDeck
+        let first = Set(try makeRound(from: deck).get().map(\.card.id))
+        let differs = (0..<8).contains { _ in
+            Set(try! makeRound(from: deck).get().map(\.card.id)) != first
+        }
+
+        #expect(differs)
+    }
+
+    @Test("Due cards still come before cards that are not due")
+    func dueCardsStillLead() throws {
+        // The jitter breaks ties; it must not outrank the keys above it.
+        let due = word(1, "DUE")
+        let later = (2...4).map {
+            LearningCard.preview(id: $0, sourceText: "L\($0)", kind: "word", dueOn: "2026-09-01")
+        }
+
+        let items = try makeRound(from: [due] + later, today: "2026-08-24").get()
+
+        #expect(items.first?.card.id == due.id)
+    }
+
+    @Test("A less familiar card still comes before a more familiar one")
+    func lessFamiliarStillLeads() throws {
+        let fresh = LearningCard.preview(id: 1, sourceText: "FRESH", kind: "word", ladderStage: 0)
+        let known = (2...4).map {
+            LearningCard.preview(id: $0, sourceText: "K\($0)", kind: "word", ladderStage: 3)
+        }
+
+        let items = try makeRound(from: [fresh] + known).get()
+
+        #expect(items.first?.card.id == fresh.id)
+    }
+}
+
 @Suite("Difficulty follows the rung")
 struct AskedDifficultyTests {
 

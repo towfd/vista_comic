@@ -112,9 +112,33 @@ func distractors(
             // unanswerable, and the deck can hold two cards whose text differs
             // only by something normalisation folds away.
             && normalizedKey($0.sourceText) != normalizedKey(answer.sourceText)
+            && isPlausibleOption($0, beside: answer)
     }
     guard pool.count >= count else { return [] }
     return Array(pool.shuffled().prefix(count))
+}
+
+/// How many whitespace-separated pieces a card's text runs to.
+///
+/// Vietnamese puts spaces between **syllables** rather than between words, so
+/// this counts shape, not meaning — which is exactly what an option needs to
+/// match.
+func pieceCount(_ text: String) -> Int {
+    text.split(whereSeparator: \.isWhitespace).count
+}
+
+/// Whether `candidate` can plausibly sit beside `answer` as a wrong option.
+///
+/// **A whole sentence among the four gives the answer away by its shape**,
+/// before the reader has read a word of any of them — and it reads as a bug,
+/// because nobody would offer a ten-syllable line as a candidate for a
+/// two-syllable blank. Every sentence card in the deck was eligible here, and
+/// the deck holds seven of them.
+///
+/// One piece longer than the answer is allowed, with a floor of three, so a
+/// one-syllable answer still has a pool to draw from.
+func isPlausibleOption(_ candidate: LearningCard, beside answer: LearningCard) -> Bool {
+    pieceCount(candidate.sourceText) <= max(pieceCount(answer.sourceText) + 1, 3)
 }
 
 /// How a typed answer came out.

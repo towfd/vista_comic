@@ -997,8 +997,16 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
         )
         # Attempted after every answer and refused for the rest of the day once
         # it has happened, so a replayed submission cannot move a rung twice.
-        moved = card_review_store.apply_ladder_move(
-            session, card_id, today=body.localDate
+        #
+        # Skipped outright for a card that was not due -- see
+        # `CardReviewCreate.countsTowardLadder`. The answer is still recorded;
+        # only the schedule declines to learn anything from it.
+        moved = (
+            card_review_store.apply_ladder_move(
+                session, card_id, today=body.localDate
+            )
+            if body.countsTowardLadder
+            else False
         )
         answers = [
             r.is_correct

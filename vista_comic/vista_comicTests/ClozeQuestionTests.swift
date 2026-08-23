@@ -126,6 +126,53 @@ struct ClozeDistractorTests {
         #expect(options.isEmpty)
     }
 
+    @Test("A whole sentence is never offered as an option")
+    func aSentenceIsNeverAnOption() {
+        // What the reader actually saw: a two-syllable blank with a
+        // ten-syllable line among the four answers. It gives itself away by
+        // shape before a word of it has been read, and it reads as a bug.
+        let line = sentence(100, "TRONG KHI MÌNH BỊ TẾ BÀO UNG THƯ ĂN MÒN")
+        let deck = [answer, line, word(2, "ĂN MÒN"), word(3, "XẤU"), word(4, "VÀI")]
+
+        let options = distractors(for: answer, from: deck, count: 3)
+
+        #expect(options.count == 3)
+        #expect(!options.contains { $0.id == line.id })
+    }
+
+    @Test("A cloze built from a deck of sentences offers no choices at all")
+    func aSentenceOnlyDeckOffersNoChoices() {
+        // Rather than falling back to offering them anyway. An unanswerable
+        // four-option question is worse than a typed one, and the fallback in
+        // `askableModes` already has somewhere to go.
+        let line = sentence(100, "TRONG KHI MÌNH BỊ TẾ BÀO UNG THƯ ĂN MÒN")
+        let deck = [
+            answer, line,
+            sentence(101, "TÌNH HÌNH XẤU LẮM"),
+            sentence(102, "NGAY CẢ KHI HỌC SINH CÓ HÀNH VI"),
+        ]
+
+        #expect(distractors(for: answer, from: deck, count: 3).isEmpty)
+    }
+
+    @Test("A one-syllable answer still has a pool to draw from")
+    func aShortAnswerStillHasAPool() {
+        // Six of the deck's word cards are one syllable. Without the floor, an
+        // answer that short would admit only other one-syllable cards and most
+        // of its questions would lose their options.
+        let short = word(1, "VÀI")
+        let deck = [short, word(2, "ĂN MÒN"), word(3, "TÌNH HÌNH"), word(4, "TRONG KHI")]
+
+        #expect(distractors(for: short, from: deck, count: 3).count == 3)
+    }
+
+    @Test("Options are counted in pieces, and Vietnamese counts syllables")
+    func piecesAreSyllables() {
+        #expect(pieceCount("XẤU") == 1)
+        #expect(pieceCount("TRONG KHI") == 2)
+        #expect(pieceCount("  TÌNH   HÌNH XẤU LẮM ") == 4)
+    }
+
     @Test("Too few cards means no choice question rather than a two-option one")
     func tooFewCardsMeansNoChoiceQuestion() {
         let deck = [answer, word(2, "ĂN MÒN")]
