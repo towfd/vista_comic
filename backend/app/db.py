@@ -201,9 +201,11 @@ class LearningCard(Base):
     last_looked_up_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Enforces "the ladder moves at most once per day". It cannot be derived
-    # from the reviews, because a review does not know whether it was the one
-    # that moved the rung.
+    # When the rung last moved. It used to enforce "at most once per day"; that
+    # rule was removed after acceptance (a fresh deck could never climb out of
+    # rung 0), so this is now a record rather than a gate — kept because it
+    # cannot be derived from the reviews, a review not knowing whether it was
+    # the one that moved the rung.
     last_ladder_move_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

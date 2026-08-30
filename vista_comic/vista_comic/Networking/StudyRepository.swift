@@ -87,6 +87,12 @@ protocol StudyRepository {
     ///
     /// `localDate` is the **reader's** day, not the server's. Grouping a UTC+8
     /// reader's day by a UTC boundary would reset it at eight in the morning.
+    ///
+    /// `countsTowardLadder` is false for a card the round **topped itself up
+    /// with** — one not actually due, included only because too few were. The
+    /// answer is still recorded; the schedule simply declines to learn from it,
+    /// because a card answered before its gap has elapsed was never asked the
+    /// question the ladder measures.
     @discardableResult
     func recordReview(
         cardID: Int,
@@ -94,7 +100,8 @@ protocol StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?
+        elapsedMs: Int?,
+        countsTowardLadder: Bool
     ) async throws -> ReviewOutcome
 
     /// Notes that the reader looked an already-collected word up again.

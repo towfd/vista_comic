@@ -309,6 +309,20 @@ class CardReviewCreate(BaseModel):
     # day at eight in the morning, so a card passed before breakfast could be
     # passed again after it and climb two rungs in one felt day.
     localDate: date
+    #: Whether this answer is allowed to move the card's rung.
+    #:
+    #: False for a card the round **topped itself up with** -- one not actually
+    #: due, included only because too few were. Answering a card the day after
+    #: passing it is no evidence that it survives a three-day gap, which is the
+    #: single thing the ladder measures, so letting it climb would turn the
+    #: interval into a record of effort rather than of memory.
+    #:
+    #: The answer is still recorded either way: the review log is kept complete,
+    #: and what the reader did is a fact regardless of what it schedules.
+    #:
+    #: Defaults to True so an older build, which does not send this, keeps the
+    #: behaviour it was written against.
+    countsTowardLadder: bool = True
 
 
 class CardReviewResponse(BaseModel):
@@ -342,9 +356,11 @@ class ReviewOutcome(BaseModel):
     step: str
     ladderStage: int
     dueOn: str
-    #: Whether this answer was the one that moved the rung. False for every
-    #: answer after the day's first resolution, which is how "at most once per
-    #: day" is visible to the app rather than inferred.
+    #: Whether this answer was the one that moved the rung. False for a correct
+    #: answer that changed no step -- drilling a card already at 通過, or a
+    #: first correct answer that has not reached it yet -- and for a card that
+    #: was already at the bottom and fell again. The app is told rather than
+    #: left to work it out from a rung that did not change.
     ladderMoved: bool
 
 

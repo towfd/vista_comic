@@ -141,6 +141,16 @@ func makeRound(
         return .failure(.noSentencesWithKnownWords)
     }
 
+    // Ties are broken at random, and that matters more than it sounds. On a
+    // fresh deck *every* card is due and every card is on rung 0, so the two
+    // keys above decide nothing at all and the order falls through to whatever
+    // `GET /cards` returned — which is `created_at DESC`. A round would then be
+    // the six most recently collected cards, every time, for as long as they
+    // stayed unresolved.
+    let jitter = Dictionary(
+        uniqueKeysWithValues: askable.map { ($0.id, Double.random(in: 0..<1)) }
+    )
+
     // Due first, least familiar first within that — the reader's worst words
     // come up first. A wrong answer is not a dead end here, so the usual
     // argument about discouragement does not apply; and a card at 熟悉 needs
@@ -149,7 +159,8 @@ func makeRound(
     let ordered = askable.sorted { lhs, rhs in
         let lhsDue = isDue(lhs, on: today), rhsDue = isDue(rhs, on: today)
         if lhsDue != rhsDue { return lhsDue }
-        return lhs.ladderStage < rhs.ladderStage
+        if lhs.ladderStage != rhs.ladderStage { return lhs.ladderStage < rhs.ladderStage }
+        return jitter[lhs.id, default: 0] < jitter[rhs.id, default: 0]
     }
 
     var items: [PracticeItem] = []

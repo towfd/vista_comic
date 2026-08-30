@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.daily_progress import DailyStep, passed_today, step_after, step_today
+from app.daily_progress import DailyStep, step_after, step_today
 
 
 # --- the table, transition by transition -------------------------------------
@@ -47,7 +47,7 @@ def test_a_first_correct_answer_skips_unfamiliar(clean_slate=None):
 
 
 def test_two_correct_in_a_row_passes_the_day():
-    assert passed_today([True, True])
+    assert step_today([True, True]) is DailyStep.PASSED
 
 
 def test_correct_wrong_correct_does_not_pass():
@@ -57,7 +57,6 @@ def test_correct_wrong_correct_does_not_pass():
     precisely the card the day exists to catch.
     """
     assert step_today([True, False, True]) is DailyStep.FAMILIAR
-    assert not passed_today([True, False, True])
 
 
 def test_a_wrong_answer_returns_to_the_bottom_from_anywhere():

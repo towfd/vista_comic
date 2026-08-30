@@ -128,7 +128,8 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?
+        elapsedMs: Int?,
+        countsTowardLadder: Bool
     ) async throws -> ReviewOutcome {
         try await inner.recordReview(
             cardID: cardID,
@@ -136,7 +137,8 @@ struct OfflineFallbackStudyRepository: StudyRepository {
             isCorrect: isCorrect,
             clientToken: clientToken,
             localDate: localDate,
-            elapsedMs: elapsedMs
+            elapsedMs: elapsedMs,
+            countsTowardLadder: countsTowardLadder
         )
     }
 

@@ -6,13 +6,13 @@ sticks is exactly its purpose. **This one is about recall after a gap**, and it
 answers a different question: not "can you get this right now", but "will you
 still have it in a week".
 
-That difference is why the rules below look harsh in the moment.
+That difference is why a card falls all the way to the bottom on one wrong
+answer, however well the rest of the session went.
 """
 
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Optional
 
 #: Days until a card is next due, by rung. Index is the rung.
 #:
@@ -54,26 +54,26 @@ def _clamp(rung: int) -> int:
     return max(FIRST_RUNG, min(TOP_RUNG, rung))
 
 
-def move(
-    *,
-    rung: int,
-    last_move_on: Optional[date],
-    today: date,
-    passed: bool,
-) -> Optional[tuple[int, date]]:
-    """The card's new rung and due date, or ``None`` when nothing should change.
+def move(*, rung: int, today: date, passed: bool) -> tuple[int, date]:
+    """The card's new rung and due date.
 
-    **At most one move per day**, and the day's *first* resolution decides it.
-    So a card answered wrong early does not recover its rung by being drilled to
-    通過 later the same day — and that is deliberate, however unfair it feels in
-    the moment, because the reader *did* end the session knowing the word.
+    **A card may move more than once in a day**, up or down. This used to refuse
+    a second move, on the argument that the gap had already happened: the reader
+    met the word and did not have it, and an afternoon of drilling should not
+    erase that.
 
-    The reason is what this clock measures. The gap already happened: they met
-    the word today and did not have it. Letting an afternoon of drilling erase
-    that would make the ladder a record of effort rather than of memory, and the
-    interval it schedules would stop meaning anything.
+    That argument was right about what the ladder measures and wrong about what
+    it would do to a new deck. Thirty cards all sat on rung 0; a first encounter
+    is very often wrong; one wrong answer locked the card for the day. So
+    nothing climbed, the middle rungs were never reached, and the question types
+    that live there — typing, rearranging — could not appear at all. A schedule
+    that never schedules anything measures nothing either.
+
+    What replaced the lock is not "move on every answer" but **move on the
+    answer that changes something** — see ``card_review_store.apply_ladder_move``.
+    That is what keeps drilling from ratcheting a card up five rungs in one
+    round: reaching 通過 moves it once, and further correct answers change no
+    step, so they move nothing.
     """
-    if last_move_on == today:
-        return None
     new_rung = rung_after_pass(rung) if passed else rung_after_failure(rung)
     return new_rung, next_due(new_rung, today=today)

@@ -49,10 +49,20 @@ enum Familiarity: Int, CaseIterable, Hashable {
 
     /// Whether this is worth putting on a list row.
     ///
-    /// `.new` is not: it is where every card starts and, before stage 3, where
-    /// every card still is.
-    var isWorthShowing: Bool { self != .new }
+    /// Always, now. It was false for `.new` while nothing advanced
+    /// `ladderStage` and every row would have read the same — but cards climb
+    /// as of stage 4, and hiding the bottom band meant a reader checking
+    /// whether practice had moved anything saw a row with no badge and could
+    /// not tell "still new" from "not shown".
+    var isWorthShowing: Bool { true }
 }
+
+/// The highest rung on the interval ladder.
+///
+/// Mirrors `LADDER_INTERVALS` in `backend/app/ladder.py`, which has five
+/// entries. Shown to the reader as the denominator, so a rung is a position in
+/// something finite rather than a bare number.
+let ladderTopRung = 4
 
 /// One heading and the cards under it.
 struct CardGroup: Identifiable, Hashable {

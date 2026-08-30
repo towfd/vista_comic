@@ -114,13 +114,17 @@ struct CardDetailView: View {
                 }
             }
 
-            // Shown here rather than used to group the list: before stage 3
-            // every card reads "New", so this belongs where the reader is
-            // looking at one card on purpose, not repeated down a screen.
+            // Shown here rather than used to group the list: the bands are
+            // three and the deck is thirty, so grouping by them would be a
+            // heading over ten cards that have nothing else in common.
             Section("How well you know it") {
                 LabeledContent("Familiarity") {
                     Text(Familiarity(ladderStage: card.ladderStage).title)
                 }
+                // The band alone cannot answer "did today do anything" —
+                // rungs 1 and 2 both read "Learning". The number can.
+                LabeledContent("Ladder", value: "\(card.ladderStage) / \(ladderTopRung)")
+                LabeledContent("Next due", value: card.dueOn)
             }
 
             Section {

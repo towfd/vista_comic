@@ -161,8 +161,17 @@ rather than by anything the ladder knows.
 
 ### Two clocks, deliberately
 
-**The ladder moves at most once per day per card**, up or down, and what moves it is whether the
-card reached 通過 in that day's level — not any individual answer.
+**The ladder moves on the answer that changes something**, up or down, and what moves it is
+whether the card reached 通過 — not any individual answer.
+
+Revised after the first acceptance pass, which found the original rule ("at most once per day,
+and the day's first resolution decides it") unusable on a new deck: thirty cards on rung 0, first
+encounters mostly wrong, and one wrong answer sealing the card for the day. Nothing ever climbed,
+so the middle rungs — and the typing and rearranging questions that live on them — could not be
+reached at all. A card may now fall and climb back within one day.
+
+What stops drilling from ratcheting a card up five rungs is that the rung follows **transitions**:
+a card already at 通過 stays there on further correct answers, so there is nothing to move on.
 
 Within a day a card climbs its own three-step ladder, which resets daily:
 
@@ -222,8 +231,8 @@ and generated practice sentences cannot be checked against the word they were wr
 Backend: `card_review`, the ladder, the three-step day, and the endpoints a level runs on.
 
 iOS: 每日關卡 — cloze, then matching as a warm-up between, then sentence translation. A card
-passes the day by reaching 通過; the ladder moves at most once per day on that outcome, never on
-a single answer. Matching never moves it at all.
+passes the day by reaching 通過; the ladder moves on reaching it and on any wrong answer, never on
+a correct answer that changes no step. Matching never moves it at all.
 
 `introduction.txt` and practice-sentence generation belong here too: cloze on a **word** card
 needs a sentence containing that word, and only a **sentence** card already has one.

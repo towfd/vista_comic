@@ -986,7 +986,7 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
     with _card_session() as session:
         if not card_review_store.card_exists(session, card_id):
             raise HTTPException(status_code=404, detail="Learning card not found")
-        row, _ = card_review_store.record(
+        row, created = card_review_store.record(
             session,
             card_id=card_id,
             question_type=body.questionType,
@@ -995,10 +995,20 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
             local_date=body.localDate,
             elapsed_ms=body.elapsedMs,
         )
-        # Attempted after every answer and refused for the rest of the day once
-        # it has happened, so a replayed submission cannot move a rung twice.
-        moved = card_review_store.apply_ladder_move(
-            session, card_id, today=body.localDate
+        # Attempted only for an answer that was actually stored. A replay adds
+        # no row, so it must change nothing -- and since the ladder no longer
+        # refuses a second move within a day, this check is the only thing
+        # standing between a retried submission and a second rung.
+        #
+        # Skipped outright for a card that was not due -- see
+        # `CardReviewCreate.countsTowardLadder`. The answer is still recorded;
+        # only the schedule declines to learn anything from it.
+        moved = (
+            card_review_store.apply_ladder_move(
+                session, card_id, today=body.localDate
+            )
+            if created and body.countsTowardLadder
+            else False
         )
         answers = [
             r.is_correct

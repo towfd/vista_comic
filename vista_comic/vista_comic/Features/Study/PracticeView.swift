@@ -24,15 +24,31 @@ import SwiftUI
 
 struct PracticeView: View {
     @Environment(\.studyRepository) private var repository
+    @Environment(\.scenePhase) private var scenePhase
     @State private var state: LoadState<[LearningCard]> = .loading
     @State private var round: [PracticeItem]?
     @State private var unavailable: RoundUnavailable?
+    /// Whether `.task` has already run once. `.onAppear` fires alongside it on
+    /// the first appearance and again on every return to this tab, and only the
+    /// second of those is worth a fetch.
+    @State private var hasAppeared = false
 
     var body: some View {
         NavigationStack {
             content.navigationTitle("Practice")
         }
         .task { await load() }
+        // A round changes due dates and rungs, so the deck held here goes stale
+        // the moment one is played. Coming back to the tab — or to the app — is
+        // where that showed: the next round was built from the figures the last
+        // one started with, and picked the same cards again.
+        .onAppear {
+            if hasAppeared { Task { await load() } }
+            hasAppeared = true
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await load() } }
+        }
     }
 
     @ViewBuilder
@@ -44,7 +60,15 @@ struct PracticeView: View {
             ErrorStateView { Task { await load() } }
         case .loaded:
             if let round {
-                RoundView(items: round, repository: repository) { self.round = nil }
+                RoundView(items: round, repository: repository) {
+                    self.round = nil
+                    // **The fix for "it keeps asking the same six cards."** The
+                    // cards just practised have new due dates and new rungs;
+                    // without this, tapping Play again rebuilt the round from
+                    // the figures it started with and therefore chose exactly
+                    // the same cards, until the app was relaunched.
+                    Task { await load() }
+                }
             } else {
                 start
             }
@@ -243,9 +267,27 @@ private struct RoundView: View {
             // Counts what is left rather than where the reader is, because a
             // requeued item makes the second number move — and a progress
             // readout that goes backwards reads as a bug.
-            Text("\(items.count - queue.count + 1) of \(items.count)")
-                .font(AppFont.caption)
-                .foregroundStyle(.grayFont)
+            HStack {
+                Text("\(items.count - queue.count + 1) of \(items.count)")
+
+                Spacer()
+
+                // Where this card stands on the interval ladder, named and
+                // numbered. Without it a reader meeting the same word for the
+                // fourth time has no way to tell whether anything is moving —
+                // and the rung is also what decides the question they are
+                // looking at, so a four-choice question stops reading as the
+                // app being easy on them.
+                Label {
+                    Text(Familiarity(ladderStage: item.card.ladderStage).title)
+                        + Text(" · \(item.card.ladderStage)/\(ladderTopRung)")
+                } icon: {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                }
+                .accessibilityIdentifier("cardFamiliarity")
+            }
+            .font(AppFont.caption)
+            .foregroundStyle(.grayFont)
 
             // The two whole-sentence modes show the meaning and ask for the
             // Vietnamese; the cloze modes show the sentence with a gap in it.
@@ -430,7 +472,12 @@ private struct RoundView: View {
             isCorrect: correct,
             clientToken: item.token,
             localDate: Date(),
-            elapsedMs: nil
+            elapsedMs: nil,
+            // A card the round topped itself up with is answered, recorded and
+            // shown exactly like any other; only the schedule ignores it. The
+            // ladder asks whether a word survives a gap, and this card's gap
+            // has not happened yet.
+            countsTowardLadder: item.isDue
         )
         outcome.record(
             correct: correct,

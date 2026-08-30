@@ -153,13 +153,15 @@ struct APIStudyRepository: StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?
+        elapsedMs: Int?,
+        countsTowardLadder: Bool
     ) async throws -> ReviewOutcome {
         var payload: [String: Any] = [
             "questionType": questionType.rawValue,
             "isCorrect": isCorrect,
             "clientToken": clientToken,
             "localDate": Self.dayFormatter.string(from: localDate),
+            "countsTowardLadder": countsTowardLadder,
         ]
         if let elapsedMs { payload["elapsedMs"] = elapsedMs }
         let body = try JSONSerialization.data(withJSONObject: payload)

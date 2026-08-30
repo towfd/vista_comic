@@ -188,16 +188,26 @@ def test_one_cards_reviews_are_not_anothers(client):
 # --- what an answer does to the card (ticket 03) -----------------------------
 
 
-def _answer(client, card_id, *, correct: bool, token: str, day: str = _TODAY):
-    return client.post(
-        f"/cards/{card_id}/reviews",
-        json={
-            "questionType": "cloze_typed",
-            "isCorrect": correct,
-            "clientToken": token,
-            "localDate": day,
-        },
-    ).json()
+def _answer(
+    client,
+    card_id,
+    *,
+    correct: bool,
+    token: str,
+    day: str = _TODAY,
+    counts: bool | None = None,
+):
+    body = {
+        "questionType": "cloze_typed",
+        "isCorrect": correct,
+        "clientToken": token,
+        "localDate": day,
+    }
+    # Omitted rather than sent as True when unset, so the default path — the one
+    # an older build takes — is what most of these tests exercise.
+    if counts is not None:
+        body["countsTowardLadder"] = counts
+    return client.post(f"/cards/{card_id}/reviews", json=body).json()
 
 
 def test_one_correct_answer_is_not_yet_a_pass(client, card_id):
@@ -230,12 +240,13 @@ def test_a_wrong_answer_drops_to_the_bottom_and_is_due_tomorrow(client, card_id)
     assert outcome["dueOn"] == "2026-08-22"
 
 
-def test_the_rung_moves_at_most_once_a_day(client, card_id):
-    """The case that will feel unfair, and is deliberate.
+def test_a_card_answered_wrong_can_still_be_recovered_the_same_day(client, card_id):
+    """What a wrong first answer used to cost: the whole day.
 
-    Answering wrong resolves the day. Drilling the card to 通過 an hour later
-    still passes it *for the day* — but the ladder already recorded that the
-    reader met this word and did not have it, and that is what it measures.
+    A fresh deck is thirty cards on rung 0 and first encounters are mostly
+    wrong, so the lock meant nothing ever climbed — and the rungs where typing
+    and rearranging live were unreachable. The reader who ends the session
+    knowing the word now gets the rung for it.
     """
     dropped = _answer(client, card_id, correct=False, token="a")
     assert dropped["ladderMoved"] is True
@@ -245,17 +256,35 @@ def test_the_rung_moves_at_most_once_a_day(client, card_id):
     recovered = _answer(client, card_id, correct=True, token="c")
 
     assert recovered["step"] == "passed"
-    assert recovered["ladderMoved"] is False
-    assert recovered["ladderStage"] == 0
+    assert recovered["ladderMoved"] is True
+    assert recovered["ladderStage"] == 1
 
 
-def test_passing_twice_in_one_day_moves_the_rung_once(client, card_id):
+def test_drilling_a_passed_card_cannot_ratchet_it_up(client, card_id):
+    """Why free movement is safe: the rung follows **transitions**, not states.
+
+    A card already at 通過 stays at 通過 however many more answers it gets, so
+    there is no transition to move on — otherwise ten correct answers in one
+    round would carry a card from the bottom of the ladder to the top of it.
+    """
     for token in ("a", "b"):
         _answer(client, card_id, correct=True, token=token)
-    again = _answer(client, card_id, correct=True, token="c")
 
-    assert again["ladderStage"] == 1
-    assert again["ladderMoved"] is False
+    for token in ("c", "d", "e"):
+        again = _answer(client, card_id, correct=True, token=token)
+        assert again["ladderMoved"] is False
+        assert again["ladderStage"] == 1
+
+
+def test_falling_twice_reports_no_second_move(client, card_id):
+    """The bottom is the bottom. A second wrong answer changes no column, and
+    saying otherwise would put a move on screen that did not happen."""
+    first = _answer(client, card_id, correct=False, token="a")
+    second = _answer(client, card_id, correct=False, token="b")
+
+    assert first["ladderMoved"] is True
+    assert second["ladderMoved"] is False
+    assert second["ladderStage"] == 0
 
 
 def test_a_new_day_can_move_the_rung_again(client, card_id):
@@ -282,8 +311,11 @@ def test_yesterdays_answers_do_not_count_towards_today(client, card_id):
 
 
 def test_a_replayed_submission_cannot_move_the_rung_twice(client, card_id):
-    """The two guards meet here: idempotency stops a second row, and the
-    once-a-day rule stops a second move even if one appeared."""
+    """**The only guard left**, now that the ladder moves freely within a day.
+
+    A replay stores no row, so the endpoint does not even attempt a move. Before
+    the lock came off, this was belt and braces; it is now the belt.
+    """
     _answer(client, card_id, correct=True, token="a")
     first = _answer(client, card_id, correct=True, token="b")
     replay = _answer(client, card_id, correct=True, token="b")
@@ -349,4 +381,49 @@ def test_two_sentence_answers_pass_the_day_like_any_other(client, card_id):
         },
     ).json()
 
+    assert outcome["ladderStage"] == 1
+
+
+
+def test_a_card_that_was_not_due_is_recorded_but_moves_no_rung(client, card_id):
+    """A round tops itself up when too few cards are due.
+
+    Answering one of those is worth logging and worth nothing to the schedule:
+    the ladder asks whether a word survives a gap, and a card answered before
+    its gap has elapsed has not been asked that question.
+    """
+    _answer(client, card_id, correct=True, token="a", counts=False)
+    outcome = _answer(client, card_id, correct=True, token="b", counts=False)
+
+    # Today still resolved — the reader did pass it — but the interval did not
+    # learn anything from a gap that never happened.
+    assert outcome["step"] == "passed"
+    assert outcome["ladderMoved"] is False
+    assert outcome["ladderStage"] == 0
+
+    # And the answers themselves are all there: the log stays complete.
+    listed = client.get(f"/cards/{card_id}/reviews").json()
+    assert len(listed) == 2
+
+
+def test_a_card_that_was_not_due_cannot_lose_a_rung_either(client, card_id):
+    """Both directions, because the reason is about evidence, not about mercy."""
+    for token in ("a", "b"):
+        _answer(client, card_id, correct=True, token=token)
+    # Rung 1, due in three days. Answered wrong the next day anyway, unprompted.
+    outcome = _answer(
+        client, card_id, correct=False, token="c", day="2026-08-21", counts=False
+    )
+
+    assert outcome["ladderMoved"] is False
+    assert outcome["ladderStage"] == 1
+    assert outcome["dueOn"] == "2026-08-23"
+
+
+def test_an_omitted_flag_still_moves_the_rung(client, card_id):
+    """The default an older build relies on, pinned so it cannot drift."""
+    _answer(client, card_id, correct=True, token="a")
+    outcome = _answer(client, card_id, correct=True, token="b")
+
+    assert outcome["ladderMoved"] is True
     assert outcome["ladderStage"] == 1

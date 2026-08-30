@@ -35,6 +35,9 @@ struct StudyView: View {
     /// the backend. Shown, because a workshop that quietly serves stale data is
     /// worse than one that says so.
     @State private var isOffline = false
+    /// Whether `.task` has already run. See `PracticeView` — `.onAppear` fires
+    /// alongside it the first time and again on every return to this tab.
+    @State private var hasAppeared = false
 
     var body: some View {
         NavigationStack {
@@ -60,7 +63,15 @@ struct StudyView: View {
         }
         .task { await load() }
         // Words are collected in the reader, on another tab, so coming back
-        // here is exactly when this list is most likely to be behind.
+        // here is exactly when this list is most likely to be behind — and as
+        // of stage 4 they are also *practised* on another tab, which moves the
+        // rung this list now shows. Switching tabs never fired `scenePhase`,
+        // so a reader who practised and came straight here read the figures
+        // from before the round and concluded nothing had moved.
+        .onAppear {
+            if hasAppeared { Task { await load() } }
+            hasAppeared = true
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await load() } }
         }
@@ -197,6 +208,7 @@ extension LearningCard {
         chapterTitle: String? = "bai1",
         kind: String? = "word",
         ladderStage: Int = 0,
+        dueOn: String = "2026-08-19",
         lookupCount: Int = 0,
         createdAt: String = "2026-08-19T10:30:00Z"
     ) -> LearningCard {
@@ -216,7 +228,7 @@ extension LearningCard {
             "chapterTitle": \(quoted(chapterTitle)),
             "kind": \(quoted(kind)),
             "ladderStage": \(ladderStage),
-            "dueOn": "2026-08-19",
+            "dueOn": "\(dueOn)",
             "lookupCount": \(lookupCount),
             "lastLookedUpAt": null,
             "createdAt": "\(createdAt)"
