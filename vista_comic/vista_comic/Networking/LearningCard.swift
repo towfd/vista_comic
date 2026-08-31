@@ -41,6 +41,23 @@ enum CardKind: String, Codable, Hashable, Sendable, CaseIterable {
     case sentence
 }
 
+/// Where a card is in the scheduling model.
+///
+/// The four states are Anki's, and they are stored on the card rather than
+/// derived from its answers — a learning card's position is *which step, due at
+/// what minute*, which no answer has ever carried.
+enum CardState: String, Decodable, Hashable, Sendable, CaseIterable {
+    /// Never answered. Waits on the day's new-card quota rather than on a due
+    /// date.
+    case new
+    /// Walking the learning steps for the first time.
+    case learning
+    /// Graduated, on the interval table.
+    case review
+    /// Graduated once, then missed. Walking the same steps back to its slot.
+    case relearning
+}
+
 /// One collected line: what the reader framed, what it meant, and where it was
 /// met.
 ///
@@ -82,18 +99,36 @@ struct LearningCard: Decodable, Identifiable, Hashable {
     /// precedent. The backend owns this vocabulary, and losing the entire deck
     /// over one unrecognised row would be a poor trade.
     let kind: CardKind?
-    /// Where the card sits on stage 3's interval ladder. Carried from the first
-    /// release even though nothing reads it yet: the deck snapshot caches this
-    /// response wholesale, and a field added later would be missing from every
-    /// snapshot predating it.
-    let ladderStage: Int
-    /// The day this card is next due, as an ISO-8601 *date* (`2026-08-19`).
+    /// Where the card is in the scheduling model.
     ///
-    /// Kept as a `String` rather than a `Date` because the shared decoder's
-    /// strategy parses date-*times*, and a scheduling day is not an instant —
-    /// turning it into one would invent a timezone the backend never chose.
-    /// Stage 3 is where this stops being opaque.
-    let dueOn: String
+    /// Decoded leniently, like `kind`: an unrecognised value becomes `.new`
+    /// rather than failing the deck. A card wrongly treated as new is asked
+    /// again, which is recoverable; an empty deck is not.
+    var state: CardState
+    /// Which learning step the card is on, or `nil` outside the learning
+    /// states.
+    var learningStep: Int?
+    /// Which slot of the interval table the card holds — 0 to 6, meaning
+    /// 1/3/7/21/60/150/365 days. A card still in the learning steps has not
+    /// earned this yet; the number is where it *will* land.
+    var ladderStage: Int
+    /// The slot to return to after relearning, or `nil` when the card has never
+    /// lapsed. What makes a lapse cost one slot rather than everything.
+    var previousStage: Int?
+    /// The reader's day on which this card stopped being new, or `nil` while it
+    /// still is. The session counts these against the day's new-card quota,
+    /// which it has to be able to do with no network.
+    ///
+    /// A `String` rather than a `Date` because a scheduling day is not an
+    /// instant — turning it into one would invent a timezone the backend never
+    /// chose.
+    var introducedOn: String?
+    /// When this card next comes up.
+    ///
+    /// **A timestamp, not a day.** It was `dueOn`, an ISO date, until stage 6;
+    /// learning steps are minutes apart and a card due at 20:07 cannot be said
+    /// as a day.
+    var dueAt: Date
     /// How many times the reader looked this word up **again** after collecting
     /// it. Only the positive is ever counted: not looking a word up again is no
     /// evidence of knowing it, since the reader may simply not have reached
@@ -107,7 +142,8 @@ struct LearningCard: Decodable, Identifiable, Hashable {
         case comicID = "comicId"
         case chapterID = "chapterId"
         case pageNumber, comicTitle, chapterTitle, kind
-        case ladderStage, dueOn, lookupCount, lastLookedUpAt, createdAt
+        case state, learningStep, ladderStage, previousStage, introducedOn
+        case dueAt, dueOn, lookupCount, lastLookedUpAt, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -125,10 +161,55 @@ struct LearningCard: Decodable, Identifiable, Hashable {
         kind = (try? container.decodeIfPresent(String.self, forKey: .kind))
             .flatMap { $0 }
             .flatMap(CardKind.init(rawValue:))
+        // Lenient for the same reason `kind` is, and for one more: a deck
+        // snapshot cached before stage 6 has none of these fields, and the
+        // reader who opens the app offline that morning would otherwise find an
+        // empty deck. An old snapshot decodes as a deck of new cards, which is
+        // exactly what the migration made them anyway.
+        state = (try? container.decodeIfPresent(String.self, forKey: .state))
+            .flatMap { $0 }
+            .flatMap(CardState.init(rawValue:)) ?? .new
+        learningStep = try container.decodeIfPresent(Int.self, forKey: .learningStep)
         ladderStage = try container.decode(Int.self, forKey: .ladderStage)
-        dueOn = try container.decode(String.self, forKey: .dueOn)
+        previousStage = try container.decodeIfPresent(Int.self, forKey: .previousStage)
+        introducedOn = try container.decodeIfPresent(String.self, forKey: .introducedOn)
+        if let due = try container.decodeIfPresent(Date.self, forKey: .dueAt) {
+            dueAt = due
+        } else {
+            // A pre-stage-6 snapshot, which carried a day. Read as the start of
+            // that day in the reader's own timezone — the same timezone the day
+            // was written in — so a card due "today" is due now rather than at
+            // some hour Greenwich chose.
+            let day = try container.decodeIfPresent(String.self, forKey: .dueOn)
+            dueAt = day.flatMap(LearningCard.startOfDay(_:)) ?? Date.distantPast
+        }
         lookupCount = try container.decode(Int.self, forKey: .lookupCount)
         lastLookedUpAt = try container.decodeIfPresent(Date.self, forKey: .lastLookedUpAt)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+
+    /// Takes the schedule the backend just returned.
+    ///
+    /// The six scheduling fields are `var` and nothing else is, which is the
+    /// whole rule: identity and provenance are facts about the past and are
+    /// read-only, while the schedule is what an answer changes. Applying it
+    /// locally rather than refetching the deck is what lets a session keep
+    /// going with no network.
+    mutating func apply(_ outcome: ReviewOutcome) {
+        state = outcome.state
+        learningStep = outcome.learningStep
+        ladderStage = outcome.ladderStage
+        previousStage = outcome.previousStage
+        introducedOn = outcome.introducedOn
+        dueAt = outcome.dueAt
+    }
+
+    /// Midnight of an ISO-8601 day, in the reader's timezone.
+    private static func startOfDay(_ iso: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: iso)
     }
 }

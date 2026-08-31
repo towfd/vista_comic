@@ -862,6 +862,9 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
         learningStep=row.learning_step,
         ladderStage=row.ladder_stage,
         previousStage=row.previous_stage,
+        introducedOn=(
+            row.introduced_on.isoformat() if row.introduced_on is not None else None
+        ),
         dueAt=progress_store.iso_utc(row.due_at),
         lookupCount=row.lookup_count,
         lastLookedUpAt=(
@@ -1080,7 +1083,11 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
         # fact regardless of what it moves.
         if created and body.context == card_review_store.CONTEXT_REVIEW:
             card_review_store.apply_answer(
-                session, card_id, correct=body.isCorrect, answered_at=answered_at
+                session,
+                card_id,
+                correct=body.isCorrect,
+                answered_at=answered_at,
+                local_date=body.localDate,
             )
         card = learning_card_store.get(session, card_id)
     return ReviewOutcome(
@@ -1089,6 +1096,9 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
         learningStep=card.learning_step,
         ladderStage=card.ladder_stage,
         previousStage=card.previous_stage,
+        introducedOn=(
+            card.introduced_on.isoformat() if card.introduced_on is not None else None
+        ),
         dueAt=progress_store.iso_utc(card.due_at),
         intervalChanged=_interval_of(card) != interval_before,
     )

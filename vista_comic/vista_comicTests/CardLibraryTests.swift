@@ -98,10 +98,11 @@ struct FamiliarityTests {
 
     @Test("The top rung matches the backend\'s ladder")
     func theTopRungMatchesTheBackend() {
-        // `LADDER_INTERVALS` in `backend/app/ladder.py` has five entries, and
-        // this is shown to the reader as a denominator. Two constants, one
-        // fact — so it is pinned here rather than left to be noticed.
-        #expect(ladderTopRung == 4)
+        // `LADDER_INTERVALS` in `backend/app/ladder.py` — seven entries since
+        // stage 6, and shown to the reader as a denominator. Two constants, one
+        // fact, so it is pinned here rather than left to be noticed.
+        #expect(ladderTopRung == 6)
+        #expect(ladderIntervals == [1, 3, 7, 21, 60, 150, 365])
         #expect(Familiarity(ladderStage: ladderTopRung) == .familiar)
     }
 }

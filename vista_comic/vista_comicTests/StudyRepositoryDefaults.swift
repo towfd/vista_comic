@@ -28,9 +28,23 @@ extension StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?,
-        countsTowardLadder: Bool
+        answeredAt: Date,
+        context: ReviewContext,
+        elapsedMs: Int?
     ) async throws -> ReviewOutcome {
-        ReviewOutcome(step: .familiar, ladderStage: 0, dueOn: "2026-08-21", ladderMoved: false)
+        ReviewOutcome(
+            state: .learning,
+            learningStep: 0,
+            ladderStage: 0,
+            previousStage: nil,
+            introducedOn: nil,
+            dueAt: Date(),
+            intervalChanged: false
+        )
     }
+
+    func settings() async throws -> StudySettings { .fallback }
+
+    @discardableResult
+    func updateSettings(_ settings: StudySettings) async throws -> StudySettings { settings }
 }
