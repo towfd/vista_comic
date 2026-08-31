@@ -18,17 +18,39 @@ struct OfflineFallbackStudyRepository: StudyRepository {
     private let inner: any StudyRepository
     private let pending: any PendingCardStore
     private let pendingLookups: any PendingLookupStore
+    private let pendingAnswers: any PendingAnswerStore
+    /// The last settings the server gave, kept because a session built with no
+    /// connection has to use the same step lengths the server will recompute
+    /// with — otherwise the offline due times and the flushed ones disagree.
+    private let settingsCache: any DeckSnapshotStore
     private let flusher: PendingCardFlusher
     private let lookupFlusher: PendingLookupFlusher
+    private let answerFlusher: PendingAnswerFlusher
 
     init(
         wrapping inner: any StudyRepository = APIStudyRepository(),
         pending: any PendingCardStore = InMemoryPendingCardStore(),
-        pendingLookups: any PendingLookupStore = InMemoryPendingLookupStore()
+        pendingLookups: any PendingLookupStore = InMemoryPendingLookupStore(),
+        pendingAnswers: any PendingAnswerStore = InMemoryPendingAnswerStore(),
+        settingsCache: any DeckSnapshotStore = InMemoryDeckSnapshotStore()
     ) {
         self.inner = inner
         self.pending = pending
         self.pendingLookups = pendingLookups
+        self.pendingAnswers = pendingAnswers
+        self.settingsCache = settingsCache
+        self.answerFlusher = PendingAnswerFlusher(store: pendingAnswers) { answer in
+            _ = try await inner.recordReview(
+                cardID: answer.cardID,
+                questionType: answer.questionType,
+                isCorrect: answer.isCorrect,
+                clientToken: answer.clientToken,
+                localDate: Self.day(from: answer.localDate) ?? answer.answeredAt,
+                answeredAt: answer.answeredAt,
+                context: answer.context,
+                elapsedMs: nil
+            )
+        }
         self.lookupFlusher = PendingLookupFlusher(store: pendingLookups) { lookup in
             try await inner.recordLookup(id: lookup.cardID)
         }
@@ -108,6 +130,11 @@ struct OfflineFallbackStudyRepository: StudyRepository {
     /// about to anyway.
     func cards() async throws -> [LearningCard] {
         await flusher.flush()
+        // Answers before the fetch, so the response this returns — which
+        // becomes the new snapshot — already reflects them. A snapshot taken
+        // first would be overwritten by a schedule the server had not yet been
+        // told about.
+        await answerFlusher.flush()
         // Cards first: a lookup can only be reported against a card the server
         // already has, so draining the card queue first is what gives the
         // lookups something to land on.
@@ -115,12 +142,18 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         return try await inner.cards()
     }
 
-    /// Passed straight through, and **not queued** on failure.
+    /// Records the answer, or keeps it until the backend can be reached.
     ///
-    /// A round needs the backend, as stage 3's did. Queueing answers would mean
-    /// replaying them later against a ladder that has since moved — and the
-    /// once-a-day rule makes the order they arrive in load-bearing, which a
-    /// queue cannot promise.
+    /// **Queued now, where stage 4 refused to queue at all.** The reason it
+    /// refused has gone: the ladder's once-a-day rule made the order answers
+    /// arrived in load-bearing, and a queue could not promise it. The scheduler
+    /// that replaced it is a pure function of a card's state and the answers
+    /// against it, so replaying them in the order they were *given* — which is
+    /// what `answeredAt` records — lands on the same place either way.
+    ///
+    /// The returned outcome is computed locally, by the same transition table
+    /// the backend runs (`Scheduler.swift`). It is what the session runs on
+    /// until the queue drains; the server's answer replaces it then.
     @discardableResult
     func recordReview(
         cardID: Int,
@@ -132,29 +165,143 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         context: ReviewContext,
         elapsedMs: Int?
     ) async throws -> ReviewOutcome {
-        try await inner.recordReview(
-            cardID: cardID,
-            questionType: questionType,
-            isCorrect: isCorrect,
-            clientToken: clientToken,
-            localDate: localDate,
-            answeredAt: answeredAt,
-            context: context,
-            elapsedMs: elapsedMs
+        do {
+            let outcome = try await inner.recordReview(
+                cardID: cardID,
+                questionType: questionType,
+                isCorrect: isCorrect,
+                clientToken: clientToken,
+                localDate: localDate,
+                answeredAt: answeredAt,
+                context: context,
+                elapsedMs: elapsedMs
+            )
+            // A success proves the network is back — the cheapest flush trigger
+            // there is, and the same trick `collect` uses.
+            await answerFlusher.flush()
+            return outcome
+        } catch {
+            // A refusal is not a connection problem. The card is gone, or this
+            // exact answer was already taken; queueing it would only offer the
+            // server the same thing until the 4xx rule dropped it anyway.
+            if case APIError.httpStatus(let code) = error, (400..<500).contains(code) {
+                throw error
+            }
+            let day = Self.dayFormatter.string(from: localDate)
+            let answer = PendingAnswer(
+                cardID: cardID,
+                questionType: questionType,
+                isCorrect: isCorrect,
+                clientToken: clientToken,
+                localDate: day,
+                answeredAt: answeredAt,
+                context: context
+            )
+            pendingAnswers.enqueue(answer)
+            return localOutcome(for: answer, on: day)
+        }
+    }
+
+    /// What the answer did, worked out here because nobody could be asked.
+    ///
+    /// A card the snapshot has never heard of gets an outcome that changes
+    /// nothing: it is not in the deck this session was built from, so there is
+    /// no local state to move and inventing one would be worse than admitting
+    /// it. The queued answer still goes to the server, which does know.
+    private func localOutcome(for answer: PendingAnswer, on day: String) -> ReviewOutcome {
+        let deck = knownCards()
+        guard var card = deck.first(where: { $0.id == answer.cardID }) else {
+            return ReviewOutcome(
+                state: .new,
+                learningStep: nil,
+                ladderStage: 0,
+                previousStage: nil,
+                introducedOn: nil,
+                dueAt: answer.answeredAt,
+                intervalChanged: false
+            )
+        }
+        // Training schedules nothing, here as on the server.
+        guard answer.context == .review else {
+            return ReviewOutcome(
+                state: card.state,
+                learningStep: card.learningStep,
+                ladderStage: card.ladderStage,
+                previousStage: card.previousStage,
+                introducedOn: card.introducedOn,
+                dueAt: card.dueAt,
+                intervalChanged: false
+            )
+        }
+
+        let before = card.state == .review ? card.ladderStage : nil
+        card.apply(
+            nextSchedule(
+                card.scheduling,
+                correct: answer.isCorrect,
+                answeredAt: answer.answeredAt,
+                learningSteps: cachedSettings().learningSteps
+            ),
+            introducedOn: day
+        )
+        let after = card.state == .review ? card.ladderStage : nil
+        return ReviewOutcome(
+            state: card.state,
+            learningStep: card.learningStep,
+            ladderStage: card.ladderStage,
+            previousStage: card.previousStage,
+            introducedOn: card.introducedOn,
+            dueAt: card.dueAt,
+            intervalChanged: before != after
         )
     }
 
-    /// Passed straight through, both ways. Practising offline is ticket 07; a
-    /// settings edit stays online-only for good, since an offline edit has no
-    /// derivable merge rule — the same argument this decorator already makes
-    /// about editing a card.
+    /// The reader's scheduling settings, falling back to the last ones seen.
+    ///
+    /// The defaults stand in only for a reader who has never been online, which
+    /// is a reader with an empty deck.
     func settings() async throws -> StudySettings {
-        try await inner.settings()
+        do {
+            let current = try await inner.settings()
+            if let data = try? JSONEncoder().encode(current) { settingsCache.store(data) }
+            return current
+        } catch {
+            if APIConfig.isOriginUnreachable(error) { return cachedSettings() }
+            throw error
+        }
     }
 
+    /// Passed straight through, and **never queued**.
+    ///
+    /// An offline edit has no derivable merge rule, only an invented one — the
+    /// same argument this decorator already makes about editing a card. These
+    /// decide how every card is scheduled, so two copies that disagreed would
+    /// produce two different due times for the same answer.
     @discardableResult
     func updateSettings(_ settings: StudySettings) async throws -> StudySettings {
-        try await inner.updateSettings(settings)
+        let saved = try await inner.updateSettings(settings)
+        if let data = try? JSONEncoder().encode(saved) { settingsCache.store(data) }
+        return saved
+    }
+
+    private func cachedSettings() -> StudySettings {
+        guard
+            let data = settingsCache.data(),
+            let stored = try? JSONDecoder().decode(StudySettings.self, from: data)
+        else { return .fallback }
+        return stored
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static func day(from iso: String) -> Date? {
+        dayFormatter.date(from: iso)
     }
 
     /// Notes a re-lookup, keeping it if the backend cannot be reached.
@@ -214,8 +361,24 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         pendingLookups.queued()
     }
 
+    /// The last good snapshot **with the queued answers replayed over it**.
+    ///
+    /// Which is what makes a session work with no connection: a card answered
+    /// wrong five minutes ago is back in the learning steps here, so the queue
+    /// offers it again, exactly as it would have if the server had been asked.
     func knownCards() -> [LearningCard] {
-        inner.knownCards()
+        replaying(
+            pendingAnswers.queued(),
+            over: inner.knownCards(),
+            learningSteps: cachedSettings().learningSteps
+        )
+    }
+
+    /// Answers the server has not taken yet. Exposed for the same reason
+    /// `queuedLines()` is: a screen that says "everything is saved" should be
+    /// able to be right about it.
+    func queuedAnswers() -> [PendingAnswer] {
+        pendingAnswers.queued()
     }
 
     /// Lines the reader has collected that the server has not seen yet.

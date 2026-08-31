@@ -124,6 +124,12 @@ protocol StudyRepository {
     /// Notes that the reader looked an already-collected word up again.
     func recordLookup(id: Int) async throws
 
+    /// Answers given but not yet accepted by the server.
+    ///
+    /// Empty for any repository with no queue, for the same reason
+    /// `queuedLines()` has a default: only the offline decorator has an answer.
+    func queuedAnswers() -> [PendingAnswer]
+
     /// Lines collected but not yet accepted by the server.
     ///
     /// Empty for any repository that has no queue, which is why it has a
@@ -143,6 +149,7 @@ protocol StudyRepository {
 
 extension StudyRepository {
     func queuedLines() -> [PendingCard] { [] }
+    func queuedAnswers() -> [PendingAnswer] { [] }
 }
 
 /// What became of a collect.
@@ -170,7 +177,10 @@ private struct StudyRepositoryKey: EnvironmentKey {
     static let defaultValue: any StudyRepository = OfflineFallbackStudyRepository(
         wrapping: APIStudyRepository(),
         pending: (try? FilePendingCardStore()) ?? InMemoryPendingCardStore(),
-        pendingLookups: (try? FilePendingLookupStore()) ?? InMemoryPendingLookupStore()
+        pendingLookups: (try? FilePendingLookupStore()) ?? InMemoryPendingLookupStore(),
+        pendingAnswers: (try? FilePendingAnswerStore()) ?? InMemoryPendingAnswerStore(),
+        settingsCache: (try? FileDeckSnapshotStore(filename: "settings.json"))
+            ?? InMemoryDeckSnapshotStore()
     )
 }
 

@@ -40,10 +40,14 @@ struct ReviewOutcome: Decodable, Hashable {
 
 /// Which mode asked the question.
 ///
+/// `Codable` rather than `Encodable`, unlike most of what is sent from here:
+/// stage 6's offline queue writes answers to disk and reads them back, and an
+/// answer that could not say which mode asked it would flush as a `review`.
+///
 /// Sent with every answer because the log cannot otherwise tell an answer that
 /// was meant to count from one that deliberately did not — and 永無止盡的訓練
 /// records everything while scheduling nothing.
-enum ReviewContext: String, Encodable {
+enum ReviewContext: String, Codable {
     /// The scheduled session. Moves the card.
     case review
     /// 永無止盡的訓練. Recorded, and changes no schedule in either direction.
@@ -54,7 +58,7 @@ enum ReviewContext: String, Encodable {
 ///
 /// Sent rather than inferred: the same card is asked in more than one way, and
 /// the difference matters to anything that later weighs difficulty.
-enum ReviewQuestionType: String, Encodable {
+enum ReviewQuestionType: String, Codable {
     case clozeChoice = "cloze_choice"
     case clozeTyped = "cloze_typed"
     case sentenceRearranged = "sentence_rearranged"
