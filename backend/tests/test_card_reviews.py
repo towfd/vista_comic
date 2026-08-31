@@ -234,6 +234,36 @@ def test_a_first_answer_puts_the_card_into_the_learning_steps(client, card_id):
     assert outcome["ladderStage"] == 0
 
 
+def test_meeting_a_card_records_the_day_it_stopped_being_new(client, card_id):
+    """What the daily new-card quota counts, in the reader's day.
+
+    It cannot be derived from the log: the stage 6 migration resets cards while
+    keeping their answers, so a card's oldest answer is not when it was met.
+    """
+    assert client.get("/cards").json()[0]["introducedOn"] is None
+
+    outcome = _answer(client, card_id, correct=True, token="a", day="2026-08-31")
+    assert outcome["introducedOn"] == "2026-08-31"
+
+
+def test_the_day_a_card_was_met_does_not_move_afterwards(client, card_id):
+    """Otherwise a card answered again tomorrow would spend tomorrow's quota."""
+    _answer(client, card_id, correct=True, token="a", day="2026-08-30")
+    outcome = _answer(client, card_id, correct=False, token="b", day="2026-08-31")
+
+    assert outcome["introducedOn"] == "2026-08-30"
+
+
+def test_a_training_answer_does_not_introduce_a_card(client, card_id):
+    """Training draws from cards already met, so this should not arise — and if
+    it does, spending the quota on an answer that schedules nothing would be the
+    worst of both."""
+    outcome = _answer(client, card_id, correct=True, token="a", context="training")
+
+    assert outcome["introducedOn"] is None
+    assert outcome["state"] == "new"
+
+
 def test_a_first_answer_that_is_wrong_also_only_reaches_the_first_step(
     client, card_id
 ):

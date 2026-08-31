@@ -131,7 +131,12 @@ def schedule_of(card: LearningCard) -> CardSchedule:
 
 
 def apply_answer(
-    session: Session, card_id: int, *, correct: bool, answered_at: datetime
+    session: Session,
+    card_id: int,
+    *,
+    correct: bool,
+    answered_at: datetime,
+    local_date: Optional[date] = None,
 ) -> Optional[CardSchedule]:
     """Move the card according to one answer; return where it landed.
 
@@ -161,6 +166,11 @@ def apply_answer(
         answered_at=answered_at,
         learning_steps=settings.learning_steps,
     )
+    # The day the card stopped being new, in the reader's terms rather than the
+    # server's -- the quota is "how many new words today", and on UTC+8 a UTC
+    # boundary would move that line to eight in the morning.
+    if card.state == CardState.NEW.value and landed.state is not CardState.NEW:
+        card.introduced_on = local_date or answered_at.date()
     card.state = landed.state.value
     card.learning_step = landed.learning_step
     card.ladder_stage = landed.stage

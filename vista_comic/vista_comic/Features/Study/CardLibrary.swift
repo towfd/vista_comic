@@ -57,12 +57,17 @@ enum Familiarity: Int, CaseIterable, Hashable {
     var isWorthShowing: Bool { true }
 }
 
-/// The highest rung on the interval ladder.
+/// Days between reviews, by slot.
 ///
-/// Mirrors `LADDER_INTERVALS` in `backend/app/ladder.py`, which has five
-/// entries. Shown to the reader as the denominator, so a rung is a position in
-/// something finite rather than a bare number.
-let ladderTopRung = 4
+/// Mirrors `LADDER_INTERVALS` in `backend/app/ladder.py`. Seven entries since
+/// stage 6: the two added continue the table's own ratio, where 90 and 120
+/// would have flattened the curve exactly where a card has proved itself most
+/// stable.
+let ladderIntervals = [1, 3, 7, 21, 60, 150, 365]
+
+/// The highest slot. Shown to the reader as the denominator, so a slot is a
+/// position in something finite rather than a bare number.
+let ladderTopRung = ladderIntervals.count - 1
 
 /// One heading and the cards under it.
 struct CardGroup: Identifiable, Hashable {

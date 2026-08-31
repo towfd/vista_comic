@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: implemented on branch `feat/anki-session`, 2026-08-31
 
 # 03 — The queue engine
 
@@ -37,3 +37,28 @@ rather than a counter: a card is "introduced today" if it left `new` today. Card
 - [ ] `askedDifficulty`, `practiceRoundLength` and the top-up path are gone
 - [ ] A cached deck snapshot written before stage 6 — `dueOn`, no `dueAt` — still decodes
       rather than emptying the deck (moved here from ticket 02, where the API has no snapshot)
+
+## What was built
+
+`Features/Study/PracticeQueue.swift` (the queue, pure), `Networking/StudySettings.swift`,
+the scheduling block on `LearningCard`, and `Features/Study/CardSchedule.swift` for
+the readout. `makeRound`, `practiceRoundLength`, `askedDifficulty`, `isDue` and the
+round's top-up and appearance limits are gone.
+
+**A column had to be added to make the quota countable.** The rule is "cards
+first answered today", and nothing recorded that. Deriving it from the review log
+looked possible and is not — ticket 01's migration resets cards while keeping
+their rows, so a card's oldest answer is not when it was met, and a reset card
+would be introduced for free. `learning_card.introduced_on` is one nullable date
+and a second migration (`e7c04b19f6aa`). It also has to be on the card rather than
+counted server-side, because the count is needed with no network.
+
+**`LearningCard`'s six scheduling fields became `var`.** Everything else stays
+`let`: identity and provenance are facts about the past, and the schedule is what
+an answer changes. Applying an answer's response locally rather than refetching is
+what lets a session keep building offline.
+
+**The old-snapshot path is real, not defensive.** A reader who updates and then
+opens the app with no signal is decoding yesterday's cached payload, which has
+`dueOn` and none of the new fields. It decodes as a deck of new cards — which is
+what the migration made them anyway.

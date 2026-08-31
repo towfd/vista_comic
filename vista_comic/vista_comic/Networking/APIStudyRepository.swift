@@ -153,15 +153,17 @@ struct APIStudyRepository: StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?,
-        countsTowardLadder: Bool
+        answeredAt: Date,
+        context: ReviewContext,
+        elapsedMs: Int?
     ) async throws -> ReviewOutcome {
         var payload: [String: Any] = [
             "questionType": questionType.rawValue,
             "isCorrect": isCorrect,
             "clientToken": clientToken,
             "localDate": Self.dayFormatter.string(from: localDate),
-            "countsTowardLadder": countsTowardLadder,
+            "answeredAt": ISO8601DateFormatter().string(from: answeredAt),
+            "context": context.rawValue,
         ]
         if let elapsedMs { payload["elapsedMs"] = elapsedMs }
         let body = try JSONSerialization.data(withJSONObject: payload)
@@ -183,6 +185,18 @@ struct APIStudyRepository: StudyRepository {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+
+    func settings() async throws -> StudySettings {
+        try await send(StudySettings.self, method: "GET", at: "study/settings")
+    }
+
+    @discardableResult
+    func updateSettings(_ settings: StudySettings) async throws -> StudySettings {
+        let body = try JSONEncoder().encode(settings)
+        return try await send(
+            StudySettings.self, method: "PUT", at: "study/settings", body: body
+        )
+    }
 
     func recordLookup(id: Int) async throws {
         let request = makeRequest(method: "POST", at: "\(resourcePath)/\(id)/lookups")

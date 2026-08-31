@@ -111,7 +111,11 @@ extension LearningCard {
             "chapterTitle": "bai1",
             "kind": \(kindJSON),
             "ladderStage": 0,
-            "dueOn": "2026-08-19",
+            "state": "new",
+            "learningStep": null,
+            "previousStage": null,
+            "introducedOn": null,
+            "dueAt": "2026-08-19T00:00:00Z",
             "lookupCount": \(lookupCount),
             "lastLookedUpAt": null,
             "createdAt": "2026-08-19T10:30:00Z"
@@ -242,11 +246,37 @@ struct LearningCardDecodingTests {
         #expect(card.lastLookedUpAt == nil)
     }
 
-    @Test("dueOn stays a date string rather than becoming an instant")
-    func dueOnStaysADateString() throws {
-        // A scheduling day is not a moment; decoding it as a `Date` would
-        // invent a timezone the backend never chose. Stage 3 reads this.
-        #expect(LearningCard.stub().dueOn == "2026-08-19")
+    @Test("dueAt decodes as an instant, because learning steps are minutes")
+    func dueAtIsAnInstant() throws {
+        // It was `dueOn`, an ISO date, until stage 6. A card due at 20:07
+        // cannot be said as a day, so this is the one scheduling field that had
+        // to stop being a string.
+        #expect(LearningCard.stub().dueAt == Date(timeIntervalSince1970: 1_787_097_600))
+    }
+
+    @Test("A snapshot cached before stage 6 still decodes")
+    func anOldSnapshotStillDecodes() throws {
+        // The deck snapshot is stored as raw response bytes, so a reader who
+        // opens the app offline the morning after an update is decoding
+        // yesterday's payload. Losing the deck over a missing field would be
+        // the worst possible moment for it.
+        let old = """
+        {
+            "id": 1, "sourceText": "食べる", "translation": "吃",
+            "targetLanguage": "zh-Hant", "comicId": "comic-1",
+            "chapterId": "chapter-1", "pageNumber": 3,
+            "comicTitle": null, "chapterTitle": null, "kind": "word",
+            "ladderStage": 0, "dueOn": "2026-08-19", "lookupCount": 0,
+            "lastLookedUpAt": null, "createdAt": "2026-08-19T10:30:00Z"
+        }
+        """
+        let card = try APIConfig.iso8601Decoder.decode(
+            LearningCard.self, from: Data(old.utf8)
+        )
+
+        #expect(card.state == .new)
+        #expect(card.learningStep == nil)
+        #expect(card.dueAt != Date.distantPast)
     }
 }
 

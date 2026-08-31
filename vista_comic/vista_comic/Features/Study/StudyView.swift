@@ -207,8 +207,12 @@ extension LearningCard {
         comicTitle: String? = "marrymyhusband",
         chapterTitle: String? = "bai1",
         kind: String? = "word",
+        state: String = "new",
+        learningStep: Int? = nil,
         ladderStage: Int = 0,
-        dueOn: String = "2026-08-19",
+        previousStage: Int? = nil,
+        introducedOn: String? = nil,
+        dueAt: String = "2026-08-19T00:00:00Z",
         lookupCount: Int = 0,
         createdAt: String = "2026-08-19T10:30:00Z"
     ) -> LearningCard {
@@ -227,8 +231,12 @@ extension LearningCard {
             "comicTitle": \(quoted(comicTitle)),
             "chapterTitle": \(quoted(chapterTitle)),
             "kind": \(quoted(kind)),
+            "state": "\(state)",
+            "learningStep": \(learningStep.map(String.init) ?? "null"),
             "ladderStage": \(ladderStage),
-            "dueOn": "\(dueOn)",
+            "previousStage": \(previousStage.map(String.init) ?? "null"),
+            "introducedOn": \(quoted(introducedOn)),
+            "dueAt": "\(dueAt)",
             "lookupCount": \(lookupCount),
             "lastLookedUpAt": null,
             "createdAt": "\(createdAt)"

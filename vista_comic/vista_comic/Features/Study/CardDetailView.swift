@@ -114,17 +114,18 @@ struct CardDetailView: View {
                 }
             }
 
-            // Shown here rather than used to group the list: the bands are
-            // three and the deck is thirty, so grouping by them would be a
-            // heading over ten cards that have nothing else in common.
-            Section("How well you know it") {
-                LabeledContent("Familiarity") {
-                    Text(Familiarity(ladderStage: card.ladderStage).title)
-                }
-                // The band alone cannot answer "did today do anything" —
-                // rungs 1 and 2 both read "Learning". The number can.
-                LabeledContent("Ladder", value: "\(card.ladderStage) / \(ladderTopRung)")
-                LabeledContent("Next due", value: card.dueOn)
+            // What the scheduler knows, said plainly. The adjectives that used
+            // to be here — New, Learning, Familiar — were an alias for the slot
+            // number, and a screen full of "Familiarity New" is what provoked
+            // the stage 6 rewrite: the word read as a verdict on the reader
+            // while describing a column that had not moved.
+            Section("Where it stands") {
+                LabeledContent(
+                    "State",
+                    value: scheduleState(of: card, steps: StudySettings.fallback.learningSteps)
+                )
+                LabeledContent("Interval", value: "\(card.ladderStage) / \(ladderTopRung)")
+                LabeledContent("Next up", value: scheduleDue(of: card))
             }
 
             Section {

@@ -128,8 +128,9 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?,
-        countsTowardLadder: Bool
+        answeredAt: Date,
+        context: ReviewContext,
+        elapsedMs: Int?
     ) async throws -> ReviewOutcome {
         try await inner.recordReview(
             cardID: cardID,
@@ -137,9 +138,23 @@ struct OfflineFallbackStudyRepository: StudyRepository {
             isCorrect: isCorrect,
             clientToken: clientToken,
             localDate: localDate,
-            elapsedMs: elapsedMs,
-            countsTowardLadder: countsTowardLadder
+            answeredAt: answeredAt,
+            context: context,
+            elapsedMs: elapsedMs
         )
+    }
+
+    /// Passed straight through, both ways. Practising offline is ticket 07; a
+    /// settings edit stays online-only for good, since an offline edit has no
+    /// derivable merge rule — the same argument this decorator already makes
+    /// about editing a card.
+    func settings() async throws -> StudySettings {
+        try await inner.settings()
+    }
+
+    @discardableResult
+    func updateSettings(_ settings: StudySettings) async throws -> StudySettings {
+        try await inner.updateSettings(settings)
     }
 
     /// Notes a re-lookup, keeping it if the backend cannot be reached.

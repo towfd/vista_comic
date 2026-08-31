@@ -88,11 +88,14 @@ protocol StudyRepository {
     /// `localDate` is the **reader's** day, not the server's. Grouping a UTC+8
     /// reader's day by a UTC boundary would reset it at eight in the morning.
     ///
-    /// `countsTowardLadder` is false for a card the round **topped itself up
-    /// with** — one not actually due, included only because too few were. The
-    /// answer is still recorded; the schedule simply declines to learn from it,
-    /// because a card answered before its gap has elapsed was never asked the
-    /// question the ladder measures.
+    /// `answeredAt` is when the reader answered, which is the app's to report:
+    /// an answer given with no signal arrives hours after it happened, and
+    /// scheduling it from arrival would put a five-minute step in the wrong
+    /// afternoon.
+    ///
+    /// `context` says which mode asked. A `.training` answer is recorded and
+    /// schedules **nothing** — 永無止盡的訓練 exists to be practised in without
+    /// disturbing what the schedule has earned.
     @discardableResult
     func recordReview(
         cardID: Int,
@@ -100,9 +103,23 @@ protocol StudyRepository {
         isCorrect: Bool,
         clientToken: String,
         localDate: Date,
-        elapsedMs: Int?,
-        countsTowardLadder: Bool
+        answeredAt: Date,
+        context: ReviewContext,
+        elapsedMs: Int?
     ) async throws -> ReviewOutcome
+
+    /// The reader's scheduling settings.
+    ///
+    /// Server-owned, because the server recomputes schedules when an offline
+    /// session flushes and two copies that disagreed would produce two
+    /// different due times for the same answer.
+    func settings() async throws -> StudySettings
+
+    /// Replaces the settings. Requires a connection, deliberately: an offline
+    /// edit has no derivable merge rule, only an invented one — the same reason
+    /// `OfflineFallbackStudyRepository` refuses to queue an edit to a card.
+    @discardableResult
+    func updateSettings(_ settings: StudySettings) async throws -> StudySettings
 
     /// Notes that the reader looked an already-collected word up again.
     func recordLookup(id: Int) async throws

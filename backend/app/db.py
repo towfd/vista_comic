@@ -217,6 +217,14 @@ class LearningCard(Base):
     #: has never lapsed or has already used it. This is what makes a lapse cost
     #: one slot rather than everything.
     previous_stage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    #: The **reader's** day on which this card stopped being new, or NULL if it
+    #: still is. What the daily new-card quota counts.
+    #:
+    #: Stored rather than derived from the review log, for the same reason
+    #: ``state`` is: the stage 6 migration resets cards while keeping their
+    #: rows, so a card's oldest answer is not when it was met. A card reset
+    #: today and met again today would otherwise be introduced for free.
+    introduced_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     #: When the card next comes up. **A timestamp, not a date** (it was
     #: ``due_on`` until stage 6): learning steps are minutes apart, and a card
     #: due at 20:07 cannot be expressed as a day.

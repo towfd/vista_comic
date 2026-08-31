@@ -262,6 +262,10 @@ class LearningCardResponse(BaseModel):
     learningStep: Optional[int] = None
     ladderStage: int
     previousStage: Optional[int] = None
+    #: The reader's day on which this card stopped being new, or null while it
+    #: still is. The app counts these to know how much of the day's new-card
+    #: quota is spent, which it must be able to do with no network.
+    introducedOn: Optional[str] = None  # ISO-8601 date
     #: **A timestamp, not a date** (it was ``dueOn`` until stage 6). Learning
     #: steps are minutes apart and a card due at 20:07 cannot be said as a day.
     dueAt: str  # ISO-8601 UTC
@@ -374,6 +378,7 @@ class ReviewOutcome(BaseModel):
     learningStep: Optional[int] = None
     ladderStage: int
     previousStage: Optional[int] = None
+    introducedOn: Optional[str] = None  # ISO-8601 date
     dueAt: str  # ISO-8601 UTC
     #: Whether this answer changed **which interval the card is on**, where a
     #: card still in the learning steps is on none. So graduating reads as a
