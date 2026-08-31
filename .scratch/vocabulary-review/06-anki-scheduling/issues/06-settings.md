@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: implemented on branch `feat/anki-offline`, 2026-08-31
 
 # 06 — Settings
 
@@ -23,3 +23,24 @@ list finishes on the new one at the same index, clamped.
 - [ ] Editing with no connection is refused and explained
 - [ ] Invalid input is rejected in the app, not only by the backend
 - [ ] Both phone layouts
+
+## What was built
+
+`StudySettingsView`, reached by the gear on the practice tab's start screen —
+and only there, because changing the step lengths mid-session would reschedule
+the card on screen.
+
+**The steps are a text field**, parsed by `parseLearningSteps`. A half-typed
+list has to be a state the screen can be in; parsing on every keystroke and
+snapping the field back would fight the reader mid-edit. Which makes the parser
+where every bad value is caught, so that is where the tests are: an empty list
+has no first step for a lapse to return to, and a zero-minute step would
+schedule a card to be due before it was answered.
+
+`5.5` is refused rather than rounded. The backend stores whole minutes, and
+rounding the reader's number without saying so is the kind of quiet disagreement
+this stage exists to remove.
+
+**Offline shows an explanation, not a form.** Rendering the defaults and
+accepting a save would write values the reader never chose over the ones they
+did.

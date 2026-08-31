@@ -30,3 +30,33 @@ struct StudySettings: Codable, Hashable, Sendable {
     /// able to ask. Kept in step with `scheduler.DEFAULT_LEARNING_STEPS`.
     static let fallback = StudySettings(learningSteps: [5, 7, 10], newCardsPerDay: 15)
 }
+
+/// Reads a list of minutes the way the reader would write it: `5, 7, 10`.
+///
+/// Returns `nil` rather than a partial list when anything is wrong, because
+/// there is no safe half-answer here — an empty list has no first step to
+/// restart a card on, and a zero-minute step would schedule a card to be due
+/// before it was answered. The backend refuses both; this refuses them before
+/// the reader has to find out from a failed save.
+///
+/// Separators are lenient (commas, spaces, or both) because the reader is
+/// typing a list, not a syntax.
+func parseLearningSteps(_ text: String) -> [Int]? {
+    let pieces = text
+        .split(whereSeparator: { $0 == "," || $0.isWhitespace })
+        .map(String.init)
+    guard !pieces.isEmpty else { return nil }
+
+    var steps: [Int] = []
+    for piece in pieces {
+        guard let minutes = Int(piece), minutes > 0 else { return nil }
+        steps.append(minutes)
+    }
+    return steps
+}
+
+/// Writes them back the same way, so the field the reader opens shows what they
+/// last saved rather than an array literal.
+func formatLearningSteps(_ steps: [Int]) -> String {
+    steps.map(String.init).joined(separator: ", ")
+}
