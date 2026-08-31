@@ -11,10 +11,10 @@ separate from the response models so we only expose contract fields.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Internal in-memory catalog (source of truth held in memory after a scan).
@@ -223,10 +223,11 @@ class LearningCardCreate(BaseModel):
 class LearningCardResponse(BaseModel):
     """One collected card, as returned by every ``/cards`` route.
 
-    ``ladderStage`` and ``dueOn`` are carried from the first release even though
-    nothing reads them until stage 3: the app caches this response wholesale as
-    its deck snapshot, and a field added later would mean every cached snapshot
-    predating it is missing one.
+    ``ladderStage`` was carried from the first release before anything read it,
+    for a reason stage 6 proved right: the app caches this response wholesale as
+    its deck snapshot, so a field added later is missing from every snapshot
+    predating it. ``dueOn`` was carried the same way and **replaced by
+    ``dueAt``** — a date could not say 20:07.
 
     ``lookupCount`` counts only times the reader looked this word up *again*.
     Its absence means nothing -- see ``db.LearningCard``.
@@ -253,8 +254,17 @@ class LearningCardResponse(BaseModel):
     comicTitle: Optional[str] = None
     chapterTitle: Optional[str] = None
     kind: Optional[str] = None
+    #: The scheduling block, all five of them together. The app caches this
+    #: response wholesale as its deck snapshot and builds the session queue out
+    #: of it with no further calls, so a field missing here is a session that
+    #: cannot be built offline.
+    state: str
+    learningStep: Optional[int] = None
     ladderStage: int
-    dueOn: str  # ISO-8601 date
+    previousStage: Optional[int] = None
+    #: **A timestamp, not a date** (it was ``dueOn`` until stage 6). Learning
+    #: steps are minutes apart and a card due at 20:07 cannot be said as a day.
+    dueAt: str  # ISO-8601 UTC
     lookupCount: int
     lastLookedUpAt: Optional[str] = None  # ISO-8601 UTC
     createdAt: str  # ISO-8601 UTC
@@ -309,20 +319,26 @@ class CardReviewCreate(BaseModel):
     # day at eight in the morning, so a card passed before breakfast could be
     # passed again after it and climb two rungs in one felt day.
     localDate: date
-    #: Whether this answer is allowed to move the card's rung.
+    #: When the reader actually answered.
     #:
-    #: False for a card the round **topped itself up with** -- one not actually
-    #: due, included only because too few were. Answering a card the day after
-    #: passing it is no evidence that it survives a three-day gap, which is the
-    #: single thing the ladder measures, so letting it climb would turn the
-    #: interval into a record of effort rather than of memory.
+    #: Sent by the app rather than taken from the server clock, because an
+    #: answer given in airplane mode arrives hours after it happened and
+    #: scheduling it from arrival would put a five-minute step in the wrong
+    #: afternoon. Optional only so this build can be deployed before the app
+    #: that sends it; the server falls back to its own now.
+    answeredAt: Optional[datetime] = None
+    #: Which mode asked the question.
     #:
-    #: The answer is still recorded either way: the review log is kept complete,
-    #: and what the reader did is a fact regardless of what it schedules.
+    #: ``training`` answers are recorded and schedule **nothing** -- 永無止盡的
+    #: 訓練 exists to be practised in without disturbing the schedule the reader
+    #: earned. Defaults to ``review``, which is what an answer with no opinion
+    #: about itself is.
     #:
-    #: Defaults to True so an older build, which does not send this, keeps the
-    #: behaviour it was written against.
-    countsTowardLadder: bool = True
+    #: This replaces ``countsTowardLadder``, which said only *whether* an answer
+    #: counted and could not say why. The round no longer tops itself up with
+    #: cards that were not due -- the queue is what is due plus the day's new
+    #: cards -- so the flag had lost its one caller.
+    context: Literal["review", "training"] = "review"
 
 
 class CardReviewResponse(BaseModel):
@@ -351,17 +367,46 @@ class ReviewOutcome(BaseModel):
     """
 
     review: CardReviewResponse
-    #: The card's state after this answer -- new / learning / review /
-    #: relearning. It was the three-step day's position until stage 6, derived
-    #: by replaying the day; it is now read off the card, which is what lets a
-    #: half-learned card still be half-learned tomorrow morning.
-    step: str
+    #: The card's whole scheduling block after this answer, so the app can write
+    #: it straight into its deck snapshot instead of refetching. The same five
+    #: fields ``LearningCardResponse`` carries, and deliberately the same names.
+    state: str
+    learningStep: Optional[int] = None
     ladderStage: int
-    dueOn: str
-    #: Whether this answer changed which interval slot the card holds. False
-    #: for every answer inside the learning steps, which move the card without
-    #: moving its slot. The app is told rather than left to work it out.
-    ladderMoved: bool
+    previousStage: Optional[int] = None
+    dueAt: str  # ISO-8601 UTC
+    #: Whether this answer changed **which interval the card is on**, where a
+    #: card still in the learning steps is on none. So graduating reads as a
+    #: change (no interval -> one day) and a lapse reads as one too, while the
+    #: answers between the steps do not.
+    #:
+    #: Compares the interval rather than the slot number because graduating
+    #: lands a card on slot 0, which is what the column already said -- the most
+    #: significant moment in a card's life would otherwise report nothing.
+    intervalChanged: bool
+
+
+class StudySettings(BaseModel):
+    """The reader's scheduling settings, in both directions.
+
+    ``learningSteps`` is a list rather than three fields because "how many
+    steps" and "how long each step is" are the same question, and writing three
+    down assumes an answer to the first.
+
+    Validated here as well as in the store: an empty list has no first step to
+    restart on, and a zero-minute step would schedule a card to be due before it
+    was answered.
+    """
+
+    learningSteps: List[int] = Field(min_length=1)
+    newCardsPerDay: int = Field(ge=0)
+
+    @field_validator("learningSteps")
+    @classmethod
+    def _every_step_is_positive(cls, steps: List[int]) -> List[int]:
+        if any(minutes <= 0 for minutes in steps):
+            raise ValueError("every learning step must be a positive number of minutes")
+        return steps
 
 
 class ComprehensionRecordReadUpdate(BaseModel):

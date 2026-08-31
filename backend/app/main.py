@@ -40,6 +40,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from . import (
     card_review_store,
     scheduler,
+    study_settings_store,
     comprehend_usage_store,
     comprehension_store,
     learning_card_store,
@@ -70,6 +71,7 @@ from .models import (
     LearningCardUpdate,
     ProgressResponse,
     ProgressUpdate,
+    StudySettings as StudySettingsModel,
 )
 from .normalization import normalized_key
 from .scanner import Catalog, ChapterEntry, ComicEntry, scan_library
@@ -856,8 +858,11 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
         comicTitle=comic_title,
         chapterTitle=chapter_title,
         kind=row.kind,
+        state=row.state,
+        learningStep=row.learning_step,
         ladderStage=row.ladder_stage,
-        dueOn=row.due_at.date().isoformat(),
+        previousStage=row.previous_stage,
+        dueAt=progress_store.iso_utc(row.due_at),
         lookupCount=row.lookup_count,
         lastLookedUpAt=(
             progress_store.iso_utc(row.last_looked_up_at)
@@ -972,6 +977,68 @@ def _to_review_response(row) -> CardReviewResponse:
     )
 
 
+def _moment_of(reported: Optional[datetime]) -> datetime:
+    """When the answer happened, as the app reported it.
+
+    Falls back to the server clock when the app did not say, which is only an
+    app that predates stage 6 -- for those every answer did arrive when it
+    happened, so the fallback is true rather than merely convenient. A naive
+    timestamp is read as UTC rather than refused: the app sends UTC, and
+    refusing an answer over a missing suffix would lose the answer.
+    """
+    if reported is None:
+        return datetime.now(timezone.utc)
+    if reported.tzinfo is None:
+        return reported.replace(tzinfo=timezone.utc)
+    return reported.astimezone(timezone.utc)
+
+
+def _interval_of(card) -> Optional[int]:
+    """Which interval the card is on, or None while it is on none.
+
+    A card in the learning steps is minutes away, not days, and has not earned a
+    slot -- the number in its column is where it *will* land. Treating that as
+    an interval is what would make graduating look like nothing happening.
+    """
+    return (
+        card.ladder_stage
+        if card.state == scheduler.CardState.REVIEW.value
+        else None
+    )
+
+
+@app.get("/study/settings", response_model=StudySettingsModel)
+def read_settings() -> StudySettingsModel:
+    """The reader's scheduling settings, seeding the defaults if unset."""
+    with _card_session() as session:
+        current = study_settings_store.get(session)
+    return StudySettingsModel(
+        learningSteps=current.learning_steps,
+        newCardsPerDay=current.new_cards_per_day,
+    )
+
+
+@app.put("/study/settings", response_model=StudySettingsModel)
+def write_settings(body: StudySettingsModel) -> StudySettingsModel:
+    """Replace the settings.
+
+    One row for the whole deployment, which has no per-user identity to key on
+    (ADR-0005). A ``PUT`` rather than a ``PATCH`` because there are two values
+    and the screen edits both -- a partial update would have to invent what an
+    omitted step list means.
+    """
+    with _card_session() as session:
+        saved = study_settings_store.put(
+            session,
+            learning_steps=body.learningSteps,
+            new_cards_per_day=body.newCardsPerDay,
+        )
+    return StudySettingsModel(
+        learningSteps=saved.learning_steps,
+        newCardsPerDay=saved.new_cards_per_day,
+    )
+
+
 @app.post("/cards/{card_id}/reviews", response_model=ReviewOutcome, status_code=201)
 def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
     """Record one answer.
@@ -986,21 +1053,13 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
     with _card_session() as session:
         if not card_review_store.card_exists(session, card_id):
             raise HTTPException(status_code=404, detail="Learning card not found")
-        # Stage 6 ticket 02 moves this to the app, which is the only side that
-        # knows when an answer given in airplane mode actually happened. Until
-        # then an answer is recorded as having happened when it arrived, which
-        # is true of every answer this build can send.
-        answered_at = datetime.now(timezone.utc)
+        answered_at = _moment_of(body.answeredAt)
         before = learning_card_store.get(session, card_id)
         # Which interval the card was on, or None while it is still in the
         # learning steps and on no interval at all. Comparing these is what
         # makes graduating count as a move: it lands on slot 0, which the column
         # already said, so comparing slots alone would report nothing happened.
-        interval_before = (
-            before.ladder_stage
-            if before.state == scheduler.CardState.REVIEW.value
-            else None
-        )
+        interval_before = _interval_of(before)
         row, created = card_review_store.record(
             session,
             card_id=card_id,
@@ -1009,28 +1068,29 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
             client_token=body.clientToken,
             local_date=body.localDate,
             answered_at=answered_at,
+            context=body.context,
             elapsed_ms=body.elapsedMs,
         )
         # Attempted only for an answer that was actually stored. A replay adds
         # no row, so it must change nothing -- and it is the only thing standing
         # between a retried submission and a second graduation.
-        landed = (
+        # A training answer schedules nothing, by the reader's decision: the
+        # second entrance exists to be practised in without disturbing what the
+        # schedule has earned. The row is still written -- what they did is a
+        # fact regardless of what it moves.
+        if created and body.context == card_review_store.CONTEXT_REVIEW:
             card_review_store.apply_answer(
                 session, card_id, correct=body.isCorrect, answered_at=answered_at
             )
-            if created and body.countsTowardLadder
-            else None
-        )
         card = learning_card_store.get(session, card_id)
     return ReviewOutcome(
         review=_to_review_response(row),
-        step=card.state,
+        state=card.state,
+        learningStep=card.learning_step,
         ladderStage=card.ladder_stage,
-        dueOn=card.due_at.date().isoformat(),
-        ladderMoved=(
-            (card.ladder_stage if card.state == scheduler.CardState.REVIEW.value else None)
-            != interval_before
-        ),
+        previousStage=card.previous_stage,
+        dueAt=progress_store.iso_utc(card.due_at),
+        intervalChanged=_interval_of(card) != interval_before,
     )
 
 

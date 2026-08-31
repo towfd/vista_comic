@@ -87,9 +87,14 @@ def test_adding_a_line_returns_it_as_a_new_card(client):
     assert card["targetLanguage"] == _BODY["targetLanguage"]
     assert card["comicId"] == _BODY["comicId"]
     assert card["pageNumber"] == 12
-    # Written now, read in stage 3.
+    # The scheduling block, all of it. The app builds its session queue out of
+    # the cached deck snapshot with no further calls, so a field missing here is
+    # a session that cannot be built offline.
+    assert card["state"] == "new"
+    assert card["learningStep"] is None
     assert card["ladderStage"] == learning_card_store.INITIAL_LADDER_STAGE
-    assert card["dueOn"]
+    assert card["previousStage"] is None
+    assert card["dueAt"]
     # Only re-lookups move this, and none has happened.
     assert card["lookupCount"] == 0
     assert card["lastLookedUpAt"] is None
@@ -304,7 +309,7 @@ def test_a_lookup_does_not_touch_the_schedule(client):
     client.post(f"/cards/{card['id']}/lookups")
 
     updated = client.get("/cards").json()[0]
-    assert updated["dueOn"] == card["dueOn"]
+    assert updated["dueAt"] == card["dueAt"]
     assert updated["ladderStage"] == card["ladderStage"]
 
 
@@ -431,7 +436,7 @@ def test_a_patch_leaves_the_reviewing_columns_alone(client):
 
     after = client.get("/cards").json()[0]
     assert after["ladderStage"] == card["ladderStage"]
-    assert after["dueOn"] == card["dueOn"]
+    assert after["dueAt"] == card["dueAt"]
     assert after["lookupCount"] == 1
     assert after["createdAt"] == card["createdAt"]
 

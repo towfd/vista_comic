@@ -35,3 +35,5 @@ rather than a counter: a card is "introduced today" if it left `new` today. Card
 - [ ] Mode selection can return any mode the card supports and never one it cannot
 - [ ] A deck of one card still produces a session rather than an empty one
 - [ ] `askedDifficulty`, `practiceRoundLength` and the top-up path are gone
+- [ ] A cached deck snapshot written before stage 6 — `dueOn`, no `dueAt` — still decodes
+      rather than emptying the deck (moved here from ticket 02, where the API has no snapshot)
