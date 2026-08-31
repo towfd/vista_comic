@@ -138,6 +138,11 @@ functions, as in `HistoryActions.swift`.
 
 ## The lesson architecture
 
+> **Superseded by stage 6 (2026-08-31).** The three-step day, the once-a-day framing, 錯題區 and
+> the recent-appearance weighting all belong to the model `06-anki-scheduling/spec.md` replaces.
+> Kept here until that stage ships, because it is the record of what was tried and why it moved.
+
+
 Settled 2026-08-20, after stage 2 shipped, and **materially different from what the stage list
 below originally said**. It came out of asking how a lesson actually runs, and the answer turned
 out to have three separate places rather than one.
@@ -237,9 +242,15 @@ a correct answer that changes no step. Matching never moves it at all.
 `introduction.txt` and practice-sentence generation belong here too: cloze on a **word** card
 needs a sentence containing that word, and only a **sentence** card already has one.
 
-### 5. Practice areas
-錯題區 and 單字練習, both outside the ladder and both selecting by familiarity suppressed by
-recent appearances. 單字練習 holds words only, as matching and typing.
+### 5. Practice areas — replaced, 2026-08-31
+Was 錯題區 and 單字練習, both outside the ladder, both selecting by familiarity suppressed by
+recent appearances.
+
+**Both are cancelled**, and so is the weighting rule they shared. 錯題區's job — catching a card
+you got wrong and asking it again — is done inside the sitting by stage 6's learning steps, so a
+separate area would be a second scheduler disagreeing with the first. 單字練習 became
+永無止盡的訓練 in stage 6, and 翻牌 was dropped rather than deferred: it is the easiest of the four
+question types, and nothing now needs it.
 
 ### Practice sentences — parked, not numbered
 
@@ -255,7 +266,20 @@ plan, and parking it keeps that spend behind evidence that the loop is worth spe
 The foundations stay in place and cost nothing while unused: `introduction.txt` is a convention
 `scanner.py` can pick up whenever, and `learning_card.comprehension_record_id` already exists.
 
-### 6. Game layer
+### 6. The Anki model — added 2026-08-31
+The review model replaced wholesale: learning steps (5/7/10 minutes, adjustable) before a card
+graduates onto a seven-slot interval table (1/3/7/21/60/150/365 days), a lapse costing one slot
+rather than everything, a session that runs until its queue is empty rather than for ten
+questions, a second entrance that practises without rescheduling, and answering that works with
+no network.
+
+**What it deletes is the three-step day**, which reset at midnight and threw away every card the
+reader had half-learned before putting the phone down. That reset is the mechanism behind the
+first acceptance pass's "I have practised this card several times and it still says New".
+
+Specified in full in `06-anki-scheduling/spec.md`.
+
+### 7. Game layer
 `daily_completion`, streak, XP and levels. Per-comic mastery — how many words collected from
 this comic, how many have reached a stable rung, how many were hit while reading this week — is
 **optional and the lowest priority in this PRD**; drop it if the stage runs long.
@@ -294,8 +318,9 @@ Each stage is its own folder under `.scratch/vocabulary-review/`, holding a `spe
 | `04-the-ladder/` | The ladder and the three-step day turn a round into 每日關卡 | 03 |
 | `05-sentence-translation/` | The second question type, typed and rearranged, and how it is judged | 04 |
 | ~~`06-practice-sentences/`~~ | **Parked, 2026-08-20.** Generation, so a word card could carry a cloze too | — |
-| `06-practice-areas/` | 錯題區 and 單字練習, both outside the ladder | 04 |
-| `07-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 04 |
+| ~~`06-practice-areas/`~~ | **Cancelled, 2026-08-31.** Absorbed by stage 6's learning steps and 永無止盡的訓練 | — |
+| `06-anki-scheduling/` | Learning steps, the seven-slot interval table, a session that ends, 永無止盡的訓練, settings, and offline answering | 05 |
+| `07-game-layer/` | Streak, XP and levels, per-comic mastery (optional) | 06 |
 
 **Reordered twice on 2026-08-20.** First, once the lesson architecture above was settled: what
 had been stage 3 — matching plus the ladder — turned out not to be buildable first, because
@@ -319,9 +344,14 @@ carry real sentences already, so generation buys variety rather than viability.
 
 Sentence translation runs **Chinese → Vietnamese**: producing the target language is the harder
 and more valuable direction, and the developer types Vietnamese comfortably. Judging strips
-punctuation and whitespace and then requires an exact match, so word order and spelling — tones
-included — must be right. That reuses the deck's existing normalisation rather than inventing a
-second idea of "the same text".
+punctuation and whitespace and then requires an exact match, so word order and spelling must be
+right. That reuses the deck's existing normalisation rather than inventing a second idea of "the
+same text".
+
+**Tones are forgiven and named**, not required — this said the opposite until 2026-08-31, and had
+been wrong since `551c42c` ("Forgive a missing tone, then name it"). Typing tones on a phone is
+laborious, so an otherwise perfect answer counts as correct while the spelling is still shown.
+`ClozeQuestion.swift`'s `TypedVerdict.correctApartFromTones` is where it lives.
 
 Each spec is finalised only after the previous stage has shipped and been used, so its details
 come from real experience rather than guesses about experience that has not happened yet.
