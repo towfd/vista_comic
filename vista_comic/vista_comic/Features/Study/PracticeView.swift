@@ -35,10 +35,36 @@ struct PracticeView: View {
     /// the first appearance and again on every return to this tab, and only the
     /// second of those is worth a fetch.
     @State private var hasAppeared = false
+    @State private var isEditingSettings = false
 
     var body: some View {
         NavigationStack {
-            content.navigationTitle("Practice")
+            content
+                .navigationTitle("Practice")
+                .toolbar {
+                    // Only on the start screen: a session in progress has its
+                    // own trailing control, and changing the step lengths
+                    // halfway through one would reschedule the card on screen.
+                    if session == nil {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                isEditingSettings = true
+                            } label: {
+                                Image(systemName: "gearshape")
+                            }
+                            .accessibilityIdentifier("openSettings")
+                        }
+                    }
+                }
+                .sheet(isPresented: $isEditingSettings) {
+                    StudySettingsView()
+                }
+                .onChange(of: isEditingSettings) { _, editing in
+                    // Reload once the sheet closes: the steps decide how the
+                    // queue is built, so the start screen's figures are stale
+                    // the moment they change.
+                    if !editing { Task { await load() } }
+                }
         }
         .task { await load() }
         // A session changes due times and slots, so the deck held here goes

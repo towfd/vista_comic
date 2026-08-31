@@ -37,13 +37,17 @@ final class FileDeckSnapshotStore: DeckSnapshotStore, @unchecked Sendable {
     private let file: URL
     private let fileManager = FileManager.default
 
-    init(root: URL? = nil) throws {
+    /// `filename` exists so a second snapshot of a different thing can reuse
+    /// this without a near-identical type. Stage 6 keeps the reader's
+    /// scheduling settings beside the deck, for the same reason: a session
+    /// built offline needs the step lengths the server would have used.
+    init(root: URL? = nil, filename: String = "deck.json") throws {
         var resolvedRoot = try root ?? Self.defaultRoot()
         try fileManager.createDirectory(at: resolvedRoot, withIntermediateDirectories: true)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         try resolvedRoot.setResourceValues(values)
-        self.file = resolvedRoot.appendingPathComponent("deck.json")
+        self.file = resolvedRoot.appendingPathComponent(filename)
     }
 
     static func defaultRoot() throws -> URL {

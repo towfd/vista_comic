@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: implemented on branch `feat/anki-offline`, 2026-08-31
 
 # 08 — What a card says about itself
 
@@ -24,3 +24,27 @@ stage replaces, and line 313's claim that judging requires tones has been false 
 - [ ] `Familiarity` and its tests are gone
 - [ ] The PRD no longer describes the three-step day, 錯題區, 翻牌 or the once-a-day ladder
 - [ ] Both phone layouts, and long source text does not push the readout off the row
+
+## What was built
+
+`scheduleState` / `scheduleDue` / `scheduleSummary` in `CardSchedule.swift`, on
+單字庫's rows, the card detail screen and the question header. `Familiarity` is
+deleted.
+
+**The row now says what the system knows.** `New`, `Learning 2/3 · in 7 min`,
+`21 days · in 3 days`, `Relearning 1/3`. A graduated card is described by its
+**interval** rather than its slot number: "21 days" is a fact about the reader's
+memory, "slot 3" is a fact about an array.
+
+A new card shows no due time. It waits on the day's quota rather than on a
+clock, and "due now" beside it would be describing the wrong thing.
+
+**33 strings were translated into 繁中** in the same pass, and the strings the
+old model owned were removed from the catalog. New UI in English would have
+shipped a half-translated app.
+
+The PRD's *lesson architecture* section was rewritten rather than annotated: it
+described a three-step day, a once-a-day ladder, 錯題區 and a weighting rule,
+none of which exist. The settled-decisions table's rows for scheduling, question
+types and offline were rewritten too, each saying what it used to say and why it
+changed.

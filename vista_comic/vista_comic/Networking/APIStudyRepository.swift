@@ -43,8 +43,8 @@ struct APIStudyRepository: StudyRepository {
 
     /// Shared decoder: the backend emits ISO-8601 timestamps. See
     /// `APIConfig.iso8601Decoder` for why this isn't the stock `.iso8601`
-    /// strategy. `dueOn` is a date rather than an instant and stays a `String`
-    /// on the model, so it never reaches this.
+    /// strategy. `dueAt` goes through it; `introducedOn` is a day rather than
+    /// an instant and stays a `String`, so it never reaches this.
     private var decoder: JSONDecoder { APIConfig.iso8601Decoder }
 
     private let resourcePath = "cards"

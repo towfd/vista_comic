@@ -15,48 +15,6 @@ import Foundation
 // SwiftUI for the same kind of reason.
 import SwiftUI
 
-/// How well a card is known, as a heading the reader can scan.
-///
-/// A coarsening of `ladderStage`, not a second scale: the ladder is
-/// 1/3/7/21/60 days and five labels for five rungs would be a list of intervals
-/// rather than a sense of progress.
-///
-/// **Every card sits in `.new` until stage 3 ships**, because nothing advances
-/// `ladderStage` yet. That is why this is shown one card at a time rather than
-/// used to group the list, and why a row mentions it only once a card has
-/// actually moved: six identical badges would be noise, and the same six become
-/// worth reading the moment they start to differ.
-enum Familiarity: Int, CaseIterable, Hashable {
-    case new
-    case learning
-    case familiar
-
-    init(ladderStage: Int) {
-        switch ladderStage {
-        case ..<1: self = .new
-        case 1...2: self = .learning
-        default: self = .familiar
-        }
-    }
-
-    var title: LocalizedStringKey {
-        switch self {
-        case .new: "New"
-        case .learning: "Learning"
-        case .familiar: "Familiar"
-        }
-    }
-
-    /// Whether this is worth putting on a list row.
-    ///
-    /// Always, now. It was false for `.new` while nothing advanced
-    /// `ladderStage` and every row would have read the same — but cards climb
-    /// as of stage 4, and hiding the bottom band meant a reader checking
-    /// whether practice had moved anything saw a row with no badge and could
-    /// not tell "still new" from "not shown".
-    var isWorthShowing: Bool { true }
-}
-
 /// Days between reviews, by slot.
 ///
 /// Mirrors `LADDER_INTERVALS` in `backend/app/ladder.py`. Seven entries since
@@ -95,9 +53,9 @@ struct CardGroup: Identifiable, Hashable {
 /// Kind also matches what this screen is for — the unclassified section is a
 /// list of cards needing work, which is a workshop's natural first question.
 ///
-/// Familiarity has not gone away; it moved to where it can be read one card at a
-/// time (`CardDetailView`), and appears on a row only once a card has actually
-/// advanced.
+/// Where a card stands is on the row itself rather than a heading — see
+/// `CardSchedule.swift`. It is four states and seven intervals, so grouping by
+/// it would be eleven headings over a deck of thirty.
 ///
 /// **Empty sections are dropped**: a deck of only words should not carry an
 /// empty "Sentences" heading.
