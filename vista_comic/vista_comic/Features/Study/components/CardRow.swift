@@ -36,18 +36,19 @@ struct CardRow: View {
                         .lineLimit(1)
                 }
 
-                // Familiarity on every row, including `New`. It was hidden at
-                // the bottom band while nothing could move a card off it; now
-                // that practice does, an absent badge and a card still at the
-                // bottom looked identical, which is the one comparison a reader
-                // opens this list to make. The rung itself is in the card's own
-                // screen — three bands is the right resolution to scan.
-                if Familiarity(ladderStage: card.ladderStage).isWorthShowing {
-                    Label(
-                        Familiarity(ladderStage: card.ladderStage).title,
-                        systemImage: "chart.line.uptrend.xyaxis"
-                    )
-                }
+                // Where the card is and when it is next up — the two things
+                // the scheduler actually knows. This used to be an adjective
+                // (New / Learning / Familiar) aliased to the slot number, and a
+                // screen full of "New" on cards the reader had practised for
+                // days is what provoked the stage 6 rewrite: the word read as a
+                // verdict on them while describing a column that had not moved.
+                Label(
+                    scheduleSummary(
+                        of: card, steps: StudySettings.fallback.learningSteps
+                    ),
+                    systemImage: "chart.line.uptrend.xyaxis"
+                )
+                .accessibilityIdentifier("cardSchedule")
 
                 // Only ever counted upward, and only on a real re-lookup, so a
                 // number here is the reader having forgotten this word that

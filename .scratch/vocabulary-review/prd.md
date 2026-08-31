@@ -56,17 +56,17 @@ the developer can find out whether this works for him before anything larger is 
 | Collection entry point | OCR -> correct -> Translate -> "Add to vocabulary" appears beside the translation result |
 | Card atom | The text the reader selected and corrected, **and which of the two it is**: two save buttons, 加入單字 and 加入句子. The reader knows instantly what a tokeniser would have to guess at, and the answer decides which questions stage 3 asks and whether stage 4 generates a sentence for it (stage 1 ticket 06, added 2026-08-19) |
 | Source location | `comicID` / `chapterID` / `pageNumber` only, matching the existing peek route. **No crop rectangle** |
-| Scheduling | Fixed-interval ladder: 1 / 3 / 7 / 21 / 60 days. Correct advances one rung, wrong drops to the first — **confirmed against a contradiction that appeared during stage 4 planning**, where it had drifted to dropping by one. Correctness only — no speed or hint signals |
+| Scheduling | **Replaced by stage 6 (2026-08-31).** Learning steps in minutes (5/7/10, and the reader owns both the numbers and how many) then an interval table in days (1/3/7/21/60/150/365). A lapse costs **one slot**, not everything — the opposite of what this row said for five stages, and changed because judging is an exact match on production, so a wrong answer is often a slip. Still correctness only: no speed, no hints, no self-rating |
 | Review log | Recorded in full (timestamp, question type, correct, elapsed ms) so swapping in FSRS later is an algorithm change, not a data migration |
-| Question types | Matching pairs; sentence cloze; sentence translation; typing. **Where each one lives changed on 2026-08-20** — see *The lesson architecture* |
+| Question types | Sentence cloze (four choices or typed); sentence translation (typed or rearranged). **Matching was dropped entirely on 2026-08-31** rather than deferred: it was the easiest of the four, and 永無止盡的訓練 covers what it was for. The mode is now drawn **at random** from whatever a card can carry — the difficulty curve by rung was removed at the reader's request |
 | Practice sentence corpus | Context comes from a user-authored `introduction.txt` in each comic folder (3,000 characters max; on launch the app tells the reader which comics are missing one) |
 | Practice sentence budget | **5–10 sentences per day in total**, not one per card. The budget is allocated by familiarity and card age: low rungs and recently added cards weigh more. Generation keeps running on days when nothing is collected, and pauses only after **seven consecutive days with no new card**, resuming on the next one. The stock balances itself out over time |
 | Cloze target | The blank is always a word that is in the deck. Generated sentences necessarily contain words that are not, and those are never blanked. Where several deck words appear in one sentence, blank the least familiar |
 | Reading feedback | After OCR (when online), match against the deck. On a hit: mark "already learned", still show the meaning, increment `lookup_count`, and reschedule the card to the near term. **The negative is never inferred** — not looking a word up again is not evidence of knowing it |
 | Game layer | Daily streak + daily completion; per-comic mastery progress; XP and levels. No ability scores |
 | History tab | Removed in **stage 2**, alongside the tab that replaces it (moved from stage 5, 2026-08-19) |
-| Archiving a card | **Not built.** A word on the ladder's top rung is already scheduled once every 60 days, which is what "I know this, stop testing me" would have meant. `archived_at` stays unused |
-| Offline | Stages 1–5 are online-only. Offline review is deferred to a later "download pack" approach |
+| Archiving a card | **Not built.** A word on the table's top slot is already scheduled once a year, which is what "I know this, stop testing me" would have meant. `archived_at` stays unused |
+| Offline | Collecting has worked offline since stage 1. **Answering joined it in stage 6** (ticket 07): answers are written to a local queue the moment they are given and replayed over the last good deck snapshot, so a session builds itself with no connection. Editing a card, and editing the settings, stay online-only — an offline edit has no derivable merge rule, only an invented one |
 
 ### Why the source text is trustworthy and the translation is not
 
@@ -138,70 +138,65 @@ functions, as in `HistoryActions.swift`.
 
 ## The lesson architecture
 
-> **Superseded by stage 6 (2026-08-31).** The three-step day, the once-a-day framing, 錯題區 and
-> the recent-appearance weighting all belong to the model `06-anki-scheduling/spec.md` replaces.
-> Kept here until that stage ships, because it is the record of what was tried and why it moved.
-
-
-Settled 2026-08-20, after stage 2 shipped, and **materially different from what the stage list
-below originally said**. It came out of asking how a lesson actually runs, and the answer turned
-out to have three separate places rather than one.
+**Rewritten by stage 6 (2026-08-31).** What was here described a three-step day
+that reset at midnight, a ladder that moved at most once per day, a separate
+錯題區, and a weighting rule to keep practice areas from deadlocking. All four
+are gone. The record of what they were and why they were replaced is in
+`06-anki-scheduling/spec.md`; what follows is what the app now does.
 
 ```
-每日關卡  ── the ladder lives here, and only here
-├── 克漏字        → moves the ladder
-├── 翻牌          → does NOT move the ladder
-└── 句子翻譯      → moves the ladder
+複習卡片        ── the schedule lives here, and only here
+├── 克漏字      → four choices, or typed
+├── 句子翻譯    → typed, or rearranged from pieces
+└── the mode is drawn at random; the card decides only what it *can* carry
 
-錯題區            → outside the ladder entirely
-單字練習          → outside the ladder entirely
-├── 翻牌
-└── 打字
+永無止盡的訓練  → outside the schedule entirely, and changes nothing
 ```
 
-**Matching sits inside the daily level without counting.** It is there to remind the reader of
-the words between the two demanding question types — a warm-up, not an assessment. Selection for
-it, and for both areas outside, is by familiarity and how often a word has come up recently
-rather than by anything the ladder knows.
+A card walks **learning steps** measured in minutes — 5 / 7 / 10 by default,
+and the reader owns both the numbers and how many there are — and on clearing
+the last one it **graduates** onto an interval table measured in days:
+1 / 3 / 7 / 21 / 60 / 150 / 365. A graduated card answered wrong walks the steps
+again and comes back **one slot lower**, not to the bottom.
 
-### Two clocks, deliberately
+So a card takes four correct answers to graduate: one to meet it, then one per
+step.
 
-**The ladder moves on the answer that changes something**, up or down, and what moves it is
-whether the card reached 通過 — not any individual answer.
+### One clock, and it does not reset
 
-Revised after the first acceptance pass, which found the original rule ("at most once per day,
-and the day's first resolution decides it") unusable on a new deck: thirty cards on rung 0, first
-encounters mostly wrong, and one wrong answer sealing the card for the day. Nothing ever climbed,
-so the middle rungs — and the typing and rearranging questions that live on them — could not be
-reached at all. A card may now fall and climb back within one day.
+The three-step day existed because the app had no way to bring a card back in
+minutes. It reset every midnight, which meant a card left half-learned when the
+reader put the phone down was back at first sight the next morning — and their
+two answers had bought nothing. That is the mechanism behind the first
+acceptance pass's *"I have practised this card several times and it still says
+New"*.
 
-What stops drilling from ratcheting a card up five rungs is that the rung follows **transitions**:
-a card already at 通過 stays there on further correct answers, so there is nothing to move on.
+The learning state is now stored on the card and does not reset. A gap of three
+weeks costs nothing: the card is simply overdue, and being overdue is not a
+penalty.
 
-Within a day a card climbs its own three-step ladder, which resets daily:
+### The mistakes area is cancelled
 
-| Now | Correct → | Wrong → |
-|---|---|---|
-| first appearance | **熟悉** (skips 不熟) | 不熟 |
-| 不熟 | 熟悉 | 不熟 |
-| 熟悉 | **通過** | 不熟 |
+A wrong answer sends the card to the first learning step, so it comes back
+within minutes — in the same sitting, without anything having to remember it
+separately. That is what 錯題區 was for, and a second place doing it would be a
+second scheduler disagreeing with the first.
 
-So a card needs **two correct answers in a row to pass for the day**, and a round of five
-questions is not five distinct words — a word appears until it passes or the round ends.
+The weighting rule that was going to keep both practice areas from deadlocking
+went with it. 永無止盡的訓練 draws at random from cards already met, avoiding
+only the same card twice in a row; unfamiliarity weighting was the most
+complicated rule in this document and it was serving the one mode whose answers
+change nothing.
 
-### 錯題區 is its own thing, and is allowed to grow
+### A session ends when its queue is empty
 
-A wrong answer anywhere puts a card here. Answering it correctly first try removes it; anything
-else leaves it. **It does not touch the ladder in either direction**, and letting it pile up is
-normal rather than a failure state — the developer's call, following how Duolingo separates
-practice from progress.
+Not after ten questions. What is due now, then the day's new cards — 15 by
+default, not carried over, and yesterday's unfinished learning cards do not
+spend today's — and then nothing. Learn-ahead pulls a learning card forward by
+up to twenty minutes when nothing else is available, which on a deck this size
+is most of the time.
 
-### The selection problem this creates
-
-Weighting purely by familiarity deadlocks: the least familiar card always wins, so the same word
-appears over and over while others never come up, and getting it wrong makes it more likely
-still. Every list outside the ladder therefore needs **recent appearances to suppress weight** as
-well as unfamiliarity to raise it. Named here because it is one rule shared by three places.
+Stopping early is free and always visible: every card keeps the step it is on.
 
 ## Stages
 
@@ -266,7 +261,7 @@ plan, and parking it keeps that spend behind evidence that the loop is worth spe
 The foundations stay in place and cost nothing while unused: `introduction.txt` is a convention
 `scanner.py` can pick up whenever, and `learning_card.comprehension_record_id` already exists.
 
-### 6. The Anki model — added 2026-08-31
+### 6. The Anki model — added 2026-08-31, shipped 2026-08-31
 The review model replaced wholesale: learning steps (5/7/10 minutes, adjustable) before a card
 graduates onto a seven-slot interval table (1/3/7/21/60/150/365 days), a lapse costing one slot
 rather than everything, a session that runs until its queue is empty rather than for ten
@@ -277,7 +272,13 @@ no network.
 reader had half-learned before putting the phone down. That reset is the mechanism behind the
 first acceptance pass's "I have practised this card several times and it still says New".
 
-Specified in full in `06-anki-scheduling/spec.md`.
+Specified in full in `06-anki-scheduling/spec.md`, and shipped in eight tickets.
+Two things it added that the spec did not foresee: `learning_card.introduced_on`,
+because the new-card quota counts cards met today and nothing recorded that; and
+a **second implementation of the scheduler, in Swift**, because offline practice
+cannot ask the server what an answer did. The duplication is deliberate and
+pinned by `SchedulerParityTests`, which asserts the same transition table as
+`backend/tests/test_scheduler.py`.
 
 ### 7. Game layer
 `daily_completion`, streak, XP and levels. Per-comic mastery — how many words collected from

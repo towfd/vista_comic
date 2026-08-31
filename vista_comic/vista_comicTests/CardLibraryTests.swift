@@ -72,38 +72,76 @@ struct CardGroupingTests {
     }
 }
 
-@Suite("How well a card is known")
-struct FamiliarityTests {
+@Suite("What a card says about itself")
+struct CardScheduleReadoutTests {
 
-    @Test("Each ladder rung maps to a band", arguments: [
-        (0, Familiarity.new),
-        (1, Familiarity.learning),
-        (2, Familiarity.learning),
-        (3, Familiarity.familiar),
-        (4, Familiarity.familiar),
-    ])
-    func rungsMapToBands(_ pair: (Int, Familiarity)) {
-        #expect(Familiarity(ladderStage: pair.0) == pair.1)
+    @Test("A new card says so and nothing else")
+    func aNewCardSaysOnlyThat() {
+        // No due time: a new card waits on the day's quota, not on a clock,
+        // and "due now" beside it would be describing the wrong thing.
+        let card = LearningCard.preview(state: "new")
+
+        #expect(scheduleSummary(of: card, steps: [5, 7, 10]) == "New")
     }
 
-    @Test("Every band shows on a row, including the bottom one", arguments: Familiarity.allCases)
-    func everyBandShowsOnARow(_ band: Familiarity) {
-        // Reversed by stage 4, deliberately. `.new` was hidden while nothing
-        // could move a card off it and six identical badges would have been
-        // noise. Now that practice moves cards, an absent badge and a card
-        // still at the bottom looked the same on screen — and telling those two
-        // apart is the reason a reader opens this list after a round.
-        #expect(band.isWorthShowing)
+    @Test("A learning card says which step it is on")
+    func aLearningCardCountsItsSteps() {
+        // The complaint that started stage 6 was a reader practising a card for
+        // days and being told "New" each time. This is the answer: a number
+        // that moves.
+        let card = LearningCard.preview(state: "learning", learningStep: 1)
+
+        #expect(scheduleState(of: card, steps: [5, 7, 10]) == "Learning 2/3")
     }
 
-    @Test("The top rung matches the backend\'s ladder")
-    func theTopRungMatchesTheBackend() {
+    @Test("A relearning card is named apart from a learning one")
+    func relearningIsItsOwnWord() {
+        // They are the same steps and a different situation: one is a word
+        // being met, the other a word being recovered.
+        let card = LearningCard.preview(state: "relearning", learningStep: 0)
+
+        #expect(scheduleState(of: card, steps: [5, 7, 10]) == "Relearning 1/3")
+    }
+
+    @Test("The step count follows the reader's own settings")
+    func theStepCountIsNotHardcoded() {
+        let card = LearningCard.preview(state: "learning", learningStep: 1)
+
+        #expect(scheduleState(of: card, steps: [1, 5]) == "Learning 2/2")
+    }
+
+    @Test("A card past the end of a shortened list is clamped, not misreported")
+    func aShortenedListClamps() {
+        let card = LearningCard.preview(state: "learning", learningStep: 4)
+
+        #expect(scheduleState(of: card, steps: [5, 7]) == "Learning 2/2")
+    }
+
+    @Test("A graduated card is described by its interval, not its slot number")
+    func aReviewCardShowsItsInterval() {
+        // "21 days" is a fact about the reader's memory; "slot 3" is a fact
+        // about an array.
+        let card = LearningCard.preview(state: "review", ladderStage: 3)
+
+        #expect(scheduleState(of: card, steps: [5, 7, 10]) == "21 days")
+    }
+
+    @Test("A card already due says so rather than counting backwards")
+    func anOverdueCardSaysDueNow() {
+        let card = LearningCard.preview(
+            state: "review", dueAt: "2020-01-01T00:00:00Z"
+        )
+
+        #expect(scheduleDue(of: card) == "due now")
+    }
+
+    @Test("The interval table matches the backend's")
+    func theIntervalsMatchTheBackend() {
         // `LADDER_INTERVALS` in `backend/app/ladder.py` — seven entries since
         // stage 6, and shown to the reader as a denominator. Two constants, one
         // fact, so it is pinned here rather than left to be noticed.
         #expect(ladderTopRung == 6)
         #expect(ladderIntervals == [1, 3, 7, 21, 60, 150, 365])
-        #expect(Familiarity(ladderStage: ladderTopRung) == .familiar)
     }
 }
 
