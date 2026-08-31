@@ -3,11 +3,12 @@
 Thin functions over a SQLAlchemy ``Session``, the shape ``progress_store``,
 ``comprehension_store`` and ``learning_card_store`` already use.
 
-These rows are the unit the whole reviewing system is computed from. A card's
-position in the three-step day is **derived by replaying today's rows**, not
-stored, which is what makes a gap in practice cost nothing: there is no
-settlement moment, so nothing runs late, nothing runs three times, and a day the
-reader skipped is a day with no rows in it.
+These rows are the complete record of what the reader did. They no longer decide
+where a card stands -- stage 6 moved that to a stored state, because a learning
+card's position is *which step, due at what minute*, a dimension no row here has
+ever carried, and because the stage 6 migration resets cards while keeping their
+rows. What the log is still for is unchanged: it is kept complete so that
+adopting FSRS later is an algorithm change rather than a migration.
 """
 
 from __future__ import annotations
@@ -19,9 +20,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import ladder
-from .daily_progress import DailyStep, step_today
+from . import scheduler, study_settings_store
 from .db import CardReview, LearningCard
+from .scheduler import CardSchedule, CardState
 
 # What kind of question produced an answer. Recorded rather than inferred, since
 # the same card can be asked in more than one way and the difference matters to
@@ -37,6 +38,13 @@ QUESTION_TYPES = frozenset({
     QUESTION_SENTENCE_TYPED,
 })
 
+# Which mode asked the question. 永無止盡的訓練 records every answer and
+# schedules nothing, so without this the log could not tell an answer that was
+# meant to count from one that deliberately did not.
+CONTEXT_REVIEW = "review"
+CONTEXT_TRAINING = "training"
+CONTEXTS = frozenset({CONTEXT_REVIEW, CONTEXT_TRAINING})
+
 
 def record(
     session: Session,
@@ -46,6 +54,8 @@ def record(
     is_correct: bool,
     client_token: str,
     local_date: date,
+    answered_at: datetime,
+    context: str = CONTEXT_REVIEW,
     elapsed_ms: Optional[int] = None,
 ) -> Tuple[CardReview, bool]:
     """Record one answer; return it and whether it was new.
@@ -68,6 +78,11 @@ def record(
         elapsed_ms=elapsed_ms,
         client_token=client_token,
         local_date=local_date,
+        context=context,
+        # When the reader answered, which is theirs to report; and when it
+        # reached us, which is ours. They are the same moment online and hours
+        # apart after an offline session flushes.
+        answered_at=answered_at,
         reviewed_at=datetime.now(timezone.utc),
     )
     session.add(review)
@@ -95,26 +110,6 @@ def for_card(session: Session, card_id: int) -> List[CardReview]:
     return list(rows)
 
 
-def on_day(session: Session, card_id: int, day: date) -> List[CardReview]:
-    """One card's answers on ``day`` (UTC), oldest first.
-
-    The three-step day is computed from exactly this list. Anything outside it
-    is a different day and has no bearing — which is the whole reason a reader
-    can be away for three weeks and come back to a card sitting where they left
-    it.
-    """
-    rows = session.execute(
-        select(CardReview)
-        .where(
-            CardReview.card_id == card_id,
-            # The reader's day, not the server's — see `CardReview.local_date`.
-            CardReview.local_date == day,
-        )
-        .order_by(CardReview.reviewed_at.asc(), CardReview.id.asc())
-    ).scalars()
-    return list(rows)
-
-
 def card_exists(session: Session, card_id: int) -> bool:
     """Whether there is a card to record against.
 
@@ -124,54 +119,52 @@ def card_exists(session: Session, card_id: int) -> bool:
     return session.get(LearningCard, card_id) is not None
 
 
-def apply_ladder_move(session: Session, card_id: int, *, today: date) -> bool:
-    """Move the card's rung if the last answer calls for it; report whether it did.
+def schedule_of(card: LearningCard) -> CardSchedule:
+    """The card's scheduling state, as a value the pure function can take."""
+    return CardSchedule(
+        state=CardState(card.state),
+        learning_step=card.learning_step,
+        stage=card.ladder_stage,
+        previous_stage=card.previous_stage,
+        due_at=card.due_at,
+    )
 
-    **Transitions, not states.** The question is not "where does today stand"
-    but "did this answer change where today stands", and the difference is the
-    whole of why free movement is safe. Once a card is at 通過 a further correct
-    answer leaves it at 通過 — no transition, no move — so drilling a passed card
-    cannot ratchet it up the ladder. Two answers move it:
 
-    * a **wrong** one, which drops it to the bottom. Idempotent by nature, since
-      the bottom is the bottom however many times it is reached.
-    * the one that **reaches 通過** from anywhere below, which climbs one rung.
+def apply_answer(
+    session: Session, card_id: int, *, correct: bool, answered_at: datetime
+) -> Optional[CardSchedule]:
+    """Move the card according to one answer; return where it landed.
 
-    Between them a card can fall and climb back within a single day, which is
-    the point: locking the day on its first resolution left a fresh deck unable
-    to climb at all. See ``ladder.move``.
+    Returns ``None`` only when there is no such card. **Every scheduled answer
+    moves something** -- which is the difference from the ladder this replaced,
+    where a correct answer that changed no step deliberately changed nothing.
+    That rule existed because passing was a state a card could sit in and be
+    drilled inside; learning steps have no such resting place, so an answer
+    always advances a step, restarts one, or moves a slot.
 
-    Call this only for an answer that was actually **recorded** — a replayed
-    submission stores no row and must therefore change nothing, and that is now
-    the only thing standing between a retry and a second rung. The caller owns
-    that check because only the caller knows whether the row was new.
+    Call this only for an answer that was actually **recorded**. A replayed
+    submission stores no row and must therefore change nothing, and that check
+    is the only thing standing between a retry and a second graduation. The
+    caller owns it because only the caller knows whether the row was new.
+
+    Call it only for ``review`` answers, too: 永無止盡的訓練 records and
+    schedules nothing, by the reader's decision.
     """
     card = session.get(LearningCard, card_id)
     if card is None:
-        return False
+        return None
 
-    answers = [row.is_correct for row in on_day(session, card_id, today)]
-    if not answers:
-        return False
-
-    before = step_today(answers[:-1])
-    after = step_today(answers)
-    if not answers[-1]:
-        passed = False
-    elif after is DailyStep.PASSED and before is not DailyStep.PASSED:
-        passed = True
-    else:
-        # Still climbing, or already passed and being drilled. Neither is news.
-        return False
-
-    outcome = ladder.move(rung=card.ladder_stage, today=today, passed=passed)
-    # A card already at the bottom and already due tomorrow has nowhere to fall,
-    # and reporting a move that changed no column would be a lie the app shows
-    # to the reader.
-    if outcome == (card.ladder_stage, card.due_on):
-        return False
-
-    card.ladder_stage, card.due_on = outcome
-    card.last_ladder_move_on = today
+    settings = study_settings_store.get(session)
+    landed = scheduler.next_schedule(
+        schedule_of(card),
+        correct=correct,
+        answered_at=answered_at,
+        learning_steps=settings.learning_steps,
+    )
+    card.state = landed.state.value
+    card.learning_step = landed.learning_step
+    card.ladder_stage = landed.stage
+    card.previous_stage = landed.previous_stage
+    card.due_at = landed.due_at
     session.commit()
-    return True
+    return landed

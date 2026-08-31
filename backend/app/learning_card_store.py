@@ -12,7 +12,7 @@ vocabulary is empty" would be a lie the reader cannot detect.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import delete as delete_stmt, func, select
@@ -20,10 +20,13 @@ from sqlalchemy import update as update_stmt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from . import scheduler
 from .db import LearningCard
 from .normalization import normalized_key
 
-# Where a new card starts on stage 3's interval ladder. Written now, read there.
+# Which interval slot a card starts on. A new card does not wait on this -- it
+# waits on the day's new-card quota -- but the column has to hold something, and
+# the bottom of the table is what it will graduate onto.
 INITIAL_LADDER_STAGE = 0
 
 # What the reader can say a line is, by which of the two save buttons they
@@ -49,7 +52,6 @@ def create_or_get(
     chapter_id: str,
     page_number: int,
     kind: Optional[str] = None,
-    today: Optional[date] = None,
 ) -> Tuple[LearningCard, bool]:
     """Collect ``source_text``; return the card and whether it was new.
 
@@ -91,8 +93,14 @@ def create_or_get(
         page_number=page_number,
         comprehension_record_id=None,
         kind=kind,
+        state=scheduler.CardState.NEW.value,
+        learning_step=None,
         ladder_stage=INITIAL_LADDER_STAGE,
-        due_on=today or datetime.now(timezone.utc).date(),
+        previous_stage=None,
+        # In the past rather than in the future: a new card is held back by the
+        # day's quota, not by a due date, and a timestamp that has already
+        # passed says "ready whenever you are" without pretending to schedule.
+        due_at=datetime.now(timezone.utc),
         lookup_count=0,
         last_looked_up_at=None,
         # The database clock is the source of truth for this, matching
@@ -161,8 +169,8 @@ def update(
     answer has to be possible. The caller decides whether ``kind`` was *given*;
     this function does not try to infer it from the value.
 
-    Nothing else is touched. ``ladder_stage``, ``due_on``, ``lookup_count`` and
-    ``created_at`` are the reviewing stages' business, and the identity columns
+    Nothing else is touched. ``ladder_stage``, ``due_at``, ``lookup_count`` and
+    ``created_at`` are the scheduler's business, and the identity columns
     are nobody's -- see ``models.LearningCardUpdate``.
     """
     values = {}
@@ -184,9 +192,9 @@ def delete(session: Session, card_id: int) -> bool:
     """Remove one card; report whether it was there.
 
     A real delete, not a flag. Archiving was considered and dropped: a word on
-    the ladder's top rung is already scheduled once every 60 days, which is what
-    "I know this one" would have meant, so a second concept saying the same
-    thing would have had no consumer.
+    the table's top slot is already scheduled once a year, which is what "I know
+    this one" would have meant, so a second concept saying the same thing would
+    have had no consumer.
     """
     result = session.execute(delete_stmt(LearningCard).where(LearningCard.id == card_id))
     session.commit()
@@ -197,8 +205,8 @@ def record_lookup(session: Session, card_id: int) -> bool:
     """Note that the reader looked this word up again; report whether it exists.
 
     The one clean forgetting signal this system gets: the reader just proved
-    they had not retained it. **``due_on`` is deliberately untouched** —
-    rescheduling on a hit belongs to stage 3, where scheduling exists at all.
+    they had not retained it. **``due_at`` is deliberately untouched** — a
+    lookup is not an answer, and the scheduler moves on answers.
     """
     result = session.execute(
         update_stmt(LearningCard)

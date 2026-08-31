@@ -19,6 +19,7 @@ from typing import Iterator, Optional
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     Engine,
     ForeignKey,
@@ -27,6 +28,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -195,18 +197,34 @@ class LearningCard(Base):
         nullable=True,
     )
     kind: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    #: Where the card is in the scheduling model -- see ``scheduler.CardState``.
+    #:
+    #: **Stored, not derived**, which reverses the three-step day's design and is
+    #: forced by two facts: a learning card's position is *which step, due at
+    #: what minute*, which the review log has never carried; and stage 6's
+    #: migration resets every card while keeping every review row, so "has
+    #: answers" stopped meaning "has been met".
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    #: Index into the reader's learning steps. NULL outside the learning states.
+    learning_step: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    #: Which slot of ``ladder.LADDER_INTERVALS`` (0-6 since 2026-08-31).
+    #:
+    #: The column kept its name through stage 6 and changed meaning: it was the
+    #: rung of a ladder that a wrong answer knocked to the bottom, and is now
+    #: simply which interval the card has earned.
     ladder_stage: Mapped[int] = mapped_column(Integer, nullable=False)
-    due_on: Mapped[date] = mapped_column(Date, nullable=False)
+    #: The slot to return to on graduating out of relearning; NULL when the card
+    #: has never lapsed or has already used it. This is what makes a lapse cost
+    #: one slot rather than everything.
+    previous_stage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    #: When the card next comes up. **A timestamp, not a date** (it was
+    #: ``due_on`` until stage 6): learning steps are minutes apart, and a card
+    #: due at 20:07 cannot be expressed as a day.
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     lookup_count: Mapped[int] = mapped_column(Integer, nullable=False)
     last_looked_up_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # When the rung last moved. It used to enforce "at most once per day"; that
-    # rule was removed after acceptance (a fresh deck could never climb out of
-    # rung 0), so this is now a record rather than a gate — kept because it
-    # cannot be derived from the reviews, a review not knowing whether it was
-    # the one that moved the rung.
-    last_ladder_move_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -261,6 +279,23 @@ class CardReview(Base):
     #: it would put everything before 08:00 on the previous day. The three-step
     #: day is grouped by this column.
     local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    #: Which mode asked the question: ``review`` (the schedule) or ``training``
+    #: (永無止盡的訓練, which records everything and schedules nothing).
+    #:
+    #: A column on the row rather than a token prefix or a join to a session
+    #: table. A review row is meant to be legible on its own; encoding the mode
+    #: into ``client_token`` would overload an idempotency key with meaning and
+    #: force ``LIKE`` queries, and a session table would need a lifecycle that a
+    #: mode with no end cannot have.
+    context: Mapped[str] = mapped_column(String, nullable=False)
+    #: When the reader actually answered, **as reported by the app**.
+    #:
+    #: Separate from ``reviewed_at`` because offline practice makes them differ
+    #: by hours, and scheduling from the moment an answer arrived would put a
+    #: five-minute step in the wrong afternoon.
+    answered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     #: When the answer reached the server. Orders a replay, and is the timestamp
     #: FSRS would want later.
     reviewed_at: Mapped[datetime] = mapped_column(
@@ -285,6 +320,31 @@ class ComprehendUsage(Base):
 
     usage_date: Mapped[date] = mapped_column(Date, primary_key=True)
     request_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class StudySettings(Base):
+    """The reader's scheduling settings. Exactly one row.
+
+    On the backend rather than on the device because the backend recomputes
+    schedules when an offline session flushes, and two copies that disagreed
+    would produce two different ``due_at`` values for the same answer.
+
+    One row, pinned by a check constraint, in the spirit of ``ComprehendUsage``'s
+    natural key: this deployment has no per-user identity (ADR-0005), so there is
+    nothing to key settings on.
+    """
+
+    __tablename__ = "study_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_study_settings_single_row"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    #: Minutes between learning steps, in order. A list rather than three
+    #: columns because "how many steps" and "how long each step is" are the same
+    #: question, and writing three down assumes an answer to the first.
+    learning_steps: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False)
+    new_cards_per_day: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 # Module-level engine/session factory, installed by ``init_engine`` at startup

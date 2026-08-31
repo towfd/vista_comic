@@ -1,79 +1,54 @@
-"""The across-days schedule: 1 / 3 / 7 / 21 / 60 days.
+"""The across-days schedule: 1 / 3 / 7 / 21 / 60 / 150 / 365 days.
 
-Two clocks run in this feature and most of the difficulty is keeping them
-apart. ``daily_progress`` is the one inside a session — practising until a word
-sticks is exactly its purpose. **This one is about recall after a gap**, and it
-answers a different question: not "can you get this right now", but "will you
-still have it in a week".
+The table a card graduates onto once it is out of the learning steps. Those
+steps (``scheduler``) run in minutes and ask "can you get this right now"; this
+one runs in days and asks the different question — "will you still have it in a
+week".
 
-That difference is why a card falls all the way to the bottom on one wrong
-answer, however well the rest of the session went.
+**Seven slots since 2026-08-31**, up from five. The two new entries continue the
+table's own ratio rather than extending it flat: 90 and 120 were considered and
+rejected, because 60 -> 90 is x1.5 and 90 -> 120 is x1.33, both below the
+table's average of about x2.8, which would say that surviving sixty days makes a
+card *less* stable. SM-2 grows intervals multiplicatively (``I(n) = I(n-1) x
+EF``, EF defaulting to 2.5, which is also Anki's default starting ease), so the
+consistent continuation is 150 and 365.
+
+365 is the terminal slot: a card asked once a year is retired without being
+deleted.
+
+**What is no longer here**: ``move``, ``rung_after_pass`` and
+``rung_after_failure``. They encoded "one wrong answer falls to the bottom",
+which stage 6 replaced with a fall of one slot -- and the decision of where a
+card goes next now belongs to the state machine in ``scheduler``, which needs to
+know about learning steps this module has no business knowing about.
 """
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
-#: Days until a card is next due, by rung. Index is the rung.
-#:
-#: A starting guess, and it stays one until there is real data to argue with —
-#: the PRD is explicit that no interval gets adjusted before then.
-LADDER_INTERVALS = (1, 3, 7, 21, 60)
+#: Days until a card is next due, by slot. Index is the slot.
+LADDER_INTERVALS = (1, 3, 7, 21, 60, 150, 365)
 
-FIRST_RUNG = 0
-TOP_RUNG = len(LADDER_INTERVALS) - 1
+FIRST_SLOT = 0
+TOP_SLOT = len(LADDER_INTERVALS) - 1
 
 
-def next_due(rung: int, *, today: date) -> date:
-    """When a card at ``rung`` should next be asked.
+def clamp_slot(slot: int) -> int:
+    """``slot`` brought inside the table."""
+    return max(FIRST_SLOT, min(TOP_SLOT, slot))
 
-    Counted from the day the move happened, not from the previous due date. A
-    card answered four days late is not owed those four days back — the point of
-    reference is when the reader actually recalled it.
+
+def interval_days(slot: int) -> int:
+    """How many days a card at ``slot`` waits."""
+    return LADDER_INTERVALS[clamp_slot(slot)]
+
+
+def due_after(slot: int, moment: datetime) -> datetime:
+    """When a card at ``slot`` answered at ``moment`` comes back.
+
+    Counted from the answer, not from the previous due date. A card answered
+    four days late is not owed those four days back -- the point of reference is
+    when the reader actually recalled it.
     """
-    return today + timedelta(days=LADDER_INTERVALS[_clamp(rung)])
-
-
-def rung_after_pass(rung: int) -> int:
-    """One rung up, clamped at the top."""
-    return _clamp(rung + 1)
-
-
-def rung_after_failure(rung: int) -> int:
-    """Straight back to the bottom, from any height.
-
-    **Not one rung down.** A card forgotten at sixty days would then be next
-    asked in twenty-one — a long wait after just proving it is gone. The point
-    of an interval is that it reflects what the reader retains, and a card they
-    have just missed retains nothing worth scheduling far out.
-    """
-    return FIRST_RUNG
-
-
-def _clamp(rung: int) -> int:
-    return max(FIRST_RUNG, min(TOP_RUNG, rung))
-
-
-def move(*, rung: int, today: date, passed: bool) -> tuple[int, date]:
-    """The card's new rung and due date.
-
-    **A card may move more than once in a day**, up or down. This used to refuse
-    a second move, on the argument that the gap had already happened: the reader
-    met the word and did not have it, and an afternoon of drilling should not
-    erase that.
-
-    That argument was right about what the ladder measures and wrong about what
-    it would do to a new deck. Thirty cards all sat on rung 0; a first encounter
-    is very often wrong; one wrong answer locked the card for the day. So
-    nothing climbed, the middle rungs were never reached, and the question types
-    that live there — typing, rearranging — could not appear at all. A schedule
-    that never schedules anything measures nothing either.
-
-    What replaced the lock is not "move on every answer" but **move on the
-    answer that changes something** — see ``card_review_store.apply_ladder_move``.
-    That is what keeps drilling from ratcheting a card up five rungs in one
-    round: reaching 通過 moves it once, and further correct answers change no
-    step, so they move nothing.
-    """
-    new_rung = rung_after_pass(rung) if passed else rung_after_failure(rung)
-    return new_rung, next_due(new_rung, today=today)
+    return moment + timedelta(days=interval_days(slot))
