@@ -174,6 +174,11 @@ def learning_card_db(_progress_engine):
         # both is preferred to CASCADE, which would silently reach whatever is
         # added later.
         conn.execute(text("TRUNCATE TABLE card_review, learning_card"))
+        # Settings are global rather than per-card, so nothing above reaches
+        # them — and a test that shortens the learning steps would otherwise
+        # reschedule every test after it. The store seeds the defaults again on
+        # the next read.
+        conn.execute(text("TRUNCATE TABLE study_settings"))
     return _progress_engine
 
 
