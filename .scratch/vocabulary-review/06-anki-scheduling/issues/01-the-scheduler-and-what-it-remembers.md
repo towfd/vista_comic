@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: implemented on branch `feat/anki-scheduler`, 2026-08-31
 
 # 01 — The scheduler, and what a card now remembers
 
@@ -46,3 +46,34 @@ keeps every `card_review` row. `due_on` is dropped after `due_at` is populated;
 - [ ] Alembic upgrade adds the columns, backfills `due_at`, resets state, and keeps review rows
 - [ ] Alembic downgrade is written and runs
 - [ ] `daily_progress.py` and every reference to it are gone
+
+## What was built
+
+`app/scheduler.py` (the state machine, pure), `app/ladder.py` (rewritten down to
+the interval table), `app/study_settings_store.py`, the columns in `app/db.py`,
+and `alembic/versions/d5a91c3e7b28_anki_scheduling.py`. `app/daily_progress.py`
+and `card_review_store.on_day` are gone — the three-step day was their only
+consumer.
+
+**A test written from the ticket found the ticket ambiguous.** It said a new
+card's correct answer goes to "learning, step 0", and a test called
+`test_three_correct_answers_graduate_the_card` was written from the same table —
+but with three steps, entering at step 0 means **four** correct answers to
+graduate: one to meet the card, then one per step. That is what the reader
+described (right the first time is five minutes, then seven, then ten, and the
+fourth is where days begin), so the code is right and the test was renamed.
+Worth knowing that Anki differs here: it advances a new card straight to the
+*second* step on Good, and uses the first only for Again.
+
+**`ladderMoved` had to be redefined, not just rewired.** Graduating lands a card
+on slot 0, which is what the column already said, so "did the slot change"
+reported nothing happening at the single most significant moment in a card's
+life. It now compares *which interval the card is on*, where a card still in the
+learning steps is on none — so graduating reads as None → 0, and a lapse reads
+as 2 → None.
+
+**Do not deploy this ticket on its own.** `ReviewOutcome.step` now carries the
+card's state (`learning`, `review`, ...) where the app expects the three-step
+day's words, and `CardReview.swift` decodes that field strictly. The app is
+fixed in tickets 03 and 04; the backend on the developer's other machine should
+stay where it is until then.

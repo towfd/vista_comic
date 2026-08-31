@@ -185,8 +185,11 @@ def test_the_constraint_refuses_a_second_row_for_one_identity(learning_card_sess
     learning_card_session.add(
         LearningCard(
             normalized_key=normalized_key(common["source_text"]),
+            state="new",
+            learning_step=None,
             ladder_stage=0,
-            due_on=date.today(),
+            previous_stage=None,
+            due_at=datetime.now(timezone.utc),
             lookup_count=0,
             created_at=datetime.now(timezone.utc),
             **common,

@@ -351,16 +351,16 @@ class ReviewOutcome(BaseModel):
     """
 
     review: CardReviewResponse
-    #: Where the card stands today — unseen / unfamiliar / familiar / passed.
-    #: Derived from the day's answers, never stored.
+    #: The card's state after this answer -- new / learning / review /
+    #: relearning. It was the three-step day's position until stage 6, derived
+    #: by replaying the day; it is now read off the card, which is what lets a
+    #: half-learned card still be half-learned tomorrow morning.
     step: str
     ladderStage: int
     dueOn: str
-    #: Whether this answer was the one that moved the rung. False for a correct
-    #: answer that changed no step -- drilling a card already at 通過, or a
-    #: first correct answer that has not reached it yet -- and for a card that
-    #: was already at the bottom and fell again. The app is told rather than
-    #: left to work it out from a rung that did not change.
+    #: Whether this answer changed which interval slot the card holds. False
+    #: for every answer inside the learning steps, which move the card without
+    #: moving its slot. The app is told rather than left to work it out.
     ladderMoved: bool
 
 

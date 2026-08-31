@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager, contextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -39,7 +39,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from . import (
     card_review_store,
-    daily_progress,
+    scheduler,
     comprehend_usage_store,
     comprehension_store,
     learning_card_store,
@@ -857,7 +857,7 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
         chapterTitle=chapter_title,
         kind=row.kind,
         ladderStage=row.ladder_stage,
-        dueOn=row.due_on.isoformat(),
+        dueOn=row.due_at.date().isoformat(),
         lookupCount=row.lookup_count,
         lastLookedUpAt=(
             progress_store.iso_utc(row.last_looked_up_at)
@@ -986,6 +986,21 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
     with _card_session() as session:
         if not card_review_store.card_exists(session, card_id):
             raise HTTPException(status_code=404, detail="Learning card not found")
+        # Stage 6 ticket 02 moves this to the app, which is the only side that
+        # knows when an answer given in airplane mode actually happened. Until
+        # then an answer is recorded as having happened when it arrived, which
+        # is true of every answer this build can send.
+        answered_at = datetime.now(timezone.utc)
+        before = learning_card_store.get(session, card_id)
+        # Which interval the card was on, or None while it is still in the
+        # learning steps and on no interval at all. Comparing these is what
+        # makes graduating count as a move: it lands on slot 0, which the column
+        # already said, so comparing slots alone would report nothing happened.
+        interval_before = (
+            before.ladder_stage
+            if before.state == scheduler.CardState.REVIEW.value
+            else None
+        )
         row, created = card_review_store.record(
             session,
             card_id=card_id,
@@ -993,35 +1008,29 @@ def record_review(card_id: int, body: CardReviewCreate) -> ReviewOutcome:
             is_correct=body.isCorrect,
             client_token=body.clientToken,
             local_date=body.localDate,
+            answered_at=answered_at,
             elapsed_ms=body.elapsedMs,
         )
         # Attempted only for an answer that was actually stored. A replay adds
-        # no row, so it must change nothing -- and since the ladder no longer
-        # refuses a second move within a day, this check is the only thing
-        # standing between a retried submission and a second rung.
-        #
-        # Skipped outright for a card that was not due -- see
-        # `CardReviewCreate.countsTowardLadder`. The answer is still recorded;
-        # only the schedule declines to learn anything from it.
-        moved = (
-            card_review_store.apply_ladder_move(
-                session, card_id, today=body.localDate
+        # no row, so it must change nothing -- and it is the only thing standing
+        # between a retried submission and a second graduation.
+        landed = (
+            card_review_store.apply_answer(
+                session, card_id, correct=body.isCorrect, answered_at=answered_at
             )
             if created and body.countsTowardLadder
-            else False
+            else None
         )
-        answers = [
-            r.is_correct
-            for r in card_review_store.on_day(session, card_id, body.localDate)
-        ]
         card = learning_card_store.get(session, card_id)
-        step = daily_progress.step_today(answers).value
     return ReviewOutcome(
         review=_to_review_response(row),
-        step=step,
+        step=card.state,
         ladderStage=card.ladder_stage,
-        dueOn=card.due_on.isoformat(),
-        ladderMoved=moved,
+        dueOn=card.due_at.date().isoformat(),
+        ladderMoved=(
+            (card.ladder_stage if card.state == scheduler.CardState.REVIEW.value else None)
+            != interval_before
+        ),
     )
 
 
