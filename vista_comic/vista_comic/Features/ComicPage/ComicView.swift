@@ -170,9 +170,16 @@ private struct ReaderView: View {
     /// The height of the same window onto the content, which the pan limits and
     /// the end-of-chapter shift are both expressed against.
     @State private var containerHeight: CGFloat = 0
-    /// How tall the top control bar is, so the selection cancel badge can be
-    /// placed clear of it. `0` until the controls have been laid out once.
-    @State private var controlBarHeight: CGFloat = 0
+    /// How much of the top of the reader is covered by the control bar, so the
+    /// selection cancel badge can be placed clear of it. `0` until the controls
+    /// have been laid out once.
+    ///
+    /// **The bar plus the inset it sits under**, not the bar alone. The pages
+    /// now run to the top edge of the screen, so the status-bar region is over
+    /// the reader too — measuring only the bar would place the badge underneath
+    /// it. Named for what it is rather than for the thing that causes it,
+    /// because that is what the caller does with it.
+    @State private var topObstruction: CGFloat = 0
     /// The scroll view's live offset and content height.
     ///
     /// A reference box rather than `@State` deliberately: this changes on every
@@ -327,7 +334,7 @@ private struct ReaderView: View {
                         pageNumber: index + 1,
                         retryAllToken: retryAllToken,
                         isSelecting: isSelecting,
-                        controlBarHeight: controlBarHeight,
+                        topObstruction: topObstruction,
                         magnification: zoomScale,
                         viewportPan: CGSize(width: panX, height: endPan),
                         reservedWidth: pageWidth,
@@ -519,6 +526,21 @@ private struct ReaderView: View {
         // chapter always starts at its first page instead of inheriting the
         // previous chapter's scroll offset.
         .id(currentChapter.id)
+        // **The pages reach the edges of the screen.** Everything else on this
+        // screen was taken to the edges when the immersive controls were built
+        // — the navigation bar and tab bar hidden, the status bar and home
+        // indicator following the controls, both bars extending their material
+        // past the insets — and the content was the one thing left inset. What
+        // showed above and below a page was not a letterbox and not the image
+        // (a page is drawn to fit the container width, so it has no bars of its
+        // own); it was the safe area, with the window behind it.
+        //
+        // Applied here rather than to the `ZStack`, which is what keeps
+        // `controlsOverlay` inside the insets: the back button must not sit
+        // under the Dynamic Island. Nothing is hidden by extending a continuous
+        // vertical strip — the top of the first page and the bottom of the last
+        // are still scrollable into view.
+        .ignoresSafeArea()
         .onTapGesture {
             // A tap while selecting shouldn't hide the very controls (the
             // selection-mode toggle) needed to exit selection mode.
@@ -674,7 +696,22 @@ private struct ReaderView: View {
             // below this or it is drawn correctly and still cannot be seen.
             // Measured rather than assumed because the bar grows with Dynamic
             // Type.
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlBarHeight = $0 }
+            //
+            // **Measured through a layer that ignores the top inset**, which is
+            // the same mechanism the material above uses and the reason this is
+            // a background rather than a plain `onGeometryChange`. Now that the
+            // pages run to the top edge, the bar covers the status-bar region
+            // as well as itself, and measuring only its own height would put
+            // the badge underneath it — placed correctly, impossible to see,
+            // and with nothing on screen to explain why the drag will not
+            // cancel.
+            .background(alignment: .top) {
+                Color.clear
+                    .ignoresSafeArea(edges: .top)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                        topObstruction = $0
+                    }
+            }
 
             Spacer()
 
@@ -1158,9 +1195,10 @@ private struct ReaderPage: View {
     /// Whether the Reader is in text-selection mode. Drives whether this page
     /// installs the drag-to-select overlay/gesture over its rendered image.
     let isSelecting: Bool
-    /// How much of the top of the reader the control bar covers. Selection mode
-    /// forces the controls visible, so the cancel badge is placed below this.
-    let controlBarHeight: CGFloat
+    /// How much of the top of the reader is covered by the control bar and the
+    /// inset above it. Selection mode forces the controls visible, so the
+    /// cancel badge is placed below this.
+    let topObstruction: CGFloat
     /// The reader's settled magnification and how far its viewport is moved,
     /// which together say which part of this page is on screen.
     ///
@@ -1314,7 +1352,7 @@ private struct ReaderPage: View {
             visibleRect: visibleRect,
             diameter: cancelZoneDiameter,
             inset: cancelZoneInset,
-            topObstruction: controlBarHeight
+            topObstruction: topObstruction
         )
         return ZStack(alignment: .topLeading) {
             // Transparent, but shaped so it still receives the drag — this is
