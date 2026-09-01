@@ -292,6 +292,17 @@ private struct SessionView: View {
         }
     }
 
+    /// The cards this session still has to get through, including the one on
+    /// screen — read off the same in-memory deck the queue is built from, which
+    /// every answer updates from the response. So it moves with no refetch and
+    /// stays right with no network, and it reaches zero at the same moment the
+    /// closing screen appears.
+    private var remaining: Int {
+        remainingCards(
+            from: deck, settings: settings, now: Date(), today: PracticeView.today()
+        )
+    }
+
     private func question(_ item: PracticeItem) -> some View {
         // Centred rather than ragged-left. Everything here is one thing at a
         // time — a sentence, then the ways to answer it — and a column pinned to
@@ -300,6 +311,14 @@ private struct SessionView: View {
         VStack(alignment: .center, spacing: 20) {
             HStack {
                 Text("\(outcome.total) answered")
+
+                // Only where there is an end to be near. 永無止盡的訓練 has no
+                // remaining anything — that is the mode — and a count there
+                // would be a pool size dressed up as a finish line.
+                if mode == .scheduled {
+                    Text("\(remaining) left")
+                        .accessibilityIdentifier("cardsRemaining")
+                }
 
                 Spacer()
 

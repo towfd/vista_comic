@@ -161,3 +161,46 @@ func nextTrainingItem(
         mode: mode
     )
 }
+
+/// How many cards a scheduled session still has to get through.
+///
+/// The same three sources `nextCard` draws from, counted instead of picked:
+/// what is due, what is left of the day's new quota, and the learning cards
+/// coming back inside the learn-ahead window. Pinned by the invariant that
+/// makes it worth having — **this is `0` if and only if `nextCard` fails**, for
+/// the same deck, settings, clock and day. Two implementations of "finished"
+/// disagreeing is how the three-step day's "I have practised this and it still
+/// says New" happened, so the parity is asserted rather than assumed.
+///
+/// Learning cards not yet due are counted for the same reason `nextCard` offers
+/// them: a card on a five-minute step *is* coming back in this session, so
+/// leaving it out would read `0` while the session kept asking questions.
+///
+/// **This counts cards, not questions.** A wrong answer sends a card back to
+/// the first learning step, so how many questions remain is unknowable — which
+/// is why a session has no fixed length in the first place. It also means the
+/// figure can rise: answering a review card wrong puts it into relearning and
+/// adds one. That is a fact about the deck rather than a punishment, and it is
+/// the reason this is a number on screen and not a progress bar.
+func remainingCards(
+    from deck: [LearningCard],
+    settings: StudySettings,
+    now: Date,
+    today: String
+) -> Int {
+    let met = deck.filter { $0.state != .new }
+    let dueNow = met.filter { $0.dueAt <= now }
+
+    // Capped by the deck as well as by the quota: a reader with room for
+    // twenty new cards and three left uncollected has three.
+    let quotaLeft = max(settings.newCardsPerDay - introducedCount(in: deck, on: today), 0)
+    let newCounted = min(quotaLeft, deck.filter { $0.state == .new }.count)
+
+    // Strictly after `now`, so a learning card already due is counted once by
+    // `dueNow` rather than twice here.
+    let soon = met.filter {
+        isInLearning($0) && $0.dueAt > now && $0.dueAt <= now.addingTimeInterval(learnAheadWindow)
+    }
+
+    return dueNow.count + newCounted + soon.count
+}
