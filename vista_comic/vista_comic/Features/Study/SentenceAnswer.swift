@@ -92,3 +92,63 @@ func shuffledPieces(of card: LearningCard, attempts: Int = 8) -> [String] {
 func judgeArrangement(_ pieces: [String], for card: LearningCard) -> TypedVerdict {
     judgeSentenceAnswer(pieces.joined(separator: " "), for: card)
 }
+
+/// The pieces of a rearrangement, and where the reader has put them.
+///
+/// A value rather than two `@State` arrays, because the rules worth being sure
+/// about are about *moving* a piece between the two rows — and those are
+/// testable only if they are not tangled with a view.
+///
+/// **A piece can be placed anywhere, not only on the end.** Appending was all
+/// the first version could do, so realising the word you need goes *before*
+/// what you have already placed meant taking everything back one at a time. The
+/// pieces are also interchangeable when they read the same: two sentences in
+/// the deck repeat a word, so this addresses them by position and never by
+/// identity.
+struct PieceTray: Hashable {
+    /// What has been placed, in order. This is the answer.
+    private(set) var placed: [String] = []
+    /// What is left to choose from.
+    private(set) var available: [String]
+
+    init(available: [String] = []) {
+        self.available = available
+    }
+
+    /// Moves the available piece at `source` into the answer.
+    ///
+    /// `before` is the position it lands at; `nil` puts it on the end. Out-of-
+    /// range indexes are clamped rather than refused — a drop lands where the
+    /// finger was, and the finger is not obliged to be inside the row.
+    mutating func place(from source: Int, before target: Int? = nil) {
+        guard available.indices.contains(source) else { return }
+        let piece = available.remove(at: source)
+        let index = min(max(target ?? placed.count, 0), placed.count)
+        placed.insert(piece, at: index)
+    }
+
+    /// Returns a placed piece to the pool.
+    ///
+    /// Any piece, not just the last one. Tapping the wrong word to undo it is
+    /// what Duolingo does, and it is the whole reason a misplacement near the
+    /// start no longer costs everything after it.
+    mutating func takeBack(at index: Int) {
+        guard placed.indices.contains(index) else { return }
+        available.append(placed.remove(at: index))
+    }
+
+    /// Moves a piece already in the answer to a different position in it.
+    mutating func move(from source: Int, before target: Int) {
+        guard placed.indices.contains(source) else { return }
+        let piece = placed.remove(at: source)
+        // The removal shifts everything after it, so a target past the source
+        // has to come back one to land where the reader aimed.
+        let adjusted = target > source ? target - 1 : target
+        placed.insert(piece, at: min(max(adjusted, 0), placed.count))
+    }
+
+    /// What is judged.
+    var produced: String { placed.joined(separator: " ") }
+
+    var isEmpty: Bool { placed.isEmpty }
+}

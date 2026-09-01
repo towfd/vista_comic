@@ -1,16 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    " · %lld/%lld": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": " · %1$lld/%2$lld"
-          }
-        }
-      }
-    },
     "#%lld": {},
     "%@ · last read": {
       "comment": "Library card: last read timestamp",
@@ -64,16 +54,6 @@
         }
       }
     },
-    "%lld of %lld": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld of %2$lld"
-          }
-        }
-      }
-    },
     "%lld/%lld downloaded": {
       "comment": "Chapter list: downloads in use against the cap",
       "localizations": {
@@ -85,6 +65,7 @@
         }
       }
     },
+    "5, 7, 10": {},
     "A new card comes back after each of these, then graduates onto the day intervals. How many you list is how many times it comes back.": {
       "localizations": {
         "zh-Hant": {
@@ -95,7 +76,6 @@
         }
       }
     },
-    "Add a sentence that contains one of your words, and it becomes a question.": {},
     "Add as sentence": {},
     "Add as word": {},
     "Added as a sentence": {},
@@ -161,7 +141,6 @@
       }
     },
     "Cloud": {},
-    "Collect %lld more while reading, then come back.": {},
     "Collect a few while reading, then come back.": {
       "localizations": {
         "zh-Hant": {
@@ -328,7 +307,6 @@
     "English": {},
     "Exit text selection": {},
     "Explain in depth": {},
-    "Familiar": {},
     "French": {},
     "History": {
       "extractionState": "stale",
@@ -636,7 +614,16 @@
         }
       }
     },
-    "Take back": {},
+    "Tap a word to take it back.": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "點一下方塊可以把它拿回來。"
+          }
+        }
+      }
+    },
     "Tap to retry": {
       "comment": "Reader: retry loading a single page that failed",
       "localizations": {

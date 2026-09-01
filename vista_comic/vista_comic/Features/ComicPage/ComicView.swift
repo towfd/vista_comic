@@ -244,6 +244,18 @@ private struct ReaderView: View {
         // Use custom, immersive controls instead of the system navigation bar,
         // so there is no duplicate back button.
         .toolbar(.hidden, for: .navigationBar)
+        // **The tab bar goes too, and stays gone.** Hiding this screen's own
+        // controls left 書庫 / 已下載 / 練習 / 單字庫 sitting under the page the
+        // whole time — a tap that was supposed to clear everything cleared the
+        // top half. Nobody switches tabs mid-page; getting out is the back
+        // button, which is part of the controls a tap brings back.
+        .toolbar(.hidden, for: .tabBar)
+        // The clock and the battery follow the controls, so a tap really does
+        // leave nothing but the page.
+        .statusBarHidden(!showControls)
+        // And the home indicator dims with them. It reappears on the next
+        // touch, which is the system's business rather than ours.
+        .persistentSystemOverlays(showControls ? .automatic : .hidden)
         .sheet(isPresented: $showChapterList) {
             chapterListSheet
         }

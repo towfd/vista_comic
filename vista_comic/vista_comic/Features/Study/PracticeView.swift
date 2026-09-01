@@ -203,23 +203,16 @@ private struct StartView: View {
                         start(.scheduled)
                     } label: {
                         Label("Review cards", systemImage: "play.fill")
-                            .font(AppFont.prompt)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.primaryRed)
+                    .buttonStyle(.commit)
                     .accessibilityIdentifier("startPractice")
 
                     Button {
                         start(.training)
                     } label: {
                         Label("Endless training", systemImage: "infinity")
-                            .font(AppFont.prompt)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.option)
                     .disabled(trainable == 0)
                     .accessibilityIdentifier("startTraining")
 
@@ -267,9 +260,8 @@ private struct SessionView: View {
     /// Set once the queue runs dry, and what the closing screen reads.
     @State private var ended: QueueEmpty?
     @State private var typed = ""
-    /// The rearrangement in progress: what has been placed, and what is left.
-    @State private var assembled: [String] = []
-    @State private var available: [String] = []
+    /// The rearrangement in progress. See `PieceTray`.
+    @State private var tray = PieceTray()
     /// `nil` while the question is open; set once answered, and what the screen
     /// shows instead of accepting another answer.
     @State private var verdict: TypedVerdict?
@@ -301,7 +293,11 @@ private struct SessionView: View {
     }
 
     private func question(_ item: PracticeItem) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+        // Centred rather than ragged-left. Everything here is one thing at a
+        // time — a sentence, then the ways to answer it — and a column pinned to
+        // the left edge of a phone reads as a form to fill in rather than as a
+        // question to answer.
+        VStack(alignment: .center, spacing: 20) {
             HStack {
                 Text("\(outcome.total) answered")
 
@@ -325,6 +321,7 @@ private struct SessionView: View {
             // Vietnamese; the cloze modes show the sentence with a gap in it.
             Text(item.prompt)
                 .font(AppFont.prompt)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let verdict {
@@ -340,26 +337,27 @@ private struct SessionView: View {
             Spacer()
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private func choices(_ item: PracticeItem) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 14) {
             ForEach(item.question?.choices ?? []) { choice in
                 Button {
                     answer(choice.id == item.question?.answer.id ? .correct : .wrong)
                 } label: {
                     Text(choice.sourceText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.option)
             }
         }
     }
 
     private func typing(_ item: PracticeItem) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 14) {
             TextField("The missing word", text: $typed)
+                .font(AppFont.choice)
+                .multilineTextAlignment(.center)
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -372,20 +370,53 @@ private struct SessionView: View {
                         ?? judgeSentenceAnswer(typed, for: item.card)
                 )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.primaryRed)
+            .buttonStyle(.commit)
             .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 
     private func rearranging(_ item: PracticeItem) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // The answer so far, on its own line so it reads as a sentence
-            // rather than as a row of buttons.
-            Text(assembled.joined(separator: " "))
-                .font(AppFont.prompt)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+            // The answer so far, as pieces rather than as a finished line.
+            //
+            // **Each one is a control.** Tapping takes it back, and a piece
+            // dragged onto it lands in front of it — which is the whole change:
+            // realising the word you need goes before what you have already
+            // placed used to mean taking everything back one at a time.
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 72), spacing: 8)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(Array(tray.placed.enumerated()), id: \.offset) { index, piece in
+                    Button(piece) { tray.takeBack(at: index) }
+                        .buttonStyle(.piece)
+                        .draggable("p:\(index)")
+                        .dropDestination(for: String.self) { payload, _ in
+                            drop(payload, before: index)
+                        }
+                }
+
+                // Somewhere to land that means "on the end". Without it the
+                // last position is unreachable by drag, since every piece drops
+                // *before* something.
+                Color.clear
+                    .frame(minWidth: 44, minHeight: 36)
+                    .dropDestination(for: String.self) { payload, _ in
+                        drop(payload, before: nil)
+                    }
+            }
+            .frame(minHeight: 44, alignment: .topLeading)
+            .accessibilityIdentifier("assembledPieces")
+
+            // Said, because it is invisible otherwise. "Take back" used to be a
+            // button that could only undo the last piece; tapping any word is
+            // strictly better and strictly less discoverable.
+            if !tray.isEmpty {
+                Text("Tap a word to take it back.")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+            }
 
             Divider()
 
@@ -396,27 +427,40 @@ private struct SessionView: View {
                     columns: [GridItem(.adaptive(minimum: 72), spacing: 8)],
                     spacing: 8
                 ) {
-                    ForEach(Array(available.enumerated()), id: \.offset) { index, piece in
-                        Button(piece) { assembled.append(available.remove(at: index)) }
-                            .buttonStyle(.bordered)
+                    ForEach(Array(tray.available.enumerated()), id: \.offset) { index, piece in
+                        Button(piece) { tray.place(from: index) }
+                            .buttonStyle(.piece)
+                            .draggable("a:\(index)")
                     }
                 }
             }
             .frame(maxHeight: 180)
 
-            HStack {
-                Button("Check") { answer(judgeArrangement(assembled, for: item.card)) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.primaryRed)
-                    .disabled(assembled.isEmpty)
-
-                // Undoing one piece rather than starting over: a misplacement
-                // near the end of fifteen should not cost the other fourteen.
-                Button("Take back") { available.append(assembled.removeLast()) }
-                    .buttonStyle(.bordered)
-                    .disabled(assembled.isEmpty)
-            }
+            Button("Check") { answer(judgeArrangement(tray.placed, for: item.card)) }
+                .buttonStyle(.commit)
+                .disabled(tray.isEmpty)
         }
+    }
+
+    /// Applies a dropped piece. `before` is `nil` for "on the end".
+    ///
+    /// The payload carries a **position**, not the word: two sentences in the
+    /// deck repeat a word, so the screen shows identical pieces and a word alone
+    /// could not say which one was picked up.
+    private func drop(_ payload: [String], before index: Int?) -> Bool {
+        guard let token = payload.first else { return false }
+        let parts = token.split(separator: ":", maxSplits: 1)
+        guard parts.count == 2, let source = Int(parts[1]) else { return false }
+
+        switch parts[0] {
+        case "a":
+            tray.place(from: source, before: index)
+        case "p":
+            tray.move(from: source, before: index ?? tray.placed.count)
+        default:
+            return false
+        }
+        return true
     }
 
     /// What the reader sees once they have answered.
@@ -426,15 +470,16 @@ private struct SessionView: View {
     /// first learning step, so it returns on its own a few minutes later —
     /// which is the whole reason the mistakes area was cancelled.
     private func answered(_ item: PracticeItem, verdict: TypedVerdict) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 12) {
             Label(
                 verdict == .wrong
                     ? "The answer was \(item.question?.removed ?? item.card.sourceText)"
                     : "Correct",
                 systemImage: verdict == .wrong ? "xmark.circle.fill" : "checkmark.circle.fill"
             )
-            .font(AppFont.caption)
-            .foregroundStyle(.grayFont)
+            .font(AppFont.choice)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(verdict == .wrong ? Color.primaryRed : Color.practiceTeal)
 
             // Named rather than waved through. The answer counted — the reader
             // knew the word — but a lesson that said nothing here would be
@@ -451,8 +496,7 @@ private struct SessionView: View {
                 .foregroundStyle(.grayFont)
 
             Button("Next") { advance() }
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryRed)
+                .buttonStyle(.commit)
                 .accessibilityIdentifier("nextQuestion")
         }
     }
@@ -483,8 +527,8 @@ private struct SessionView: View {
             }
 
             Button("Done") { onFinish() }
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryRed)
+                .buttonStyle(.commit)
+                .padding(.horizontal, 40)
                 .accessibilityIdentifier("finishRound")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -561,12 +605,10 @@ private struct SessionView: View {
     /// a stale arrangement cannot be checked against the next question.
     private func seedPieces() {
         guard let item = current, item.mode == .rearranging else {
-            assembled = []
-            available = []
+            tray = PieceTray()
             return
         }
-        assembled = []
-        available = shuffledPieces(of: item.card)
+        tray = PieceTray(available: shuffledPieces(of: item.card))
     }
 }
 
