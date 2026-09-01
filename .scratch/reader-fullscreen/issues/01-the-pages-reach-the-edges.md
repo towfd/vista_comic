@@ -1,4 +1,4 @@
-Status: implemented, awaiting the repo owner's device pass
+Status: done — device-verified by the repo owner, 2026-09-01
 
 # 01 — The pages reach the edges
 
@@ -35,27 +35,31 @@ screen to explain why the drag cannot be cancelled.
 
 ## Acceptance criteria
 
-- [ ] With the controls hidden, a page runs to the top and bottom edges of the screen with no
+- [x] With the controls hidden, a page runs to the top and bottom edges of the screen with no
       band above or below it
-- [ ] The controls, when tapped up, are still fully inside the safe area — the back button is
+- [x] The controls, when tapped up, are still fully inside the safe area — the back button is
       not under the Dynamic Island and the chapter bar is not under the home indicator
-- [ ] Both bars' material still reaches the screen edges
-- [ ] In selection mode the cancel badge is fully visible, below the control bar, on a device
+- [x] Both bars' material still reaches the screen edges
+- [x] In selection mode the cancel badge is fully visible, below the control bar, on a device
       with a top inset
-- [ ] Pinch, pan, and the end-of-chapter shift behave as before
-- [ ] Pulling past the end still advances the chapter, and an ordinary scroll to the bottom
+- [x] Pinch, pan, and the end-of-chapter shift behave as before
+- [x] Pulling past the end still advances the chapter, and an ordinary scroll to the bottom
       still does not
-- [ ] Reopening a chapter resumes to the same page as before this change
-- [ ] The loading, failed, and offline-unavailable states are unaffected
-- [ ] No XCUITest is written, built, or run — the device checklist is the deliverable
+- [x] Reopening a chapter resumes to the same page as before this change
+- [x] The loading, failed, and offline-unavailable states are unaffected
+- [x] No XCUITest is written, built, or run — the device checklist is the deliverable
 
 ## File boundary
 
 - `vista_comic/vista_comic/Features/ComicPage/ComicView.swift`
 - `vista_comic/vista_comicTests/` if a pure function ends up changing
 
-Nothing is ticked yet. Every criterion on this ticket is visual, and the device pass is what
-answers them — the unit suite can only say that nothing else broke.
+Every criterion on this ticket is visual, and all of them are answered by the repo owner's
+device pass on 2026-09-01, which passed with no changes asked for. The unit suite only ever
+said that nothing else broke.
+
+**The measurement held.** The risk named below — a background that does not expand into the
+inset, leaving the cancel badge under the control bar — did not happen on a real device.
 
 ## What was built
 
