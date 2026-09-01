@@ -110,6 +110,10 @@ def next_schedule(
     ``RELEARNING``    as learning                      step 0
     ================  ===============================  ========================
 
+    **A ``REVIEW`` card answered before ``due_at`` is returned unchanged**, in
+    either direction. See the comment on that branch: the interval is the claim
+    being tested, and an answer given early has not tested it.
+
     **A first answer that is wrong still only reaches the first step.** There is
     nothing below the bottom to fall to, and inventing a punishment there would
     charge the reader for meeting a word.
@@ -165,6 +169,30 @@ def next_schedule(
         return at_step(current.state, index + 1)
 
     # REVIEW.
+    #
+    # **An answer that arrives before the card is due moves nothing.** It is
+    # recorded like any other -- what the reader did is a fact -- but it cannot
+    # promote a slot, and by the same sentence it cannot cost one either: an
+    # answer that is not allowed to earn anything must not be allowed to charge
+    # anything.
+    #
+    # The interval is the claim being tested. A card that graduated onto "one
+    # day" an hour ago has not survived a day, so answering it correctly now
+    # says nothing about whether three days is the right next question, and
+    # promoting it would teach the schedule something that did not happen.
+    #
+    # In practice this is also the guard against being asked twice. The queue
+    # lives in the app and is built from a deck the app holds; a dropped
+    # response leaves that deck believing a graduated card is still due, and it
+    # will offer it again. The card's own due date is the only thing in the
+    # system that can refuse.
+    #
+    # The learning steps are deliberately not covered: ``learnAheadWindow``
+    # offers a learning card up to twenty minutes early **on purpose**, and a
+    # duplicate there costs one step and heals itself.
+    if answered_at < current.due_at:
+        return current
+
     if correct:
         slot = ladder.clamp_slot(current.stage + 1)
         return CardSchedule(

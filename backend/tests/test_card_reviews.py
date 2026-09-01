@@ -214,14 +214,36 @@ def _answer(
     return client.post(f"/cards/{card_id}/reviews", json=body).json()
 
 
+def _answer_when_due(client, card_id, *, correct: bool, token: str, previous=None):
+    """One answer, given at the moment the previous one made the card due.
+
+    Ticket 09: a review card answered **before** its due date moves nothing, so
+    a test that climbs the interval table can no longer do it by answering the
+    same card six times in the same millisecond. Letting time pass here means
+    telling the endpoint when the answer was given, which is a facility it has
+    for a better reason — an offline session flushes hours late.
+    """
+    at = previous["dueAt"] if previous else None
+    outcome = _answer(client, card_id, correct=correct, token=token, answered_at=at)
+    # Stashed on the response so `_due_in_days` can measure from the right
+    # moment. The endpoint does not send this; the test knows it because the
+    # test chose it.
+    outcome["_answeredAt"] = at
+    return outcome
+
+
 def _due_in_days(outcome, days: int) -> bool:
     """Whether the endpoint scheduled the card roughly `days` out.
 
     Compared loosely because `dueAt` is a timestamp now: the answer's own moment
-    plus the interval, which is only equal to a date boundary by accident.
+    plus the interval, which is only equal to a date boundary by accident. The
+    moment is the one the answer was given at, which for a card being walked up
+    the table by `_answer_when_due` is not now.
     """
     due = datetime.fromisoformat(outcome["dueAt"])
-    expected = datetime.now(timezone.utc) + timedelta(days=days)
+    given = outcome.get("_answeredAt")
+    moment = datetime.fromisoformat(given) if given else datetime.now(timezone.utc)
+    expected = moment + timedelta(days=days)
     return abs((due - expected).total_seconds()) < 300
 
 
@@ -329,47 +351,104 @@ def test_a_graduated_card_missed_falls_one_slot_not_to_the_bottom(client, card_i
     Judging is an exact match on production, so a wrong answer is often a slip
     rather than a forgetting, and charging the whole table for it teaches
     nothing. Getting to slot 2 takes six correct answers — four to graduate onto
-    slot 0, then one per slot — which is what the loop below is doing.
+    slot 0, then one per slot — which is what the loop below is doing, each
+    answer given on the day the one before it made the card due.
     """
     token = iter("abcdefghijklmnop")
+    outcome = None
     for _ in range(6):
-        outcome = _answer(client, card_id, correct=True, token=next(token))
+        outcome = _answer_when_due(
+            client, card_id, correct=True, token=next(token), previous=outcome
+        )
     assert outcome["ladderStage"] == 2
 
-    lapsed = _answer(client, card_id, correct=False, token=next(token))
+    lapsed = _answer_when_due(
+        client, card_id, correct=False, token=next(token), previous=outcome
+    )
     assert lapsed["state"] == "relearning"
 
+    recovered = lapsed
     for _ in range(3):
-        recovered = _answer(client, card_id, correct=True, token=next(token))
+        recovered = _answer_when_due(
+            client, card_id, correct=True, token=next(token), previous=recovered
+        )
     assert recovered["state"] == "review"
     assert recovered["ladderStage"] == 1
     assert _due_in_days(recovered, 3)
 
 
-def test_a_graduated_card_climbs_on_every_correct_answer(client, card_id):
-    """**What stops this being drilling is the queue, not the scheduler.**
+def test_a_graduated_card_climbs_on_every_correct_answer_it_is_due_for(client, card_id):
+    """One slot per answer, and **the answer has to be owed**.
 
     The ladder this replaced refused to move on an answer that changed no step,
     which is how it kept ten correct answers in one round from carrying a card
     to the top. There is no resting place to sit in now, so the endpoint moves
-    the card every time it is asked — and what keeps that honest is that a
-    graduated card is scheduled a day out and the round will not offer it again
-    (stage 6 ticket 03). Training answers, which could, schedule nothing.
+    the card on every answer — but only on one given at or after the card's due
+    date, which is the guard ticket 09 added. Ten answers in one evening now
+    carry a card exactly as far as one does.
     """
     token = iter("abcdefghijklmnop")
+    outcome = None
     for _ in range(4):
-        _answer(client, card_id, correct=True, token=next(token))
+        outcome = _answer_when_due(
+            client, card_id, correct=True, token=next(token), previous=outcome
+        )
 
     for expected in (1, 2, 3):
-        outcome = _answer(client, card_id, correct=True, token=next(token))
+        outcome = _answer_when_due(
+            client, card_id, correct=True, token=next(token), previous=outcome
+        )
         assert outcome["ladderStage"] == expected
         assert outcome["intervalChanged"] is True
 
 
+def test_answering_a_card_that_is_not_due_yet_changes_nothing(client, card_id):
+    """The bug this guard was written for.
+
+    A card graduated onto one day, and the app — whose deck had not heard about
+    it, because the response never arrived — offered it again in the same
+    session. The second answer promoted it to three days. Nothing had happened
+    in between that three days could be a measurement of.
+    """
+    for token in ("a", "b", "c"):
+        _answer(client, card_id, correct=True, token=token)
+    graduated = _answer(client, card_id, correct=True, token="d")
+    assert graduated["ladderStage"] == 0
+    assert _due_in_days(graduated, 1)
+
+    again = _answer(client, card_id, correct=True, token="e")
+
+    assert again["ladderStage"] == 0
+    assert again["dueAt"] == graduated["dueAt"]
+    assert again["intervalChanged"] is False
+    # The answer is still on the record. What the reader did is a fact; it just
+    # moves nothing, exactly as a training answer moves nothing.
+    assert len(client.get(f"/cards/{card_id}/reviews").json()) == 5
+
+
+def test_a_card_that_is_not_due_cannot_be_knocked_down_either(client, card_id):
+    """Symmetry, and it is the half that protects the reader.
+
+    An answer that cannot earn a slot must not be able to cost one — otherwise
+    the same duplicated question that could not promote a card could still send
+    it back into relearning.
+    """
+    for token in ("a", "b", "c", "d"):
+        _answer(client, card_id, correct=True, token=token)
+
+    again = _answer(client, card_id, correct=False, token="e")
+
+    assert again["state"] == "review"
+    assert again["ladderStage"] == 0
+
+
 def test_the_top_slot_clamps_rather_than_overflowing(client, card_id):
     token = iter("abcdefghijklmnopqrstuvwxyz")
+    outcome = None
     for _ in range(20):
-        outcome = _answer(client, card_id, correct=True, token=next(token))
+        outcome = _answer_when_due(
+            client, card_id, correct=True, token=next(token), previous=outcome
+        )
 
     assert outcome["ladderStage"] == 6
     assert _due_in_days(outcome, 365)

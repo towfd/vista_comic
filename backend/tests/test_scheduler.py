@@ -146,7 +146,10 @@ def test_the_remembered_slot_is_cleared_once_it_is_used():
     assert graduated.stage == 5
     assert graduated.previous_stage is None
 
-    lapsed_again = answer(graduated, False)
+    # A hundred and fifty days later, which is when it is next asked. Answering
+    # it at the same instant it graduated would now change nothing (ticket 09),
+    # and it is the honest reading of the story anyway.
+    lapsed_again = answer(graduated, False, at=graduated.due_at)
     assert lapsed_again.previous_stage == 4
 
 
@@ -155,6 +158,62 @@ def test_relearning_restarts_on_a_wrong_answer_without_forgetting_the_slot():
     assert landed.state is CardState.RELEARNING
     assert landed.learning_step == 0
     assert landed.previous_stage == 3
+
+
+# --- Answered before it was due (ticket 09) ----------------------------------
+
+
+def not_yet_due(stage: int) -> CardSchedule:
+    """A review card with a day still to run."""
+    return CardSchedule(
+        state=CardState.REVIEW,
+        learning_step=None,
+        stage=stage,
+        previous_stage=None,
+        due_at=ANSWERED + timedelta(days=1),
+    )
+
+
+@pytest.mark.parametrize("correct", [True, False])
+def test_a_review_card_answered_early_does_not_move(correct):
+    """The interval is the claim, and an early answer has not tested it.
+
+    This is the fifth answer in the bug report: a card graduated onto one day,
+    was asked again in the same session because the app's deck had not heard
+    about it, and was promoted to three. Nothing had happened in between to
+    justify three.
+
+    Wrong answers are covered by the same rule for symmetry — an answer that
+    cannot earn a slot must not be able to cost one either.
+    """
+    subject = not_yet_due(2)
+    assert answer(subject, correct) == subject
+
+
+def test_the_moment_it_is_due_it_moves_again():
+    """The boundary is `answered_at < due_at`, not a grace period.
+
+    A card due at 08:00 answered at 08:00 is being answered on time, and the
+    day's session is the one that must count.
+    """
+    subject = not_yet_due(2)
+    landed = answer(subject, True, at=subject.due_at)
+    assert landed.stage == 3
+
+
+def test_a_learning_card_answered_early_still_advances():
+    """`learnAheadWindow` offers a learning card up to twenty minutes early on
+    purpose, so the rule above must not reach it — a session with three cards on
+    five-minute timers would otherwise be unable to move at all."""
+    subject = CardSchedule(
+        state=CardState.LEARNING,
+        learning_step=0,
+        stage=0,
+        previous_stage=None,
+        due_at=ANSWERED + timedelta(minutes=4),
+    )
+    landed = answer(subject, True)
+    assert landed.learning_step == 1
 
 
 # --- The two properties later tickets depend on ------------------------------

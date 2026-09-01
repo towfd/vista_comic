@@ -203,23 +203,16 @@ private struct StartView: View {
                         start(.scheduled)
                     } label: {
                         Label("Review cards", systemImage: "play.fill")
-                            .font(AppFont.prompt)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.primaryRed)
+                    .buttonStyle(.commit)
                     .accessibilityIdentifier("startPractice")
 
                     Button {
                         start(.training)
                     } label: {
                         Label("Endless training", systemImage: "infinity")
-                            .font(AppFont.prompt)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.option)
                     .disabled(trainable == 0)
                     .accessibilityIdentifier("startTraining")
 
@@ -267,9 +260,8 @@ private struct SessionView: View {
     /// Set once the queue runs dry, and what the closing screen reads.
     @State private var ended: QueueEmpty?
     @State private var typed = ""
-    /// The rearrangement in progress: what has been placed, and what is left.
-    @State private var assembled: [String] = []
-    @State private var available: [String] = []
+    /// The rearrangement in progress. See `PieceTray`.
+    @State private var tray = PieceTray()
     /// `nil` while the question is open; set once answered, and what the screen
     /// shows instead of accepting another answer.
     @State private var verdict: TypedVerdict?
@@ -301,7 +293,11 @@ private struct SessionView: View {
     }
 
     private func question(_ item: PracticeItem) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+        // Centred rather than ragged-left. Everything here is one thing at a
+        // time — a sentence, then the ways to answer it — and a column pinned to
+        // the left edge of a phone reads as a form to fill in rather than as a
+        // question to answer.
+        VStack(alignment: .center, spacing: 20) {
             HStack {
                 Text("\(outcome.total) answered")
 
@@ -325,6 +321,7 @@ private struct SessionView: View {
             // Vietnamese; the cloze modes show the sentence with a gap in it.
             Text(item.prompt)
                 .font(AppFont.prompt)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let verdict {
@@ -340,26 +337,27 @@ private struct SessionView: View {
             Spacer()
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private func choices(_ item: PracticeItem) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 14) {
             ForEach(item.question?.choices ?? []) { choice in
                 Button {
                     answer(choice.id == item.question?.answer.id ? .correct : .wrong)
                 } label: {
                     Text(choice.sourceText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.option)
             }
         }
     }
 
     private func typing(_ item: PracticeItem) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 14) {
             TextField("The missing word", text: $typed)
+                .font(AppFont.choice)
+                .multilineTextAlignment(.center)
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -372,50 +370,50 @@ private struct SessionView: View {
                         ?? judgeSentenceAnswer(typed, for: item.card)
                 )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.primaryRed)
+            .buttonStyle(.commit)
             .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 
     private func rearranging(_ item: PracticeItem) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            // The answer so far, on its own line so it reads as a sentence
-            // rather than as a row of buttons.
-            Text(assembled.joined(separator: " "))
-                .font(AppFont.prompt)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+            // The answer so far, as pieces rather than as a finished line.
+            // Tapping one takes it back; holding one moves it, and the rest of
+            // the row gets out of its way while the finger is down.
+            PlacedPiecesRow(
+                pieces: tray.placedPieces,
+                takeBack: { tray.takeBack(at: $0) },
+                move: { tray.move(from: $0, before: $1) }
+            )
+            .frame(minHeight: 44, alignment: .topLeading)
+            .accessibilityIdentifier("assembledPieces")
+
+            // Said, because both gestures are invisible otherwise — and the
+            // second one was invisible enough that the reader asked for a
+            // feature the screen already had.
+            if !tray.isEmpty {
+                Text("Tap a word to take it back. Hold one to move it.")
+                    .font(AppFont.caption)
+                    .foregroundStyle(.grayFont)
+            }
 
             Divider()
 
-            // Wrapping, because a sentence splits into twelve to fifteen pieces
-            // and one scrolling row would hide most of them.
+            // Scrolls only when it has to. Each word is its own width now, so a
+            // twelve-piece sentence fits where the grid's equal columns did not
+            // — and the strip that had to be scrolled to read was the reader's
+            // second complaint about this screen.
             ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 72), spacing: 8)],
-                    spacing: 8
-                ) {
-                    ForEach(Array(available.enumerated()), id: \.offset) { index, piece in
-                        Button(piece) { assembled.append(available.remove(at: index)) }
-                            .buttonStyle(.bordered)
-                    }
-                }
+                PiecePool(
+                    pieces: tray.availablePieces,
+                    place: { tray.place(from: $0) }
+                )
             }
-            .frame(maxHeight: 180)
+            .frame(maxHeight: 300)
 
-            HStack {
-                Button("Check") { answer(judgeArrangement(assembled, for: item.card)) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.primaryRed)
-                    .disabled(assembled.isEmpty)
-
-                // Undoing one piece rather than starting over: a misplacement
-                // near the end of fifteen should not cost the other fourteen.
-                Button("Take back") { available.append(assembled.removeLast()) }
-                    .buttonStyle(.bordered)
-                    .disabled(assembled.isEmpty)
-            }
+            Button("Check") { answer(judgeArrangement(tray.placed, for: item.card)) }
+                .buttonStyle(.commit)
+                .disabled(tray.isEmpty)
         }
     }
 
@@ -426,15 +424,21 @@ private struct SessionView: View {
     /// first learning step, so it returns on its own a few minutes later —
     /// which is the whole reason the mistakes area was cancelled.
     private func answered(_ item: PracticeItem, verdict: TypedVerdict) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(
-                verdict == .wrong
-                    ? "The answer was \(item.question?.removed ?? item.card.sourceText)"
-                    : "Correct",
-                systemImage: verdict == .wrong ? "xmark.circle.fill" : "checkmark.circle.fill"
-            )
-            .font(AppFont.caption)
-            .foregroundStyle(.grayFont)
+        VStack(spacing: 12) {
+            // **The sentence, with nothing in front of it.** "The answer was"
+            // was three words of preamble on the one line the reader is here to
+            // read, and the colour has already said which way it went.
+            if verdict == .wrong {
+                Text(item.question?.removed ?? item.card.sourceText)
+                    .font(AppFont.prompt)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(Color.primaryRed)
+            } else {
+                Label("Correct", systemImage: "checkmark.circle.fill")
+                    .font(AppFont.choice)
+                    .foregroundStyle(Color.practiceTeal)
+            }
 
             // Named rather than waved through. The answer counted — the reader
             // knew the word — but a lesson that said nothing here would be
@@ -446,13 +450,17 @@ private struct SessionView: View {
                     .accessibilityIdentifier("toneHint")
             }
 
+            // The meaning, at a size it can be read at. It was a 12pt caption
+            // under a 26pt sentence, which made the half that explains the
+            // other half the smallest thing on the screen.
             Text(item.card.translation)
-                .font(AppFont.caption)
+                .font(AppFont.explanation)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.grayFont)
 
             Button("Next") { advance() }
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryRed)
+                .buttonStyle(.commit)
                 .accessibilityIdentifier("nextQuestion")
         }
     }
@@ -483,8 +491,8 @@ private struct SessionView: View {
             }
 
             Button("Done") { onFinish() }
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryRed)
+                .buttonStyle(.commit)
+                .padding(.horizontal, 40)
                 .accessibilityIdentifier("finishRound")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -493,7 +501,34 @@ private struct SessionView: View {
     private func answer(_ result: TypedVerdict) {
         verdict = result
         guard let item = current else { return }
-        Task { await submit(item, correct: result.isCorrect) }
+        let moment = Date()
+
+        // **The deck moves now, not when the response comes back.**
+        //
+        // The queue is built from this deck, and the submission below is a
+        // round trip that "Next" does not wait for — so a slow one, or one that
+        // never arrives, used to leave a card sitting here as due when the
+        // server had already scheduled it days out. The session would then
+        // offer it again and the second answer would be taken as a real one,
+        // which is how a card graduated onto one day was promoted to three.
+        //
+        // Computed with the same table the server runs (`Scheduler.swift`),
+        // which the offline path has always used. The server's outcome
+        // overwrites this the moment it arrives; until then this is what the
+        // queue reads, rather than something known to be out of date.
+        if mode == .scheduled, let index = deck.firstIndex(where: { $0.id == item.card.id }) {
+            deck[index].apply(
+                nextSchedule(
+                    deck[index].scheduling,
+                    correct: result.isCorrect,
+                    answeredAt: moment,
+                    learningSteps: settings.learningSteps
+                ),
+                introducedOn: PracticeView.today()
+            )
+        }
+
+        Task { await submit(item, correct: result.isCorrect, at: moment) }
     }
 
     /// Records the answer, and lets the backend say what it changed.
@@ -506,19 +541,24 @@ private struct SessionView: View {
     ///
     /// A failure costs the record, not the session. The reader is mid-question
     /// and there is nothing they could do about it; the answer they gave stands
-    /// on screen either way.
-    private func submit(_ item: PracticeItem, correct: Bool) async {
+    /// on screen either way — and `answer(_:)` has already moved the card, so a
+    /// failure no longer leaves the queue believing it is still due.
+    ///
+    /// `moment` is passed in rather than read here, so that what the server is
+    /// told and what the deck was moved with are the same instant.
+    private func submit(_ item: PracticeItem, correct: Bool, at moment: Date) async {
         let result = try? await repository.recordReview(
             cardID: item.card.id,
             questionType: item.questionType,
             isCorrect: correct,
             clientToken: item.token,
-            localDate: Date(),
-            answeredAt: Date(),
+            localDate: moment,
+            answeredAt: moment,
             context: mode == .training ? .training : .review,
             elapsedMs: nil
         )
         if let result, let index = deck.firstIndex(where: { $0.id == item.card.id }) {
+            // The server's answer wins over the one computed on tapping.
             // Training changes nothing on the server, and writing the response
             // back is how that stays true here too rather than only there.
             deck[index].apply(result)
@@ -526,7 +566,9 @@ private struct SessionView: View {
         outcome.record(
             correct: correct,
             cardID: item.card.id,
-            state: result?.state ?? item.card.state
+            // The card as it now stands: the server's word if it arrived, and
+            // otherwise the local move, which is what the session is running on.
+            state: deck.first(where: { $0.id == item.card.id })?.state ?? item.card.state
         )
     }
 
@@ -561,12 +603,10 @@ private struct SessionView: View {
     /// a stale arrangement cannot be checked against the next question.
     private func seedPieces() {
         guard let item = current, item.mode == .rearranging else {
-            assembled = []
-            available = []
+            tray = PieceTray()
             return
         }
-        assembled = []
-        available = shuffledPieces(of: item.card)
+        tray = PieceTray(available: shuffledPieces(of: item.card))
     }
 }
 
