@@ -1,4 +1,4 @@
-Status: implemented, awaiting the repo owner's device pass
+Status: done — device-verified by the repo owner, 2026-09-01
 
 # 11 — How many are left
 
@@ -46,17 +46,17 @@ Nothing. Tickets 03 and 04 shipped; this reads the queue they built.
 
 ## Acceptance criteria
 
-- [ ] A scheduled session shows the remaining card count in the header, beside the answered count
-- [ ] 永無止盡的訓練 does not show it
+- [x] A scheduled session shows the remaining card count in the header, beside the answered count
+- [x] 永無止盡的訓練 does not show it
 - [x] The count comes from a pure function in `PracticeQueue.swift` taking deck, settings, clock and day
 - [x] Unit test: the count is `0` exactly when `nextCard` fails, over an empty deck, a finished day, a deck with only future review cards, and a deck with a learning card due inside the learn-ahead window
 - [x] Unit test: a `new` card counts only while the day's quota has room, and the quota cap never counts more new cards than the deck holds
 - [x] Unit test: a learning card due inside the learn-ahead window is counted exactly once, not twice via rule (1)
 - [x] Unit test: introducing a new card leaves the count unchanged — it moves from the quota to the learning pool
 - [x] Unit test: a card answered wrong stays counted, and one that graduates onto the interval table leaves the count
-- [ ] The figure updates from the in-memory deck after each answer, with no refetch and with no network
+- [x] The figure updates from the in-memory deck after each answer, with no refetch and with no network
 - [x] No progress bar, percentage, or ring is added
-- [ ] The closing screen is unchanged — it already distinguishes an empty deck from a finished day
+- [x] The closing screen is unchanged — it already distinguishes an empty deck from a finished day
 - [x] No XCUITest is written, built, or run — the device checklist is the deliverable
 
 ## File boundary
@@ -67,8 +67,8 @@ Nothing. Tickets 03 and 04 shipped; this reads the queue they built.
 
 Nothing in `Scheduler.swift` or on the backend. This ticket reads the queue; it does not change what the queue does.
 
-Unticked boxes are the ones only the device pass can honestly tick. Everything ticked is covered
-by a unit test or is a structural fact about the diff.
+Everything above is ticked: the unit-tested half by the suite, the visual half by the repo
+owner's device pass on 2026-09-01, which passed with no changes asked for.
 
 ## What was built
 

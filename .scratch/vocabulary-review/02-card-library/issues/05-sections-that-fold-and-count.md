@@ -1,4 +1,4 @@
-Status: implemented, awaiting the repo owner's device pass
+Status: done — device-verified by the repo owner, 2026-09-01
 
 # 05 — Sections that fold, and say how many
 
@@ -37,17 +37,17 @@ Nothing. Ticket 03 shipped; this changes the screen it built.
 
 ## Acceptance criteria
 
-- [ ] Opening 單字庫 shows the section headings collapsed, with no card rows visible
-- [ ] Tapping a heading expands it; tapping again collapses it
-- [ ] Leaving the tab and returning shows the headings collapsed again
-- [ ] Each heading shows the number of cards in that section
-- [ ] With a search active, every section is expanded and each count is the matching count
-- [ ] Clearing the search collapses the sections again
+- [x] Opening 單字庫 shows the section headings collapsed, with no card rows visible
+- [x] Tapping a heading expands it; tapping again collapses it
+- [x] Leaving the tab and returning shows the headings collapsed again
+- [x] Each heading shows the number of cards in that section
+- [x] With a search active, every section is expanded and each count is the matching count
+- [x] Clearing the search collapses the sections again
 - [x] A deck of only words shows one heading, not an empty `Sentences 0`
-- [ ] The unclassified section counts and folds like the others, and keeps the quiet treatment
-- [ ] The offline notice is visible without expanding anything
-- [ ] The empty-deck state and the no-matches state are both unchanged
-- [ ] Every colour comes from the asset catalogue and is checked in both light and dark appearance
+- [x] The unclassified section counts and folds like the others, and keeps the quiet treatment
+- [x] The offline notice is visible without expanding anything
+- [x] The empty-deck state and the no-matches state are both unchanged
+- [x] Every colour comes from the asset catalogue and is checked in both light and dark appearance
 - [x] Counting and grouping stay free functions in `CardLibrary.swift` and are unit tested; the view holds only the fold state
 - [x] No XCUITest is written, built, or run — the device checklist is the deliverable
 
@@ -59,8 +59,8 @@ Nothing. Ticket 03 shipped; this changes the screen it built.
 - `vista_comic/vista_comicTests/` — the counting tests
 - `Assets.xcassets` only if an existing colour genuinely cannot serve, and then say why in the report
 
-Unticked boxes are the ones only the device pass can honestly tick. Everything ticked is
-covered by a unit test or is a structural fact about the diff.
+Everything above is ticked: the unit-tested half by the suite, the visual half by the repo
+owner's device pass on 2026-09-01, which passed with no changes asked for.
 
 ## What was built
 
