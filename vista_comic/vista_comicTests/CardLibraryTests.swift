@@ -216,3 +216,72 @@ struct CardSourceLabelTests {
         #expect(card.source.canJumpToSource)
     }
 }
+
+/// The counts and colours the headings carry (stage 2, ticket 05).
+///
+/// Both are read off `groupedByKind`, which is the point: the heading counts
+/// the rows underneath it and nothing else, so a search can never leave a
+/// number describing cards the reader cannot see.
+@Suite("What a heading says about its section")
+struct CardSectionHeadingTests {
+
+    @Test("A heading counts the cards under it")
+    func headingsCountTheirOwnSection() {
+        let deck = [
+            LearningCard.preview(id: 1, kind: "word"),
+            LearningCard.preview(id: 2, kind: "word"),
+            LearningCard.preview(id: 3, kind: "sentence"),
+        ]
+
+        #expect(groupedByKind(deck).map { $0.cards.count } == [2, 1])
+    }
+
+    @Test("While searching, the count is what was found")
+    func countsFollowTheSearch() {
+        // The number the reader sees has to describe the rows underneath it.
+        // Grouping the *matches* rather than the deck is what guarantees that,
+        // so this asserts the order the screen composes them in.
+        let deck = [
+            LearningCard.preview(id: 1, sourceText: "KHI", kind: "word"),
+            LearningCard.preview(id: 2, sourceText: "NAO", kind: "word"),
+            LearningCard.preview(id: 3, sourceText: "KHI NAO", kind: "sentence"),
+        ]
+
+        let groups = groupedByKind(cardsMatching("KHI", in: deck))
+
+        #expect(groups.map(\.kind) == [.word, .sentence])
+        #expect(groups.map { $0.cards.count } == [1, 1])
+    }
+
+    @Test("A search that empties a section drops the heading with it")
+    func aSectionWithNoMatchesDisappears() {
+        let deck = [
+            LearningCard.preview(id: 1, sourceText: "KHI", kind: "word"),
+            LearningCard.preview(id: 2, sourceText: "BAO", kind: "sentence"),
+        ]
+
+        let groups = groupedByKind(cardsMatching("KHI", in: deck))
+
+        #expect(groups.map(\.kind) == [.word])
+        #expect(groups.map { $0.cards.count } == [1])
+    }
+
+    @Test("Unclassified takes no colour")
+    func theQuietSectionStaysQuiet() {
+        // Pinned rather than left to the eye: the section holding the reader's
+        // mis-taps must not shout at them every time the tab opens, and it is
+        // the kind of decision a later "make it consistent" tidy-up undoes.
+        let deck = [
+            LearningCard.preview(id: 1, kind: "word"),
+            LearningCard.preview(id: 2, kind: "sentence"),
+            LearningCard.preview(id: 3, kind: nil),
+        ]
+
+        let accents = groupedByKind(deck).map(\.accent)
+
+        #expect(accents[0] != nil)
+        #expect(accents[1] != nil)
+        #expect(accents[0] != accents[1])
+        #expect(accents[2] == nil)
+    }
+}

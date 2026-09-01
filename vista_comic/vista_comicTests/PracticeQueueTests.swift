@@ -284,3 +284,105 @@ struct TrainingPoolTests {
         #expect(item.card.id == 1)
     }
 }
+
+/// How many cards a scheduled session still has to get through (stage 6,
+/// ticket 11).
+///
+/// The suite exists for its first test. Everything else here describes the
+/// count; that one pins it to the queue, so the screen and the session can
+/// never disagree about what "finished" means.
+@Suite("How many are left")
+struct RemainingCardsTests {
+
+    private func left(_ deck: [LearningCard], _ config: StudySettings = settings) -> Int {
+        remainingCards(from: deck, settings: config, now: now, today: today)
+    }
+
+    @Test("The count is zero exactly when the queue has nothing to offer")
+    func zeroMeansFinished() {
+        let spent = (1...15).map {
+            card($0, state: "review", dueIn: 86_400, introducedOn: today)
+        }
+        let decks: [[LearningCard]] = [
+            // Nothing collected at all.
+            [],
+            // Everything reviewed; nothing comes back today.
+            [card(1, state: "review", dueIn: 86_400)],
+            // A learning card, but further out than the learn-ahead window.
+            [card(1, state: "learning", dueIn: 40 * 60, step: 1)],
+            // New cards left, but the day's quota is spent on other cards.
+            spent + [card(99, state: "new")],
+            // One due card.
+            [card(1, state: "review", dueIn: -60)],
+            // One new card and room for it.
+            [card(1, state: "new")],
+            // A learning card inside the learn-ahead window.
+            [card(1, state: "learning", dueIn: 10 * 60, step: 1)],
+        ]
+
+        for deck in decks {
+            let queueIsEmpty = (try? pick(deck).get()) == nil
+            #expect((left(deck) == 0) == queueIsEmpty)
+        }
+    }
+
+    @Test("New cards count only while the day's quota has room")
+    func quotaBoundsTheCount() {
+        let deck = (1...5).map { card($0, state: "new") }
+
+        #expect(left(deck) == 5)
+        #expect(left(deck, StudySettings(learningSteps: [5, 7, 10], newCardsPerDay: 2)) == 2)
+    }
+
+    @Test("The quota never counts more new cards than the deck holds")
+    func theDeckBoundsTheQuota() {
+        // Room for fifteen, two collected. Counting the room rather than the
+        // cards would promise thirteen questions that do not exist.
+        #expect(left([card(1, state: "new"), card(2, state: "new")]) == 2)
+    }
+
+    @Test("Cards met earlier today have already spent their share of the quota")
+    func introducedCardsShrinkTheQuota() {
+        let met = (1...14).map {
+            card($0, state: "review", dueIn: 86_400, introducedOn: today)
+        }
+        let deck = met + [card(20, state: "new"), card(21, state: "new")]
+
+        // One slot left in the day, so one of the two new cards.
+        #expect(left(deck) == 1)
+    }
+
+    @Test("A learning card that is already due is counted once, not twice")
+    func noDoubleCountingAcrossTheWindow() {
+        // Due now *and* inside the learn-ahead window, which is the overlap the
+        // count has to resolve — it is one question either way.
+        #expect(left([card(1, state: "learning", dueIn: -60, step: 1)]) == 1)
+    }
+
+    @Test("Introducing a new card leaves the count unchanged")
+    func introducingMovesRatherThanRemoves() {
+        let before = [card(1, state: "new")]
+        // The same card after being met: it has spent a quota slot and is now
+        // waiting on a five-minute step. It moved between the two things the
+        // count adds up, so the total must not move.
+        let after = [
+            card(1, state: "learning", dueIn: 300, step: 0, introducedOn: today)
+        ]
+
+        #expect(left(before) == 1)
+        #expect(left(after) == 1)
+    }
+
+    @Test("A card answered wrong stays counted; one that graduates leaves")
+    func onlyLeavingTodayDropsTheCount() {
+        let due = [card(1, state: "review", dueIn: -60)]
+        // Wrong: back onto a learning step, still coming back this session.
+        let lapsed = [card(1, state: "relearning", dueIn: 300, step: 0)]
+        // Right: onto the interval table, gone until tomorrow at the earliest.
+        let graduated = [card(1, state: "review", dueIn: 86_400, stage: 1)]
+
+        #expect(left(due) == 1)
+        #expect(left(lapsed) == 1)
+        #expect(left(graduated) == 0)
+    }
+}
