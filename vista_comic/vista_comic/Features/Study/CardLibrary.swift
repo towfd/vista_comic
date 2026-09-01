@@ -43,6 +43,22 @@ struct CardGroup: Identifiable, Hashable {
         case nil: "Unclassified"
         }
     }
+
+    /// The heading's colour, or `nil` for the quiet one.
+    ///
+    /// Kept beside `title` because it is the same decision — how this heading
+    /// presents itself — and drawn from the two colour families the app already
+    /// has rather than a third invented for this screen. Unclassified takes no
+    /// colour on purpose: it is the section with work in it, and giving it a
+    /// band as strong as the others would have the reader's mis-taps shouting
+    /// every time the tab opens.
+    var accent: Color? {
+        switch kind {
+        case .word: .practiceTeal
+        case .sentence: .primaryRed
+        case nil: nil
+        }
+    }
 }
 
 /// Groups `cards` by what the reader said each one is, newest first within each.

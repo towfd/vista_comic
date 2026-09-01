@@ -38,6 +38,15 @@ struct StudyView: View {
     /// Whether `.task` has already run. See `PracticeView` — `.onAppear` fires
     /// alongside it the first time and again on every return to this tab.
     @State private var hasAppeared = false
+    /// Which headings the reader has opened, by `CardGroup.id`.
+    ///
+    /// **Everything starts closed, and nothing is remembered.** Opening the tab
+    /// shows the two or three headings and their counts — the whole deck in one
+    /// screen, nothing to scroll — and leaving it forgets what was open. That
+    /// is deliberately the cheapest arrangement: no stored state, nothing to
+    /// migrate, nothing to go stale, on a screen whose premise is that it is
+    /// rarely opened. Rarely opening a workshop is success.
+    @State private var openSections: Set<String> = []
 
     var body: some View {
         NavigationStack {
@@ -71,9 +80,17 @@ struct StudyView: View {
         .onAppear {
             if hasAppeared { Task { await load() } }
             hasAppeared = true
+            // A tab keeps its state while the reader is on another one, so
+            // "the fold is not remembered" has to be done rather than assumed:
+            // without this, returning to 單字庫 would show whatever was left
+            // open last time.
+            openSections.removeAll()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await load() } }
+            if phase == .active {
+                Task { await load() }
+                openSections.removeAll()
+            }
         }
     }
 
@@ -118,7 +135,25 @@ struct StudyView: View {
                     // than about the feature being unfinished, so "Words"
                     // above a list of only words is worth saying.
                     ForEach(groups) { group in
-                        Section(group.title) { rows(group.cards) }
+                        Section {
+                            if isExpanded(group) { rows(group.cards) }
+                        } header: {
+                            CardSectionHeader(
+                                title: group.title,
+                                // `groups` is built from the matches, so this
+                                // is the total when nothing is being searched
+                                // and the number found when something is. The
+                                // heading never describes rows that are not
+                                // under it.
+                                count: group.cards.count,
+                                isExpanded: isExpanded(group),
+                                accent: group.accent
+                            ) {
+                                toggle(group)
+                            }
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                            .textCase(nil)
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -127,6 +162,31 @@ struct StudyView: View {
         .navigationTitle("Vocabulary")
         .searchable(text: $query, prompt: "Search words and meanings")
         .refreshable { await load() }
+    }
+
+    /// A section is open if the reader opened it — **or if a search is
+    /// running**, which overrides the fold entirely.
+    ///
+    /// The override is the one place "start closed" and "search is why people
+    /// come here" would fight. Typing a word and being shown a closed heading
+    /// answers the question with a number instead of the card, and this screen
+    /// exists for the two ways a reader arrives: "I just mis-tapped" and "I
+    /// remember one of these being wrong". Clearing the field returns to
+    /// whatever was open before, because the query never touched `openSections`.
+    private func isExpanded(_ group: CardGroup) -> Bool {
+        isSearching || openSections.contains(group.id)
+    }
+
+    private var isSearching: Bool {
+        !query.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func toggle(_ group: CardGroup) {
+        if openSections.contains(group.id) {
+            openSections.remove(group.id)
+        } else {
+            openSections.insert(group.id)
+        }
     }
 
     private func rows(_ cards: [LearningCard]) -> some View {
