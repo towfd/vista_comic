@@ -152,7 +152,46 @@ struct SchedulerParityTests {
         #expect(graduated.stage == 5)
         #expect(graduated.previousStage == nil)
 
-        #expect(answer(graduated, false).previousStage == 4)
+        // A hundred and fifty days later, which is when it is next asked.
+        // Answering it at the instant it graduated would now change nothing,
+        // and it is the honest reading of the story anyway.
+        #expect(answer(graduated, false, at: graduated.dueAt).previousStage == 4)
+    }
+
+    @Test("A review card answered early does not move", arguments: [true, false])
+    func anEarlyAnswerDoesNotMove(_ correct: Bool) {
+        // The fifth answer in the bug report: a card graduated onto one day,
+        // was asked again in the same session because this app's deck had not
+        // heard about it, and was promoted to three days. Nothing had happened
+        // in between that three days could be a measurement of.
+        //
+        // Wrong answers are covered by the same rule for symmetry: an answer
+        // that cannot earn a slot must not be able to cost one.
+        var subject = schedule(.review, stage: 2)
+        subject.dueAt = days(1)
+
+        #expect(answer(subject, correct) == subject)
+    }
+
+    @Test("The moment it is due, it moves again")
+    func onTheDueMomentItMovesAgain() {
+        // The boundary is `answeredAt < dueAt`, not a grace period. A card due
+        // at eight answered at eight is being answered on time.
+        var subject = schedule(.review, stage: 2)
+        subject.dueAt = days(1)
+
+        #expect(answer(subject, true, at: subject.dueAt).stage == 3)
+    }
+
+    @Test("A learning card answered early still advances")
+    func anEarlyLearningAnswerStillAdvances() {
+        // `learnAheadWindow` offers a learning card up to twenty minutes early
+        // on purpose, so the rule above must not reach it — a session with
+        // three cards on five-minute timers could otherwise never move.
+        var subject = schedule(.learning, step: 0)
+        subject.dueAt = minutes(4)
+
+        #expect(answer(subject, true).learningStep == 1)
     }
 
     @Test("The scheduler reads no clock of its own")

@@ -34,6 +34,17 @@ enum AppFont {
     /// question, and it was inheriting the system body size (17) while the
     /// question was 22, which made the answers look like small print.
     static let choice = Font.system(size: 20, weight: .semibold)
+    /// A word waiting in the pool of a rearrangement.
+    ///
+    /// Smaller than `choice` because there are twelve to fifteen of them on
+    /// screen at once and they are being *scanned* for the one wanted next,
+    /// where a choice is being read. The reader asked for this: the pool was
+    /// costing a scroll to reach words that should simply be visible.
+    static let poolPiece = Font.system(size: 17, weight: .semibold)
+    /// A line read after answering — the translation under a sentence that was
+    /// got wrong. Not a caption: it is the thing that makes the sentence mean
+    /// something, and it was set at 12 alongside a 26pt sentence.
+    static let explanation = Font.system(size: 20)
     /// A single figure meant to be read at a glance — a count on a card.
     static let statistic = Font.system(size: 28, weight: .bold)
 }
@@ -64,22 +75,40 @@ struct ChunkyButtonStyle: ButtonStyle {
     /// Whether the button should stretch. Choices do (a column of equal
     /// targets); a piece of a sentence must not (it is as wide as its word).
     var fills = true
+    /// The label's size. A parameter because the pool of a rearrangement holds
+    /// a dozen words at once and reads better smaller — everything else keeps
+    /// the size an answer is read at.
+    var font: Font = AppFont.choice
+    /// How much room the label is given around it, which follows the font.
+    var padding: (vertical: CGFloat, horizontal: CGFloat) = (14, 18)
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(AppFont.choice)
+        configuration.label.chunkyFace(self, sunk: configuration.isPressed)
+    }
+}
+
+extension View {
+    /// The face of a `ChunkyButtonStyle`, for something that is **not** a
+    /// button.
+    ///
+    /// A word being moved needs gestures of its own, and a `Button` keeps its
+    /// touches to itself — so the piece cannot be one, and the look cannot be
+    /// pasted a second time either. One definition, two callers.
+    func chunkyFace(_ style: ChunkyButtonStyle, sunk: Bool) -> some View {
+        self
+            .font(style.font)
             .foregroundStyle(.white)
-            .padding(.vertical, 14)
-            .padding(.horizontal, 18)
-            .frame(maxWidth: fills ? .infinity : nil)
-            .background(RoundedRectangle(cornerRadius: 14).fill(face))
-            .offset(y: configuration.isPressed ? depth : 0)
+            .padding(.vertical, style.padding.vertical)
+            .padding(.horizontal, style.padding.horizontal)
+            .frame(maxWidth: style.fills ? .infinity : nil)
+            .background(RoundedRectangle(cornerRadius: 14).fill(style.face))
+            .offset(y: sunk ? style.depth : 0)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(edge)
-                    .offset(y: depth)
+                    .fill(style.edge)
+                    .offset(y: style.depth)
             )
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.08), value: sunk)
     }
 }
 
@@ -93,6 +122,18 @@ extension ButtonStyle where Self == ChunkyButtonStyle {
     /// full-width button would be one word per line.
     static var piece: ChunkyButtonStyle {
         ChunkyButtonStyle(face: .practiceTeal, edge: .practiceTealDeep, fills: false)
+    }
+
+    /// A word still waiting in the pool: the same face, one size down.
+    static var poolPiece: ChunkyButtonStyle {
+        ChunkyButtonStyle(
+            face: .practiceTeal,
+            edge: .practiceTealDeep,
+            depth: 3,
+            fills: false,
+            font: AppFont.poolPiece,
+            padding: (10, 13)
+        )
     }
 
     /// The commit: Check, Next, Play. The brand colour, so that "I am choosing"

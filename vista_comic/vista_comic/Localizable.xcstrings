@@ -614,12 +614,12 @@
         }
       }
     },
-    "Tap a word to take it back.": {
+    "Tap a word to take it back. Hold one to move it.": {
       "localizations": {
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "點一下方塊可以把它拿回來。"
+            "value": "點一下把它拿回來，長按可以移動位置。"
           }
         }
       }
@@ -636,7 +636,6 @@
       }
     },
     "Text recognition failed unexpectedly.": {},
-    "The answer was %@": {},
     "The explanation couldn't be written. Your translation above is unaffected.": {},
     "The missing word": {},
     "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection.": {},

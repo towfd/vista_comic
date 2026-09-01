@@ -38,6 +38,9 @@ struct CardScheduling: Hashable {
 /// | `review` slot *n* | slot *n+1*, clamped | relearning, keeping *n−1* |
 /// | `relearning` | as learning | step 0 |
 ///
+/// A `review` card answered **before** its due date is returned unchanged in
+/// either direction — see the comment on that branch.
+///
 /// A first answer that is wrong still only reaches the first step: there is
 /// nothing below the bottom, and inventing a punishment there would charge the
 /// reader for meeting a word.
@@ -90,6 +93,20 @@ func nextSchedule(
         return index >= usable.count - 1 ? graduated() : atStep(current.state, index + 1)
 
     case .review:
+        // **An answer that arrives before the card is due moves nothing** —
+        // not up, and by the same sentence not down either. The interval is
+        // the claim being tested, and a card that graduated onto one day an
+        // hour ago has not survived a day, so nothing it can be answered with
+        // now is a measurement of three.
+        //
+        // It is also what stops a card being asked twice from counting twice.
+        // The queue is built from a deck this app holds, and a deck can be
+        // stale; the card's own due date cannot.
+        //
+        // The learning steps are deliberately outside this: `learnAheadWindow`
+        // offers a learning card up to twenty minutes early on purpose.
+        if answeredAt < current.dueAt { return current }
+
         if correct {
             let slot = clampSlot(current.stage + 1)
             return CardScheduling(
