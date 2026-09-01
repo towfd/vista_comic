@@ -1,4 +1,4 @@
-Status: built on branch `feat/practice-ui`, 2026-09-01 — awaiting the reader's touch test
+Status: implemented on branch `feat/practice-ui`, 2026-09-01 — verified on device by the reader
 
 # 10 — The pieces of a sentence
 
@@ -52,7 +52,8 @@ sentence**, which is the only part being read; and the translation under it is `
 - [x] A wrong answer shows the sentence with no preamble, and a translation that can be read
 - [x] `PieceTray` still judges the same string it did before
 
-Every one of these is a claim about a screen, so they are ticked as *built*, not as *seen*.
+Every one of these is a claim about a screen, and the reader has since seen all of them on a
+device — the move, the wrapping, the pool, and the line after a wrong answer.
 
 ## Verification the user owns
 
