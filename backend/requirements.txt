@@ -12,3 +12,11 @@ Pillow==11.0.0
 # The schema's owner: migrations replace `create_all`, which can add a table
 # but never a column (see docs/manual-migrations.md for what that used to cost).
 alembic==1.14.0
+# The IANA zone database, as an explicit dependency rather than an inherited
+# one. `ladder.due_after` names a zone (`config.get_scheduling_timezone`), and
+# `zoneinfo` resolves it from the system database first -- which the current
+# `python:3.12-slim` base image does ship. This is the fallback for the day it
+# does not: without either, `ZoneInfo("Asia/Taipei")` raises at *import* time,
+# because the default is a module-level constant, so the API would stop
+# starting rather than stop scheduling.
+tzdata==2024.2
