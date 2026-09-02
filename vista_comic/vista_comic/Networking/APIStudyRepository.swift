@@ -137,6 +137,19 @@ struct APIStudyRepository: StudyRepository {
         return card
     }
 
+    @discardableResult
+    func reset(id: Int) async throws -> LearningCard {
+        // No body: the client is asking for a transition, not proposing values.
+        let card = try await send(
+            LearningCard.self, method: "POST", at: "\(resourcePath)/\(id)/reset"
+        )
+        // Same reason as `update` and `delete`: the snapshot behind the
+        // already-collected marker must not go on describing where this card
+        // used to stand.
+        _ = try? await cards()
+        return card
+    }
+
     func delete(id: Int) async throws {
         let request = makeRequest(method: "DELETE", at: "\(resourcePath)/\(id)")
         let (_, response) = try await session.data(for: request)

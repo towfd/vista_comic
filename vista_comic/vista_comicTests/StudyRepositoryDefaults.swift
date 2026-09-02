@@ -43,6 +43,9 @@ extension StudyRepository {
         )
     }
 
+    @discardableResult
+    func reset(id: Int) async throws -> LearningCard { .preview() }
+
     func settings() async throws -> StudySettings { .fallback }
 
     @discardableResult

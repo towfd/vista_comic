@@ -40,6 +40,17 @@ private final class EditSpyRepository: StudyRepository, @unchecked Sendable {
         return try updateResult.get()
     }
 
+    var resetResult: Result<LearningCard, Error> = .success(.preview())
+    private(set) var resetCallCount = 0
+    private(set) var resetID: Int?
+
+    @discardableResult
+    func reset(id: Int) async throws -> LearningCard {
+        resetCallCount += 1
+        resetID = id
+        return try resetResult.get()
+    }
+
     var deleteResult: Result<Void, Error> = .success(())
     private(set) var deleteCallCount = 0
     private(set) var deletedID: Int?
@@ -144,6 +155,64 @@ struct CardUpdateTests {
 
         _ = try await repository(inner, cards: cards)
             .update(id: 7, translation: "你沒事吧", kind: .word)
+
+        #expect(cards.queued().isEmpty)
+    }
+}
+
+@Suite("Resetting a card's progress")
+struct CardResetTests {
+
+    private func repository(
+        _ inner: EditSpyRepository,
+        cards: any PendingCardStore = InMemoryPendingCardStore()
+    ) -> OfflineFallbackStudyRepository {
+        OfflineFallbackStudyRepository(
+            wrapping: inner, pending: cards, pendingLookups: InMemoryPendingLookupStore()
+        )
+    }
+
+    @Test("A reset reaches the backend")
+    func aResetReachesTheBackend() async throws {
+        let inner = EditSpyRepository()
+
+        _ = try await repository(inner).reset(id: 7)
+
+        #expect(inner.resetID == 7)
+        #expect(inner.resetCallCount == 1)
+    }
+
+    @Test("A failed reset throws rather than being queued")
+    func aFailedResetIsNotQueued() async {
+        // The same refusal update and delete make, and for the same reason: a
+        // queued reset would report a card back to new while the deck the
+        // reader is looking at still shows it on a year-long interval.
+        let inner = EditSpyRepository()
+        inner.resetResult = .failure(offline)
+        let cards = InMemoryPendingCardStore()
+
+        await #expect(throws: URLError.self) {
+            _ = try await repository(inner, cards: cards).reset(id: 7)
+        }
+        #expect(cards.queued().isEmpty)
+    }
+
+    @Test("A successful reset flushes whatever was waiting")
+    func aSuccessfulResetFlushesTheQueues() async throws {
+        let inner = EditSpyRepository()
+        let cards = InMemoryPendingCardStore()
+        cards.enqueue(
+            PendingCard(
+                sourceText: "waiting",
+                translation: "…",
+                targetLanguage: "zh-Hant",
+                comicID: "c",
+                chapterID: "ch",
+                pageNumber: 1
+            )
+        )
+
+        _ = try await repository(inner, cards: cards).reset(id: 7)
 
         #expect(cards.queued().isEmpty)
     }

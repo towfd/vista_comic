@@ -76,6 +76,24 @@ protocol StudyRepository {
     /// A real delete. Whatever it knew — how often it had been forgotten, how
     /// far up the ladder it had climbed — goes with it, which is why the screen
     /// confirms first.
+    /// Puts one card back to never-having-been-met, and returns it.
+    ///
+    /// The reader's "I do not actually know this one". Only proficiency is
+    /// cleared -- the state, the step, the slot, and the day it was introduced.
+    /// What they wrote, how often they looked the word up, and every answer
+    /// they ever gave are all kept: resetting a card does not make its history
+    /// untrue, and nothing has scheduled from that history since the cards
+    /// gained a stored state.
+    ///
+    /// Clearing the introduction day is the part with a consequence: the card
+    /// waits on the daily new-card quota again rather than becoming due at
+    /// once. It is *met* again, not merely due again.
+    ///
+    /// Returns the card so the list can swap it in place, the same way
+    /// `update(id:translation:kind:)` does.
+    @discardableResult
+    func reset(id: Int) async throws -> LearningCard
+
     func delete(id: Int) async throws
 
     /// Records one answer and reports what it changed.

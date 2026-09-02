@@ -550,3 +550,105 @@ def test_cards_are_still_listable_when_the_catalog_is_unavailable(
     listed = client.get("/cards")
     assert listed.status_code == 200
     assert listed.json()[0]["comicTitle"] is None
+
+
+# --- putting a card back to never-having-been-met ---------------------------
+
+
+def _walk_to_graduation(client, card_id: int) -> dict:
+    """Four correct answers: the three learning steps, then the slot table.
+
+    Answered at the moment each previous answer made the card due, because a
+    review card answered early moves nothing (see `test_card_reviews`).
+    """
+    outcome = None
+    for token in ("a", "b", "c", "d"):
+        body = {
+            "questionType": "cloze_typed",
+            "isCorrect": True,
+            "clientToken": token,
+            "localDate": "2026-08-20",
+        }
+        if outcome is not None:
+            body["answeredAt"] = outcome["dueAt"]
+        outcome = client.post(f"/cards/{card_id}/reviews", json=body).json()
+    return outcome
+
+
+def test_a_reset_puts_a_graduated_card_back_to_new(client):
+    """The whole point: "I do not actually know this one"."""
+    card = _add(client).json()
+    graduated = _walk_to_graduation(client, card["id"])
+    assert graduated["state"] == "review"
+
+    resp = client.post(f"/cards/{card['id']}/reset")
+
+    assert resp.status_code == 200, resp.text
+    reset = resp.json()
+    assert reset["state"] == "new"
+    assert reset["learningStep"] is None
+    assert reset["ladderStage"] == 0
+    assert reset["previousStage"] is None
+
+
+def test_a_reset_makes_the_card_wait_on_the_new_card_quota_again(client):
+    """`introducedOn` cleared is the part with a consequence.
+
+    A reset card is *met* again rather than merely due again, so it queues
+    behind the day's new-card allowance like any other unmet word.
+    """
+    card = _add(client).json()
+    _walk_to_graduation(client, card["id"])
+    assert client.get("/cards").json()[0]["introducedOn"] is not None
+
+    reset = client.post(f"/cards/{card['id']}/reset").json()
+
+    assert reset["introducedOn"] is None
+
+
+def test_a_reset_keeps_the_answers_the_reader_actually_gave(client):
+    """Resetting a card does not make its history untrue.
+
+    Nothing schedules from the review log, so keeping it costs the schedule
+    nothing -- and it is the only record that the reader ever knew this word.
+    """
+    card = _add(client).json()
+    _walk_to_graduation(client, card["id"])
+
+    client.post(f"/cards/{card['id']}/reset")
+
+    reviews = client.get(f"/cards/{card['id']}/reviews").json()
+    assert len(reviews) == 4
+
+
+def test_a_reset_keeps_the_reading_facts_and_the_readers_own_words(client):
+    """Only proficiency is cleared.
+
+    How often a word had to be looked up again is a fact about the reading, and
+    the translation is what the reader wrote. Neither is a level to be cleared.
+    """
+    card = _add(client, translation="你還好嗎", kind="word").json()
+    client.post(f"/cards/{card['id']}/lookups")
+    _walk_to_graduation(client, card["id"])
+
+    reset = client.post(f"/cards/{card['id']}/reset").json()
+
+    assert reset["lookupCount"] == 1
+    assert reset["lastLookedUpAt"] is not None
+    assert reset["translation"] == "你還好嗎"
+    assert reset["kind"] == "word"
+    assert reset["createdAt"] == card["createdAt"]
+
+
+def test_resetting_a_card_that_is_never_been_met_changes_nothing_visible(client):
+    """Harmless rather than an error -- the reader cannot see the difference."""
+    card = _add(client).json()
+
+    reset = client.post(f"/cards/{card['id']}/reset").json()
+
+    assert reset["state"] == "new"
+    assert reset["ladderStage"] == 0
+
+
+def test_a_reset_for_a_card_that_is_gone_is_a_404(client):
+    assert client.post("/cards/999999/reset").status_code == 404

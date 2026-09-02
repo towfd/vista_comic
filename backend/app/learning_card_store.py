@@ -201,6 +201,41 @@ def delete(session: Session, card_id: int) -> bool:
     return result.rowcount > 0
 
 
+def reset(session: Session, card_id: int) -> bool:
+    """Put one card back to never-having-been-met; report whether it existed.
+
+    What the reader means by "I do not actually know this one". The scheduling
+    columns go back to exactly what ``create`` writes -- taken from
+    ``scheduler.new_card`` rather than restated here, so "reset" and "freshly
+    collected" cannot drift into two different ideas of a new card.
+
+    **The review log is kept.** Nothing schedules from it since stage 6 (see
+    ``db.LearningCard.state``), so it costs the schedule nothing, and it is the
+    record of what the reader actually did -- which resetting a card does not
+    make untrue. ``lookup_count`` and ``last_looked_up_at`` stay for the same
+    reason: how often a word had to be looked up again is a fact about the
+    reading, not a level to be cleared.
+
+    ``introduced_on`` is cleared, which is the part with a consequence: the card
+    goes back to waiting on the daily new-card quota rather than being due at
+    once. That is the point -- a reset card is met again, and meeting cards is
+    what the quota paces.
+    """
+    card = session.get(LearningCard, card_id)
+    if card is None:
+        return False
+
+    fresh = scheduler.new_card(now=datetime.now(timezone.utc))
+    card.state = fresh.state.value
+    card.learning_step = fresh.learning_step
+    card.ladder_stage = fresh.stage
+    card.previous_stage = fresh.previous_stage
+    card.due_at = fresh.due_at
+    card.introduced_on = None
+    session.commit()
+    return True
+
+
 def record_lookup(session: Session, card_id: int) -> bool:
     """Note that the reader looked this word up again; report whether it exists.
 
