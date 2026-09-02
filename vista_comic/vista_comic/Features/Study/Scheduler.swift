@@ -45,6 +45,18 @@ struct CardScheduling: Hashable {
 /// nothing below the bottom, and inventing a punishment there would charge the
 /// reader for meeting a word.
 ///
+/// **The learning steps land on a minute; the slots land on a day.** A step
+/// means its minutes literally. A slot means a *day* rather than a block of
+/// twenty-four hours, so those due dates are rounded to the start of a
+/// scheduling day (`dueAfter`) — which is what stops a card finished at
+/// 23:59 from coming back at 23:59 the following night.
+///
+/// `timeZone` decides whose day that is. It defaults to the phone's, which is
+/// the right answer for every caller here: all three are "this reader, on this
+/// device, now". The backend is configured with a fixed zone instead
+/// (`config.get_scheduling_timezone`), and the two agree at home; where they
+/// do not, the server's result wins on sync, as it does for everything else.
+///
 /// Graduating returns to `previousStage` when there is one, which is what makes
 /// a lapse cost one slot instead of everything — and it is cleared once used,
 /// so a second lapse from slot 5 returns to 4 rather than to whatever the first
@@ -53,7 +65,8 @@ func nextSchedule(
     _ current: CardScheduling,
     correct: Bool,
     answeredAt: Date,
-    learningSteps: [Int]
+    learningSteps: [Int],
+    timeZone: TimeZone = .current
 ) -> CardScheduling {
     let steps = learningSteps.filter { $0 > 0 }
     // The backend raises on an unusable list because a route can answer 422.
@@ -79,7 +92,7 @@ func nextSchedule(
             learningStep: nil,
             stage: slot,
             previousStage: nil,
-            dueAt: dueAfter(slot: slot, from: answeredAt)
+            dueAt: dueAfter(slot: slot, from: answeredAt, in: timeZone)
         )
     }
 
@@ -114,7 +127,7 @@ func nextSchedule(
                 learningStep: nil,
                 stage: slot,
                 previousStage: nil,
-                dueAt: dueAfter(slot: slot, from: answeredAt)
+                dueAt: dueAfter(slot: slot, from: answeredAt, in: timeZone)
             )
         }
         var lapsed = atStep(.relearning, 0)
@@ -128,14 +141,56 @@ func clampSlot(_ slot: Int) -> Int {
     max(0, min(slot, ladderTopRung))
 }
 
+/// The hour a scheduling day begins, in the reader's own timezone.
+///
+/// Four in the morning rather than midnight — Anki's default, for Anki's
+/// reason. This reader reads comics at night, and under a midnight rollover a
+/// card finished at 23:59 would come back **one minute later**, in the same
+/// sitting. A day that ends when the reader goes to sleep is the day they
+/// actually live.
+///
+/// Mirrored in `backend/app/ladder.py` as `DAY_ROLLOVER_HOUR`.
+let ladderDayRolloverHour = 4
+
+/// The start of the scheduling day `moment` falls in.
+///
+/// A scheduling day runs from `ladderDayRolloverHour` to the same hour the
+/// next calendar day, so an answer given in the small hours belongs to the day
+/// the reader still thinks of as in progress — 02:00 on Tuesday is Monday
+/// night.
+func schedulingDayStart(of moment: Date, in timeZone: TimeZone = .current) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    guard let rollover = calendar.date(
+        bySettingHour: ladderDayRolloverHour, minute: 0, second: 0, of: moment
+    ) else {
+        // Only reachable if the zone has no such hour on this date at all.
+        // Falling back to the calendar day keeps a schedule rather than
+        // refusing one, which is the same stance `nextSchedule` takes on an
+        // unusable list of steps.
+        return calendar.startOfDay(for: moment)
+    }
+    guard moment < rollover else { return rollover }
+    return calendar.date(byAdding: .day, value: -1, to: rollover) ?? rollover
+}
+
 /// When a card on `slot` answered at `moment` comes back.
 ///
 /// Counted from the answer rather than from the previous due date: a card
 /// answered four days late is not owed those four days back.
-func dueAfter(slot: Int, from moment: Date) -> Date {
-    Calendar(identifier: .gregorian).date(
-        byAdding: .day, value: ladderIntervals[clampSlot(slot)], to: moment
-    ) ?? moment.addingTimeInterval(TimeInterval(ladderIntervals[clampSlot(slot)]) * 86_400)
+///
+/// **Measured in days, not in multiples of 24 hours.** The answer is rounded
+/// down to the start of its scheduling day and the interval added to that, so
+/// "one day" means "next day" whether the answer came at breakfast or at
+/// 23:59. Added with `Calendar` rather than as seconds so a zone that observes
+/// DST still lands on the rollover hour on the far side of a clock change.
+func dueAfter(slot: Int, from moment: Date, in timeZone: TimeZone = .current) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    let start = schedulingDayStart(of: moment, in: timeZone)
+    let days = ladderIntervals[clampSlot(slot)]
+    return calendar.date(byAdding: .day, value: days, to: start)
+        ?? start.addingTimeInterval(TimeInterval(days) * 86_400)
 }
 
 extension LearningCard {

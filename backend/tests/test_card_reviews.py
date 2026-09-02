@@ -8,12 +8,12 @@ silently, in a system whose whole job is to be trusted about what they know.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import card_review_store, main
+from app import card_review_store, config, ladder, main
 
 _CARD = {
     "sourceText": "TRONG KHI",
@@ -232,19 +232,40 @@ def _answer_when_due(client, card_id, *, correct: bool, token: str, previous=Non
     return outcome
 
 
-def _due_in_days(outcome, days: int) -> bool:
-    """Whether the endpoint scheduled the card roughly `days` out.
+def _expected_due(moment: datetime, days: int) -> datetime:
+    """Where a day-length interval of `days` from `moment` should land.
 
-    Compared loosely because `dueAt` is a timestamp now: the answer's own moment
-    plus the interval, which is only equal to a date boundary by accident. The
-    moment is the one the answer was given at, which for a card being walked up
-    the table by `_answer_when_due` is not now.
+    The rule restated rather than borrowed: `ladder.due_after` is the thing
+    under test here, so asserting against a call to it would only prove it
+    equals itself. Only the zone is taken from the app, since which zone is
+    configured is not the rule.
+    """
+    tz = config.get_scheduling_timezone()
+    local = moment.astimezone(tz)
+    day = local.date()
+    if local.hour < ladder.DAY_ROLLOVER_HOUR:
+        day -= timedelta(days=1)
+    return datetime.combine(
+        day + timedelta(days=days), time(ladder.DAY_ROLLOVER_HOUR), tzinfo=tz
+    )
+
+
+def _due_in_days(outcome, days: int) -> bool:
+    """Whether the endpoint scheduled the card `days` **days** out.
+
+    Exact rather than approximate, which is the change: `dueAt` used to be the
+    answer's own moment plus the interval and so landed on a date boundary only
+    by accident, and had to be compared with a five-minute tolerance. A
+    day-length interval now lands on the start of a scheduling day by rule, so
+    there is an exact answer to compare against and no slack to allow.
+
+    The moment measured from is the one the answer was given at, which for a
+    card being walked up the table by `_answer_when_due` is not now.
     """
     due = datetime.fromisoformat(outcome["dueAt"])
     given = outcome.get("_answeredAt")
     moment = datetime.fromisoformat(given) if given else datetime.now(timezone.utc)
-    expected = moment + timedelta(days=days)
-    return abs((due - expected).total_seconds()) < 300
+    return due == _expected_due(moment, days)
 
 
 def test_a_first_answer_puts_the_card_into_the_learning_steps(client, card_id):

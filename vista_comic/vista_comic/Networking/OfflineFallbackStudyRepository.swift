@@ -343,6 +343,19 @@ struct OfflineFallbackStudyRepository: StudyRepository {
         await lookupFlusher.flush()
     }
 
+    @discardableResult
+    func reset(id: Int) async throws -> LearningCard {
+        // Deliberately **not** queued when it fails, the same as `delete` and
+        // `update` above. Those three change a card the reader is looking at,
+        // and a queued one would report success against a deck that still shows
+        // the old standing until some later flush -- so the honest answer to no
+        // connection is that it did not happen.
+        let card = try await inner.reset(id: id)
+        await flusher.flush()
+        await lookupFlusher.flush()
+        return card
+    }
+
     func recordLookup(id: Int) async throws {
         do {
             try await inner.recordLookup(id: id)

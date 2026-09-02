@@ -37,6 +37,7 @@ struct CardDetailView: View {
     @State private var kind: CardKind?
     @State private var isSaving = false
     @State private var isConfirmingDelete = false
+    @State private var isConfirmingReset = false
     @State private var failure: Failure?
 
     init(
@@ -55,16 +56,24 @@ struct CardDetailView: View {
     private enum Failure: Identifiable {
         case couldNotSave
         case couldNotDelete
+        case couldNotReset
 
-        var id: Int { self == .couldNotSave ? 0 : 1 }
+        var id: Int {
+            switch self {
+            case .couldNotSave: 0
+            case .couldNotDelete: 1
+            case .couldNotReset: 2
+            }
+        }
 
         var message: LocalizedStringKey {
-            // Both name the connection, because it is overwhelmingly the reason
-            // and because these two actions deliberately do not queue: the
+            // All three name the connection, because it is overwhelmingly the
+            // reason and because these actions deliberately do not queue: the
             // reader needs to know it did not happen, not be reassured it will.
             switch self {
             case .couldNotSave: "Couldn't save. This needs a connection."
             case .couldNotDelete: "Couldn't delete. This needs a connection."
+            case .couldNotReset: "Couldn't reset. This needs a connection."
             }
         }
     }
@@ -129,6 +138,13 @@ struct CardDetailView: View {
             }
 
             Section {
+                // Not `.destructive`, unlike Delete below it. Both cost
+                // something and neither can be undone, but the card survives
+                // this one — two red buttons in a row would flatten a real
+                // difference in what the reader is about to lose.
+                Button("Reset progress") { isConfirmingReset = true }
+                    .accessibilityIdentifier("resetCard")
+
                 Button("Delete", role: .destructive) { isConfirmingDelete = true }
                     .accessibilityIdentifier("deleteCard")
             }
@@ -153,6 +169,16 @@ struct CardDetailView: View {
             Button("Delete", role: .destructive) { Task { await remove() } }
         } message: {
             Text("How often you've looked it up goes too. You can collect it again later.")
+        }
+        // Says what actually happens rather than "are you sure": the reader is
+        // choosing between two outcomes that both sound like starting over, and
+        // the one that matters — the card queues behind the day's new words
+        // instead of coming straight back — is not guessable from the button.
+        .alert("Reset this card's progress?", isPresented: $isConfirmingReset) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) { Task { await resetProgress() } }
+        } message: {
+            Text("It goes back to new and waits for the day's new-word allowance. Your answers and lookups are kept.")
         }
         // A failed save keeps what was typed: the reader's correction is the
         // only copy of it, and discarding it to show an error would cost them
@@ -181,6 +207,21 @@ struct CardDetailView: View {
             dismiss()
         } catch {
             failure = .couldNotSave
+        }
+    }
+
+    private func resetProgress() async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            let reset = try await repository.reset(id: card.id)
+            // Reported and dismissed rather than shown here, exactly as `save`
+            // does: `card` is a `let`, so this screen cannot redraw itself
+            // around the new standing, and the list behind it can.
+            onChanged(reset)
+            dismiss()
+        } catch {
+            failure = .couldNotReset
         }
     }
 

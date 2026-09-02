@@ -969,6 +969,27 @@ def delete_card(card_id: int) -> Response:
     return Response(status_code=204)
 
 
+@app.post("/cards/{card_id}/reset", response_model=LearningCardResponse)
+def reset_card(card_id: int) -> LearningCardResponse:
+    """Put one card back to never-having-been-met.
+
+    Its own endpoint rather than a ``PATCH``, on the same reasoning as
+    ``/lookups``: the client is asking for a transition, not proposing values,
+    and the scheduling columns are deliberately not something
+    ``LearningCardUpdate`` lets it set.
+
+    Returns the card rather than 204 so the app can write the result straight
+    into its deck snapshot -- the same reason ``/reviews`` returns where the
+    card landed instead of making the client guess.
+    """
+    with _card_session() as session:
+        found = learning_card_store.reset(session, card_id)
+        row = learning_card_store.get(session, card_id) if found else None
+    if row is None:
+        raise HTTPException(status_code=404, detail="Learning card not found")
+    return _to_card_response(row)
+
+
 def _to_review_response(row) -> CardReviewResponse:
     return CardReviewResponse(
         id=row.id,
