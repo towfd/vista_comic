@@ -18,8 +18,37 @@ import Testing
 
 @testable import vista_comic
 
+/// The zone these cases count days in, pinned rather than inherited.
+///
+/// `nextSchedule` defaults to the phone's zone, which is right in production
+/// and useless in a test: the expectations below would then depend on where the
+/// machine running them happens to be. The backend's twin pins the same zone
+/// for the same reason.
+private let schedulingZone = TimeZone(identifier: "Asia/Taipei")!
+
+/// 2025-09-01 04:00 in Taipei — deliberately the rollover hour exactly, so the
+/// day-length expectations can stay written as `days(n)` and still mean "the
+/// start of the day n days later". At any other hour the two readings come
+/// apart; the late-night cases at the bottom are where the day rule is pinned.
 private let answered = Date(timeIntervalSince1970: 1_756_670_400)
 private let steps = [5, 7, 10]
+
+private var schedulingCalendar: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = schedulingZone
+    return calendar
+}
+
+/// A moment written the way the reader would say it.
+private func taipei(
+    _ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0
+) -> Date {
+    schedulingCalendar.date(
+        from: DateComponents(
+            year: year, month: month, day: day, hour: hour, minute: minute
+        )
+    )!
+}
 
 private func schedule(
     _ state: CardState,
@@ -42,7 +71,13 @@ private func answer(
     steps list: [Int] = steps,
     at moment: Date = answered
 ) -> CardScheduling {
-    nextSchedule(current, correct: correct, answeredAt: moment, learningSteps: list)
+    nextSchedule(
+        current,
+        correct: correct,
+        answeredAt: moment,
+        learningSteps: list,
+        timeZone: schedulingZone
+    )
 }
 
 private func minutes(_ count: Int) -> Date {
@@ -50,7 +85,7 @@ private func minutes(_ count: Int) -> Date {
 }
 
 private func days(_ count: Int) -> Date {
-    Calendar(identifier: .gregorian).date(byAdding: .day, value: count, to: answered)!
+    schedulingCalendar.date(byAdding: .day, value: count, to: answered)!
 }
 
 @Suite("The Swift scheduler matches the backend's")
@@ -237,4 +272,48 @@ struct SchedulerParityTests {
         #expect(landed.state == .learning)
         #expect(landed.dueAt == minutes(5))
     }
+
+    // MARK: - Days are days, not blocks of 24 hours
+    //
+    // Twins of `test_scheduler.py`'s section of the same name. The cases above
+    // are all answered at the rollover hour exactly, which is the one moment
+    // where "plus one day" and "the start of the next day" agree — so none of
+    // them would notice if the rule were lost. These would.
+
+    @Test("Graduating late at night comes back the next morning")
+    func graduatingLateAtNightComesBackTheNextMorning() {
+        let landed = answer(
+            schedule(.learning, step: 2), true, at: taipei(2026, 9, 1, 23, 59)
+        )
+
+        #expect(landed.state == .review)
+        #expect(landed.dueAt == taipei(2026, 9, 2, ladderDayRolloverHour))
+    }
+
+    @Test("Climbing a slot late at night lands on a morning too")
+    func climbingASlotLateAtNightLandsOnAMorning() {
+        let late = taipei(2026, 9, 1, 23, 59)
+        let subject = CardScheduling(
+            state: .review,
+            learningStep: nil,
+            stage: 2,
+            previousStage: nil,
+            dueAt: late.addingTimeInterval(-86_400)
+        )
+
+        let landed = answer(subject, true, at: late)
+
+        #expect(landed.stage == 3)
+        #expect(landed.dueAt == taipei(2026, 9, 22, ladderDayRolloverHour))
+    }
+
+    @Test("The learning steps are untouched by the day rule")
+    func theLearningStepsAreUntouchedByTheDayRule() {
+        let late = taipei(2026, 9, 1, 23, 59)
+
+        let landed = answer(schedule(.new), true, at: late)
+
+        #expect(landed.dueAt == late.addingTimeInterval(5 * 60))
+    }
+
 }

@@ -13,6 +13,7 @@ left to be inferred:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -25,6 +26,13 @@ from app.scheduler import (
     next_schedule,
 )
 
+TAIPEI = ZoneInfo("Asia/Taipei")
+
+#: 2026-09-01 04:00 in Taipei -- deliberately the rollover hour exactly, so the
+#: day-length assertions below can stay written as ``ANSWERED + n days`` and
+#: still mean "the start of the day n days later". Any other hour and the two
+#: readings come apart; see the late-night tests at the bottom, which is where
+#: the day rule is actually pinned.
 ANSWERED = datetime(2026, 8, 31, 20, 0, tzinfo=timezone.utc)
 STEPS = (5, 7, 10)
 
@@ -40,7 +48,15 @@ def card(state, *, step=None, stage=0, previous=None) -> CardSchedule:
 
 
 def answer(subject: CardSchedule, correct: bool, *, steps=STEPS, at=ANSWERED):
-    return next_schedule(subject, correct=correct, answered_at=at, learning_steps=steps)
+    # The zone is passed rather than defaulted so these tests say whose day
+    # they are counting in, instead of inheriting it from the module.
+    return next_schedule(
+        subject,
+        correct=correct,
+        answered_at=at,
+        learning_steps=steps,
+        scheduling_timezone=TAIPEI,
+    )
 
 
 # --- New cards ---------------------------------------------------------------
@@ -258,3 +274,59 @@ def test_an_unusable_step_list_is_refused(steps):
 
 def test_the_defaults_are_the_ones_the_spec_states():
     assert DEFAULT_LEARNING_STEPS == (5, 7, 10)
+
+
+# --- Days are days, not blocks of 24 hours -----------------------------------
+#
+# The learning steps above land on a minute and mean it. These land on a day,
+# and the difference only shows up when an answer is given at an hour that is
+# not the rollover -- which is every real answer, and especially the ones given
+# late at night, since that is when this reader reads.
+
+
+def taipei(year, month, day, hour=0, minute=0) -> datetime:
+    """A moment written the way the reader would say it."""
+    return datetime(year, month, day, hour, minute, tzinfo=TAIPEI)
+
+
+def test_graduating_late_at_night_comes_back_the_next_morning():
+    """23:59 on the 1st graduates onto "one day", which is the 2nd.
+
+    Not 23:59 on the 2nd. This is the behaviour the reader asked for, and the
+    scheduler-level twin of `test_ladder`'s case.
+    """
+    landed = answer(card(CardState.LEARNING, step=2), True, at=taipei(2026, 9, 1, 23, 59))
+
+    assert landed.state is CardState.REVIEW
+    assert landed.due_at == taipei(2026, 9, 2, ladder.DAY_ROLLOVER_HOUR)
+
+
+def test_climbing_a_slot_late_at_night_lands_on_a_morning_too():
+    """The same rule on the way up the table, not just at graduation."""
+    late = taipei(2026, 9, 1, 23, 59)
+    subject = CardSchedule(
+        state=CardState.REVIEW,
+        learning_step=None,
+        stage=2,
+        previous_stage=None,
+        due_at=late - timedelta(days=1),
+    )
+
+    landed = answer(subject, True, at=late)
+
+    assert landed.stage == 3
+    assert landed.due_at == taipei(2026, 9, 22, ladder.DAY_ROLLOVER_HOUR)
+
+
+def test_the_learning_steps_are_untouched_by_the_day_rule():
+    """A step is still exactly its own number of minutes.
+
+    Rounding these to a day boundary would turn "see this again in five
+    minutes" into "see this again tomorrow", which is the opposite of what the
+    learning steps are for.
+    """
+    late = taipei(2026, 9, 1, 23, 59)
+
+    landed = answer(card(CardState.NEW), True, at=late)
+
+    assert landed.due_at == late + timedelta(minutes=5)

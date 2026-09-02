@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import scheduler, study_settings_store
+from . import config, scheduler, study_settings_store
 from .db import CardReview, LearningCard
 from .scheduler import CardSchedule, CardState
 
@@ -165,6 +165,11 @@ def apply_answer(
         correct=correct,
         answered_at=answered_at,
         learning_steps=settings.learning_steps,
+        # Whose day a day-length interval lands on. Configured rather than
+        # sent, on the same reasoning `introduced_on` below is the reader's day
+        # rather than the server's -- a UTC boundary would roll the schedule
+        # over at noon on UTC+8.
+        scheduling_timezone=config.get_scheduling_timezone(),
     )
     # The day the card stopped being new, in the reader's terms rather than the
     # server's -- the quota is "how many new words today", and on UTC+8 a UTC

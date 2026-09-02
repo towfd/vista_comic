@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -22,12 +23,21 @@ load_dotenv(dotenv_path=_ENV_PATH)
 _ENV_KEY = "MANGA_LIBRARY_PATH"
 _DB_ENV_KEY = "DATABASE_URL"
 _CLAUDE_API_KEY_ENV_KEY = "ANTHROPIC_API_KEY"
+_SCHEDULING_TZ_ENV_KEY = "SCHEDULING_TIMEZONE"
+
 
 # Non-secret local default used when DATABASE_URL is unset (e.g. a local
 # uvicorn dev run after ``docker compose up`` published Postgres on localhost).
 # The real URL / password live only in the gitignored repo-root ``.env`` (or,
 # for the container, in the compose ``environment:``) and are never committed.
 _DEFAULT_DATABASE_URL = "postgresql+psycopg://vista:vista@localhost:5432/vista"
+
+# Whose midnight the day-length intervals roll over on. Not a secret and not
+# machine-specific in the way the library path is -- it is a statement about
+# the reader, who is one person in one place -- so it has a real default here
+# rather than failing loudly, and ``.env`` only has to say anything if that
+# person moves.
+_DEFAULT_SCHEDULING_TIMEZONE = "Asia/Taipei"
 
 
 def get_database_url() -> str:
@@ -81,3 +91,30 @@ def get_library_root() -> Path:
     if not root.is_dir():
         raise RuntimeError(f"{_ENV_KEY} does not point to a directory: {root}")
     return root
+
+
+def get_scheduling_timezone() -> ZoneInfo:
+    """Return the timezone whose day boundary the review schedule counts in.
+
+    A card on a day-length interval comes back at the start of a **reader's**
+    day, not at the instant-plus-24-hours the answer happened to land on (see
+    ``ladder.due_after``). Turning "the day after next" into a stored UTC
+    moment needs a zone, and the server has no way to know one: it is the
+    reader's, and every request that carries a day already says so in the
+    reader's terms (``local_date``, and the note on ``StudyRepository`` about a
+    UTC boundary landing at eight in the morning on UTC+8).
+
+    Configured rather than sent because this is a single-reader deployment.
+    Sending an offset with each answer would be more correct while travelling
+    and is a one-field change if that ever matters; a fixed zone is the honest
+    description of the system as it stands, and travelling under it means days
+    keep rolling over on home time -- which is arguably what a study streak
+    should do anyway.
+
+    The offline path is the app's own ``dueAfter``, which uses
+    ``TimeZone.current`` because a phone always knows. The two agree at home
+    and reconcile on sync, where the server's answer wins.
+    """
+    return ZoneInfo(
+        os.environ.get(_SCHEDULING_TZ_ENV_KEY) or _DEFAULT_SCHEDULING_TIMEZONE
+    )

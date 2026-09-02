@@ -23,9 +23,10 @@ three-step list and a five-step list in the same run.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from enum import Enum
 from typing import Optional, Sequence
+from zoneinfo import ZoneInfo
 
 from . import ladder
 
@@ -37,6 +38,15 @@ DEFAULT_LEARNING_STEPS = (5, 7, 10)
 
 #: How many cards may be met for the first time in one day, by default.
 DEFAULT_NEW_CARDS_PER_DAY = 15
+
+#: Whose day the day-length intervals are counted in, by default.
+#:
+#: A parameter rather than a lookup, exactly like ``learning_steps`` above and
+#: for the same stated reason -- but it needs a default here so the pure
+#: function stays callable on its own, and the deployment has exactly one
+#: reader. ``config.get_scheduling_timezone()`` is what production passes;
+#: this is what a test that does not care gets.
+DEFAULT_SCHEDULING_TIMEZONE = ZoneInfo("Asia/Taipei")
 
 
 class CardState(str, Enum):
@@ -97,6 +107,7 @@ def next_schedule(
     correct: bool,
     answered_at: datetime,
     learning_steps: Sequence[int] = DEFAULT_LEARNING_STEPS,
+    scheduling_timezone: tzinfo = DEFAULT_SCHEDULING_TIMEZONE,
 ) -> CardSchedule:
     """Where ``current`` goes after one answer.
 
@@ -117,6 +128,13 @@ def next_schedule(
     **A first answer that is wrong still only reaches the first step.** There is
     nothing below the bottom to fall to, and inventing a punishment there would
     charge the reader for meeting a word.
+
+    **The learning steps land on a minute; the slots land on a day.** A step is
+    "come back in ten minutes" and means it literally. A slot is "come back in
+    three days", which is a day and not seventy-two hours -- so those due dates
+    are rounded to the start of a scheduling day in ``scheduling_timezone``
+    (``ladder.due_after``), and a card answered at midnight and one answered at
+    noon on the same day come back together.
 
     **Graduating goes to ``previous_stage`` when there is one**, which is what
     makes a lapse cost one slot instead of everything: 60 days -> missed -> the
@@ -154,7 +172,7 @@ def next_schedule(
             learning_step=None,
             stage=slot,
             previous_stage=None,
-            due_at=ladder.due_after(slot, answered_at),
+            due_at=ladder.due_after(slot, answered_at, tz=scheduling_timezone),
         )
 
     if current.state is CardState.NEW:
@@ -200,7 +218,7 @@ def next_schedule(
             learning_step=None,
             stage=slot,
             previous_stage=None,
-            due_at=ladder.due_after(slot, answered_at),
+            due_at=ladder.due_after(slot, answered_at, tz=scheduling_timezone),
         )
     return replace(
         at_step(CardState.RELEARNING, 0),
