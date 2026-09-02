@@ -1,877 +1,1057 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "#%lld": {},
-    "%@ · last read": {
-      "comment": "Library card: last read timestamp",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · 上次閱讀"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "#%lld" : {
+
+    },
+    "%@ · last read" : {
+      "comment" : "Library card: last read timestamp",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 上次閱讀"
           }
         }
       }
     },
-    "%@ · p.%lld": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ · p.%2$lld"
+    "%@ · p.%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · p.%2$lld"
           }
         }
       }
+    },
+    "%lld" : {
+
     },
-    "%lld": {},
-    "%lld a day": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "每天 %lld 張"
+    "%lld a day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天 %lld 張"
           }
         }
       }
     },
-    "%lld answered": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已答 %lld 題"
+    "%lld answered" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已答 %lld 題"
           }
         }
       }
     },
-    "%lld days": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 天"
+    "%lld days" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天"
           }
         }
       }
     },
-    "%lld/%lld downloaded": {
-      "comment": "Chapter list: downloads in use against the cap",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已下載 %lld/%lld"
+    "%lld left" : {
+
+    },
+    "%lld/%lld downloaded" : {
+      "comment" : "Chapter list: downloads in use against the cap",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載 %lld/%lld"
           }
         }
       }
     },
-    "5, 7, 10": {},
-    "A new card comes back after each of these, then graduates onto the day intervals. How many you list is how many times it comes back.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新卡會在每個步驟之後回來一次，走完才畢業進入以天計的間隔。你列幾個，它就回來幾次。"
+    "5, 7, 10" : {
+
+    },
+    "A new card comes back after each of these, then graduates onto the day intervals. How many you list is how many times it comes back." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新卡會在每個步驟之後回來一次，走完才畢業進入以天計的間隔。你列幾個，它就回來幾次。"
           }
         }
       }
+    },
+    "Add as sentence" : {
+
     },
-    "Add as sentence": {},
-    "Add as word": {},
-    "Added as a sentence": {},
-    "Added as a word": {},
-    "Adding…": {},
-    "Back": {
-      "comment": "Reader: back button",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "返回"
+    "Add as word" : {
+
+    },
+    "Added as a sentence" : {
+
+    },
+    "Added as a word" : {
+
+    },
+    "Adding…" : {
+
+    },
+    "Back" : {
+      "comment" : "Reader: back button",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
           }
         }
       }
+    },
+    "Being written. You can close this — it'll be waiting in 歷史紀錄." : {
+
     },
-    "Being written. You can close this — it'll be waiting in 歷史紀錄.": {},
-    "Cancel": {},
-    "Cancel download": {
-      "comment": "Chapter row: cancel the download in progress",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "取消下載"
+    "Cancel" : {
+
+    },
+    "Cancel download" : {
+      "comment" : "Chapter row: cancel the download in progress",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消下載"
           }
         }
       }
+    },
+    "Card" : {
+
     },
-    "Card": {},
-    "Chapter list": {
-      "comment": "Reader: open the chapter list",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "章節列表"
+    "cards due" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "張到期"
           }
         }
       }
     },
-    "Chapters you download appear here, ready to read with no connection.": {
-      "comment": "已下載: empty state",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下載的章節會出現在這裡，沒有網路也能閱讀。"
+    "Chapter list" : {
+      "comment" : "Reader: open the chapter list",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "章節列表"
           }
         }
       }
     },
-    "Check": {},
-    "Check that the server is running and try again.": {
-      "comment": "Error state: description when a fetch fails",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "請確認伺服器正在執行後再試一次。"
+    "chapter(%lld)" : {
+      "comment" : "Library card: opens the chapter list, with chapter count",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "章節（%lld）"
           }
         }
       }
     },
-    "Cloud": {},
-    "Collect a few while reading, then come back.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "閱讀時先收集幾個，再回來這裡。"
+    "Chapters you download appear here, ready to read with no connection." : {
+      "comment" : "已下載: empty state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載的章節會出現在這裡，沒有網路也能閱讀。"
           }
         }
       }
     },
-    "Comics you add will appear here.": {
-      "comment": "Empty library description",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你加入的漫畫會顯示在這裡。"
+    "Check" : {
+
+    },
+    "Check that the server is running and try again." : {
+      "comment" : "Error state: description when a fetch fails",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請確認伺服器正在執行後再試一次。"
           }
         }
       }
     },
-    "Context notes": {},
-    "Correct": {},
-    "Could not save. Check the connection and try again.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "無法儲存。請檢查連線後再試一次。"
+    "Cloud" : {
+
+    },
+    "Collect a few while reading, then come back." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閱讀時先收集幾個，再回來這裡。"
           }
         }
       }
     },
-    "Couldn't add this to your vocabulary.": {},
-    "Couldn't connect": {
-      "comment": "Error state: title when a fetch fails",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "無法連線"
+    "Comics you add will appear here." : {
+      "comment" : "Empty library description",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你加入的漫畫會顯示在這裡。"
           }
         }
       }
+    },
+    "Context notes" : {
+
     },
-    "Couldn't delete. This needs a connection.": {},
-    "Couldn't load this page": {
-      "comment": "Reader: page failed to load",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "無法載入此頁"
+    "continue" : {
+      "comment" : "Library card: continue reading",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續閱讀"
           }
         }
       }
     },
-    "Couldn't save. This needs a connection.": {},
-    "Deeper": {},
-    "Deeper explanation": {},
-    "Delete": {},
-    "Delete all": {
-      "comment": "已下載: clear every download",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "全部刪除"
+    "Correct" : {
+
+    },
+    "Could not save. Check the connection and try again." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存。請檢查連線後再試一次。"
           }
         }
       }
     },
-    "Delete everything downloaded?": {
-      "comment": "已下載: confirmation title",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "刪除全部已下載的章節？"
+    "Couldn't add this to your vocabulary." : {
+
+    },
+    "Couldn't connect" : {
+      "comment" : "Error state: title when a fetch fails",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連線"
           }
         }
       }
+    },
+    "Couldn't delete. This needs a connection." : {
+
     },
-    "Delete this card?": {},
-    "Depth": {},
-    "Done": {},
-    "Download (%lld)": {
-      "comment": "Chapter list: download the selected chapters",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下載 (%lld)"
+    "Couldn't load this page" : {
+      "comment" : "Reader: page failed to load",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入此頁"
           }
         }
       }
+    },
+    "Couldn't reset. This needs a connection." : {
+
+    },
+    "Couldn't save. This needs a connection." : {
+
+    },
+    "Deeper" : {
+
     },
-    "Download chapter": {
-      "comment": "Chapter row: start downloading this chapter for offline reading",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下載章節"
+    "Deeper explanation" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete all" : {
+      "comment" : "已下載: clear every download",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部刪除"
           }
         }
       }
     },
-    "Downloaded": {
-      "comment": "Chapter row: this chapter is on the device",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已下載"
+    "Delete everything downloaded?" : {
+      "comment" : "已下載: confirmation title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除全部已下載的章節？"
           }
         }
       }
+    },
+    "Delete this card?" : {
+
+    },
+    "Depth" : {
+
+    },
+    "Done" : {
+
     },
-    "Downloading": {
-      "comment": "已下載 row: started, page count not known yet",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下載中"
+    "Download (%lld)" : {
+      "comment" : "Chapter list: download the selected chapters",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載 (%lld)"
           }
         }
       }
     },
-    "Downloading %lld/%lld": {
-      "comment": "已下載 row: pages fetched so far",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下載中 %lld/%lld"
+    "Download chapter" : {
+      "comment" : "Chapter row: start downloading this chapter for offline reading",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載章節"
           }
         }
       }
     },
-    "Downloads": {
-      "comment": "Tab: downloaded chapters",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已下載"
+    "Downloaded" : {
+      "comment" : "Chapter row: this chapter is on the device",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載"
           }
         }
       }
     },
-    "Drag here and release to cancel selection": {},
-    "Endless training": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "永無止盡的訓練"
+    "Downloading" : {
+      "comment" : "已下載 row: started, page count not known yet",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載中"
           }
         }
       }
     },
-    "English": {},
-    "Exit text selection": {},
-    "Explain in depth": {},
-    "French": {},
-    "History": {
-      "extractionState": "stale",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "歷史紀錄"
+    "Downloading %lld/%lld" : {
+      "comment" : "已下載 row: pages fetched so far",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載中 %lld/%lld"
           }
         }
       }
     },
-    "How often you've looked it up goes too. You can collect it again later.": {},
-    "In your vocabulary": {},
-    "Incomplete": {
-      "comment": "已下載 row: a download that did not finish",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未完成"
+    "Downloads" : {
+      "comment" : "Tab: downloaded chapters",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已下載"
           }
         }
       }
     },
-    "Interval": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "間隔"
+    "Drag here and release to cancel selection" : {
+
+    },
+    "due now" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在到期"
           }
         }
       }
     },
-    "Japanese": {},
-    "Korean": {},
-    "Learning": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "學習中"
+    "Endless training" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永無止盡的訓練"
           }
         }
       }
+    },
+    "English" : {
+
+    },
+    "Exit text selection" : {
+
     },
-    "Learning steps": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "學習步驟"
+    "Explain in depth" : {
+
+    },
+    "French" : {
+
+    },
+    "History" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歷史紀錄"
           }
         }
       }
+    },
+    "How often you've looked it up goes too. You can collect it again later." : {
+
     },
-    "Library": {
-      "comment": "Library screen title",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "書庫"
+    "In your vocabulary" : {
+
+    },
+    "Incomplete" : {
+      "comment" : "已下載 row: a download that did not finish",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完成"
           }
         }
       }
     },
-    "Looked up again": {},
-    "Meaning": {},
-    "Minutes, separated by commas — at least one.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "以逗號分隔的分鐘數，至少一個。"
+    "Interval" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔"
           }
         }
       }
+    },
+    "It goes back to new and waits for the day's new-word allowance. Your answers and lookups are kept." : {
+
     },
-    "New": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新卡"
+    "Japanese" : {
+
+    },
+    "Korean" : {
+
+    },
+    "Learning" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "學習中"
           }
         }
       }
     },
-    "New words": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新單字"
+    "Learning steps" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "學習步驟"
           }
         }
       }
     },
-    "Next": {},
-    "Next chapter": {
-      "comment": "Reader: next chapter",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下一章"
+    "Library" : {
+      "comment" : "Library screen title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書庫"
           }
         }
       }
+    },
+    "Looked up again" : {
+
     },
-    "Next up": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下次"
+    "Meaning" : {
+
+    },
+    "Minutes, separated by commas — at least one." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以逗號分隔的分鐘數，至少一個。"
           }
         }
       }
     },
-    "No comics yet": {
-      "comment": "Empty library title",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "還沒有漫畫"
+    "New" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新卡"
           }
         }
       }
     },
-    "No explanation was written for this selection. Trying again would return the same answer.": {},
-    "No text was found in the selected region. Try selecting a tighter area around the text.": {},
-    "No words yet": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "還沒有單字"
+    "new today" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天的新卡"
           }
         }
       }
     },
-    "Not downloaded": {
-      "comment": "Reader: the chapter is not on the device and there is no connection",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尚未下載"
+    "New words" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新單字"
           }
         }
       }
     },
-    "Nothing downloaded yet": {
-      "comment": "已下載: empty state title",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尚未下載任何章節"
+    "Next" : {
+
+    },
+    "Next chapter" : {
+      "comment" : "Reader: next chapter",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一章"
           }
         }
       }
     },
-    "Nothing left for today.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今天沒有東西了。"
+    "Next up" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次"
           }
         }
       }
     },
-    "OK": {},
-    "On device": {},
-    "Original": {},
-    "Practice": {},
-    "Practice settings": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "練習設定"
+    "No comics yet" : {
+      "comment" : "Empty library title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還沒有漫畫"
           }
         }
       }
+    },
+    "No explanation was written for this selection. Trying again would return the same answer." : {
+
     },
-    "Preview — progress won't be saved": {},
-    "Previous chapter": {
-      "comment": "Reader: previous chapter",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "上一章"
+    "No text was found in the selected region. Try selecting a tighter area around the text." : {
+
+    },
+    "No words yet" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還沒有單字"
           }
         }
       }
     },
-    "Recognition failed. You can try again.": {},
-    "Recognizing text…": {},
-    "Relearning": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重新學習"
+    "Not downloaded" : {
+      "comment" : "Reader: the chapter is not on the device and there is no connection",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載"
           }
         }
       }
     },
-    "Retry": {
-      "comment": "Error state: retry the failed fetch",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重新整理"
+    "not started yet" : {
+      "comment" : "Library card: comic never opened",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未開始"
           }
         }
       }
     },
-    "Retry download": {
-      "comment": "Chapter row: a download that did not finish",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重試下載"
+    "Nothing downloaded yet" : {
+      "comment" : "已下載: empty state title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載任何章節"
           }
         }
       }
     },
-    "Review cards": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "複習卡片"
+    "Nothing left for today." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天沒有東西了。"
           }
         }
       }
+    },
+    "OK" : {
+
+    },
+    "On device" : {
+
     },
-    "Runs until nothing is left.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一直做到沒東西為止。"
+    "Original" : {
+
+    },
+    "Practice" : {
+
+    },
+    "Practice settings" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "練習設定"
           }
         }
       }
     },
-    "Save": {},
-    "Search words and meanings": {},
-    "Select": {
-      "comment": "Chapter list: enter selection mode for batch download",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "選取"
+    "Preview — progress won't be saved" : {
+
+    },
+    "Previous chapter" : {
+      "comment" : "Reader: previous chapter",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一章"
           }
         }
       }
     },
-    "Select text": {},
-    "Selected text": {},
-    "Sentence": {},
-    "Sentences": {},
-    "Settings need a connection": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "設定需要連線"
+    "read" : {
+      "comment" : "Chapter read state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已讀"
           }
         }
       }
     },
-    "Showing what was saved on this device.": {},
-    "Spanish": {},
-    "Standard": {},
-    "State": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "狀態"
+    "reading" : {
+      "comment" : "Chapter read state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閱讀中"
           }
         }
       }
+    },
+    "Recognition failed. You can try again." : {
+
+    },
+    "Recognizing text…" : {
+
     },
-    "Stop": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "結束"
+    "Relearning" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新學習"
           }
         }
       }
     },
-    "Tap a word to take it back. Hold one to move it.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "點一下把它拿回來，長按可以移動位置。"
+    "Reset" : {
+
+    },
+    "Reset progress" : {
+
+    },
+    "Reset this card's progress?" : {
+
+    },
+    "Retry" : {
+      "comment" : "Error state: retry the failed fetch",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新整理"
           }
         }
       }
     },
-    "Tap to retry": {
-      "comment": "Reader: retry loading a single page that failed",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "點一下重試"
+    "Retry download" : {
+      "comment" : "Chapter row: a download that did not finish",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重試下載"
           }
         }
       }
     },
-    "Text recognition failed unexpectedly.": {},
-    "The explanation couldn't be written. Your translation above is unaffected.": {},
-    "The missing word": {},
-    "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection.": {},
-    "These decide how every card is scheduled, so they are kept in one place rather than on this device.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "這些決定每張卡怎麼排程，所以放在同一個地方，而不是這台裝置上。"
+    "Review cards" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複習卡片"
           }
         }
       }
     },
-    "This chapter isn't on your device. Reconnect to read it, or download it while you're online.": {
-      "comment": "Reader: what to do about a chapter that is not available offline",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "這一章不在你的裝置上。重新連線後即可閱讀，或趁有網路時先下載。"
+    "Runs until nothing is left." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一直做到沒東西為止。"
           }
         }
       }
     },
-    "This comic is no longer in your library.": {},
-    "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again.": {},
-    "This removes every downloaded chapter from this device. It can't be undone.": {
-      "comment": "已下載: confirmation body",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "這會移除裝置上所有已下載的章節，且無法復原。"
+    "Save" : {
+
+    },
+    "Search words and meanings" : {
+
+    },
+    "Select" : {
+      "comment" : "Chapter list: enter selection mode for batch download",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取"
           }
         }
       }
+    },
+    "Select text" : {
+
     },
-    "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄.": {},
-    "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow.": {},
-    "Tone & register": {},
-    "Too many chapters": {
-      "comment": "Chapter list: the selection is larger than the device can hold",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "選取的章節太多"
+    "Selected text" : {
+
+    },
+    "Sentence" : {
+
+    },
+    "Sentences" : {
+
+    },
+    "Settings need a connection" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定需要連線"
           }
         }
       }
+    },
+    "Showing what was saved on this device." : {
+
+    },
+    "Spanish" : {
+
     },
-    "Traditional Chinese": {},
-    "Training opens once you have met a word.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "認識過一個字之後，訓練就會開放。"
+    "Standard" : {
+
+    },
+    "State" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "狀態"
           }
         }
       }
     },
-    "Translate": {},
-    "Translate a line while reading, then add it as a word or a sentence.": {},
-    "Translate to": {},
-    "Translating…": {},
-    "Translation": {},
-    "Translation failed unexpectedly.": {},
-    "Translation failed. You can try again.": {},
-    "Type": {},
-    "Unclassified": {},
-    "Unused ones do not carry over to tomorrow. Zero is a choice: clear what is due without meeting anything new.": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "沒用完不會累積到明天。填 0 也是一種選擇：只清到期的，不認識新的字。"
+    "Stop" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束"
           }
         }
       }
     },
-    "Uses one of today's requests, and saves this line to 歷史紀錄.": {},
-    "Vocabulary": {},
-    "Vocabulary & grammar": {},
-    "WAITING FOR YOU": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等著你"
+    "Tap a word to take it back. Hold one to move it." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下把它拿回來，長按可以移動位置。"
           }
         }
       }
     },
-    "Watch the tones: %@": {},
-    "Where it came from": {},
-    "Where it stands": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "目前狀態"
+    "Tap to retry" : {
+      "comment" : "Reader: retry loading a single page that failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下重試"
           }
         }
       }
+    },
+    "Text recognition failed unexpectedly." : {
+
+    },
+    "The explanation couldn't be written. Your translation above is unaffected." : {
+
     },
-    "Word": {},
-    "Words": {},
-    "You can download up to %lld chapters at once.": {
-      "comment": "Chapter list: the batch limit, explained",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一次最多下載 %lld 章。"
+    "The missing word" : {
+
+    },
+    "The recognized text wasn't clear enough to show reliably. Try a larger or clearer selection." : {
+
+    },
+    "These decide how every card is scheduled, so they are kept in one place rather than on this device." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這些決定每張卡怎麼排程，所以放在同一個地方，而不是這台裝置上。"
           }
         }
       }
     },
-    "You've learned this before": {},
-    "cards due": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "張到期"
+    "This chapter isn't on your device. Reconnect to read it, or download it while you're online." : {
+      "comment" : "Reader: what to do about a chapter that is not available offline",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這一章不在你的裝置上。重新連線後即可閱讀，或趁有網路時先下載。"
           }
         }
       }
+    },
+    "This comic is no longer in your library." : {
+
     },
-    "chapter(%lld)": {
-      "comment": "Library card: opens the chapter list, with chapter count",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "章節（%lld）"
+    "This language isn't downloaded for on-device translation yet. Download it in Settings, then try again." : {
+
+    },
+    "This removes every downloaded chapter from this device. It can't be undone." : {
+      "comment" : "已下載: confirmation body",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會移除裝置上所有已下載的章節，且無法復原。"
           }
         }
       }
+    },
+    "This selection couldn't be sent for an explanation, so it isn't in 歷史紀錄." : {
+
     },
-    "continue": {
-      "comment": "Library card: continue reading",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "繼續閱讀"
+    "Today's explanation limit is used up, so this selection wasn't saved to 歷史紀錄. The limit resets tomorrow." : {
+
+    },
+    "Tone & register" : {
+
+    },
+    "Too many chapters" : {
+      "comment" : "Chapter list: the selection is larger than the device can hold",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取的章節太多"
           }
         }
       }
+    },
+    "Traditional Chinese" : {
+
     },
-    "due now": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "現在到期"
+    "Training opens once you have met a word." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "認識過一個字之後，訓練就會開放。"
           }
         }
       }
+    },
+    "Translate" : {
+
+    },
+    "Translate a line while reading, then add it as a word or a sentence." : {
+
+    },
+    "Translate to" : {
+
+    },
+    "Translating…" : {
+
+    },
+    "Translation" : {
+
+    },
+    "Translation failed unexpectedly." : {
+
     },
-    "new today": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今天的新卡"
+    "Translation failed. You can try again." : {
+
+    },
+    "Type" : {
+
+    },
+    "Unclassified" : {
+
+    },
+    "unread" : {
+      "comment" : "Chapter read state",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未讀"
           }
         }
       }
     },
-    "not started yet": {
-      "comment": "Library card: comic never opened",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "尚未開始"
+    "Unused ones do not carry over to tomorrow. Zero is a choice: clear what is due without meeting anything new." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒用完不會累積到明天。填 0 也是一種選擇：只清到期的，不認識新的字。"
           }
         }
       }
+    },
+    "Uses one of today's requests, and saves this line to 歷史紀錄." : {
+
+    },
+    "Vocabulary" : {
+
     },
-    "read": {
-      "comment": "Chapter read state",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已讀"
+    "Vocabulary & grammar" : {
+
+    },
+    "WAITING FOR YOU" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等著你"
           }
         }
       }
+    },
+    "Watch the tones: %@" : {
+
+    },
+    "Where it came from" : {
+
     },
-    "reading": {
-      "comment": "Chapter read state",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "閱讀中"
+    "Where it stands" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前狀態"
           }
         }
       }
     },
-    "unread": {
-      "comment": "Chapter read state",
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未讀"
+    "Word" : {
+
+    },
+    "word learned" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個字學會了"
           }
         }
       }
     },
-    "word learned": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "個字學會了"
+    "Words" : {
+
+    },
+    "words learned" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個字學會了"
           }
         }
       }
     },
-    "words learned": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "個字學會了"
+    "You can download up to %lld chapters at once." : {
+      "comment" : "Chapter list: the batch limit, explained",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次最多下載 %lld 章。"
           }
         }
       }
+    },
+    "You've learned this before" : {
+
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }
