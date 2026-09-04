@@ -343,6 +343,22 @@ private struct SessionView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
+            // **A cloze gets the meaning too.** The blank alone narrows the
+            // answer only as far as the deck is small: every collected word
+            // that fits the gap grammatically is a defensible guess, so the
+            // bigger the deck grows the more a wrong answer measures the size
+            // of the deck rather than what the reader knows. The sentence's
+            // meaning is what makes one word the answer. Only for the cloze
+            // modes, since the other two already show this line as the prompt.
+            if item.question != nil, !item.card.translation.isEmpty {
+                Text(item.card.translation)
+                    .font(AppFont.explanation)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(.grayFont)
+                    .accessibilityIdentifier("clozeMeaning")
+            }
+
             if let verdict {
                 answered(item, verdict: verdict)
             } else {
