@@ -22,10 +22,9 @@ inventing one. An "on device" marker beside text the reader wrote fails that sta
 **Blocked by:** 01 — Editable translation, and the reader's wording as the single
 downstream source. The marker needs the edited-translation state that ticket introduces.
 
-**Status:** implemented on branch `feat/translation-editing`, 2026-09-06 — builds clean,
-awaiting the repo owner's device pass (spec checklist item 10). The "Edited" string still
-needs Xcode's own extraction pass into the string catalog; `xcodebuild` from the command
-line does not write it.
+**Status:** done — device-verified by the repo owner, 2026-09-06 (branch
+`feat/translation-editing`). The "Edited" string was extracted into the catalog by Xcode
+during that pass.
 
 - [ ] The provenance marker's boolean cloud/device input becomes a three-case value:
       on-device, cloud, reader-edited.

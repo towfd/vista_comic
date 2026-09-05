@@ -34,9 +34,9 @@ either loses the reader's work or misreports what it will do with it.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** implemented on branch `feat/translation-editing`, 2026-09-06 — builds clean,
-awaiting the repo owner's device pass (spec checklist items 1–9 and 11–15). No automated
-tests by decision; see the spec's Testing Decisions.
+**Status:** done — device-verified by the repo owner, 2026-09-06 (branch
+`feat/translation-editing`). No automated tests by decision; see the spec's Testing
+Decisions.
 
 - [ ] The translation column is an always-editable text editor — no view/edit toggle, no
       pencil affordance — seeded with the machine translation when one lands.
