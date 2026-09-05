@@ -179,15 +179,30 @@ struct ComprehensionDetailSection: View {
 /// A chip on the translation column rather than a banner: it labels the thing
 /// it describes, and it is the half of M9's verdict banner that was actually
 /// about the translation.
+/// Who produced the wording currently on screen.
+///
+/// Three answers rather than the two this started with, because the reader can
+/// now edit a translation. A chip labelling text the reader typed as "on
+/// device" asserts something it cannot support — the same standard that keeps
+/// the collected label deliberately vague for a card with no recorded kind
+/// rather than inventing one.
+enum TranslationSource {
+    /// Apple's on-device `Translation` framework, via `AppleTranslator`.
+    case onDevice
+    /// Claude's own translation, carried back on a finished record.
+    case cloud
+    /// The reader's own words, replacing whatever a machine produced.
+    case reader
+}
+
 struct TranslationProvenanceChip: View {
-    /// `true` once the record carries a cloud translation.
-    let isCloud: Bool
+    let source: TranslationSource
 
     var body: some View {
         Label {
-            Text(isCloud ? "Cloud" : "On device")
+            Text(label)
         } icon: {
-            Image(systemName: isCloud ? "cloud" : "iphone")
+            Image(systemName: icon)
         }
         .font(.system(size: 10))
         .foregroundStyle(.grayFont)
@@ -195,7 +210,34 @@ struct TranslationProvenanceChip: View {
         .padding(.vertical, 2)
         .background(Color.gray.opacity(0.15))
         .clipShape(Capsule())
-        .accessibilityIdentifier(isCloud ? "provenance.cloud" : "provenance.onDevice")
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var label: LocalizedStringKey {
+        switch source {
+        case .onDevice: "On device"
+        case .cloud: "Cloud"
+        case .reader: "Edited"
+        }
+    }
+
+    private var icon: String {
+        switch source {
+        case .onDevice: "iphone"
+        case .cloud: "cloud"
+        case .reader: "pencil"
+        }
+    }
+
+    /// These strings are API, not decoration: a UI test waits on
+    /// `provenance.onDevice`, so the two original values are kept exactly as
+    /// they were and the new case simply gets a third.
+    private var identifier: String {
+        switch source {
+        case .onDevice: "provenance.onDevice"
+        case .cloud: "provenance.cloud"
+        case .reader: "provenance.edited"
+        }
     }
 }
 

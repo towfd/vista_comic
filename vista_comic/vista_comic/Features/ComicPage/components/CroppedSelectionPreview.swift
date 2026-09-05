@@ -72,6 +72,22 @@ struct CroppedSelectionPreview: View {
     /// language or a further-edited text without disturbing the recognition
     /// result. `nil` until the user taps "Translate" for the first time.
     @State private var translationState: LoadState<String>?
+    /// User-editable translation, seeded from whichever machine produced the
+    /// wording most recently, and the only translation anything downstream
+    /// reads.
+    ///
+    /// The mirror image of `editedText` above: the machine writes a draft, the
+    /// reader writes the final version. It exists because a translation is
+    /// often *nearly* right — the reader can already see what the panel means
+    /// and only needs to fix the wording — and the alternative was spending one
+    /// of the day's 深入解釋 requests as an expensive spell-checker.
+    ///
+    /// Three things write here, and the rules matter more than the field does:
+    /// a fresh translation resets it, a cloud translation overwrites it once,
+    /// and the reader's typing wins over everything afterwards. See
+    /// `applyCloudTranslation(from:)` for why "once" is free rather than
+    /// guarded.
+    @State private var editedTranslation = ""
     /// How the opt-in explanation request went, `nil` until the reader asks for
     /// one — which is what keeps a plain translate off the network entirely.
     ///
@@ -150,6 +166,12 @@ struct CroppedSelectionPreview: View {
                 }
                 .padding()
             }
+            // Two text editors now, and the lower one sits above the collect
+            // buttons — so the keyboard raised to type a translation covers the
+            // thing the reader typed it *for*. Scrolling is the gesture they
+            // already reach for; a keyboard toolbar would need focus state for
+            // the same result.
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Selected text")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -269,6 +291,42 @@ struct CroppedSelectionPreview: View {
         return !editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Whether the translation on screen is something that can be acted on.
+    ///
+    /// Empty became reachable the moment the field became editable — select
+    /// all, delete — and nothing downstream survives it. A card with no answer
+    /// side defeats the manual-collection quality gate the whole of 單字庫
+    /// rests on, and can only ever be answered "I don't know" in review; an
+    /// explanation of nothing is one of the day's requests spent on nothing.
+    ///
+    /// Nothing is *said* about it. The disabled buttons sit directly under the
+    /// empty field, so the cause is already on screen, and a warning line would
+    /// only be a second way of saying it.
+    private var canUseTranslation: Bool {
+        !editedTranslation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Whether a card already exists for this line — collected just now, being
+    /// collected right now, or found in the deck from some previous session.
+    ///
+    /// This is what freezes the translation field, and it is deliberately not a
+    /// write-back. An offline collection is queued locally and has **no card
+    /// id**, so there is nothing to update; and 單字庫's own card screen is
+    /// already where a saved card is corrected, so a second write path would
+    /// only give the two places somewhere to disagree.
+    ///
+    /// Read-only rather than merely inert, because a field that accepts typing
+    /// which goes nowhere is exactly the sort of screen this one otherwise
+    /// avoids. By this point the buttons have already been replaced by a
+    /// confirmation label — freezing the field is the input catching up with
+    /// what the screen has said.
+    private var cardExists: Bool {
+        switch collectionState {
+        case .collecting, .collected, .alreadyKnown: return true
+        case .idle, .failed: return false
+        }
+    }
+
     private var isTranslating: Bool {
         if case .loading = translationState { return true }
         return false
@@ -353,24 +411,16 @@ struct CroppedSelectionPreview: View {
                     Spacer()
                 }
                 .frame(minHeight: 80)
-            case .loaded(let translation):
+            case .loaded:
                 VStack(alignment: .leading, spacing: 12) {
                     // Original and translated text side by side, so the reader
                     // can compare them directly without scrolling between two
-                    // screens.
+                    // screens — which matters more now that the right-hand
+                    // side is something they type rather than only read.
                     HStack(alignment: .top, spacing: 12) {
                         translationColumn(titleKey: "Original", text: editedText)
                         Divider()
-                        translationColumn(
-                            titleKey: "Translation",
-                            // Where a cloud translation exists it wins; until
-                            // then the on-device one stands. Reading it off the
-                            // record means pending, failed and declined records
-                            // need no special case here — they simply have no
-                            // cloud wording yet, or ever.
-                            text: record?.displayedTranslation ?? translation,
-                            isCloud: record?.cloudTranslation != nil
-                        )
+                        editableTranslationColumn
                     }
 
                     Divider()
@@ -473,7 +523,7 @@ struct CroppedSelectionPreview: View {
             Task { await collect(as: kind) }
         }
         .buttonStyle(.bordered)
-        .disabled(!canTranslate)
+        .disabled(!canTranslate || !canUseTranslation)
         .accessibilityIdentifier(kind == .word ? "addWord" : "addSentence")
     }
 
@@ -491,17 +541,19 @@ struct CroppedSelectionPreview: View {
     /// Keeps the line the reader confirmed, with the translation they are
     /// looking at right now.
     ///
-    /// `displayedTranslation` is read the same way the translation column reads
-    /// it, so the card stores exactly the wording on screen: the on-device one
-    /// if they added straight after translating, the cloud's if they asked for
-    /// an explanation and waited for it.
+    /// The card stores exactly the wording on screen, and now that the field is
+    /// editable that is a stronger promise than it used to be: the on-device
+    /// translation if they added straight after translating, the cloud's if
+    /// they asked for an explanation and waited, or their own words if they
+    /// corrected either one. The reader's judgement is the whole point of the
+    /// deck, so it is their wording that goes into it.
     private func collect(as kind: CardKind) async {
-        guard case .loaded(let translation) = translationState else { return }
+        guard case .loaded = translationState else { return }
 
         collectionState = .collecting
         let outcome = await collectSelection(
             sourceText: editedText,
-            translation: record?.displayedTranslation ?? translation,
+            translation: editedTranslation,
             targetLanguageCode: selectedLanguageID,
             comicID: comicID,
             chapterID: chapterID,
@@ -584,6 +636,7 @@ struct CroppedSelectionPreview: View {
         }
         .buttonStyle(.bordered)
         .tint(.primaryRed)
+        .disabled(!canUseTranslation)
         .accessibilityIdentifier("explainInDepth")
     }
 
@@ -627,21 +680,87 @@ struct CroppedSelectionPreview: View {
 
     private func translationColumn(
         titleKey: LocalizedStringKey,
-        text: String,
-        isCloud: Bool? = nil
+        text: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(titleKey)
-                    .font(AppFont.rowTitle)
-                if let isCloud {
-                    TranslationProvenanceChip(isCloud: isCloud)
-                }
-            }
+            Text(titleKey)
+                .font(AppFont.rowTitle)
             Text(text)
                 .font(AppFont.caption)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The translation half of the pair — an editor rather than a label,
+    /// because a machine translation is a draft and the reader is the one who
+    /// knows what the panel actually says.
+    ///
+    /// Always editable, with no view/edit toggle: the source text above it is
+    /// already an always-on editor, and the whole screen then reads as one rule
+    /// — *the machine drafts, the reader decides*. A pencil button would put a
+    /// tap in front of the most common thing done here, since a translation
+    /// being nearly-but-not-quite right is the normal case, not the exception.
+    ///
+    /// Goes read-only once a card exists, so that typing never goes nowhere.
+    private var editableTranslationColumn: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text("Translation")
+                    .font(AppFont.rowTitle)
+                TranslationProvenanceChip(source: translationSource)
+            }
+            if cardExists {
+                Text(editedTranslation)
+                    .font(AppFont.caption)
+            } else {
+                TextEditor(text: $editedTranslation)
+                    // Deliberately *not* `.autocorrectionDisabled()`, unlike
+                    // the source editor above. That field holds Vietnamese the
+                    // reader is fixing character by character against a
+                    // mismatched keyboard, where autocorrect rewrites
+                    // deliberate corrections and costs seconds of keyboard
+                    // latency. This field holds the reader's own language,
+                    // where candidate input is what makes typing possible at
+                    // all. The two differ on purpose.
+                    .font(AppFont.caption)
+                    .frame(minHeight: 80)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.3))
+                    }
+                    .accessibilityIdentifier("translationEditor")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Which of the three possible authors produced the wording on screen.
+    ///
+    /// Derived by comparing against the machine's own wording rather than
+    /// tracked with a "has been touched" flag, so a reader who edits and then
+    /// types the machine's version back gets told the truth — that what they
+    /// are looking at is the machine's after all.
+    private var translationSource: TranslationSource {
+        if editedTranslation != machineTranslation { return .reader }
+        return record?.cloudTranslation != nil ? .cloud : .onDevice
+    }
+
+    /// The latest machine wording for this text: the cloud's once it has
+    /// arrived, the on-device one until then. `nil` before any translation.
+    ///
+    /// Reading the on-device half off `translationState` is what keeps this
+    /// honest — that state is never written by editing, so it stays a record of
+    /// what the machine said no matter what the reader does to the field.
+    ///
+    /// `cloudTranslation` specifically, **not** `displayedTranslation`, which
+    /// falls back to the record's `translatedText` — and that field is just an
+    /// echo of the wording this screen uploaded when it asked for the
+    /// explanation. Comparing against an echo of the reader's own edit would
+    /// report their words as the machine's from the moment they pressed
+    /// 深入解釋, which is the exact claim the chip exists to avoid making.
+    private var machineTranslation: String? {
+        guard case .loaded(let onDevice) = translationState else { return nil }
+        return record?.cloudTranslation ?? onDevice
     }
 
     private func translationFailureContent(for error: Error) -> some View {
@@ -692,6 +811,16 @@ struct CroppedSelectionPreview: View {
         translationState = await translateSelection(
             editedText, to: selectedLanguage, using: translator
         )
+        // Seeded, and on a re-translate that means any edit is discarded. Same
+        // reasoning as the three resets above: the reader got here by changing
+        // the source text or the target language, so the wording they typed
+        // belongs to a line that no longer exists. Keeping it would leave the
+        // field claiming to be, say, English while showing Chinese — worse than
+        // losing the edit, because the screen would then be wrong rather than
+        // merely empty-handed.
+        if case .loaded(let machine) = translationState {
+            editedTranslation = machine
+        }
         // Checked here rather than on appear because this is the first moment
         // the text is settled: recognition runs automatically and the reader
         // corrects it afterwards, so anything earlier would be matching against
@@ -726,14 +855,20 @@ struct CroppedSelectionPreview: View {
     private func requestDeeperExplanation() async {
         // The button only exists under a loaded translation, so this is a
         // guard against a re-entrant tap rather than a real branch.
-        guard case .loaded(let translation) = translationState else { return }
+        guard case .loaded = translationState else { return }
 
         isRequestingExplanation = true
         explanationOutcome = nil
         record = nil
         let outcome = await requestExplanation(
             sourceText: editedText,
-            translation: translation,
+            // The reader's wording, not the raw on-device output this used to
+            // send. The two used to coincide — no record exists yet at the
+            // moment of asking, so there was nothing to prefer — which quietly
+            // left this reading one thing while `collect` read another. Now
+            // there is a real difference to get right: an explanation should be
+            // written against the meaning the reader settled on.
+            translation: editedTranslation,
             targetLanguageCode: selectedLanguageID,
             comicID: comicID,
             chapterID: chapterID,
@@ -763,7 +898,29 @@ struct CroppedSelectionPreview: View {
             using: comprehensionRepository
         ) {
             record = finished
+            applyCloudTranslation(from: finished)
         }
+    }
+
+    /// Replaces the field with the cloud's wording once it arrives.
+    ///
+    /// The cloud wins over anything the reader typed beforehand, deliberately.
+    /// That follows the two flows this screen actually gets: either the reader
+    /// understands the line and fixes the wording without ever asking for an
+    /// explanation, or they do not understand it, ask, and edit *after* the
+    /// answer lands. Editing and then asking is not a flow anyone has — so
+    /// defending the edit here would guard nothing while costing the reader the
+    /// better answer they waited minutes for.
+    ///
+    /// It can only happen **once**, and that is a property of the polling
+    /// rather than a flag kept here: `awaitRecordFinishing` returns as soon as
+    /// the record leaves an in-progress status, and `pollKey` does not change
+    /// when `record` is replaced, so nothing writes a record again afterwards.
+    /// That is what makes the second flow safe — everything the reader types
+    /// after reading the cloud's answer survives, however long they stay.
+    private func applyCloudTranslation(from record: ComprehensionRecord) {
+        guard let cloud = record.cloudTranslation else { return }
+        editedTranslation = cloud
     }
 
     /// Re-enqueues a record the backend failed on, putting it back to `pending`.
