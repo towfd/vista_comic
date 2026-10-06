@@ -94,6 +94,10 @@ class ComicDetail(BaseModel):
     title: str
     coverUrl: str
     chapters: List[ChapterSummary]
+    # Same value GET /comics reports for this comic: computed by the same
+    # progress_store.continue_chapter_id from the rows get_comic already reads,
+    # so the two endpoints cannot disagree. First chapter when the store is down.
+    continueChapterId: str
 
 
 class ChapterDetail(BaseModel):

@@ -1,4 +1,4 @@
-import type { ChapterDetail, ComicDetail, ComicSummary } from './types'
+import type { ChapterDetail, ComicDetail, ComicSummary, ProgressSaved } from './types'
 
 /**
  * Why a request failed, in the terms the screens need to tell apart.
@@ -43,12 +43,21 @@ export function toMediaPath(url: string): string {
 export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 
 export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promise<T> {
+  return requestJson<T>(path, { headers: { Accept: 'application/json' } }, fetcher)
+}
+
+/**
+ * One request to the API, with the error shaping every screen relies on.
+ * Shared by reads and the progress write so an Access refusal on a PUT is
+ * recognised exactly as it is on a GET.
+ */
+async function requestJson<T>(path: string, init: RequestInit, fetcher: Fetcher): Promise<T> {
   let response: Response
   try {
     // 'manual' keeps Access's redirect visible to us. Followed, it would land on
     // a cross-origin login page, fail CORS, and surface as a network error --
     // indistinguishable from the server being down.
-    response = await fetcher(path, { redirect: 'manual', headers: { Accept: 'application/json' } })
+    response = await fetcher(path, { ...init, redirect: 'manual' })
   } catch (error) {
     throw new ApiError('unavailable', `request failed: ${String(error)}`)
   }
@@ -103,4 +112,30 @@ export async function fetchChapter(comicId: string, chapterId: string, fetcher: 
     fetcher,
   )
   return { ...chapter, pages: chapter.pages.map(toMediaPath) }
+}
+
+/**
+ * Save the reading position into the one progress store the phone shares.
+ *
+ * `keepalive` lets the request outlive the page -- used for the flush sent as
+ * the tab is hidden or closed. 422 (page out of range) surfaces as
+ * `unexpected`, 503 (progress store down) as `unavailable`.
+ */
+export async function saveProgress(
+  comicId: string,
+  chapterId: string,
+  lastPage: number,
+  options: { keepalive?: boolean } = {},
+  fetcher: Fetcher = fetch,
+): Promise<ProgressSaved> {
+  return requestJson<ProgressSaved>(
+    `/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(chapterId)}/progress`,
+    {
+      method: 'PUT',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lastPage }),
+      ...(options.keepalive ? { keepalive: true } : {}),
+    },
+    fetcher,
+  )
 }

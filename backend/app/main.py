@@ -313,8 +313,10 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
     if comic is None:
         raise HTTPException(status_code=404, detail="Comic not found")
     base = _base_url(request)
-    # One query for this comic's rows; derive per-chapter readState.
-    # Degrades to {} (all readState "unread") if the progress store is unavailable.
+    # One query for this comic's rows; derive per-chapter readState and
+    # continueChapterId (the same rule GET /comics uses) from it — no second query.
+    # Degrades to {} (all readState "unread", Continue -> first chapter) if the
+    # progress store is unavailable.
     rows = progress_store.safe_progress_by_chapter(comic_id)
     return ComicDetail(
         id=comic.id,
@@ -334,6 +336,7 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
             )
             for ch in comic.chapters
         ],
+        continueChapterId=progress_store.continue_chapter_id(comic.chapters, rows),
     )
 
 

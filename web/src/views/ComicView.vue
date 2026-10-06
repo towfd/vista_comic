@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useComicsStore } from '../stores/comics'
+import { continueChapter, useComicsStore } from '../stores/comics'
 import ErrorState from '../components/ErrorState.vue'
 import type { ChapterSummary } from '../api/types'
 
 const props = defineProps<{ comicId: string }>()
 const store = useComicsStore()
 const state = computed(() => store.entry(props.comicId))
+const continueTo = computed(() => (state.value.data ? continueChapter(state.value.data) : null))
 
+// Every visit revalidates: a cached copy renders at once and the fresh one
+// (with the badges and Continue of what was just read) replaces it.
 watch(
   () => props.comicId,
   (comicId) => {
-    if (!store.entry(comicId).data) store.load(comicId)
+    void store.load(comicId)
   },
   { immediate: true },
 )
@@ -57,6 +60,14 @@ const badges: Record<string, { label: string; class: string }> = {
           <p class="mt-1 text-sm text-neutral-400">{{ state.data.chapters.length }} 章</p>
         </div>
       </header>
+
+      <RouterLink
+        v-if="continueTo"
+        :to="{ name: 'reader', params: { comicId, chapterId: continueTo.id } }"
+        class="mb-6 block rounded-md bg-sky-600 px-4 py-3 text-center font-medium text-white hover:bg-sky-500"
+      >
+        繼續閱讀 · 第 {{ continueTo.number }} 話
+      </RouterLink>
 
       <p v-if="state.data.chapters.length === 0" class="py-24 text-center text-neutral-400">這部漫畫還沒有章節。</p>
 

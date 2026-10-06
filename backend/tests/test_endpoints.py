@@ -52,7 +52,7 @@ def test_get_comic_detail_shape_and_counts(client):
     assert resp.status_code == 200
 
     detail = resp.json()
-    assert set(detail) == {"id", "title", "coverUrl", "chapters"}
+    assert set(detail) == {"id", "title", "coverUrl", "chapters", "continueChapterId"}
     assert detail["id"] == comic_id
     assert detail["title"] == "Alpha"
     assert len(detail["chapters"]) == 2
