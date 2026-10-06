@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, fetchChapter, fetchComic, fetchComics, getJson, toMediaPath, type Fetcher } from './client'
+import { ApiError, fetchChapter, fetchComic, fetchComics, getJson, saveProgress, toMediaPath, type Fetcher } from './client'
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
@@ -154,5 +154,55 @@ describe('fetchChapter', () => {
 
   it('reports an unknown chapter as notFound', async () => {
     expect(await errorKind(fetchChapter('a', 'nope', respondWith(json({ detail: 'Chapter not found' }, 404))))).toBe('notFound')
+  })
+})
+
+describe('saveProgress', () => {
+  const saved = { comicId: 'a', chapterId: 'c1', lastPage: 12, pageCount: 30, updatedAt: '2026-10-06T00:00:00Z' }
+
+  function capture() {
+    const seen: { input: string; init?: RequestInit } = { input: '' }
+    const fetcher: Fetcher = async (input, init) => {
+      seen.input = input
+      seen.init = init
+      return json(saved)
+    }
+    return { seen, fetcher }
+  }
+
+  it('PUTs { lastPage } as JSON, with redirects kept manual', async () => {
+    const { seen, fetcher } = capture()
+    const result = await saveProgress('a', 'c1', 12, {}, fetcher)
+    expect(seen.init?.method).toBe('PUT')
+    expect(seen.init?.redirect).toBe('manual')
+    expect(new Headers(seen.init?.headers).get('content-type')).toBe('application/json')
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ lastPage: 12 })
+    expect(seen.init?.keepalive).toBeUndefined()
+    expect(result).toEqual(saved)
+  })
+
+  it('targets the progress path by encoded ids', async () => {
+    const { seen, fetcher } = capture()
+    await saveProgress('a b', 'c/1', 3, {}, fetcher)
+    expect(seen.input).toBe('/comics/a%20b/chapters/c%2F1/progress')
+  })
+
+  it('passes keepalive through when asked', async () => {
+    const { seen, fetcher } = capture()
+    await saveProgress('a', 'c1', 12, { keepalive: true }, fetcher)
+    expect(seen.init?.keepalive).toBe(true)
+  })
+
+  it('reports an Access redirect as an auth failure', async () => {
+    const response = new Response(null, { status: 302, headers: { location: 'https://x.cloudflareaccess.com/login' } })
+    expect(await errorKind(saveProgress('a', 'c1', 12, {}, respondWith(response)))).toBe('auth')
+  })
+
+  it('reports a progress store outage (503) as unavailable', async () => {
+    expect(await errorKind(saveProgress('a', 'c1', 12, {}, respondWith(json({ detail: 'down' }, 503))))).toBe('unavailable')
+  })
+
+  it('reports an out-of-range page (422) as unexpected', async () => {
+    expect(await errorKind(saveProgress('a', 'c1', 99, {}, respondWith(json({ detail: 'out of range' }, 422))))).toBe('unexpected')
   })
 })
