@@ -10,14 +10,33 @@
 
 **Blocked by:** 01, 02
 
-**Status:** ready
+**Status:** done 2026-10-06 — stale-while-revalidate comics store and the Continue button are in; button stays hidden until ticket 01's backend is deployed; browser checklist is the developer's
 
-- [ ] `types.ts`: `ComicDetail.continueChapterId?: string`; client decoding unit-tested with and without it
-- [ ] Comics store revalidates on every visit while keeping cached data visible; failure of a background refetch keeps the cached list (no error screen over good data)
-- [ ] Revalidation awaits the in-flight save before fetching
-- [ ] Continue button with the right label and target; hidden when absent or unknown
-- [ ] Library unchanged
-- [ ] `vue-tsc` clean, vitest green
+- [x] `types.ts`: `ComicDetail.continueChapterId?: string`; client decoding unit-tested with and without it
+- [x] Comics store revalidates on every visit while keeping cached data visible; failure of a background refetch keeps the cached list (no error screen over good data)
+- [x] Revalidation awaits the in-flight save before fetching
+- [x] Continue button with the right label and target; hidden when absent or unknown
+- [x] Library unchanged
+- [x] `vue-tsc` clean, vitest green
+
+## What was built
+
+- `web/src/api/types.ts` — `ComicDetail.continueChapterId?: string` (optional: a backend not yet deployed omits it). `client.ts` unchanged; `fetchComic` passes the field through.
+- `web/src/stores/comics.ts`:
+  - `load(comicId)` is now stale-while-revalidate: the cached `data` stays in the entry while `loading` is true, `await useChaptersStore().savesSettled()` runs before `fetchComic`, and a generation counter discards a late, superseded response (success or failure).
+  - A failed refetch **with** cached data keeps it, sets `error: null`, and logs one `console.warn`; **without** cached data, `loading`/`error` behave as before (「載入中」 / ErrorState).
+  - `entry(comicId)` / `load(comicId)` keep their signatures, so ReaderView's next-chapter lookup is unaffected (its `load` now also waits for in-flight saves, which only makes the list it reads fresher).
+  - `continueChapter(comic): ChapterSummary | null` — pure; the chapter whose id is `continueChapterId`, or `null` when absent / not in the list.
+- `web/src/views/ComicView.vue` — calls `store.load` on every visit (ComicView is not kept alive, so each visit remounts it). Under the header, above the list: a full-width primary `RouterLink` 「繼續閱讀 · 第 N 話」 to `{ name: 'reader', params: { comicId, chapterId } }`, `v-if` on `continueChapter`. Primary style (new; the web had none): `rounded-md bg-sky-600 px-4 py-3 text-center font-medium text-white hover:bg-sky-500`. Ticket 03's 「下一話」 button should reuse these classes.
+- Library screen untouched.
+
+## Verification done
+
+- `npm run typecheck` (vue-tsc) clean; `npm test` 72/72 across 6 files.
+  - `api/client.test.ts`: `fetchComic` decodes with `continueChapterId` and without it.
+  - `stores/comics.test.ts` (new, 10 tests): first visit loading → data; revalidate keeps the cached copy visible then swaps the fresh one; refetch waits for an in-flight save (`fetchComic` not called until the PUT answers); background failure keeps cache with no error; no cache → error reported; late older success ignored; late older failure ignored; `continueChapter` found / absent / unknown id.
+- `GET /comics/63d82d8f2f73a6d3` through the running dev server (`localhost:5173`, GET only): production does **not** return `continueChapterId` yet — ticket 01 is not deployed, so the button is hidden there for now, which is the "before the backend deploy" case.
+- Not exercised here: the browser behaviour (checklist below is the developer's).
 
 ## Browser checklist for the developer
 

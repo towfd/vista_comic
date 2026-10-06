@@ -29,6 +29,11 @@ export interface ComicDetail {
   id: string
   title: string
   coverUrl: string
+  /**
+   * The chapter the Continue button opens (same rule as the library's). Optional
+   * because a backend not yet deployed omits it; the button is then hidden.
+   */
+  continueChapterId?: string
   chapters: ChapterSummary[]
 }
 

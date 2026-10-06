@@ -120,6 +120,17 @@ describe('fetchComic', () => {
     expect(requested).toBe('/comics/a%2Fb')
   })
 
+  it('decodes continueChapterId when the backend sends it', async () => {
+    const comic = await fetchComic('a', respondWith(json({ ...detail, continueChapterId: 'c2' })))
+    expect(comic.continueChapterId).toBe('c2')
+  })
+
+  it('decodes a response without continueChapterId (backend not yet deployed)', async () => {
+    const comic = await fetchComic('a', respondWith(json(detail)))
+    expect(comic.continueChapterId).toBeUndefined()
+    expect(comic.chapters).toHaveLength(2)
+  })
+
   it('reports an unknown comic as notFound', async () => {
     expect(await errorKind(fetchComic('nope', respondWith(json({ detail: 'Comic not found' }, 404))))).toBe('notFound')
   })
