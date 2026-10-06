@@ -485,14 +485,10 @@ private struct SessionView: View {
                     .accessibilityIdentifier("toneHint")
             }
 
-            // The meaning, at a size it can be read at. It was a 12pt caption
-            // under a 26pt sentence, which made the half that explains the
-            // other half the smallest thing on the screen.
-            Text(item.card.translation)
-                .font(AppFont.explanation)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.grayFont)
+            // No meaning repeated here. It is on screen throughout now — as
+            // the prompt itself in the whole-sentence modes, and under the
+            // prompt in the cloze ones — so printing it again put the same line
+            // on the screen twice.
 
             Button("Next") { advance() }
                 .buttonStyle(.commit)
