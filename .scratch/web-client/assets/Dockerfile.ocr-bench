@@ -1,0 +1,26 @@
+# Measurement container for .scratch/web-client/issues/10-measure-ocr-latency.md
+#
+# Deliberately NOT the eventual service image -- it installs the dependencies and
+# nothing else, and the source, samples and script are bind-mounted at run time so
+# the build context stays tiny and a change to the script costs no rebuild.
+#
+# paddlepaddle is pinned to 3.1.0 because that is the last release publishing a
+# manylinux2014_aarch64 wheel; 3.3.1 ships Linux x86_64 only, so an unpinned
+# install fails outright on Apple Silicon. torch 2.2.2 has an aarch64 wheel too.
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+        paddlepaddle==3.1.0 \
+        torch==2.2.2 torchvision==0.17.2 \
+        opencv-python-headless \
+        vietocr \
+        "numpy<2" pillow einops pyclipper lmdb shapely pyyaml \
+        scikit-image imgaug lanms-neo rapidfuzz albumentations \
+        "pandas" "matplotlib"
+
+WORKDIR /work
+ENV PYTHONPATH=/work
