@@ -10,7 +10,7 @@
 
 **Blocked by:** 01, 02
 
-**Status:** done 2026-10-06 — stale-while-revalidate comics store and the Continue button are in; button stays hidden until ticket 01's backend is deployed; browser checklist is the developer's
+**Status:** done 2026-10-06 — stale-while-revalidate comics store and the Continue button are in; merged in #104 and browser-verified by the developer.
 
 - [x] `types.ts`: `ComicDetail.continueChapterId?: string`; client decoding unit-tested with and without it
 - [x] Comics store revalidates on every visit while keeping cached data visible; failure of a background refetch keeps the cached list (no error screen over good data)
@@ -40,7 +40,7 @@
 
 ## Browser checklist for the developer
 
-- [ ] Before the backend deploy: chapter list works, no Continue button
-- [ ] After it: Continue names the chapter you're on and opens it at its resume page
-- [ ] Read into another chapter, go back → its badge and Continue have updated without a reload, and the list didn't flash
-- [ ] A comic never read → Continue points at chapter 1
+- [x] Before the backend deploy: chapter list works, no Continue button
+- [x] After it: Continue names the chapter you're on and opens it at its resume page
+- [x] Read into another chapter, go back → its badge and Continue have updated without a reload, and the list didn't flash
+- [x] A comic never read → Continue points at chapter 1

@@ -8,7 +8,7 @@ With the progress store down, `rows` is `{}` and the value degrades to the first
 
 **Blocked by:** none
 
-**Status:** done 2026-10-06 — backend field added and unit-verified (full suite green); deploying to production is still the developer's step.
+**Status:** done 2026-10-06 — backend field added and unit-verified (full suite green); merged in #104 and deployed to production by the developer.
 
 - [x] `ComicDetail` in `backend/app/models.py` has `continueChapterId: str`
 - [x] `get_comic` fills it with `progress_store.continue_chapter_id(comic.chapters, rows)` — no extra query
