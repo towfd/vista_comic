@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { ChapterDetail } from '../api/types'
 import { useChaptersStore } from '../stores/chapters'
 import { useComicsStore } from '../stores/comics'
 import { currentPage, isScrollKey, resumeStartPage } from '../reader/progress'
 import { createProgressSaver, type ProgressSaver } from '../reader/progressSaver'
+import { nextChapter, START_AT_TOP_KEY, takeStartAtTopFlag } from '../reader/nextChapter'
 import ErrorState from '../components/ErrorState.vue'
 import ReaderPage from '../components/ReaderPage.vue'
 
 const props = defineProps<{ comicId: string; chapterId: string }>()
 const chapters = useChaptersStore()
 const comics = useComicsStore()
+const router = useRouter()
 
 const state = computed(() => chapters.entry(props.comicId, props.chapterId))
 // The comic's title, if the chapter list was visited first. Arriving straight
@@ -35,12 +37,15 @@ const visiblePages = new Set<number>()
 let endVisible = false
 
 /**
- * Whether this open should ignore the saved position and start at the top.
- * Ticket 03 (next-chapter button) reads -- and clears -- its flag from
- * `history.state` here; until then every open resumes.
+ * Whether this open should ignore the saved position and start at the top:
+ * the next-chapter button leaves a flag in `history.state`. Read when the new
+ * chapter's data is positioned, then removed (vue-router's own keys kept), so
+ * reloading mid-chapter resumes from the saved position instead.
  */
 function takeStartAtTop(): boolean {
-  return false
+  const { startAtTop, rest } = takeStartAtTopFlag(window.history.state)
+  if (rest) window.history.replaceState(rest, '')
+  return startAtTop
 }
 
 /**
@@ -154,6 +159,34 @@ onUnmounted(() => {
   saver = null
 })
 
+// ---- Next chapter ---------------------------------------------------------
+// The neighbour comes from the comic's chapter list; ChapterDetail has none.
+// Arriving straight on a reader URL, the list is fetched in the background --
+// the pages never wait for it, and the button simply appears once it lands.
+watch(
+  () => props.comicId,
+  (comicId) => {
+    const entry = comics.entry(comicId)
+    if (!entry.data && !entry.loading) void comics.load(comicId)
+  },
+  { immediate: true },
+)
+
+const next = computed(() => nextChapter(comics.entry(props.comicId).data?.chapters, props.chapterId))
+
+function openNext() {
+  const target = next.value
+  if (!target) return
+  // With 「本話完」 visible this sends pageCount, marking the chapter read.
+  flushProgress()
+  // replace: after 5 -> 6 -> 7, browser back returns to the chapter list.
+  router.replace({
+    name: 'reader',
+    params: { comicId: props.comicId, chapterId: target.id },
+    state: { [START_AT_TOP_KEY]: true },
+  })
+}
+
 const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId } }))
 </script>
 
@@ -195,9 +228,17 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
         </div>
       </div>
 
-      <div ref="endEl" class="mt-12 text-center">
+      <div ref="endEl" class="mt-12 flex flex-col items-center text-center">
         <p class="text-sm text-neutral-500">本話完</p>
-        <RouterLink :to="backTo" class="mt-3 inline-block text-sm text-neutral-300 hover:text-neutral-100">
+        <button
+          v-if="next"
+          type="button"
+          class="mt-4 rounded-md bg-sky-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-sky-500"
+          @click="openNext"
+        >
+          下一話 · 第 {{ next.number }} 話
+        </button>
+        <RouterLink :to="backTo" class="mt-3 text-sm text-neutral-300 hover:text-neutral-100">
           回到章節列表
         </RouterLink>
       </div>

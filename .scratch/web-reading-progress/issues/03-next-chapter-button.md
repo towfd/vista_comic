@@ -10,14 +10,31 @@
 
 **Blocked by:** 02
 
-**Status:** ready
+**Status:** done 2026-10-06 — button, background list load, start-at-top flag in history state; browser checklist is the developer's
 
-- [ ] Pure `nextChapter(chapters, currentId)` with unit tests: middle → following; last → none; unknown id → none
-- [ ] Button renders below 「本話完」 with the next chapter's number; hidden in the three cases above
-- [ ] Reader loads the comic detail in the background when the store lacks it; pages are never blocked on it
-- [ ] Next chapter opens at its top even with a saved position; reload mid-chapter resumes instead of restarting
-- [ ] `router.replace` navigation; progress flushed before leaving
-- [ ] `vue-tsc` clean, vitest green
+- [x] Pure `nextChapter(chapters, currentId)` with unit tests: middle → following; last → none; unknown id → none
+- [x] Button renders below 「本話完」 with the next chapter's number; hidden in the three cases above
+- [x] Reader loads the comic detail in the background when the store lacks it; pages are never blocked on it
+- [x] Next chapter opens at its top even with a saved position; reload mid-chapter resumes instead of restarting
+- [x] `router.replace` navigation; progress flushed before leaving
+- [x] `vue-tsc` clean, vitest green
+
+## What was built
+
+- `web/src/reader/nextChapter.ts` — pure, no DOM:
+  - `nextChapter(chapters, currentId)` → the entry after `currentId`, or `null` on the last chapter, an unknown id, or a missing/empty list.
+  - `START_AT_TOP_KEY` (`'vistaStartAtTop'`) and `takeStartAtTopFlag(state)` → `{ startAtTop, rest }`: the flag, plus the state without it (every vue-router key kept); `rest` is `null` when there is nothing to clear.
+- `web/src/views/ReaderView.vue`:
+  - `takeStartAtTop()` now reads the flag from `window.history.state` and, if present, clears it with `history.replaceState(rest, '')` (same URL). It is still called only from `position()`, i.e. after the *new* chapter's data has rendered — vue-router writes the replace's history entry before the props change, so the flag is there for the new chapter and the old one (already positioned) never sees it.
+  - A `watch(props.comicId, immediate)` calls `comics.load(comicId)` (not awaited) when the store has neither data nor a load in flight. The pages do not depend on it.
+  - `next = nextChapter(comics.entry(comicId).data?.chapters, chapterId)`; the button `v-if="next"` sits below 「本話完」, above 「回到章節列表」 (end block is now a centred flex column). Style matches the comic page's Continue button (`bg-sky-600`, white, medium).
+  - `openNext()` → `flushProgress()` then `router.replace({ name: 'reader', params, state: { [START_AT_TOP_KEY]: true } })`. The param change then runs `openChapter` (its own flush is a no-op: same page).
+
+## Verification done
+
+- `npm run typecheck` (vue-tsc) clean; `npm run build` OK; `npm test` 72/72 across 6 files (8 new in `reader/nextChapter.test.ts`: middle / first → following, last → none, unknown id → none, missing/empty list → none; flag read with vue-router keys preserved, absent → nothing to clear, non-object state, non-`true` value cleared but not honoured). The count includes a concurrent agent's new `stores/comics.test.ts`.
+- No network writes made for this ticket.
+- Not exercised here: the browser behaviour (checklist below).
 
 ## Browser checklist for the developer
 
