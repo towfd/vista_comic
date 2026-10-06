@@ -17,7 +17,7 @@
 
 **Blocked by:** none
 
-**Status:** done 2026-10-06 — resume, gate, debounce/flush and the PUT are in; browser checklist is the developer's
+**Status:** done 2026-10-06 — resume, gate, debounce/flush and the PUT are in; merged in #104 and browser-verified by the developer.
 
 - [x] `client.ts` gains `saveProgress(comicId, chapterId, lastPage, { keepalive? })` — `PUT` with JSON `{ lastPage }`, the same `redirect: 'manual'` and error shaping as `getJson`; unit-tested (body, method, encoded ids, auth redirect → `auth`, 503 → `unavailable`)
 - [x] `types.ts`: `lastReadPage` no longer documented as ignored
@@ -62,11 +62,11 @@
 
 ## Browser checklist for the developer
 
-- [ ] A chapter with phone progress opens on that page and stays there while nearby pages load
-- [ ] Open a chapter, don't scroll, go back → no `PUT` in the network panel
-- [ ] Trackpad-scroll and stop → one `PUT` about a second later, with the top-most visible page
-- [ ] Reach 「本話完」 → `PUT` with `lastPage == pageCount`
-- [ ] Back link, and switching tab away → a `PUT` fires immediately
-- [ ] Reopen the same chapter → it resumes at the page just read, not the earlier one
-- [ ] The phone shows the web's position, and vice versa
-- [ ] Every request goes to `localhost:5173`
+- [x] A chapter with phone progress opens on that page and stays there while nearby pages load
+- [x] Open a chapter, don't scroll, go back → no `PUT` in the network panel
+- [x] Trackpad-scroll and stop → one `PUT` about a second later, with the top-most visible page
+- [x] Reach 「本話完」 → `PUT` with `lastPage == pageCount`
+- [x] Back link, and switching tab away → a `PUT` fires immediately
+- [x] Reopen the same chapter → it resumes at the page just read, not the earlier one
+- [x] The phone shows the web's position, and vice versa
+- [x] Every request goes to `localhost:5173`

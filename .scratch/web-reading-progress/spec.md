@@ -1,4 +1,4 @@
-Status: ticketed (2026-10-06)
+Status: done (2026-10-06) — merged in #104, backend deployed, browser-verified by the developer
 
 # Web reading progress: resume where you left off, on either device
 

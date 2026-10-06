@@ -10,7 +10,7 @@
 
 **Blocked by:** 02
 
-**Status:** done 2026-10-06 — button, background list load, start-at-top flag in history state; browser checklist is the developer's
+**Status:** done 2026-10-06 — button, background list load, start-at-top flag in history state; merged in #104 and browser-verified by the developer.
 
 - [x] Pure `nextChapter(chapters, currentId)` with unit tests: middle → following; last → none; unknown id → none
 - [x] Button renders below 「本話完」 with the next chapter's number; hidden in the three cases above
@@ -38,9 +38,9 @@
 
 ## Browser checklist for the developer
 
-- [ ] End of a chapter → button names the right chapter; pressing it opens that chapter at its top, even one read halfway on the phone
-- [ ] The finished chapter shows 已讀 afterwards
-- [ ] Last chapter → no button
-- [ ] Two hops, then browser back → chapter list
-- [ ] Open a reader URL directly (fresh tab) → the button still appears once the list arrives
-- [ ] After a hop, scroll a little, reload → resumes there, not at the top
+- [x] End of a chapter → button names the right chapter; pressing it opens that chapter at its top, even one read halfway on the phone
+- [x] The finished chapter shows 已讀 afterwards
+- [x] Last chapter → no button
+- [x] Two hops, then browser back → chapter list
+- [x] Open a reader URL directly (fresh tab) → the button still appears once the list arrives
+- [x] After a hop, scroll a little, reload → resumes there, not at the top
