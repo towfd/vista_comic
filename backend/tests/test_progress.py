@@ -206,6 +206,40 @@ def test_comics_continue_first_chapter_when_all_read(client):
     assert comics[ALPHA]["continueChapterId"] == JOURNEY
 
 
+# --- continueChapterId: on the /comics/{id} detail endpoint -----------------
+
+
+def _continue_both(client, comic_id: str) -> tuple[str, str]:
+    """(list endpoint's, detail endpoint's) continueChapterId for one comic."""
+    listed = {c["id"]: c for c in client.get("/comics").json()}[comic_id]
+    detail = client.get(f"/comics/{comic_id}")
+    assert detail.status_code == 200
+    return listed["continueChapterId"], detail.json()["continueChapterId"]
+
+
+def test_detail_continue_matches_list_with_no_rows(client):
+    assert _continue_both(client, ALPHA) == (JOURNEY, JOURNEY)
+    assert _continue_both(client, BETA) == (INTRO, INTRO)
+
+
+def test_detail_continue_matches_list_with_reading_chapter(client):
+    # JOURNEY is the only multi-page Alpha chapter, so it is the one that can
+    # be "reading" (CH_TWO has 1 page: any progress on it means "read").
+    client.put(_progress_path(ALPHA, JOURNEY), json={"lastPage": 1})
+    assert _continue_both(client, ALPHA) == (JOURNEY, JOURNEY)
+
+
+def test_detail_continue_matches_list_with_first_unread(client):
+    client.put(_progress_path(ALPHA, JOURNEY), json={"lastPage": 2})
+    assert _continue_both(client, ALPHA) == (CH_TWO, CH_TWO)
+
+
+def test_detail_continue_matches_list_when_all_read(client):
+    client.put(_progress_path(ALPHA, JOURNEY), json={"lastPage": 2})
+    client.put(_progress_path(ALPHA, CH_TWO), json={"lastPage": 1})
+    assert _continue_both(client, ALPHA) == (JOURNEY, JOURNEY)
+
+
 # --- endpoint: readState derivation -----------------------------------------
 
 
@@ -286,6 +320,7 @@ def test_catalog_endpoints_degrade_when_store_unavailable(client, monkeypatch):
     detail = client.get(f"/comics/{ALPHA}")
     assert detail.status_code == 200
     assert all(ch["readState"] == "unread" for ch in detail.json()["chapters"])
+    assert detail.json()["continueChapterId"] == JOURNEY
 
     chapter = client.get(f"/comics/{ALPHA}/chapters/{JOURNEY}")
     assert chapter.status_code == 200

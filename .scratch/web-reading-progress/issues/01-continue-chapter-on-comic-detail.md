@@ -8,11 +8,24 @@ With the progress store down, `rows` is `{}` and the value degrades to the first
 
 **Blocked by:** none
 
-**Status:** ready
+**Status:** done 2026-10-06 — backend field added and unit-verified (full suite green); deploying to production is still the developer's step.
 
-- [ ] `ComicDetail` in `backend/app/models.py` has `continueChapterId: str`
-- [ ] `get_comic` fills it with `progress_store.continue_chapter_id(comic.chapters, rows)` — no extra query
-- [ ] pytest: the detail's `continueChapterId` equals the list endpoint's for the same comic — with no rows (first chapter), with a `reading` chapter, and with every chapter `read` (first chapter)
-- [ ] pytest: with the progress store unavailable, the detail still returns 200 with the first chapter
-- [ ] `docs/api-contract.md` documents the field on `GET /comics/{comicId}`
-- [ ] Full backend suite passes
+- [x] `ComicDetail` in `backend/app/models.py` has `continueChapterId: str`
+- [x] `get_comic` fills it with `progress_store.continue_chapter_id(comic.chapters, rows)` — no extra query
+- [x] pytest: the detail's `continueChapterId` equals the list endpoint's for the same comic — with no rows (first chapter), with a `reading` chapter, and with every chapter `read` (first chapter)
+- [x] pytest: with the progress store unavailable, the detail still returns 200 with the first chapter
+- [x] `docs/api-contract.md` documents the field on `GET /comics/{comicId}`
+- [x] Full backend suite passes
+
+## What was built
+
+- `backend/app/models.py` — `ComicDetail.continueChapterId: str`.
+- `backend/app/main.py` — `get_comic` passes `comic.chapters` and the `rows` it already reads (`safe_progress_by_chapter`) to `progress_store.continue_chapter_id`, so there is still one query and one copy of the rule.
+- `docs/api-contract.md` — the field is added to the `GET /comics/{comicId}` shape, and the `continueChapterId` note now says the detail endpoint uses the same rule and degrades the same way.
+
+## Verification done
+
+- New tests in `backend/tests/test_progress.py`: the detail's `continueChapterId` equals the list endpoint's for the same comic with no rows (both comics → first chapter), with a `reading` chapter, with a fully read first chapter (→ first unread), and with every chapter `read` (→ first chapter). The existing store-down test (`_SessionLocal = None`) now also checks the detail returns 200 with the first chapter.
+- `backend/tests/test_endpoints.py`: the exact-key assertion on the detail shape now includes `continueChapterId`.
+- `cd backend && .venv/bin/python -m pytest` → 329 passed (Postgres `vista_test` via `docker compose up -d postgres`).
+- Fixture limitation: in `sample_library` the only multi-page Alpha chapter is its first, so the `reading` case also lands on the first chapter. The pure-function tests already cover a `reading` chapter that is not the first.

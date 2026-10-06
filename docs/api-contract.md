@@ -44,7 +44,7 @@ GET /comics
 
 # Chapter list
 GET /comics/{comicId}
-→ { id, title, coverUrl,
+→ { id, title, coverUrl, continueChapterId,
     chapters: [ { id, number, title, pageCount, readState } ] }
 
 # Reader
@@ -69,7 +69,7 @@ Notes:
 - **IDs are Stable IDs** (see `CONTEXT.md`) — a hash of the item's path relative to the Library root. Path segments in `/media/...` use these opaque IDs, not raw folder names (avoids path-encoding / traversal).
 - **`readState`** is derived per Chapter: no Progress row → `unread`, `lastPage >= pageCount` → `read`, else `reading`.
 - **`Comic.lastReadAt`** is the max `updatedAt` across that Comic's Chapters.
-- **`Comic.continueChapterId`** (always present) is the Chapter the "Continue" action opens: the most-recently-`updatedAt` `reading` Chapter, else the first `unread` Chapter in reading order, else the first Chapter. Derived from one grouped query over all Progress rows (no N+1).
+- **`Comic.continueChapterId`** (always present) is the Chapter the "Continue" action opens: the most-recently-`updatedAt` `reading` Chapter, else the first `unread` Chapter in reading order, else the first Chapter. Derived from one grouped query over all Progress rows (no N+1). `GET /comics/{comicId}` returns the same field, computed by the same rule from the single query it already makes for that Comic's rows, so the two endpoints always agree. If the Progress store is unavailable, both degrade to the first Chapter.
 
 ## Data flow
 
