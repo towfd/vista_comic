@@ -1,4 +1,4 @@
-import type { ChapterDetail, ComicDetail, ComicSummary, ProgressSaved } from './types'
+import type { CardState, ChapterDetail, ComicDetail, ComicSummary, LearningCard, ProgressSaved, StudySettings } from './types'
 
 /**
  * Why a request failed, in the terms the screens need to tell apart.
@@ -138,4 +138,26 @@ export async function saveProgress(
     },
     fetcher,
   )
+}
+
+const CARD_STATES: readonly CardState[] = ['new', 'learning', 'review', 'relearning']
+
+/**
+ * The deck shared with the phone, newest card first.
+ *
+ * Decoded as leniently as the phone decodes it: a state this client does not
+ * know becomes `new` and a kind it does not know becomes `null`, so a value
+ * the backend adds later degrades a card rather than breaking the deck.
+ */
+export async function fetchCards(fetcher: Fetcher = fetch): Promise<LearningCard[]> {
+  const cards = await getJson<LearningCard[]>('/cards', fetcher)
+  return cards.map((card) => ({
+    ...card,
+    state: CARD_STATES.includes(card.state) ? card.state : 'new',
+    kind: card.kind === 'word' || card.kind === 'sentence' ? card.kind : null,
+  }))
+}
+
+export async function fetchStudySettings(fetcher: Fetcher = fetch): Promise<StudySettings> {
+  return getJson<StudySettings>('/study/settings', fetcher)
 }

@@ -35,6 +35,8 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/comics': upstream,
         '/media': upstream,
+        '/cards': upstream,
+        '/study': upstream,
       },
     },
     test: {
