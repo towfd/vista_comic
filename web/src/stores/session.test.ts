@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import type { CardSchedule, CardState, LearningCard } from '../api/types'
+import { localDay } from '../practice/queue'
 import { useDeckStore } from './deck'
 import { RETRY_DELAYS_MS, useSessionStore } from './session'
 
@@ -436,5 +437,67 @@ describe('cloze questions', () => {
     const session = await started([{ ...card(2, 'review', -5, 'đường'), kind: 'word' as const }])
     expect(session.question?.type).toBe('sentence_typed')
     expect(random).not.toHaveBeenCalled()
+  })
+})
+
+describe('after the phone has moved the deck', () => {
+  it('leaves the question on screen alone and asks the next from the fresh deck', async () => {
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50), card(3, 'review', -1)])
+    const asked = session.question
+    expect(asked?.card.id).toBe(2)
+
+    // Meanwhile, on the phone: cards 2 and 1 answered, card 4 collected and due.
+    api.fetchCards.mockResolvedValue([card(1, 'review', 600), card(2, 'review', 600), card(3, 'review', -1), card(4, 'learning', -1)])
+    await useDeckStore().refresh()
+    expect(session.question).toBe(asked)
+    expect(session.phase).toBe('asking')
+
+    session.submit('câu 2')
+    await settle()
+    session.advance()
+    expect(session.question?.card.id).toBe(4)
+    expect(session.remaining).toBe(2)
+  })
+
+  it('keeps the verdict and the save when a refresh lands during feedback', async () => {
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('câu 2')
+    await settle()
+    api.fetchCards.mockResolvedValue([card(1, 'review', -5), card(2, 'review', 600)])
+    await useDeckStore().refresh()
+    expect(session.phase).toBe('feedback')
+    expect(session.saveState).toBe('saved')
+    expect(session.verdict?.given).toBe('câu 2')
+  })
+
+  it('does not ask again a card whose answer was saved while a refresh was on its way', async () => {
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    const slow = deferred<LearningCard[]>()
+    api.fetchCards.mockReturnValue(slow.promise)
+    const refreshing = useDeckStore().refresh()
+    session.submit('câu 2')
+    await settle()
+    // The fetch left before the answer arrived, so it still lists card 2 as due.
+    slow.resolve([card(1, 'review', -5), card(2, 'review', -50)])
+    await refreshing
+    session.advance()
+    expect(session.question?.card.id).toBe(1)
+    session.submit('câu 1')
+    await settle()
+    session.advance()
+    expect(session.phase).toBe('finished')
+  })
+
+  it("sees the new day's allowance in a session resumed after midnight", async () => {
+    // Whatever day the machine running this calls today, so the test holds in any timezone.
+    const spent = { ...card(9, 'review', 6000), introducedOn: localDay(NOW) }
+    api.fetchStudySettings.mockResolvedValue({ learningSteps: [5, 7, 10], newCardsPerDay: 1 })
+    const session = await started([card(1, 'review', -5), card(2, 'new', 0), spent])
+    expect(session.remaining).toBe(1)
+    session.submit('câu 1')
+    await settle()
+    vi.setSystemTime(new Date(NOW.getTime() + 24 * 60 * 60_000))
+    session.advance()
+    expect(session.question?.card.id).toBe(2)
   })
 })

@@ -6,7 +6,7 @@ See the spec's *Question types* and *Judging*, and the two JavaScript traps it n
 
 **Blocked by:** 12 — A translate session that saves.
 
-**Status:** done (2026-10-12) — merged; the browser checklist below is still the developer's to run
+**Status:** done (2026-10-12) — merged in #111; the browser checklist below is still the developer's to run
 
 - [x] A deck word is found in a sentence as a whole word: not inside a longer word (including one with non-ASCII letters), with punctuation and the sentence's ends counting as boundaries
 - [x] Finding is exact about tones — a word differing only by tone is not a match — and tolerant of case and of spacing
