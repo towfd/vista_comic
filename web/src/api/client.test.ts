@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
+  REQUEST_TIMEOUT_MS,
   fetchCards,
   fetchChapter,
   fetchComic,
@@ -349,5 +350,51 @@ describe('recordReview', () => {
   it('reports an outage and an Access refusal as every other request does', async () => {
     expect(await errorKind(recordReview(7, review, respondWith(json({}, 503))))).toBe('unavailable')
     expect(await errorKind(recordReview(7, review, respondWith(new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } }))))).toBe('auth')
+  })
+})
+
+describe('request timeout', () => {
+  /** A connection that never answers, and gives up only when told to. */
+  const hanging: Fetcher = (_path, init) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })
+
+  it('gives up on a request that never answers and reports the backend unavailable', async () => {
+    vi.useFakeTimers()
+    try {
+      const outcome = errorKind(fetchCards(hanging))
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS)
+      expect(await outcome).toBe('unavailable')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not give up before the limit', async () => {
+    vi.useFakeTimers()
+    try {
+      let settled = false
+      const outcome = fetchCards(hanging).catch(() => {
+        settled = true
+      })
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS - 1)
+      expect(settled).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      await outcome
+      expect(settled).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves no timer running once a request has answered', async () => {
+    vi.useFakeTimers()
+    try {
+      await fetchCards(respondWith(json([])))
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -7,10 +7,12 @@ import ErrorState from '../components/ErrorState.vue'
 
 const router = useRouter()
 const session = useSessionStore()
-const { phase, loadError, question, verdict, saveState, remaining, waitingToAdvance } = storeToRefs(session)
+const { phase, loadError, question, verdict, saveState, saveFailure, remaining, waitingToAdvance } = storeToRefs(session)
 
 const field = ref<HTMLInputElement | null>(null)
 const nextButton = ref<HTMLButtonElement | null>(null)
+
+const reload = () => window.location.reload()
 
 onMounted(() => session.start())
 
@@ -102,9 +104,27 @@ function onNextKeydown(event: KeyboardEvent) {
           </div>
         </dl>
 
-        <p v-if="saveState === 'failed'" class="mt-6 text-sm text-amber-400">
-          這個答案還沒有存進去。請檢查連線後重新整理頁面。
-        </p>
+        <p v-if="saveState === 'gone'" class="mt-6 text-sm text-neutral-400">這張卡片已經在別的裝置上刪除了。</p>
+
+        <div v-if="saveState === 'failed'" class="mt-6 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3" role="alert">
+          <template v-if="saveFailure === 'auth'">
+            <p class="text-sm font-medium text-amber-300">登入已經過期，這個答案沒有存進去。</p>
+            <p class="mt-1 text-sm text-amber-200/80">重新整理後登入，這一題會再出一次。</p>
+            <button class="mt-3 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700" @click="reload">
+              重新整理
+            </button>
+          </template>
+          <template v-else>
+            <p class="text-sm font-medium text-amber-300">這個答案還沒有存進去。</p>
+            <p class="mt-1 text-sm text-amber-200/80">存好之前不會出下一題。關掉這個分頁會遺失這一個答案。</p>
+            <button
+              class="mt-3 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
+              @click="session.retrySave()"
+            >
+              重試
+            </button>
+          </template>
+        </div>
 
         <div class="mt-8 flex items-center justify-end gap-3">
           <button

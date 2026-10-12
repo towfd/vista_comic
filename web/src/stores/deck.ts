@@ -69,6 +69,14 @@ export const useDeckStore = defineStore('deck', () => {
     loadedAt.value = new Date()
   }
 
+  /** Forget a card that no longer exists on the server. */
+  function removeCard(cardId: number) {
+    const index = cards.value.findIndex((card) => card.id === cardId)
+    if (index === -1) return
+    cards.value.splice(index, 1)
+    loadedAt.value = new Date()
+  }
+
   const standing = computed<Standing | null>(() => {
     if (!settings.value || !loadedAt.value) return null
     const now = loadedAt.value
@@ -81,5 +89,5 @@ export const useDeckStore = defineStore('deck', () => {
     }
   })
 
-  return { cards, settings, loading, error, loaded, loadedAt, standing, load, applySchedule }
+  return { cards, settings, loading, error, loaded, loadedAt, standing, load, applySchedule, removeCard }
 })
