@@ -185,6 +185,8 @@ Ported from the phone, minus the training entrance.
 
 ### Fixing a card
 
+> **Changed after the spec was implemented.** Fixing a card now happens on the card's own page in the library (`issues/19-the-card-library.md`); the feedback screen carries a link to it, not the actions. What follows describes the actions themselves, which are unchanged, and where they first lived.
+
 - Offered on the feedback screen, enabled once the review is saved.
 - Change translation and change kind go through the card update; reset and delete through their own endpoints. The held deck is updated from each response — no full fetch.
 - After a translation change the card keeps its place in the schedule. After a kind change, later questions are built from the deck as it now stands. After a reset the card is new and returns under the allowance. After a delete it is gone; delete asks for confirmation.
@@ -254,7 +256,7 @@ Three seams, all already used in the web project:
 - **Cloze with four choices, and rearranging** — ruled out for the web, not deferred.
 - **Endless training.**
 - **Entering practice from the reader** — the next slice after this one.
-- **The card library screens** beyond the fixing actions here, and **collecting cards on the web**.
+- ~~**The card library screens** beyond the fixing actions here~~ — reversed on 2026-10-12: a card library was built and fixing moved into it, see `issues/19-the-card-library.md`. Still out of scope: **collecting cards on the web**, and a card's source page and lookup count.
 - **Any change to the iOS app or to an existing backend endpoint**, including making the source text editable.
 - **A scheduler on the web**, and **question generation in the backend**.
 - **Answering with no network**, and any store of unsent answers in the browser.

@@ -46,3 +46,5 @@ A card with no kind shows neither 單字 nor 句子 selected. Clearing a kind ba
 - The whole panel can be worked with Tab, Enter and Space alone.
 - Stop the backend and try an action: a message says the card was not changed, and it was not.
 - A narrow window: the translation field and its button stay on one line, and the buttons wrap rather than overflow.
+
+**Superseded in part, 2026-10-12.** The panel under the verdict was replaced by a link to the card's page in the library — see [The card library](19-the-card-library.md). The four actions and the API client calls built here are unchanged; they are reached from the library now. This ticket's browser checklist no longer applies; ticket 19's does.

@@ -6,26 +6,11 @@ import { localDay } from '../practice/queue'
 import { useDeckStore } from './deck'
 import { RETRY_DELAYS_MS, useSessionStore } from './session'
 
-const api = vi.hoisted(() => ({
-  fetchCards: vi.fn(),
-  fetchStudySettings: vi.fn(),
-  recordReview: vi.fn(),
-  updateCard: vi.fn(),
-  resetCard: vi.fn(),
-  deleteCard: vi.fn(),
-}))
+const api = vi.hoisted(() => ({ fetchCards: vi.fn(), fetchStudySettings: vi.fn(), recordReview: vi.fn() }))
 
 vi.mock('../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/client')>()
-  return {
-    ...actual,
-    fetchCards: api.fetchCards,
-    fetchStudySettings: api.fetchStudySettings,
-    recordReview: api.recordReview,
-    updateCard: api.updateCard,
-    resetCard: api.resetCard,
-    deleteCard: api.deleteCard,
-  }
+  return { ...actual, fetchCards: api.fetchCards, fetchStudySettings: api.fetchStudySettings, recordReview: api.recordReview }
 })
 
 const NOW = new Date('2026-08-31T12:00:00Z')
@@ -86,9 +71,6 @@ beforeEach(() => {
   api.fetchCards.mockReset()
   api.fetchStudySettings.mockReset().mockResolvedValue({ learningSteps: [5, 7, 10], newCardsPerDay: 15 })
   api.recordReview.mockReset().mockResolvedValue(promoted)
-  api.updateCard.mockReset()
-  api.resetCard.mockReset()
-  api.deleteCard.mockReset()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 afterEach(() => {
@@ -630,180 +612,5 @@ describe('how a session ends', () => {
     await settle()
     expect(session.phase).toBe('asking')
     expect(session.question?.card.id).toBe(3)
-  })
-})
-
-describe('fixing a card after the verdict', () => {
-  /** Card 2 answered and saved, card 1 still waiting. */
-  async function answered() {
-    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
-    session.submit('câu 2')
-    await settle()
-    return session
-  }
-  const held = (id: number) => useDeckStore().cards.find((c) => c.id === id)
-
-  it('cannot be done before the answer, while it is saving, or after it failed to save', async () => {
-    const pending = deferred<CardSchedule>()
-    api.recordReview.mockReturnValue(pending.promise)
-    const session = await started([card(1, 'review', -5)])
-    expect(session.canFix()).toBe(false)
-    await session.resetCardOnScreen()
-    session.submit('câu 1')
-    expect(session.canFix()).toBe(false)
-    await session.deleteCardOnScreen()
-    await session.fixTranslation('better')
-    pending.reject(new ApiError('unexpected', 'refused'))
-    await settle()
-    expect(session.canFix()).toBe(false)
-    await session.resetCardOnScreen()
-    expect(api.resetCard).not.toHaveBeenCalled()
-    expect(api.deleteCard).not.toHaveBeenCalled()
-    expect(api.updateCard).not.toHaveBeenCalled()
-  })
-
-  it('can be done once the answer is saved', async () => {
-    expect((await answered()).canFix()).toBe(true)
-  })
-
-  it('changes the translation, on screen and in the deck, and leaves the schedule alone', async () => {
-    const session = await answered()
-    const before = held(2)!
-    api.updateCard.mockResolvedValue({ ...before, translation: 'better' })
-    await session.fixTranslation('  better ')
-    expect(api.updateCard).toHaveBeenCalledWith(2, { translation: 'better' })
-    expect(held(2)).toMatchObject({ translation: 'better', dueAt: before.dueAt, ladderStage: before.ladderStage })
-    expect(session.question).toMatchObject({ prompt: 'better' })
-    expect(session.fixed).toBe('translation')
-    expect(session.canFix()).toBe(true)
-  })
-
-  it('sends nothing for an empty translation or one that changes nothing', async () => {
-    const session = await answered()
-    await session.fixTranslation('   ')
-    await session.fixTranslation('meaning 2')
-    expect(api.updateCard).not.toHaveBeenCalled()
-  })
-
-  it('changes the kind, and a card that is now a word is no longer asked as a cloze', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0)
-    // Card 2 holds card 1's word and was saved as a sentence, so it can be a
-    // cloze. The server keeps it due, so it is asked again once it is a word.
-    api.recordReview.mockResolvedValue({ ...promoted, state: 'relearning', learningStep: 0, dueAt: minutes(-1) })
-    const session = await started([{ ...card(1, 'review', 600, 'đường'), kind: 'word' as const }, card(2, 'review', -50, 'Tôi biết đường')])
-    expect(session.question?.type).toBe('cloze_typed')
-    session.submit('đường')
-    await settle()
-    api.updateCard.mockResolvedValue({ ...held(2)!, kind: 'word' })
-    await session.fixKind('word')
-    expect(api.updateCard).toHaveBeenCalledWith(2, { kind: 'word' })
-    expect(held(2)?.kind).toBe('word')
-    expect(session.fixed).toBe('kind')
-    session.advance()
-    expect(session.question?.card.id).toBe(2)
-    expect(session.question?.type).toBe('sentence_typed')
-  })
-
-  it('sends nothing when the kind is already that', async () => {
-    const session = await answered()
-    await session.fixKind('sentence')
-    expect(api.updateCard).not.toHaveBeenCalled()
-  })
-
-  it('resets the card to new, which then waits on the allowance like any other', async () => {
-    const session = await answered()
-    api.resetCard.mockResolvedValue({ ...held(2)!, state: 'new', ladderStage: 0, introducedOn: null })
-    await session.resetCardOnScreen()
-    expect(held(2)).toMatchObject({ state: 'new', introducedOn: null })
-    expect(session.fixed).toBe('reset')
-    expect(session.canFix()).toBe(false)
-    session.advance()
-    expect(session.question?.card.id).toBe(1)
-    expect(session.remaining).toBe(2)
-  })
-
-  it('deletes the card from the deck and from the rest of the session', async () => {
-    const session = await answered()
-    api.deleteCard.mockResolvedValue(undefined)
-    await session.deleteCardOnScreen()
-    expect(api.deleteCard).toHaveBeenCalledWith(2)
-    expect(held(2)).toBeUndefined()
-    expect(session.fixed).toBe('deleted')
-    expect(session.canFix()).toBe(false)
-    session.advance()
-    expect(session.question?.card.id).toBe(1)
-    expect(session.remaining).toBe(1)
-  })
-
-  it('stops counting a deleted or reset card as graduated, and keeps the answer counted', async () => {
-    const session = await answered()
-    expect(session.outcome).toEqual({ correct: 1, wrong: 0, graduated: 1 })
-    api.deleteCard.mockResolvedValue(undefined)
-    await session.deleteCardOnScreen()
-    expect(session.outcome).toEqual({ correct: 1, wrong: 0, graduated: 0 })
-  })
-
-  it('reports a failed action and leaves the card as it was', async () => {
-    const session = await answered()
-    const before = held(2)
-    api.updateCard.mockRejectedValue(new ApiError('unavailable', 'down'))
-    await session.fixTranslation('better')
-    expect(session.fixError).toBe('unavailable')
-    expect(session.fixed).toBeNull()
-    expect(held(2)).toEqual(before)
-    expect(session.question?.prompt).toBe('meaning 2')
-    expect(session.canFix()).toBe(true)
-  })
-
-  it('clears the report when the next attempt works', async () => {
-    const session = await answered()
-    api.updateCard.mockRejectedValueOnce(new ApiError('unavailable', 'down')).mockResolvedValue({ ...held(2)!, translation: 'better' })
-    await session.fixTranslation('better')
-    await session.fixTranslation('better')
-    expect(session.fixError).toBeNull()
-    expect(session.fixed).toBe('translation')
-  })
-
-  it('treats a card the server no longer has as already deleted', async () => {
-    const session = await answered()
-    api.resetCard.mockRejectedValue(new ApiError('notFound', 'gone'))
-    await session.resetCardOnScreen()
-    expect(held(2)).toBeUndefined()
-    expect(session.fixed).toBe('deleted')
-    expect(session.fixError).toBeNull()
-  })
-
-  it('does not run two actions at once', async () => {
-    const session = await answered()
-    const slow = deferred<LearningCard>()
-    api.resetCard.mockReturnValue(slow.promise)
-    const resetting = session.resetCardOnScreen()
-    expect(session.fixing).toBe(true)
-    await session.deleteCardOnScreen()
-    expect(api.deleteCard).not.toHaveBeenCalled()
-    slow.resolve({ ...held(2)!, state: 'new' })
-    await resetting
-    expect(session.fixing).toBe(false)
-  })
-
-  it('starts each question with nothing fixed', async () => {
-    const session = await answered()
-    api.updateCard.mockResolvedValue({ ...held(2)!, translation: 'better' })
-    await session.fixTranslation('better')
-    session.advance()
-    expect(session.fixed).toBeNull()
-    expect(session.fixError).toBeNull()
-  })
-
-  it('keeps a fixed card fixed when a fetch that left earlier comes back', async () => {
-    const session = await answered()
-    const slow = deferred<LearningCard[]>()
-    api.fetchCards.mockReturnValue(slow.promise)
-    const refreshing = useDeckStore().refresh()
-    api.updateCard.mockResolvedValue({ ...held(2)!, translation: 'better' })
-    await session.fixTranslation('better')
-    slow.resolve([card(1, 'review', -5), card(2, 'review', 600)])
-    await refreshing
-    expect(held(2)?.translation).toBe('better')
   })
 })

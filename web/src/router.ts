@@ -5,11 +5,13 @@ import ReaderView from './views/ReaderView.vue'
 import PracticeView from './views/PracticeView.vue'
 import PracticeSessionView from './views/PracticeSessionView.vue'
 import PracticeSettingsView from './views/PracticeSettingsView.vue'
+import DeckView from './views/DeckView.vue'
+import DeckCardView from './views/DeckCardView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
     /** Which entry of the navigation bar is current on this route. */
-    section?: 'library' | 'practice'
+    section?: 'library' | 'deck' | 'practice'
     /** Hides the navigation bar. */
     fullBleed?: boolean
   }
@@ -22,6 +24,10 @@ export const router = createRouter({
     { path: '/comic/:comicId', name: 'comic', component: ComicView, props: true, meta: { section: 'library' } },
     // The reader keeps the whole screen: no navigation bar over the manga.
     { path: '/comic/:comicId/chapter/:chapterId', name: 'reader', component: ReaderView, props: true, meta: { fullBleed: true } },
+    // Not /cards: the dev proxy forwards that path to the backend, so a page
+    // there could be neither opened directly nor reloaded.
+    { path: '/deck', name: 'deck', component: DeckView, meta: { section: 'deck' } },
+    { path: '/deck/:cardId(\\d+)', name: 'deck-card', component: DeckCardView, props: true, meta: { section: 'deck' } },
     { path: '/practice', name: 'practice', component: PracticeView, meta: { section: 'practice' } },
     { path: '/practice/session', name: 'practice-session', component: PracticeSessionView, meta: { section: 'practice' } },
     { path: '/practice/settings', name: 'practice-settings', component: PracticeSettingsView, meta: { section: 'practice' } },
