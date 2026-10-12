@@ -12,17 +12,17 @@ No repeat-lookup is recorded for an already-collected line. See [the spec](../sp
 
 **Blocked by:** 01 — Collect a card from the reader.
 
-**Status:** merged (2026-10-12) in #121 — browser checks are with the developer
+**Status:** done (2026-10-12) — merged in #121; browser checks confirmed by the developer
 
-- [ ] Adding a line already in the deck keeps the panel open and the fields intact, and does not show the added confirmation
-- [ ] The notice shows the existing card's source text and translation, and links to that card's page in 字卡庫
-- [ ] A previously deleted card collected again is back in 字卡庫 without a reload
-- [ ] An existing card keeps its kind when collected under the other button
-- [ ] A failed save keeps the panel open and the fields intact, with a message that the card was not saved
-- [ ] A sign-in failure is reported differently from an unreachable backend
-- [ ] Pressing an add button after a failure retries, and a retry that succeeds behaves exactly as a first-time add
-- [ ] Editing either field clears an already-collected or failure notice
-- [ ] A response arriving after a collapse or a chapter change does not reopen the panel; a card it created is still in the held deck
-- [ ] No lookup is recorded against an already-collected card
-- [ ] Unit tests cover each outcome above through the collecting store; the existing web suite still passes
-- [ ] The developer is handed the browser checks: the notice and its link for a known line, and a failed add recovering once the backend is back
+- [x] Adding a line already in the deck keeps the panel open and the fields intact, and does not show the added confirmation
+- [x] The notice shows the existing card's source text and translation, and links to that card's page in 字卡庫
+- [x] A previously deleted card collected again is back in 字卡庫 without a reload
+- [x] An existing card keeps its kind when collected under the other button
+- [x] A failed save keeps the panel open and the fields intact, with a message that the card was not saved
+- [x] A sign-in failure is reported differently from an unreachable backend
+- [x] Pressing an add button after a failure retries, and a retry that succeeds behaves exactly as a first-time add
+- [x] Editing either field clears an already-collected or failure notice
+- [x] A response arriving after a collapse or a chapter change does not reopen the panel; a card it created is still in the held deck
+- [x] No lookup is recorded against an already-collected card
+- [x] Unit tests cover each outcome above through the collecting store; the existing web suite still passes
+- [x] The developer is handed the browser checks: the notice and its link for a known line, and a failed add recovering once the backend is back

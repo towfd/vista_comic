@@ -18,22 +18,22 @@ Layout in this ticket is the wide-window one only; the narrow-window dock is tic
 
 **Blocked by:** None — can start immediately.
 
-**Status:** merged (2026-10-12) in #119 — browser checks are with the developer
+**Status:** done (2026-10-12) — merged in #119; browser checks confirmed by the developer
 
-- [ ] A collect button is present in the reader once a chapter's pages are shown, and the panel is collapsed by default
-- [ ] Pressing the button opens the panel to the right of the page column with the cursor in the source field; the page column does not move or resize
-- [ ] The manga scrolls behind the open panel
-- [ ] Both fields start empty; the source field is marked as Vietnamese text
-- [ ] The source field stops at 200 characters and shows the count as the limit nears
-- [ ] The panel shows the page it has fixed; that page does not change when the reader scrolls after starting to type
-- [ ] Emptying the source field releases the page, so typing again on another page records the new one
-- [ ] 加入單字 and 加入句子 are unavailable while either field is empty or whitespace-only, and while a save is in flight
-- [ ] Adding sends the source text, translation, kind, comic, chapter and fixed page, with the fixed target language
-- [ ] On a new card: the fields clear, the panel collapses, and a confirmation naming the line appears by the button and goes away by itself
-- [ ] The new card appears in 字卡庫 and in the practice overview's counts without a reload, and is not removed by a deck load that began before it was collected
-- [ ] Collapsing by hand discards the fields and the fixed page; reopening is empty
-- [ ] Changing chapter collapses the panel and discards its contents
-- [ ] A space typed in either field neither scrolls the page nor opens the progress gate; Enter does not submit
-- [ ] A line already in the deck, and a failed save, each show a message and leave the panel open with the text kept
-- [ ] Unit tests cover the collecting store, the API client's card creation, and the deck store's new action, at the seams the spec names; the existing web suite still passes
-- [ ] The developer is handed the browser checklist for what unit tests cannot cover
+- [x] A collect button is present in the reader once a chapter's pages are shown, and the panel is collapsed by default
+- [x] Pressing the button opens the panel to the right of the page column with the cursor in the source field; the page column does not move or resize
+- [x] The manga scrolls behind the open panel
+- [x] Both fields start empty; the source field is marked as Vietnamese text
+- [x] The source field stops at 200 characters and shows the count as the limit nears
+- [x] The panel shows the page it has fixed; that page does not change when the reader scrolls after starting to type
+- [x] Emptying the source field releases the page, so typing again on another page records the new one
+- [x] 加入單字 and 加入句子 are unavailable while either field is empty or whitespace-only, and while a save is in flight
+- [x] Adding sends the source text, translation, kind, comic, chapter and fixed page, with the fixed target language
+- [x] On a new card: the fields clear, the panel collapses, and a confirmation naming the line appears by the button and goes away by itself
+- [x] The new card appears in 字卡庫 and in the practice overview's counts without a reload, and is not removed by a deck load that began before it was collected
+- [x] Collapsing by hand discards the fields and the fixed page; reopening is empty
+- [x] Changing chapter collapses the panel and discards its contents
+- [x] A space typed in either field neither scrolls the page nor opens the progress gate; Enter does not submit
+- [x] A line already in the deck, and a failed save, each show a message and leave the panel open with the text kept
+- [x] Unit tests cover the collecting store, the API client's card creation, and the deck store's new action, at the seams the spec names; the existing web suite still passes
+- [x] The developer is handed the browser checklist for what unit tests cannot cover
