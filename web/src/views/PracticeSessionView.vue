@@ -69,8 +69,19 @@ function onNextKeydown(event: KeyboardEvent) {
     <template v-else-if="question">
       <p class="mb-8 text-sm text-neutral-400">還剩 {{ remaining }} 張</p>
 
-      <p class="text-sm text-neutral-400">把這句話寫成越南文</p>
-      <p class="mt-2 text-2xl leading-relaxed text-neutral-100">{{ question.prompt }}</p>
+      <template v-if="question.cloze">
+        <p class="text-sm text-neutral-400">填入空格裡的字</p>
+        <!-- pre-wrap: the sentence is shown exactly as collected, line breaks and all. -->
+        <p class="mt-2 text-2xl leading-relaxed whitespace-pre-wrap text-neutral-100" lang="vi">
+          {{ question.cloze.before }}<span class="mx-1 inline-block w-20 border-b-2 border-sky-500 align-baseline" aria-label="空格">&nbsp;</span
+          >{{ question.cloze.after }}
+        </p>
+        <p class="mt-3 text-base text-neutral-400">{{ question.prompt }}</p>
+      </template>
+      <template v-else>
+        <p class="text-sm text-neutral-400">把這句話寫成越南文</p>
+        <p class="mt-2 text-2xl leading-relaxed text-neutral-100">{{ question.prompt }}</p>
+      </template>
 
       <!-- Kept mounted through feedback, read-only, so what was typed stays where it was typed. -->
       <input
@@ -99,8 +110,12 @@ function onNextKeydown(event: KeyboardEvent) {
             <dd class="mt-1 text-xl text-neutral-300" lang="vi">{{ verdict.given }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-neutral-500">卡片</dt>
+            <dt class="text-xs text-neutral-500">{{ verdict.sentence ? '空格裡的字' : '卡片' }}</dt>
             <dd class="mt-1 text-xl text-neutral-100" lang="vi">{{ verdict.expected }}</dd>
+          </div>
+          <div v-if="verdict.sentence">
+            <dt class="text-xs text-neutral-500">整句</dt>
+            <dd class="mt-1 text-lg whitespace-pre-wrap text-neutral-300" lang="vi">{{ verdict.sentence }}</dd>
           </div>
         </dl>
 
