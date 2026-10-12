@@ -7,6 +7,7 @@ import {
   fetchComics,
   fetchStudySettings,
   getJson,
+  recordReview,
   saveProgress,
   toMediaPath,
   type Fetcher,
@@ -296,5 +297,57 @@ describe('fetchStudySettings', () => {
 
   it('reports a missing route as not found', async () => {
     expect(await errorKind(fetchStudySettings(respondWith(json({}, 404))))).toBe('notFound')
+  })
+})
+
+describe('recordReview', () => {
+  const review = {
+    questionType: 'sentence_typed' as const,
+    isCorrect: true,
+    clientToken: 'token-1',
+    localDate: '2026-08-31',
+    answeredAt: '2026-08-31T12:00:00.000Z',
+    context: 'review' as const,
+  }
+  const outcome = {
+    review: { id: 1, cardId: 7, questionType: 'sentence_typed', isCorrect: true, reviewedAt: '2026-08-31T12:00:00+00:00' },
+    state: 'review',
+    ladderStage: 3,
+    introducedOn: '2026-08-01',
+    dueAt: '2026-09-07T20:00:00+00:00',
+    intervalChanged: true,
+  }
+
+  it("posts the review to the card's own route as JSON", async () => {
+    let seen: { path: string; init?: RequestInit } | undefined
+    await recordReview(7, review, async (path, init) => {
+      seen = { path, init }
+      return json(outcome, 201)
+    })
+    expect(seen?.path).toBe('/cards/7/reviews')
+    expect(seen?.init?.method).toBe('POST')
+    expect(new Headers(seen?.init?.headers).get('content-type')).toBe('application/json')
+    expect(JSON.parse(String(seen?.init?.body))).toEqual(review)
+  })
+
+  it("returns the card's scheduling block and nothing else, with absent fields as null", async () => {
+    expect(await recordReview(7, review, respondWith(json(outcome, 201)))).toEqual({
+      state: 'review',
+      learningStep: null,
+      ladderStage: 3,
+      previousStage: null,
+      introducedOn: '2026-08-01',
+      dueAt: '2026-09-07T20:00:00+00:00',
+    })
+  })
+
+  it('reports a deleted card as not found, and a refused body as unexpected', async () => {
+    expect(await errorKind(recordReview(7, review, respondWith(json({}, 404))))).toBe('notFound')
+    expect(await errorKind(recordReview(7, review, respondWith(json({}, 422))))).toBe('unexpected')
+  })
+
+  it('reports an outage and an Access refusal as every other request does', async () => {
+    expect(await errorKind(recordReview(7, review, respondWith(json({}, 503))))).toBe('unavailable')
+    expect(await errorKind(recordReview(7, review, respondWith(new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } }))))).toBe('auth')
   })
 })

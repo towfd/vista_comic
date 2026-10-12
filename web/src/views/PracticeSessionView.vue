@@ -1,0 +1,123 @@
+<script setup lang="ts">
+import { nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { useSessionStore } from '../stores/session'
+import ErrorState from '../components/ErrorState.vue'
+
+const router = useRouter()
+const session = useSessionStore()
+const { phase, loadError, question, verdict, saveState, remaining, waitingToAdvance } = storeToRefs(session)
+
+const field = ref<HTMLInputElement | null>(null)
+const nextButton = ref<HTMLButtonElement | null>(null)
+
+onMounted(() => session.start())
+
+// The keyboard never has to hunt for where it is: the field while a question
+// is open, the way onward once it is answered.
+watch(
+  [phase, question],
+  async () => {
+    await nextTick()
+    if (phase.value === 'asking') {
+      if (field.value) field.value.value = ''
+      field.value?.focus()
+    } else if (phase.value === 'feedback') {
+      nextButton.value?.focus()
+    } else if (phase.value === 'finished') {
+      // The closing screen comes later; until then the overview says what is left.
+      router.replace({ name: 'practice' })
+    }
+  },
+  { flush: 'post' },
+)
+
+/**
+ * Enter submits -- unless an input method is still composing a syllable, when
+ * Enter belongs to it. That keydown arrives with `isComposing` set (Chrome) or
+ * with keyCode 229 (Safari, which ends the composition first); either way the
+ * reader presses Enter again to submit, as with any input method.
+ */
+function onFieldKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter') return
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  if (event.repeat) return
+  session.submit(field.value?.value ?? '')
+}
+
+/**
+ * Enter moves on. Handled here rather than left to the button's own click so
+ * a held key cannot answer one question and skip its feedback in one press.
+ */
+function onNextKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter') return
+  event.preventDefault()
+  if (!event.repeat) session.advance()
+}
+</script>
+
+<template>
+  <main class="mx-auto max-w-2xl px-4 py-8">
+    <p v-if="phase === 'loading'" class="py-24 text-center text-neutral-400">載入中…</p>
+
+    <ErrorState v-else-if="phase === 'unavailable' && loadError" :kind="loadError" @retry="session.start()" />
+
+    <template v-else-if="question">
+      <p class="mb-8 text-sm text-neutral-400">還剩 {{ remaining }} 張</p>
+
+      <p class="text-sm text-neutral-400">把這句話寫成越南文</p>
+      <p class="mt-2 text-2xl leading-relaxed text-neutral-100">{{ question.prompt }}</p>
+
+      <!-- Kept mounted through feedback, read-only, so what was typed stays where it was typed. -->
+      <input
+        ref="field"
+        type="text"
+        lang="vi"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        aria-label="你的答案"
+        :readonly="phase !== 'asking'"
+        class="mt-6 w-full rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-xl text-neutral-100 outline-none focus:border-sky-500 read-only:text-neutral-400"
+        @keydown="onFieldKeydown"
+      />
+      <p v-if="phase === 'asking'" class="mt-2 text-right text-xs text-neutral-500">Enter 送出</p>
+
+      <section v-if="phase === 'feedback' && verdict" class="mt-8" aria-live="polite">
+        <p class="text-lg font-semibold" :class="verdict.correct ? 'text-emerald-400' : 'text-rose-400'">
+          {{ verdict.correct ? '正確' : '不對' }}
+        </p>
+
+        <dl class="mt-4 space-y-3">
+          <div v-if="!verdict.correct">
+            <dt class="text-xs text-neutral-500">你的答案</dt>
+            <dd class="mt-1 text-xl text-neutral-300" lang="vi">{{ verdict.given }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-neutral-500">卡片</dt>
+            <dd class="mt-1 text-xl text-neutral-100" lang="vi">{{ verdict.expected }}</dd>
+          </div>
+        </dl>
+
+        <p v-if="saveState === 'failed'" class="mt-6 text-sm text-amber-400">
+          這個答案還沒有存進去。請檢查連線後重新整理頁面。
+        </p>
+
+        <div class="mt-8 flex items-center justify-end gap-3">
+          <button
+            ref="nextButton"
+            :disabled="saveState === 'failed'"
+            class="rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+            @click="session.advance()"
+            @keydown="onNextKeydown"
+          >
+            {{ waitingToAdvance ? '儲存中…' : '下一題' }}
+          </button>
+        </div>
+      </section>
+    </template>
+  </main>
+</template>

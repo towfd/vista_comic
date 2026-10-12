@@ -1,4 +1,14 @@
-import type { CardState, ChapterDetail, ComicDetail, ComicSummary, LearningCard, ProgressSaved, StudySettings } from './types'
+import type {
+  CardSchedule,
+  CardState,
+  ChapterDetail,
+  ComicDetail,
+  ComicSummary,
+  LearningCard,
+  ProgressSaved,
+  ReviewRequest,
+  StudySettings,
+} from './types'
 
 /**
  * Why a request failed, in the terms the screens need to tell apart.
@@ -142,6 +152,8 @@ export async function saveProgress(
 
 const CARD_STATES: readonly CardState[] = ['new', 'learning', 'review', 'relearning']
 
+const cardState = (state: unknown): CardState => (CARD_STATES.includes(state as CardState) ? (state as CardState) : 'new')
+
 /**
  * The deck shared with the phone, newest card first.
  *
@@ -153,11 +165,37 @@ export async function fetchCards(fetcher: Fetcher = fetch): Promise<LearningCard
   const cards = await getJson<LearningCard[]>('/cards', fetcher)
   return cards.map((card) => ({
     ...card,
-    state: CARD_STATES.includes(card.state) ? card.state : 'new',
+    state: cardState(card.state),
     kind: card.kind === 'word' || card.kind === 'sentence' ? card.kind : null,
   }))
 }
 
 export async function fetchStudySettings(fetcher: Fetcher = fetch): Promise<StudySettings> {
   return getJson<StudySettings>('/study/settings', fetcher)
+}
+
+const JSON_BODY = { Accept: 'application/json', 'Content-Type': 'application/json' }
+
+/**
+ * Record one answer and learn where the card went.
+ *
+ * The web has no scheduler of its own: the block returned here is the only
+ * source of a card's next due date. Only the scheduling fields are kept -- the
+ * echoed review row is of no use to a session. 404 (the card was deleted
+ * elsewhere) surfaces as `notFound`, 422 as `unexpected`.
+ */
+export async function recordReview(cardId: number, review: ReviewRequest, fetcher: Fetcher = fetch): Promise<CardSchedule> {
+  const outcome = await requestJson<CardSchedule>(
+    `/cards/${cardId}/reviews`,
+    { method: 'POST', headers: JSON_BODY, body: JSON.stringify(review) },
+    fetcher,
+  )
+  return {
+    state: cardState(outcome.state),
+    learningStep: outcome.learningStep ?? null,
+    ladderStage: outcome.ladderStage,
+    previousStage: outcome.previousStage ?? null,
+    introducedOn: outcome.introducedOn ?? null,
+    dueAt: outcome.dueAt,
+  }
 }
