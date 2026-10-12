@@ -367,7 +367,7 @@ Download chapters deliberately and read them with no connection at all. Eight ti
 ### Web client (post-M10, ticket-driven)
 
 - Architecture of record: `.scratch/web-client/map.md`
-- Specs of record: `.scratch/web-reader-mvp/spec.md`, `.scratch/web-reading-progress/spec.md`, `.scratch/web-review/spec.md`
+- Specs of record: `.scratch/web-reader-mvp/spec.md`, `.scratch/web-reading-progress/spec.md`, `.scratch/web-review/spec.md`, `.scratch/web-card-collection/spec.md`
 - Decisions behind review: `.scratch/web-review/map.md` (nine resolved decision tickets)
 
 A second client for the same backend, in a browser. Three efforts: a reader MVP ([#102](https://github.com/towfd/vista_comic/pull/102)), reading progress shared with the phone ([#104](https://github.com/towfd/vista_comic/pull/104)), and review — ten tickets, [#107](https://github.com/towfd/vista_comic/pull/107)–[#116](https://github.com/towfd/vista_comic/pull/116), merged 2026-10-12 and confirmed complete by the repo owner the same day.
@@ -392,7 +392,11 @@ A second client for the same backend, in a browser. Three efforts: a reader MVP 
 
 **What was measured rather than assumed.** A Telex input method in Chrome composes one syllable at a time and delivers NFC, so Enter is ignored while composing and nothing is judged before submission. The three text keys agree with the Swift and the Python for Vietnamese only in specific JavaScript forms — `\s` and the general mark category both disagree. Against the real deck, 98 of 105 sentence cards yield a cloze, and 219 of 249 cards are entirely upper case.
 
-**Not covered.** Safari, third-party input methods and touch keyboards were never measured. The web has no OCR, no translation engine and no offline reading, so collecting a card remains the phone's; parts ① and ④ of the architecture map (the OCR service and the learning flow) are untouched. Entering practice from the reader — the one place the navigation bar is hidden — is the remaining item on the review map.
+**Collecting a card came afterwards, by typing** ([#119](https://github.com/towfd/vista_comic/pull/119), [#121](https://github.com/towfd/vista_comic/pull/121), 2026-10-12). Part ④ of the architecture map had been parked behind the OCR service of part ①, and the dependency turned out not to be real: the card route already took plain text. So the reader gained a panel where the line and its meaning are both typed — collapsed to a button, beside the page column on a wide window and along the bottom on a narrow one. The page a card records is fixed when typing starts; collapsing discards what was typed, and there is no draft. A line already in the deck is answered with the card the deck holds, untouched. No backend or iOS change.
+
+**One defect found in use the same day.** Handing the new card to the deck store sat in the same `try` as the request, so an exception after the server had answered was reported as the card being refused — and the reader, told it was not saved, added it again. Only the request is inside the `try` now. What threw was never identified; a stale store instance left by hot reload in the dev server is the likeliest cause and was not confirmed.
+
+**Not covered.** Safari, third-party input methods and touch keyboards were never measured. The web has no OCR, no translation engine and no offline reading: part ① of the architecture map (the OCR service) is untouched and deferred, and explanations are not on the web. Entering practice from the reader — the one place the navigation bar is hidden — is the remaining item on the review map.
 
 ## Known issues and constraints
 
@@ -423,12 +427,12 @@ The OCR text-editing defect — the last of the three problems reported alongsid
 
 **Offline download is merged in full** ([#68](https://github.com/towfd/vista_comic/pull/68), [#69](https://github.com/towfd/vista_comic/pull/69), [#70](https://github.com/towfd/vista_comic/pull/70), [#71](https://github.com/towfd/vista_comic/pull/71), [#72](https://github.com/towfd/vista_comic/pull/72), [#73](https://github.com/towfd/vista_comic/pull/73), [#74](https://github.com/towfd/vista_comic/pull/74), [#76](https://github.com/towfd/vista_comic/pull/76)), each ticket device-verified by the repo owner before the next was started. Two of the eight tickets did not exist when the spec was written: comic covers and offline read state were both found on a device and specified afterwards.
 
-**The web client is merged through review and the card library** ([#102](https://github.com/towfd/vista_comic/pull/102), [#104](https://github.com/towfd/vista_comic/pull/104), [#106](https://github.com/towfd/vista_comic/pull/106)–[#116](https://github.com/towfd/vista_comic/pull/116)). What it leaves open is listed at the end of its section above; none of it is in progress.
+**The web client is merged through review, the card library, and collecting a card by typing** ([#102](https://github.com/towfd/vista_comic/pull/102), [#104](https://github.com/towfd/vista_comic/pull/104), [#106](https://github.com/towfd/vista_comic/pull/106)–[#116](https://github.com/towfd/vista_comic/pull/116), [#119](https://github.com/towfd/vista_comic/pull/119), [#121](https://github.com/towfd/vista_comic/pull/121)). What it leaves open is listed at the end of its section above; none of it is in progress.
 
 **Otherwise nothing is in progress. The next action is unclaimed**, in rough order of how much each is already owed:
 
 - **Entering practice from the web reader**, the last item on `.scratch/web-review/map.md`.
-- **The web's OCR service and learning flow** (parts ① and ④ of `.scratch/web-client/map.md`), which is what would let a card be collected in the browser.
+- **The web's OCR service** (part ① of `.scratch/web-client/map.md`), which would fill the collecting panel's source field instead of the reader typing it; and **explanations on the web**, the other half of part ④.
 
 - **The three flaky prefetch tests**, now that the failures are captured (see Known issues). Worth doing as its own effort, run by the repo owner rather than in this environment.
 

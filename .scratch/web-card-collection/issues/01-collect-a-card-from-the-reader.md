@@ -18,7 +18,7 @@ Layout in this ticket is the wide-window one only; the narrow-window dock is tic
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** merged (2026-10-12) in #119 — browser checks are with the developer
 
 - [ ] A collect button is present in the reader once a chapter's pages are shown, and the panel is collapsed by default
 - [ ] Pressing the button opens the panel to the right of the page column with the cursor in the source field; the page column does not move or resize

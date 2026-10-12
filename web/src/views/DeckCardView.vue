@@ -116,7 +116,7 @@ function remove() {
       <section class="mt-6">
         <h1 class="text-2xl leading-relaxed whitespace-pre-wrap text-neutral-100" lang="vi">{{ card.sourceText }}</h1>
         <p class="mt-3 text-sm text-neutral-400">{{ summary }}</p>
-        <p class="mt-1 text-xs text-neutral-500">原文不能修改。辨識錯誤的卡片請刪除，再到手機上重新收集。</p>
+        <p class="mt-1 text-xs text-neutral-500">原文不能修改。打錯或辨識錯誤的卡片請刪除，再重新收集。</p>
       </section>
 
       <p v-if="done" class="mt-6 text-sm text-emerald-400" role="status">{{ done }}</p>
