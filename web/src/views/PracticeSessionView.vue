@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
 import ErrorState from '../components/ErrorState.vue'
-import CardFixer from '../components/CardFixer.vue'
 
 const router = useRouter()
 const session = useSessionStore()
@@ -191,7 +190,18 @@ function onNextKeydown(event: KeyboardEvent) {
           </button>
         </div>
 
-        <CardFixer />
+        <!-- Fixing a card happens in the library. A new tab, so the session is
+             not left: coming back to this one refetches the deck, and the fix
+             applies from the next question. -->
+        <p v-if="saveState === 'saved'" class="mt-8 border-t border-neutral-800 pt-4 text-sm">
+          <RouterLink
+            :to="{ name: 'deck-card', params: { cardId: question.card.id } }"
+            target="_blank"
+            class="text-neutral-400 underline decoration-neutral-600 underline-offset-4 hover:text-neutral-200"
+          >
+            這張卡片有問題？到字卡庫修改 ↗
+          </RouterLink>
+        </p>
       </section>
     </template>
   </main>

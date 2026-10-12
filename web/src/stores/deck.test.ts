@@ -3,11 +3,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import { useDeckStore } from './deck'
 
-const api = vi.hoisted(() => ({ fetchCards: vi.fn(), fetchStudySettings: vi.fn(), saveStudySettings: vi.fn() }))
+const api = vi.hoisted(() => ({
+  fetchCards: vi.fn(),
+  fetchStudySettings: vi.fn(),
+  saveStudySettings: vi.fn(),
+  updateCard: vi.fn(),
+  resetCard: vi.fn(),
+  deleteCard: vi.fn(),
+}))
 
 vi.mock('../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/client')>()
-  return { ...actual, fetchCards: api.fetchCards, fetchStudySettings: api.fetchStudySettings, saveStudySettings: api.saveStudySettings }
+  return {
+    ...actual,
+    fetchCards: api.fetchCards,
+    fetchStudySettings: api.fetchStudySettings,
+    saveStudySettings: api.saveStudySettings,
+    updateCard: api.updateCard,
+    resetCard: api.resetCard,
+    deleteCard: api.deleteCard,
+  }
 })
 
 const settings = { learningSteps: [5, 7, 10], newCardsPerDay: 15 }
@@ -301,5 +316,101 @@ describe('deck store saveSettings', () => {
     api.saveStudySettings.mockRejectedValue(new ApiError('unavailable', 'down'))
     await expect(store.saveSettings({ learningSteps: [1], newCardsPerDay: 9 })).rejects.toMatchObject({ kind: 'unavailable' })
     expect(store.settings?.newCardsPerDay).toBe(1)
+  })
+})
+
+describe('deck store fixing a card', () => {
+  const NOW = new Date('2026-08-31T12:00:00Z')
+  const at = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000).toISOString()
+  const card = (id: number, extra: object = {}) => ({
+    id,
+    translation: `meaning ${id}`,
+    kind: 'word',
+    state: 'review',
+    ladderStage: 2,
+    dueAt: at(-5),
+    createdAt: at(-id),
+    introducedOn: '2026-08-01',
+    ...extra,
+  })
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    api.updateCard.mockReset()
+    api.resetCard.mockReset()
+    api.deleteCard.mockReset()
+    api.fetchStudySettings.mockResolvedValue(settings)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  async function loadedWith(deck: object[]) {
+    api.fetchCards.mockResolvedValueOnce(deck)
+    const store = useDeckStore()
+    await store.load()
+    return store
+  }
+  const held = (store: ReturnType<typeof useDeckStore>, id: number) => store.cards.find((c) => c.id === id)
+
+  it('sends a correction and holds the card the server returns', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    api.updateCard.mockResolvedValue(card(2, { translation: 'better' }))
+    expect(await store.correctCard(2, { translation: 'better' })).toBe('done')
+    expect(api.updateCard).toHaveBeenCalledWith(2, { translation: 'better' })
+    expect(held(store, 2)).toMatchObject({ translation: 'better', ladderStage: 2 })
+    expect(held(store, 1)).toMatchObject({ translation: 'meaning 1' })
+  })
+
+  it('holds a reset card as new, so what is waiting follows at once', async () => {
+    const store = await loadedWith([card(1)])
+    expect(store.standing?.counts).toEqual({ due: 1, fresh: 0, learning: 0 })
+    api.resetCard.mockResolvedValue(card(1, { state: 'new', ladderStage: 0, introducedOn: null }))
+    expect(await store.resetCardToNew(1)).toBe('done')
+    expect(api.resetCard).toHaveBeenCalledWith(1)
+    expect(store.standing?.counts).toEqual({ due: 0, fresh: 1, learning: 0 })
+  })
+
+  it('forgets a deleted card', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    api.deleteCard.mockResolvedValue(undefined)
+    expect(await store.deleteCardForGood(1)).toBe('done')
+    expect(api.deleteCard).toHaveBeenCalledWith(1)
+    expect(store.cards.map((c) => c.id)).toEqual([2])
+    expect(store.standing?.remaining).toBe(1)
+  })
+
+  it('forgets a card the server no longer has, and says it was gone', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    api.updateCard.mockRejectedValue(new ApiError('notFound', 'gone'))
+    expect(await store.correctCard(1, { kind: 'sentence' })).toBe('gone')
+    expect(store.cards.map((c) => c.id)).toEqual([2])
+  })
+
+  it('passes any other failure on and leaves the card as it was', async () => {
+    const store = await loadedWith([card(1)])
+    const before = held(store, 1)
+    api.deleteCard.mockRejectedValue(new ApiError('unavailable', 'down'))
+    await expect(store.deleteCardForGood(1)).rejects.toMatchObject({ kind: 'unavailable' })
+    api.updateCard.mockRejectedValue(new ApiError('unexpected', 'refused'))
+    await expect(store.correctCard(1, { translation: 'x' })).rejects.toMatchObject({ kind: 'unexpected' })
+    expect(held(store, 1)).toEqual(before)
+  })
+
+  it('keeps a fix when a fetch that set out before it comes back', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    const slow = deferred<object[]>()
+    api.fetchCards.mockReturnValue(slow.promise)
+    const refreshing = store.refresh()
+    api.updateCard.mockResolvedValue(card(1, { translation: 'better' }))
+    await store.correctCard(1, { translation: 'better' })
+    api.deleteCard.mockResolvedValue(undefined)
+    await store.deleteCardForGood(2)
+    slow.resolve([card(1), card(2)])
+    await refreshing
+    expect(store.cards.map((c) => [c.id, c.translation])).toEqual([[1, 'better']])
   })
 })

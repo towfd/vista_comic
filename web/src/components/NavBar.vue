@@ -10,9 +10,9 @@ const { standing } = storeToRefs(store)
 
 // The count is fetched behind whatever page is showing. A failure is never
 // surfaced: the bar simply reads 練習 with no number, and the page under it
-// is neither delayed nor told. Practice pages load the deck themselves.
+// is neither delayed nor told. Pages about cards load the deck themselves.
 onMounted(() => {
-  if (route.meta.section !== 'practice') store.load()
+  if (route.meta.section === 'library') store.load()
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
@@ -32,10 +32,13 @@ const linkClass = (section: string) =>
 
 <template>
   <nav class="border-b border-neutral-800">
-    <div class="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
+    <div class="mx-auto flex max-w-6xl items-center gap-5 px-4 py-3 whitespace-nowrap">
       <RouterLink to="/" class="font-semibold tracking-tight text-neutral-100">vista</RouterLink>
       <RouterLink to="/" :class="linkClass('library')" :aria-current="route.meta.section === 'library' ? 'page' : undefined">
         書庫
+      </RouterLink>
+      <RouterLink to="/deck" :class="linkClass('deck')" :aria-current="route.meta.section === 'deck' ? 'page' : undefined">
+        字卡庫
       </RouterLink>
       <RouterLink
         to="/practice"

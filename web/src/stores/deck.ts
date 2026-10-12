@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { ApiError, fetchCards, fetchStudySettings, saveStudySettings, type ApiErrorKind } from '../api/client'
+import {
+  ApiError,
+  deleteCard,
+  fetchCards,
+  fetchStudySettings,
+  resetCard,
+  saveStudySettings,
+  updateCard,
+  type ApiErrorKind,
+  type CardCorrection,
+} from '../api/client'
 import type { CardSchedule, LearningCard, StudySettings } from '../api/types'
 import { localDay, nextCard, waiting, type QueueEmpty, type Waiting } from '../practice/queue'
 
@@ -139,6 +149,39 @@ export const useDeckStore = defineStore('deck', () => {
     loadedAt.value = new Date()
   }
 
+  /**
+   * Run one fixing action and hold its result. A card the server no longer
+   * has is forgotten here too -- that is what it is -- and reported as
+   * `'gone'`. Any other failure is thrown, with the card left as it was.
+   */
+  async function fix(cardId: number, action: () => Promise<LearningCard | null>): Promise<'done' | 'gone'> {
+    try {
+      const card = await action()
+      if (card) replaceCard(card)
+      else removeCard(cardId)
+      return 'done'
+    } catch (e) {
+      if (e instanceof ApiError && e.kind === 'notFound') {
+        removeCard(cardId)
+        return 'gone'
+      }
+      throw e
+    }
+  }
+
+  /** Correct a card's translation, its kind, or both. The source text is not correctable: the backend refuses it. */
+  const correctCard = (cardId: number, correction: CardCorrection) => fix(cardId, () => updateCard(cardId, correction))
+
+  /** Put a card back to new. It returns under the day's allowance like any other. */
+  const resetCardToNew = (cardId: number) => fix(cardId, () => resetCard(cardId))
+
+  /** Delete a card for good. */
+  const deleteCardForGood = (cardId: number) =>
+    fix(cardId, async () => {
+      await deleteCard(cardId)
+      return null
+    })
+
   const standing = computed<Standing | null>(() => {
     if (!settings.value || !loadedAt.value) return null
     const now = loadedAt.value
@@ -151,5 +194,21 @@ export const useDeckStore = defineStore('deck', () => {
     }
   })
 
-  return { cards, settings, loading, error, loaded, loadedAt, standing, load, refresh, saveSettings, applySchedule, replaceCard, removeCard }
+  return {
+    cards,
+    settings,
+    loading,
+    error,
+    loaded,
+    loadedAt,
+    standing,
+    load,
+    refresh,
+    saveSettings,
+    applySchedule,
+    removeCard,
+    correctCard,
+    resetCardToNew,
+    deleteCardForGood,
+  }
 })
