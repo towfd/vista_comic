@@ -6,7 +6,7 @@ See the spec's *The queue* and *When the deck is fetched*. The phone's queue rul
 
 **Blocked by:** None — can start immediately.
 
-**Status:** implemented 2026-10-12 — awaiting the developer's browser check
+**Status:** done (2026-10-12) — merged in #107; the browser checklist below is still the developer's to run
 
 - [x] The API client can list the deck and read study settings, through the same request path as comics, so an Access refusal, a 404 and an outage are classified as they already are
 - [x] The queue offers cards in the spec's order: learning and relearning due now, then other cards due now, then new cards in collection order while the day's allowance has room, then learning cards coming due within twenty minutes; longest-waiting first within a group

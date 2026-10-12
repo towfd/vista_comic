@@ -14,8 +14,6 @@ onMounted(() => {
 
 <template>
   <main class="mx-auto max-w-6xl px-4 py-8">
-    <h1 class="mb-6 text-2xl font-semibold text-neutral-100">書庫</h1>
-
     <p v-if="loading && !loaded" class="py-24 text-center text-neutral-400">載入中…</p>
 
     <ErrorState v-else-if="error" :kind="error" @retry="store.load()" />

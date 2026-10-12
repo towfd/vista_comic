@@ -1,7 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ApiError, fetchCards, fetchStudySettings, type ApiErrorKind } from '../api/client'
 import type { LearningCard, StudySettings } from '../api/types'
+import { localDay, nextCard, waiting, type QueueEmpty, type Waiting } from '../practice/queue'
+
+/** What is waiting, and why nothing is when nothing is. */
+export interface Standing {
+  counts: Waiting
+  /** The three counts added together: what a session started now would ask. */
+  remaining: number
+  empty: QueueEmpty | null
+}
 
 /**
  * The deck and the study settings, held together because nothing practice
@@ -16,6 +25,10 @@ export const useDeckStore = defineStore('deck', () => {
   // Whether a load has ever finished, so "not fetched yet" and "an empty deck"
   // do not render the same.
   const loaded = ref(false)
+  // The moment the held deck was fetched, and so the moment `standing` is true
+  // for. Kept here rather than read by each screen, so the navigation bar and
+  // the overview can never show numbers from two different instants.
+  const loadedAt = ref<Date | null>(null)
   // Which load is the latest, so an older response arriving late cannot
   // overwrite a newer one.
   let generation = 0
@@ -35,6 +48,7 @@ export const useDeckStore = defineStore('deck', () => {
       cards.value = deck
       settings.value = study
       loaded.value = true
+      loadedAt.value = new Date()
     } catch (e) {
       if (mine !== generation) return
       error.value = e instanceof ApiError ? e.kind : 'unexpected'
@@ -43,5 +57,17 @@ export const useDeckStore = defineStore('deck', () => {
     }
   }
 
-  return { cards, settings, loading, error, loaded, load }
+  const standing = computed<Standing | null>(() => {
+    if (!settings.value || !loadedAt.value) return null
+    const now = loadedAt.value
+    const today = localDay(now)
+    const counts = waiting(cards.value, settings.value, now, today)
+    return {
+      counts,
+      remaining: counts.due + counts.fresh + counts.learning,
+      empty: nextCard(cards.value, settings.value, now, today).empty ?? null,
+    }
+  })
+
+  return { cards, settings, loading, error, loaded, loadedAt, standing, load }
 })
