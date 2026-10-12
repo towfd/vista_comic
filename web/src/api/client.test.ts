@@ -10,6 +10,7 @@ import {
   getJson,
   recordReview,
   saveProgress,
+  saveStudySettings,
   toMediaPath,
   type Fetcher,
 } from './client'
@@ -396,5 +397,27 @@ describe('request timeout', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('saveStudySettings', () => {
+  const settings = { learningSteps: [1, 10], newCardsPerDay: 5 }
+
+  it('puts both fields and returns what the server saved', async () => {
+    let seen: { path: string; init?: RequestInit } | undefined
+    const saved = await saveStudySettings(settings, async (path, init) => {
+      seen = { path, init }
+      return json(settings)
+    })
+    expect(seen?.path).toBe('/study/settings')
+    expect(seen?.init?.method).toBe('PUT')
+    expect(new Headers(seen?.init?.headers).get('content-type')).toBe('application/json')
+    expect(JSON.parse(String(seen?.init?.body))).toEqual(settings)
+    expect(saved).toEqual(settings)
+  })
+
+  it('reports a refused value as unexpected and an outage as unavailable', async () => {
+    expect(await errorKind(saveStudySettings(settings, respondWith(json({}, 422))))).toBe('unexpected')
+    expect(await errorKind(saveStudySettings(settings, respondWith(json({}, 503))))).toBe('unavailable')
   })
 })

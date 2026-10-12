@@ -213,3 +213,16 @@ export async function recordReview(cardId: number, review: ReviewRequest, fetche
     dueAt: outcome.dueAt,
   }
 }
+
+/**
+ * Replace the study settings, both fields at once, and return what was saved.
+ * A value the backend refuses (an empty step list, a step of zero) surfaces
+ * as `unexpected`; the settings page is meant to refuse it first.
+ */
+export async function saveStudySettings(settings: StudySettings, fetcher: Fetcher = fetch): Promise<StudySettings> {
+  return requestJson<StudySettings>(
+    '/study/settings',
+    { method: 'PUT', headers: JSON_BODY, body: JSON.stringify(settings) },
+    fetcher,
+  )
+}

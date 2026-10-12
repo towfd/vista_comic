@@ -14,8 +14,9 @@ onMounted(() => store.load())
   <main class="mx-auto max-w-3xl px-4 py-8">
     <header class="mb-8 flex items-center justify-between">
       <h1 class="text-2xl font-semibold text-neutral-100">今天</h1>
-      <!-- Leads nowhere until the settings page exists. -->
-      <button disabled class="rounded-md px-3 py-1.5 text-sm text-neutral-500">⚙ 設定</button>
+      <RouterLink :to="{ name: 'practice-settings' }" class="rounded-md px-3 py-1.5 text-sm text-neutral-400 hover:text-neutral-200">
+        ⚙ 設定
+      </RouterLink>
     </header>
 
     <p v-if="loading && !loaded" class="py-24 text-center text-neutral-400">載入中…</p>
