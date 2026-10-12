@@ -6,7 +6,7 @@ See the spec's *Answering and saving*.
 
 **Blocked by:** 12 — A translate session that saves.
 
-**Status:** done (2026-10-12) — merged; the browser checklist below is still the developer's to run
+**Status:** done (2026-10-12) — merged in #110; the browser checklist below is still the developer's to run
 
 - [x] The API client has a request timeout, classified as the backend being unavailable
 - [x] An unreachable backend, a server error or a timeout is retried automatically a few times, backing off

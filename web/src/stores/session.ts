@@ -3,15 +3,19 @@ import { ref } from 'vue'
 import { ApiError, recordReview, type ApiErrorKind } from '../api/client'
 import type { LearningCard, QuestionType, ReviewRequest } from '../api/types'
 import { localDay, nextCard, remainingCards } from '../practice/queue'
-import { isBlank, judgeSentence } from '../practice/text'
+import type { Cloze } from '../practice/cloze'
+import { drawAsking } from '../practice/question'
+import { isBlank, judgeCloze, judgeSentence } from '../practice/text'
 import { useDeckStore } from './deck'
 
 /** One question, as data: what is asked, of which card, and the token its answer will carry. */
 export interface Question {
   card: LearningCard
   type: QuestionType
-  /** What the reader is shown: for a translation, the card's meaning. */
+  /** The card's meaning: the whole prompt for a translation, the gloss under a cloze. */
   prompt: string
+  /** The sentence with one word out, when the question is a cloze. */
+  cloze: Cloze | null
   /** Made once, when the question is, so every attempt to save its answer carries the same one. */
   token: string
 }
@@ -20,8 +24,10 @@ export interface Verdict {
   correct: boolean
   /** What the reader typed, as typed. */
   given: string
-  /** The card's text. */
+  /** What was asked for: the card's text, or the word missing from a cloze. */
   expected: string
+  /** The whole sentence, when the question was a cloze. */
+  sentence: string | null
 }
 
 /**
@@ -118,7 +124,8 @@ export const useSessionStore = defineStore('session', () => {
       phase.value = 'finished'
       return
     }
-    question.value = { card: next.card, type: 'sentence_typed', prompt: next.card.translation, token: crypto.randomUUID() }
+    const asking = drawAsking(next.card, deck.cards, Math.random)
+    question.value = { card: next.card, ...asking, prompt: next.card.translation, token: crypto.randomUUID() }
     remaining.value = remainingCards(deck.cards, settings, now, today)
     phase.value = 'asking'
   }
@@ -131,8 +138,16 @@ export const useSessionStore = defineStore('session', () => {
   function submit(typed: string) {
     const asked = question.value
     if (phase.value !== 'asking' || !asked || isBlank(typed)) return
-    const correct = judgeSentence(typed, asked.card.sourceText)
-    verdict.value = { correct, given: typed.trim(), expected: asked.card.sourceText }
+    const cloze = asked.cloze
+    const correct = cloze
+      ? judgeCloze(typed, cloze.removed, cloze.answer.sourceText)
+      : judgeSentence(typed, asked.card.sourceText)
+    verdict.value = {
+      correct,
+      given: typed.trim(),
+      expected: cloze ? cloze.removed : asked.card.sourceText,
+      sentence: cloze ? asked.card.sourceText : null,
+    }
     phase.value = 'feedback'
     lastCardId = asked.card.id
 

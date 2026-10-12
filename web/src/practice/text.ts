@@ -70,6 +70,18 @@ export function judgeSentence(produced: string, sourceText: string): boolean {
   return sameText(produced, sourceText, true)
 }
 
+/**
+ * Whether `typed` is the word missing from a cloze: either as it was written
+ * in the sentence, or as the reader's own card for it has it.
+ *
+ * Case and spacing are ignored and tones are strict, as for a sentence.
+ * Punctuation is not ignored here -- the answer is a word, and the phone does
+ * not ignore it either.
+ */
+export function judgeCloze(typed: string, removed: string, answerText: string): boolean {
+  return sameText(typed, removed, false) || sameText(typed, answerText, false)
+}
+
 /** Whether there is anything to judge. An empty field cannot be submitted. */
 export function isBlank(text: string): boolean {
   return normalizedKey(text) === ''

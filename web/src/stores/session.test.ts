@@ -126,14 +126,14 @@ describe('answering', () => {
     const session = await started([card(1, 'review', -5)])
     session.submit('câu 1')
     expect(session.phase).toBe('feedback')
-    expect(session.verdict).toEqual({ correct: true, given: 'câu 1', expected: 'câu 1' })
+    expect(session.verdict).toEqual({ correct: true, given: 'câu 1', expected: 'câu 1', sentence: null })
     expect(session.saveState).toBe('saving')
   })
 
   it('marks a missing tone wrong and keeps what was typed', async () => {
     const session = await started([card(1, 'review', -5)])
     session.submit('  cau 1 ')
-    expect(session.verdict).toEqual({ correct: false, given: 'cau 1', expected: 'câu 1' })
+    expect(session.verdict).toEqual({ correct: false, given: 'cau 1', expected: 'câu 1', sentence: null })
   })
 
   it('ignores an empty or blank field', async () => {
@@ -387,5 +387,54 @@ describe('an answer that will not save', () => {
     expect(api.recordReview).toHaveBeenCalledTimes(1)
     expect(session.saveState).toBeNull()
     expect(session.phase).toBe('asking')
+  })
+})
+
+describe('cloze questions', () => {
+  // Card 1 is a sentence holding card 2's word; card 2 is that word, not due.
+  const deck = () => [
+    card(1, 'review', -5, 'Tôi không biết ĐƯỜNG đến trường.'),
+    { ...card(2, 'review', 600, 'đường'), kind: 'word' as const },
+  ]
+
+  it('asks a sentence holding a collected word as a cloze when the draw says so', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const session = await started(deck())
+    expect(session.question).toMatchObject({ type: 'cloze_typed', prompt: 'meaning 1' })
+    expect(session.question?.cloze).toMatchObject({ before: 'Tôi không biết ', removed: 'ĐƯỜNG', after: ' đến trường.' })
+  })
+
+  it('asks the same card as a translation when the draw goes the other way', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    const session = await started(deck())
+    expect(session.question).toMatchObject({ type: 'sentence_typed', cloze: null })
+  })
+
+  it('judges the missing word, not the sentence, and records it as a cloze', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const session = await started(deck())
+    session.submit('đường')
+    expect(session.verdict).toEqual({
+      correct: true,
+      given: 'đường',
+      expected: 'ĐƯỜNG',
+      sentence: 'Tôi không biết ĐƯỜNG đến trường.',
+    })
+    expect(api.recordReview).toHaveBeenCalledWith(1, expect.objectContaining({ questionType: 'cloze_typed', isCorrect: true }))
+  })
+
+  it('marks the missing word wrong without its tone', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const session = await started(deck())
+    session.submit('duong')
+    expect(session.verdict?.correct).toBe(false)
+    expect(api.recordReview).toHaveBeenCalledWith(1, expect.objectContaining({ isCorrect: false }))
+  })
+
+  it('never draws for a card that supports only translation', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    const session = await started([{ ...card(2, 'review', -5, 'đường'), kind: 'word' as const }])
+    expect(session.question?.type).toBe('sentence_typed')
+    expect(random).not.toHaveBeenCalled()
   })
 })
