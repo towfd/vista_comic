@@ -288,6 +288,24 @@ describe('a line already in the deck', () => {
     collect.setTranslation('你好啊')
     expect(collect.notice).toBeNull()
   })
+
+  it('says so again for the other button: the card it holds is still the one shown', async () => {
+    const collect = typed()
+    await collect.add('word')
+    await collect.add('sentence')
+    expect(collect.notice).toEqual({ kind: 'exists', card: card(4, 'Xin chào', '哈囉') })
+    expect(useDeckStore().cards).toHaveLength(1)
+  })
+
+  it('becomes an ordinary add once the text is changed to a line the deck does not have', async () => {
+    const collect = typed()
+    await collect.add('word')
+    api.createCard.mockResolvedValue({ card: card(5, 'xin chào bạn'), created: true })
+    collect.setSourceText('xin chào bạn')
+    await collect.add('word')
+    expect(collect.open).toBe(false)
+    expect(collect.added).toBe('xin chào bạn')
+  })
 })
 
 describe('a save that fails', () => {
@@ -307,6 +325,29 @@ describe('a save that fails', () => {
     expect(collect.notice).toEqual({ kind: 'failed', error: 'unavailable' })
     expect(collect.added).toBeNull()
     expect(collect.saving).toBe(false)
+  })
+
+  it.each(['auth', 'unavailable', 'unexpected'] as const)('tells a failure of kind %s apart', async (kind) => {
+    api.createCard.mockRejectedValue(new ApiError(kind, 'no'))
+    const collect = typed()
+    await collect.add('word')
+    expect(collect.notice).toEqual({ kind: 'failed', error: kind })
+  })
+
+  it('reports a failure that is not the API\'s as unexpected', async () => {
+    api.createCard.mockRejectedValue(new Error('boom'))
+    const collect = typed()
+    await collect.add('word')
+    expect(collect.notice).toEqual({ kind: 'failed', error: 'unexpected' })
+  })
+
+  it('sends the same card again on a retry, so it cannot become a second one', async () => {
+    api.createCard.mockRejectedValueOnce(new ApiError('unavailable', 'down'))
+    const collect = typed()
+    collect.setCurrentPage(9)
+    await collect.add('word')
+    await collect.add('word')
+    expect(api.createCard.mock.calls[1]![0]).toEqual(api.createCard.mock.calls[0]![0])
   })
 
   it('succeeds on pressing again', async () => {
@@ -342,6 +383,19 @@ describe('an answer that arrives after the panel has gone', () => {
     expect(collect.open).toBe(true)
     expect(collect.sourceText).toBe('cảm ơn')
     expect(useDeckStore().cards.map((c) => c.id)).toEqual([1])
+  })
+
+  it('raises no already-collected notice on a panel reopened since', async () => {
+    const slow = deferred<{ card: LearningCard; created: boolean }>()
+    api.createCard.mockReturnValue(slow.promise)
+    const collect = typed()
+    const adding = collect.add('word')
+    collect.collapse()
+    collect.openPanel()
+    slow.resolve({ card: card(4, 'Xin chào', '哈囉'), created: false })
+    await adding
+    expect(collect.notice).toBeNull()
+    expect(useDeckStore().cards.map((c) => c.id)).toEqual([4])
   })
 
   it('raises no notice in the chapter the reader has moved to', async () => {

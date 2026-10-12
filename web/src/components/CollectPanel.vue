@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
+import type { ApiErrorKind } from '../api/client'
 import { useCollectStore, SOURCE_TEXT_LIMIT } from '../stores/collect'
 
 // Everything this panel does is decided in the collect store; this only
@@ -31,6 +32,16 @@ watch(
   },
 )
 onUnmounted(() => clearTimeout(addedTimer))
+
+// Each ends by saying what to do, because the same two buttons are the retry.
+const failed: Record<ApiErrorKind, string> = {
+  unavailable: '連不上伺服器，卡片沒有存進去。內容還在，請再按一次。',
+  auth: '登入已經過期，卡片沒有存進去。請在另一個分頁重新整理後，回來再按一次。',
+  notFound: '伺服器找不到收卡的位置，卡片沒有存進去。',
+  unexpected: '伺服器拒絕了這張卡片，沒有存進去。',
+}
+
+const kinds = { word: '單字', sentence: '句子' } as const
 
 const value = (event: Event) => (event.target as HTMLTextAreaElement).value
 </script>
@@ -93,11 +104,29 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
       @input="collect.setTranslation(value($event))"
     />
 
-    <p v-if="collect.notice?.kind === 'exists'" class="mt-3 text-sm text-amber-400" role="alert">
-      這一句已經在字卡庫裡了，沒有新增。
-    </p>
+    <!--
+      The card the deck already holds, in its own words: a line counts as the
+      same whatever its case and spacing, so it may not look like what was
+      typed -- and nothing typed here was saved onto it.
+    -->
+    <div v-if="collect.notice?.kind === 'exists'" class="mt-3 rounded-md border border-amber-900/60 p-3" role="alert">
+      <p class="text-sm text-amber-400">已經收過了，沒有新增，也沒有改動原本的卡片。</p>
+      <p class="mt-2 text-sm whitespace-pre-wrap text-neutral-100" lang="vi">{{ collect.notice.card.sourceText }}</p>
+      <p class="mt-1 text-sm whitespace-pre-wrap text-neutral-400">{{ collect.notice.card.translation }}</p>
+      <p class="mt-2 flex items-baseline justify-between gap-2 text-xs">
+        <span class="text-neutral-500">{{ collect.notice.card.kind ? kinds[collect.notice.card.kind] : '未分類' }}</span>
+        <!-- A new tab, as from a practice session: leaving the reader would discard what is typed here. -->
+        <RouterLink
+          :to="{ name: 'deck-card', params: { cardId: collect.notice.card.id } }"
+          target="_blank"
+          class="text-neutral-400 underline decoration-neutral-600 underline-offset-4 hover:text-neutral-200"
+        >
+          到字卡庫修改 ↗
+        </RouterLink>
+      </p>
+    </div>
     <p v-else-if="collect.notice?.kind === 'failed'" class="mt-3 text-sm text-amber-400" role="alert">
-      沒有存成功，請再按一次。
+      {{ failed[collect.notice.error] }}
     </p>
 
     <div class="mt-4 flex gap-2">
