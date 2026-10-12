@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useDeckStore } from '../stores/deck'
@@ -13,7 +13,16 @@ const { standing } = storeToRefs(store)
 // is neither delayed nor told. Practice pages load the deck themselves.
 onMounted(() => {
   if (route.meta.section !== 'practice') store.load()
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
+onUnmounted(() => document.removeEventListener('visibilitychange', onVisibilityChange))
+
+// Coming back to the tab is the ordinary way a deck goes stale: the reader
+// was on the phone. Listened for here because the bar is on every page that
+// shows anything about cards, and absent from the reader, which shows nothing.
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') store.refresh()
+}
 
 const waitingCount = computed(() => standing.value?.remaining || null)
 

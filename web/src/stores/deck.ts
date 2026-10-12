@@ -32,6 +32,23 @@ export const useDeckStore = defineStore('deck', () => {
   // Which load is the latest, so an older response arriving late cannot
   // overwrite a newer one.
   let generation = 0
+  // A count of everything that has changed the held deck, and when each card
+  // was last changed from here. A fetch reports the deck as it stood when the
+  // server answered; a card this tab changed after the fetch set out is newer
+  // than that, and must not be put back.
+  let tick = 0
+  const touched = new Map<number, number>()
+  const removed = new Map<number, number>()
+
+  /** The fetched deck, with every card changed here since `began` kept as held. */
+  function reconcile(fetched: LearningCard[], began: number): LearningCard[] {
+    const held = new Map(cards.value.map((card) => [card.id, card]))
+    return fetched.flatMap((card) => {
+      if ((removed.get(card.id) ?? 0) > began) return []
+      if ((touched.get(card.id) ?? 0) > began) return [held.get(card.id) ?? card]
+      return [card]
+    })
+  }
 
   /**
    * Fetch both fresh. Either failing fails the load: default settings are
@@ -40,12 +57,13 @@ export const useDeckStore = defineStore('deck', () => {
    */
   async function load() {
     const mine = ++generation
+    const began = ++tick
     loading.value = true
     error.value = null
     try {
       const [deck, study] = await Promise.all([fetchCards(), fetchStudySettings()])
       if (mine !== generation) return
-      cards.value = deck
+      cards.value = reconcile(deck, began)
       settings.value = study
       loaded.value = true
       loadedAt.value = new Date()
@@ -58,6 +76,29 @@ export const useDeckStore = defineStore('deck', () => {
   }
 
   /**
+   * Fetch both again without disturbing what is on screen: for when the tab
+   * comes back to the foreground and the phone may have moved the deck.
+   *
+   * Quiet in both directions. No loading state, so nothing flashes; and a
+   * failure is dropped, so the deck already held stays in use. Gives way to a
+   * `load` in flight, which is already fetching the same thing.
+   */
+  async function refresh() {
+    if (loading.value || !loaded.value) return
+    const mine = ++generation
+    const began = ++tick
+    try {
+      const [deck, study] = await Promise.all([fetchCards(), fetchStudySettings()])
+      if (mine !== generation) return
+      cards.value = reconcile(deck, began)
+      settings.value = study
+      loadedAt.value = new Date()
+    } catch (e) {
+      console.warn('deck refresh failed; keeping the deck already held:', e)
+    }
+  }
+
+  /**
    * Write the schedule an answer earned onto its card. The moment the deck is
    * true for moves with it, so the count beside 練習 follows a session along.
    * A card no longer held -- deleted meanwhile -- is ignored.
@@ -66,11 +107,13 @@ export const useDeckStore = defineStore('deck', () => {
     const index = cards.value.findIndex((card) => card.id === cardId)
     if (index === -1) return
     cards.value[index] = { ...cards.value[index]!, ...schedule }
+    touched.set(cardId, ++tick)
     loadedAt.value = new Date()
   }
 
   /** Forget a card that no longer exists on the server. */
   function removeCard(cardId: number) {
+    removed.set(cardId, ++tick)
     const index = cards.value.findIndex((card) => card.id === cardId)
     if (index === -1) return
     cards.value.splice(index, 1)
@@ -89,5 +132,5 @@ export const useDeckStore = defineStore('deck', () => {
     }
   })
 
-  return { cards, settings, loading, error, loaded, loadedAt, standing, load, applySchedule, removeCard }
+  return { cards, settings, loading, error, loaded, loadedAt, standing, load, refresh, applySchedule, removeCard }
 })
