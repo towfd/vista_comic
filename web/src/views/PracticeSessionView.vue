@@ -7,10 +7,13 @@ import ErrorState from '../components/ErrorState.vue'
 
 const router = useRouter()
 const session = useSessionStore()
-const { phase, loadError, question, verdict, saveState, saveFailure, remaining, waitingToAdvance } = storeToRefs(session)
+const { phase, loadError, question, verdict, saveState, saveFailure, remaining, waitingToAdvance, outcome } = storeToRefs(session)
 
 const field = ref<HTMLInputElement | null>(null)
 const nextButton = ref<HTMLButtonElement | null>(null)
+const doneLink = ref<{ $el: HTMLElement } | null>(null)
+
+const answered = () => outcome.value.correct + outcome.value.wrong
 
 const reload = () => window.location.reload()
 
@@ -28,8 +31,10 @@ watch(
     } else if (phase.value === 'feedback') {
       nextButton.value?.focus()
     } else if (phase.value === 'finished') {
-      // The closing screen comes later; until then the overview says what is left.
-      router.replace({ name: 'practice' })
+      // A session that asked nothing has nothing to report; the overview
+      // already says why -- an empty deck, or a day that is done.
+      if (answered() === 0) router.replace({ name: 'practice' })
+      else doneLink.value?.$el.focus()
     }
   },
   { flush: 'post' },
@@ -66,8 +71,40 @@ function onNextKeydown(event: KeyboardEvent) {
 
     <ErrorState v-else-if="phase === 'unavailable' && loadError" :kind="loadError" @retry="session.start()" />
 
+    <p v-else-if="phase === 'checking'" class="py-24 text-center text-neutral-400">確認還有沒有卡片…</p>
+
+    <section v-else-if="phase === 'finished' && answered() > 0" class="py-16 text-center">
+      <h1 class="text-2xl font-semibold text-neutral-100">這一輪做完了</h1>
+      <dl class="mx-auto mt-8 grid max-w-md grid-cols-3 gap-3">
+        <div class="rounded-md bg-neutral-900 px-2 py-5">
+          <dd class="text-3xl font-semibold text-emerald-400">{{ outcome.correct }}</dd>
+          <dt class="mt-1 text-sm text-neutral-400">答對</dt>
+        </div>
+        <div class="rounded-md bg-neutral-900 px-2 py-5">
+          <dd class="text-3xl font-semibold text-rose-400">{{ outcome.wrong }}</dd>
+          <dt class="mt-1 text-sm text-neutral-400">答錯</dt>
+        </div>
+        <div class="rounded-md bg-neutral-900 px-2 py-5">
+          <dd class="text-3xl font-semibold text-neutral-100">{{ outcome.graduated }}</dd>
+          <dt class="mt-1 text-sm text-neutral-400">畢業</dt>
+        </div>
+      </dl>
+      <p class="mt-4 text-xs text-neutral-500">畢業：這一輪最後一次作答後，進入以天計算的複習階段的卡片。</p>
+      <RouterLink
+        ref="doneLink"
+        :to="{ name: 'practice' }"
+        class="mt-8 inline-block rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500"
+      >
+        回到總覽
+      </RouterLink>
+    </section>
+
     <template v-else-if="question">
-      <p class="mb-8 text-sm text-neutral-400">還剩 {{ remaining }} 張</p>
+      <div class="mb-8 flex items-center justify-between text-sm text-neutral-400">
+        <p>還剩 {{ remaining }} 張</p>
+        <!-- Answers already saved stay saved; only the one on screen is given up. -->
+        <RouterLink :to="{ name: 'practice' }" class="hover:text-neutral-200">結束</RouterLink>
+      </div>
 
       <template v-if="question.cloze">
         <p class="text-sm text-neutral-400">填入空格裡的字</p>

@@ -6,7 +6,7 @@ See the spec's *When the deck is fetched*.
 
 **Blocked by:** 12 — A translate session that saves.
 
-**Status:** done (2026-10-12) — merged; the browser checklist below is still the developer's to run
+**Status:** done (2026-10-12) — merged in #112; the browser checklist below is still the developer's to run
 
 - [x] The deck and settings are fetched again when the tab becomes visible, on the overview and during a session
 - [x] A question on screen is never replaced or cleared by a fetch, and what has been typed stays

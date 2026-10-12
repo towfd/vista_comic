@@ -35,9 +35,18 @@ export interface Verdict {
  * - `unavailable`: the deck could not be fetched; `loadError` says why.
  * - `asking`: a question is on screen, unanswered.
  * - `feedback`: the verdict is showing.
+ * - `checking`: the queue came up empty and the deck is being fetched once more to be sure.
  * - `finished`: the queue has nothing left.
  */
-export type Phase = 'loading' | 'unavailable' | 'asking' | 'feedback' | 'finished'
+export type Phase = 'loading' | 'unavailable' | 'asking' | 'feedback' | 'checking' | 'finished'
+
+/** What a session achieved, counted from answers that were saved. */
+export interface Outcome {
+  correct: number
+  wrong: number
+  /** Cards standing in review after their last answer this session. */
+  graduated: number
+}
 
 /**
  * Where the answer on screen stands with the backend.
@@ -80,6 +89,13 @@ export const useSessionStore = defineStore('session', () => {
   const remaining = ref(0)
   /** The reader asked for the next question before the answer was saved. */
   const waitingToAdvance = ref(false)
+  const outcome = ref<Outcome>({ correct: 0, wrong: 0, graduated: 0 })
+  // By id rather than as a tally: a card that graduates and is then missed in
+  // the same session has not graduated, and only a set can take it back out.
+  const graduatedIds = new Set<number>()
+  // Raised by anything that abandons the question in hand -- a restart -- so
+  // work still in flight for the old one can tell it is no longer wanted.
+  let run = 0
   let lastCardId: number | undefined
   // The answer on screen, kept so a retry sends exactly what the first attempt
   // did: the same token, and the moment the reader answered rather than the
@@ -88,7 +104,10 @@ export const useSessionStore = defineStore('session', () => {
 
   /** Begin from the server: fetch the deck, then draw the first question. */
   async function start() {
+    run++
     phase.value = 'loading'
+    outcome.value = { correct: 0, wrong: 0, graduated: 0 }
+    graduatedIds.clear()
     loadError.value = null
     question.value = null
     verdict.value = null
@@ -103,30 +122,57 @@ export const useSessionStore = defineStore('session', () => {
       phase.value = 'unavailable'
       return
     }
-    draw()
+    // Fetched a moment ago: an empty queue here needs no second look.
+    draw({ recheck: false })
   }
 
-  /** Ask the queue, with the clock read now rather than held from an earlier question. */
-  function draw() {
+  /** The queue's answer for this instant: the clock is read now, never held from an earlier question. */
+  function ask() {
     const settings = deck.settings
-    if (!settings) return
+    if (!settings) return null
     const now = new Date()
     const today = localDay(now)
-    const next = nextCard(deck.cards, settings, now, today, lastCardId)
+    return { next: nextCard(deck.cards, settings, now, today, lastCardId), left: remainingCards(deck.cards, settings, now, today) }
+  }
+
+  /**
+   * Put the next question on screen, or end the session.
+   *
+   * "Finished" is the one thing a session says about the whole deck, so it is
+   * not said from an old copy: when the queue comes up empty the deck is
+   * fetched once more and the queue asked again. A fetch that fails changes
+   * nothing, and the session ends on what it holds.
+   */
+  function draw({ recheck = true } = {}) {
     verdict.value = null
     saveState.value = null
     saveFailure.value = null
     pending = null
     waitingToAdvance.value = false
-    if (!next.card) {
-      question.value = null
-      remaining.value = 0
+
+    const asked = ask()
+    if (!asked) return
+    if (asked.next.card) return show(asked.next.card, asked.left)
+    question.value = null
+    remaining.value = 0
+    if (!recheck) {
       phase.value = 'finished'
       return
     }
-    const asking = drawAsking(next.card, deck.cards, Math.random)
-    question.value = { card: next.card, ...asking, prompt: next.card.translation, token: crypto.randomUUID() }
-    remaining.value = remainingCards(deck.cards, settings, now, today)
+    phase.value = 'checking'
+    const mine = run
+    void deck.refresh().then(() => {
+      if (mine !== run || phase.value !== 'checking') return
+      const again = ask()
+      if (again?.next.card) show(again.next.card, again.left)
+      else phase.value = 'finished'
+    })
+  }
+
+  function show(card: LearningCard, left: number) {
+    const asking = drawAsking(card, deck.cards, Math.random)
+    question.value = { card, ...asking, prompt: card.translation, token: crypto.randomUUID() }
+    remaining.value = left
     phase.value = 'asking'
   }
 
@@ -188,6 +234,7 @@ export const useSessionStore = defineStore('session', () => {
         if (stale()) return
         deck.applySchedule(asked.card.id, schedule)
         saveState.value = 'saved'
+        record(asked.card.id, review.isCorrect, schedule.state)
         if (waitingToAdvance.value) draw()
         return
       } catch (e) {
@@ -215,6 +262,17 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  /** Count an answer that reached the server. One the server never took is not part of what the session achieved. */
+  function record(cardId: number, correct: boolean, state: string) {
+    if (state === 'review') graduatedIds.add(cardId)
+    else graduatedIds.delete(cardId)
+    outcome.value = {
+      correct: outcome.value.correct + (correct ? 1 : 0),
+      wrong: outcome.value.wrong + (correct ? 0 : 1),
+      graduated: graduatedIds.size,
+    }
+  }
+
   /** Try again to save an answer the automatic retries gave up on. */
   function retrySave() {
     if (saveState.value === 'failed' && pending) void save()
@@ -230,5 +288,19 @@ export const useSessionStore = defineStore('session', () => {
     else if (saveState.value === 'saving') waitingToAdvance.value = true
   }
 
-  return { phase, loadError, question, verdict, saveState, saveFailure, remaining, waitingToAdvance, start, submit, advance, retrySave }
+  return {
+    phase,
+    loadError,
+    question,
+    verdict,
+    saveState,
+    saveFailure,
+    remaining,
+    waitingToAdvance,
+    outcome,
+    start,
+    submit,
+    advance,
+    retrySave,
+  }
 })
