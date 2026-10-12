@@ -18,7 +18,7 @@ Filled in by the agent, not put as choices:
 
 **Blocked by:** 18 — Fixing a card after the verdict.
 
-**Status:** implemented 2026-10-12 — in review; awaiting the developer's browser check
+**Status:** done (2026-10-12) — merged in #116
 
 - [x] The navigation bar gains 字卡庫, between 書庫 and 練習, current on the library's pages
 - [x] The library lists every card under 單字 and 句子, each heading with its count and able to fold; cards with no kind appear under 未分類 only when there are any

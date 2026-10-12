@@ -7,11 +7,16 @@ continuously, and when a speech bubble stops you, drag a box around it: the app 
 the text off the page, translates it on-device, explains it if you ask, and turns it
 into a card that comes back until you know it.
 
+A browser client sits beside it for the desk: the same library, the same reading
+progress, and the same deck — read a chapter and practise the cards on a keyboard,
+and the phone already knows.
+
 ![Platform](https://img.shields.io/badge/platform-iOS%2018.1%2B-black)
 ![UI](https://img.shields.io/badge/UI-SwiftUI-orange)
 ![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20PostgreSQL-009688)
 ![OCR](https://img.shields.io/badge/OCR-on--device%20Vision-blue)
-![Tests](https://img.shields.io/badge/tests-541%20Swift%20%2F%20275%20Python-brightgreen)
+![Web](https://img.shields.io/badge/web-Vue%203%20%2B%20TypeScript-42b883)
+![Tests](https://img.shields.io/badge/tests-541%20Swift%20%2F%20275%20Python%20%2F%20286%20TypeScript-brightgreen)
 
 ---
 
@@ -150,6 +155,34 @@ counts, can be searched by text or meaning, edited when the translation was wron
 reset back to new, or deleted. Each card shows where it was collected, how often you
 looked it up again, and exactly where it stands in the schedule.
 
+### 🖥 At a desk, in a browser
+
+A second client for the same backend — not a port of the app. It does the parts a
+keyboard and a large screen are good at, and leaves the rest on the phone.
+
+| | |
+|---|---|
+| **Read** | The library, a comic's chapters, and a continuous reader. Progress is the phone's progress: a chapter opens where either device left it, and *Continue* and the read badges follow. |
+| **Practise** | An overview of what is due, new and in learning; then a session of typed questions that runs until the queue is empty. Every answer moves the card for both devices. |
+| **Two question types, both typed** | *Cloze typed* and *Translate*. Four choices and rearranging stay on the phone — they are touch idioms, and a keyboard is for producing the language. |
+| **Fix a card** | 字卡庫 lists every card under words and sentences, searchable by text or meaning, each showing where it stands in the schedule. A card's page corrects its translation or kind, resets it, or deletes it. |
+| **Settings** | Learning steps and new cards per day, shared with the phone. |
+
+Three places it differs from the phone on purpose:
+
+- **Tones are strict.** The phone forgives a missing tone because typing one on glass
+  is laborious. With an input method and a keyboard it is not, so on the web a wrong
+  or missing tone is wrong. The same toneless answer therefore advances a card on the
+  phone and lapses it here — accepted, and worth knowing.
+- **Where a tone sits does not matter.** Vietnamese has two conventions for which
+  vowel wears the mark — `hoà` and `hòa` — and a deck built from different scanlation
+  groups mixes them. The web judges which tone a syllable carries, not where it is
+  printed.
+- **No scheduler, and no offline.** The phone carries a second copy of the scheduler so
+  it can answer in airplane mode. The browser has no such case, so it asks: the verdict
+  shows at once, and the next question waits until the server has said where the card
+  went. A save that fails holds the session on that question until it goes through.
+
 ---
 
 ## How it fits together
@@ -176,10 +209,16 @@ graph TB
         W --- DB
     end
 
+    subgraph browser["🖥 Browser — Vue 3"]
+        WR["Reader<br/>書庫"]
+        WP["Practice<br/>練習 · 字卡庫"]
+    end
+
     LIB[("📁 Your manga folder<br/>read-only bind mount")]
     LLM["Claude<br/>Haiku 4.5 · Sonnet 5"]
 
     device -->|"HTTP"| API
+    browser -->|"HTTP"| API
     API -->|"scan · serve pages"| LIB
     W --> LLM
 ```
@@ -195,6 +234,11 @@ Three deliberate choices are visible in that picture:
 3. **The LLM is a background worker, not a blocking call.** Explanations are enqueued
    and written by a worker that reads the page from the library itself, so the reader is
    never waiting on a model.
+
+The browser is a second caller of the same endpoints and adds nothing to the picture's
+right-hand side: no route was changed for it, and it holds no state the phone does not
+also see. What it deliberately lacks is the left-hand column — no on-device OCR, no
+translation engine, no offline stores — so collecting a card still happens on the phone.
 
 ---
 
@@ -239,13 +283,35 @@ open vista_comic/vista_comic.xcodeproj   # Xcode → run on a device or simulato
 The UI follows the device language: English keys with Traditional Chinese
 (繁體中文) translations, so the tabs read **書庫 · 已下載 · 練習 · 單字庫**.
 
-### 3. Tests
+### 3. The web client
+
+```bash
+cd web
+npm install
+
+# A gitignored web/.env holds the Cloudflare Access service token the dev
+# server attaches on the way out. It never reaches the browser bundle.
+cat > .env <<'EOF'
+CF_ACCESS_CLIENT_ID=...
+CF_ACCESS_CLIENT_SECRET=...
+# VISTA_API_ORIGIN=http://localhost:8000   # to use a local backend instead
+EOF
+
+npm run dev                          # → http://localhost:5173
+```
+
+The browser only ever talks to the dev server, which forwards `/comics`, `/media`,
+`/cards` and `/study` to the backend. Answering a question, saving settings and fixing
+a card all write to the real deck.
+
+### 4. Tests
 
 ```bash
 cd backend && pytest                                  # 275 tests
 xcodebuild test -scheme vista_comic \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
   -only-testing:vista_comicTests                      # 541 tests
+cd web && npm test                                    # 286 tests
 ```
 
 ### Reading away from home
@@ -267,6 +333,7 @@ Cloudflare Tunnel + Access setup used here.
 | API | FastAPI · Python 3.12 | Small, typed, fast to iterate on |
 | Store | PostgreSQL · SQLAlchemy 2.0 · Alembic | Only for state the folder cannot hold; migrations own the schema |
 | LLM | `anthropic` SDK — Haiku 4.5, Sonnet 5 | Two tiers so depth is opt-in and cost is bounded |
+| Web | Vue 3 · Pinia · Tailwind · Vite · Vitest | A thin second client; the practice rules are plain TypeScript with no Vue in them |
 | Deployment | docker compose | One command, two services, your folder mounted read-only |
 
 ## Project layout
@@ -281,6 +348,12 @@ vista_comic/          The iOS app
     Study/            練習 + 單字庫 — cards, questions, scheduler
   Networking/         Repositories, OCR, translation, offline queues
   Shared/             Theme, fonts, shared sections
+web/
+  src/
+    api/              The client: one request path, typed errors
+    practice/         Queue, judging, cloze building — pure TypeScript
+    stores/           The deck and a practice session (Pinia)
+    views/            書庫, the reader, 練習, 字卡庫
 backend/
   app/                FastAPI app, scanner, stores, scheduler, worker
   alembic/            Migrations — the schema's owner
@@ -300,6 +373,10 @@ OCR-to-translation, LLM comprehension, and the comprehension response UX. Since 
 shipped as ticket-driven efforts: Alembic adoption, reader page prefetch, reader zoom,
 offline download, and the vocabulary review system through stage 6 (Anki-style
 scheduling, four question types, offline answering, and the settings behind them).
+
+The web client followed, also ticket-driven: a reader, shared reading progress, and
+then review — an overview, typed practice sessions over two question types, settings,
+and a card library.
 
 **Next up** — the game layer (stage 7) is parked partway through design: XP weighted
 towards review, a two-tier "today is done" marker, and a pet that grows instead of
