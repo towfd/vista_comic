@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: implemented (2026-10-12) — tickets 01–02 merged in #119 and #121, 03 in review; not yet marked done, which waits on the developer's browser checks
 
 # Web card collection: type a line into the deck while reading
 

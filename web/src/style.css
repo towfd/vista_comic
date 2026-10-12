@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/*
+ * `dock:` -- the window width from which the collecting panel fits beside the
+ * reader's 800px page column instead of along the bottom: half the window less
+ * half the column leaves 272px, enough for a 240px panel and its margins.
+ */
+@theme {
+  --breakpoint-dock: 84rem;
+}
+
 body {
   background-color: #0a0a0a;
 }

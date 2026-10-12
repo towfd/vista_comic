@@ -12,7 +12,7 @@ No repeat-lookup is recorded for an already-collected line. See [the spec](../sp
 
 **Blocked by:** 01 — Collect a card from the reader.
 
-**Status:** ready-for-agent
+**Status:** merged (2026-10-12) in #121 — browser checks are with the developer
 
 - [ ] Adding a line already in the deck keeps the panel open and the fields intact, and does not show the added confirmation
 - [ ] The notice shows the existing card's source text and translation, and links to that card's page in 字卡庫

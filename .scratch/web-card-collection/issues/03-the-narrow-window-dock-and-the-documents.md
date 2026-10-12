@@ -8,7 +8,7 @@
 
 **Blocked by:** 02 — A line already collected, and a failed save. The dock needs only ticket 01; it waits for 02 because both change the same panel.
 
-**Status:** ready-for-agent
+**Status:** in review (2026-10-12) — browser checks are with the developer
 
 - [ ] On a window too narrow for both, the open panel docks to the bottom edge; on a wide one it still docks right
 - [ ] Resizing across the threshold with the panel open moves the panel without losing what was typed or the fixed page
@@ -18,3 +18,9 @@
 - [ ] The web review spec's note on re-collecting a misread card is brought up to date
 - [ ] This feature's spec is marked done once the developer has confirmed the browser checks
 - [ ] The developer is handed the browser checks: both docks at a compact and a large window, and the column not shifting in either
+
+## Comments
+
+**2026-10-12, while implementing.** The width at which the panel moves beside the page column is **1344px**, not the ~1160px discussed when this was specified. That figure assumed the column could give way; the spec forbids it, so with the column centred the room to its right is half of what is left over. From 1344px the panel is 240px wide and grows to 320px by 1472px. Below it, the panel docks to the bottom at the page column's width, with the two fields side by side to keep it short.
+
+Also brought up to date here, though it is screen copy and not a document: the card page in 字卡庫 told the reader to re-collect a misread card *on the phone*.

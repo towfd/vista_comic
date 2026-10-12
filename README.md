@@ -8,15 +8,15 @@ the text off the page, translates it on-device, explains it if you ask, and turn
 into a card that comes back until you know it.
 
 A browser client sits beside it for the desk: the same library, the same reading
-progress, and the same deck — read a chapter and practise the cards on a keyboard,
-and the phone already knows.
+progress, and the same deck — read a chapter, type a line into the deck, practise the
+cards on a keyboard, and the phone already knows.
 
 ![Platform](https://img.shields.io/badge/platform-iOS%2018.1%2B-black)
 ![UI](https://img.shields.io/badge/UI-SwiftUI-orange)
 ![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20PostgreSQL-009688)
 ![OCR](https://img.shields.io/badge/OCR-on--device%20Vision-blue)
 ![Web](https://img.shields.io/badge/web-Vue%203%20%2B%20TypeScript-42b883)
-![Tests](https://img.shields.io/badge/tests-541%20Swift%20%2F%20275%20Python%20%2F%20286%20TypeScript-brightgreen)
+![Tests](https://img.shields.io/badge/tests-541%20Swift%20%2F%20275%20Python%20%2F%20339%20TypeScript-brightgreen)
 
 ---
 
@@ -163,6 +163,7 @@ keyboard and a large screen are good at, and leaves the rest on the phone.
 | | |
 |---|---|
 | **Read** | The library, a comic's chapters, and a continuous reader. Progress is the phone's progress: a chapter opens where either device left it, and *Continue* and the read badges follow. |
+| **Collect, by typing** | A panel in the reader, folded to a button until asked for, opens beside the page so the manga stays in view. Type the line and what it means, add it as a word or a sentence, and it is a card — carrying the page it came from. Nothing is recognized and nothing is translated: both are the reader's own typing. |
 | **Practise** | An overview of what is due, new and in learning; then a session of typed questions that runs until the queue is empty. Every answer moves the card for both devices. |
 | **Two question types, both typed** | *Cloze typed* and *Translate*. Four choices and rearranging stay on the phone — they are touch idioms, and a keyboard is for producing the language. |
 | **Fix a card** | 字卡庫 lists every card under words and sentences, searchable by text or meaning, each showing where it stands in the schedule. A card's page corrects its translation or kind, resets it, or deletes it. |
@@ -238,7 +239,9 @@ Three deliberate choices are visible in that picture:
 The browser is a second caller of the same endpoints and adds nothing to the picture's
 right-hand side: no route was changed for it, and it holds no state the phone does not
 also see. What it deliberately lacks is the left-hand column — no on-device OCR, no
-translation engine, no offline stores — so collecting a card still happens on the phone.
+translation engine, no offline stores. So a card collected in the browser is typed, not
+selected: the same route the phone posts to, with the reader as both recognizer and
+translator.
 
 ---
 
@@ -301,8 +304,8 @@ npm run dev                          # → http://localhost:5173
 ```
 
 The browser only ever talks to the dev server, which forwards `/comics`, `/media`,
-`/cards` and `/study` to the backend. Answering a question, saving settings and fixing
-a card all write to the real deck.
+`/cards` and `/study` to the backend. Collecting a card, answering a question, saving
+settings and fixing a card all write to the real deck.
 
 ### 4. Tests
 
@@ -311,7 +314,7 @@ cd backend && pytest                                  # 275 tests
 xcodebuild test -scheme vista_comic \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
   -only-testing:vista_comicTests                      # 541 tests
-cd web && npm test                                    # 286 tests
+cd web && npm test                                    # 339 tests
 ```
 
 ### Reading away from home
@@ -352,7 +355,7 @@ web/
   src/
     api/              The client: one request path, typed errors
     practice/         Queue, judging, cloze building — pure TypeScript
-    stores/           The deck and a practice session (Pinia)
+    stores/           The deck, a practice session, the collecting panel (Pinia)
     views/            書庫, the reader, 練習, 字卡庫
 backend/
   app/                FastAPI app, scanner, stores, scheduler, worker
@@ -376,7 +379,9 @@ scheduling, four question types, offline answering, and the settings behind them
 
 The web client followed, also ticket-driven: a reader, shared reading progress, and
 then review — an overview, typed practice sessions over two question types, settings,
-and a card library.
+and a card library. Collecting
+a card by typing it into the reader came last, and closed the loop: the browser no
+longer needs the phone to have a deck.
 
 **Next up** — the game layer (stage 7) is parked partway through design: XP weighted
 towards review, a two-tier "today is done" marker, and a pet that grows instead of

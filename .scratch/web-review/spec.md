@@ -190,7 +190,7 @@ Ported from the phone, minus the training entrance.
 - Offered on the feedback screen, enabled once the review is saved.
 - Change translation and change kind go through the card update; reset and delete through their own endpoints. The held deck is updated from each response — no full fetch.
 - After a translation change the card keeps its place in the schedule. After a kind change, later questions are built from the deck as it now stands. After a reset the card is new and returns under the allowance. After a delete it is gone; delete asks for confirmation.
-- **The source text cannot be changed.** The update endpoint refuses it by design and is not altered. A misread card is deleted and collected again on the phone.
+- **The source text cannot be changed.** The update endpoint refuses it by design and is not altered. A misread card is deleted and collected again — on the phone, or since 2026-10-12 from the web reader (`.scratch/web-card-collection/spec.md`).
 - **The answer just given is not taken back.** There is no undo and none is added.
 
 ### Settings
