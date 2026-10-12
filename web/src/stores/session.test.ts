@@ -242,7 +242,9 @@ describe('moving on', () => {
     const session = await started([card(1, 'review', -5)])
     session.submit('câu 1')
     await settle()
+    api.fetchCards.mockResolvedValue([card(1, 'review', 600)])
     session.advance()
+    await settle()
     expect(session.phase).toBe('finished')
   })
 
@@ -484,7 +486,10 @@ describe('after the phone has moved the deck', () => {
     expect(session.question?.card.id).toBe(1)
     session.submit('câu 1')
     await settle()
+    // By now the server has both answers, and says so when asked a last time.
+    api.fetchCards.mockResolvedValue([card(1, 'review', 600), card(2, 'review', 600)])
     session.advance()
+    await settle()
     expect(session.phase).toBe('finished')
   })
 
@@ -499,5 +504,113 @@ describe('after the phone has moved the deck', () => {
     vi.setSystemTime(new Date(NOW.getTime() + 24 * 60 * 60_000))
     session.advance()
     expect(session.question?.card.id).toBe(2)
+  })
+})
+
+describe('how a session ends', () => {
+  const relearning: CardSchedule = { ...promoted, state: 'relearning', learningStep: 0, dueAt: minutes(5) }
+
+  it('fetches the deck once more before saying it is over', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    api.fetchCards.mockResolvedValue([card(1, 'review', 600)])
+    session.advance()
+    expect(session.phase).toBe('checking')
+    expect(session.question).toBeNull()
+    await settle()
+    expect(api.fetchCards).toHaveBeenCalledTimes(2)
+    expect(session.phase).toBe('finished')
+  })
+
+  it('carries on when that fetch turns up a card collected or come due meanwhile', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    api.fetchCards.mockResolvedValue([card(1, 'review', 600), card(2, 'learning', -1)])
+    session.advance()
+    await settle()
+    expect(session.phase).toBe('asking')
+    expect(session.question?.card.id).toBe(2)
+    expect(session.remaining).toBe(1)
+  })
+
+  it('ends on the deck it holds when that fetch fails', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    api.fetchCards.mockRejectedValue(new ApiError('unavailable', 'down'))
+    session.advance()
+    await settle()
+    expect(session.phase).toBe('finished')
+  })
+
+  it('does not look twice when a session opens on an empty queue', async () => {
+    const session = await started([card(1, 'review', 600)])
+    expect(session.phase).toBe('finished')
+    expect(api.fetchCards).toHaveBeenCalledTimes(1)
+    expect(session.outcome).toEqual({ correct: 0, wrong: 0, graduated: 0 })
+  })
+
+  it('counts what was answered right and wrong', async () => {
+    api.recordReview.mockResolvedValueOnce(promoted).mockResolvedValueOnce({ ...relearning, dueAt: minutes(600) })
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('câu 2')
+    await settle()
+    session.advance()
+    session.submit('wrong')
+    await settle()
+    expect(session.outcome).toEqual({ correct: 1, wrong: 1, graduated: 1 })
+  })
+
+  it('counts a card as graduated when it stands in review after its answer', async () => {
+    api.recordReview.mockResolvedValue({ ...promoted, state: 'review' })
+    const session = await started([card(1, 'learning', -5)])
+    session.submit('câu 1')
+    await settle()
+    expect(session.outcome.graduated).toBe(1)
+  })
+
+  it('takes a card back out when a later answer this session drops it from review', async () => {
+    api.recordReview.mockResolvedValueOnce({ ...promoted, dueAt: minutes(-1) }).mockResolvedValueOnce(relearning)
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    expect(session.outcome.graduated).toBe(1)
+    session.advance()
+    session.submit('wrong')
+    await settle()
+    expect(session.outcome).toEqual({ correct: 1, wrong: 1, graduated: 0 })
+  })
+
+  it('does not count an answer that was never saved, or a card that was deleted', async () => {
+    api.recordReview.mockRejectedValue(new ApiError('notFound', 'gone'))
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    expect(session.outcome).toEqual({ correct: 0, wrong: 0, graduated: 0 })
+  })
+
+  it('starts the count again with a new session', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    await session.start()
+    expect(session.outcome).toEqual({ correct: 0, wrong: 0, graduated: 0 })
+  })
+
+  it('drops a second look that a restart has overtaken', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    const slow = deferred<LearningCard[]>()
+    api.fetchCards.mockReturnValueOnce(slow.promise).mockResolvedValue([card(3, 'review', -5)])
+    session.advance()
+    expect(session.phase).toBe('checking')
+    await session.start()
+    slow.resolve([card(1, 'review', 600)])
+    await settle()
+    expect(session.phase).toBe('asking')
+    expect(session.question?.card.id).toBe(3)
   })
 })
