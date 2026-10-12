@@ -69,7 +69,11 @@ export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promis
  * recognised exactly as it is on a GET.
  */
 async function requestJson<T>(path: string, init: RequestInit, fetcher: Fetcher): Promise<T> {
-  const response = await send(path, init, fetcher)
+  return readJson<T>(await send(path, init, fetcher))
+}
+
+/** The JSON body of an answer `send` let through; split out for the caller that also needs its status. */
+async function readJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') ?? ''
   if (!contentType.includes('application/json')) {
     // A 200 that is not JSON is Access's login page served in place.
@@ -257,6 +261,51 @@ export async function updateCard(cardId: number, correction: CardCorrection, fet
 export async function resetCard(cardId: number, fetcher: Fetcher = fetch): Promise<LearningCard> {
   const card = await requestJson<LearningCard>(`/cards/${cardId}/reset`, { method: 'POST', headers: { Accept: 'application/json' } }, fetcher)
   return decodeCard(card)
+}
+
+/**
+ * The target language every card collected here carries: the identifier the
+ * phone sends for Traditional Chinese. Not a parameter, because a card's
+ * identity includes it -- another spelling of the same language would give the
+ * same line a second card.
+ */
+export const TARGET_LANGUAGE = 'zh-Hant'
+
+/** One line as the reader typed it, and where in the library they were reading. */
+export interface CardDraft {
+  sourceText: string
+  translation: string
+  /** Always said: the web never collects a card of undecided kind. */
+  kind: 'word' | 'sentence'
+  comicId: string
+  chapterId: string
+  pageNumber: number
+}
+
+/** The card the deck now holds for a line, and whether this request is what made it. */
+export interface Collected {
+  card: LearningCard
+  created: boolean
+}
+
+/**
+ * Collect one line into the deck shared with the phone.
+ *
+ * The backend answers 201 for a new card and 200 for a line already there,
+ * returning the existing card untouched -- the translation, kind and page
+ * sent here are dropped. The status is the only thing that tells the two
+ * apart, so it is read here rather than left behind in `requestJson`. A source
+ * text the backend refuses (nothing to learn, or too long) surfaces as
+ * `unexpected`.
+ */
+export async function createCard(draft: CardDraft, fetcher: Fetcher = fetch): Promise<Collected> {
+  const response = await send(
+    '/cards',
+    { method: 'POST', headers: JSON_BODY, body: JSON.stringify({ ...draft, targetLanguage: TARGET_LANGUAGE }) },
+    fetcher,
+  )
+  const card = await readJson<LearningCard>(response)
+  return { card: decodeCard(card), created: response.status === 201 }
 }
 
 /**
