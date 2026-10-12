@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { ApiError, createCard, type ApiErrorKind } from '../api/client'
+import { ApiError, createCard, type ApiErrorKind, type Collected } from '../api/client'
 import type { LearningCard } from '../api/types'
 import { isBlank } from '../practice/text'
 import { useDeckStore } from './deck'
@@ -109,8 +109,9 @@ export const useCollectStore = defineStore('collect', () => {
     const line = sourceText.value.trim()
     saving.value = true
     notice.value = null
+    let collected: Collected
     try {
-      const { card, created } = await createCard({
+      collected = await createCard({
         sourceText: line,
         translation: translation.value.trim(),
         kind,
@@ -118,18 +119,29 @@ export const useCollectStore = defineStore('collect', () => {
         chapterId: chapter.chapterId,
         pageNumber: page.value,
       })
-      deck.takeCard(card)
-      if (created) {
-        // Said even when the panel was closed meanwhile: the card is in the deck.
-        added.value = line
-        if (mine === epoch) reset()
-      } else if (mine === epoch) {
-        notice.value = { kind: 'exists', card }
-      }
     } catch (e) {
+      // Only the request is in here. Anything that goes wrong after the server
+      // has answered must never be reported as the card not being saved.
+      console.warn('collecting a card failed:', e)
       if (mine === epoch) notice.value = { kind: 'failed', error: e instanceof ApiError ? e.kind : 'unexpected' }
+      return
     } finally {
       saving.value = false
+    }
+
+    const { card, created } = collected
+    if (created) {
+      // Said even when the panel was closed meanwhile: the card is in the deck.
+      added.value = line
+      if (mine === epoch) reset()
+    } else if (mine === epoch) {
+      notice.value = { kind: 'exists', card }
+    }
+    try {
+      deck.takeCard(card)
+    } catch (e) {
+      // The card is on the server either way; the next deck load brings it in.
+      console.error('collected, but the held deck could not take the card:', e)
     }
   }
 

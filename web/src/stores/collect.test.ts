@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import type { LearningCard } from '../api/types'
 import { SOURCE_TEXT_LIMIT, useCollectStore } from './collect'
@@ -187,7 +187,26 @@ describe('when a card can be added', () => {
   })
 })
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('adding a card', () => {
+  it('still says the card was added when the held deck cannot take it', async () => {
+    // The server has the card. Whatever goes wrong here afterwards, telling
+    // the reader it was not saved sends them to add it a second time.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const collect = typed()
+    useDeckStore().takeCard = () => {
+      throw new TypeError('takeCard is not a function')
+    }
+    await collect.add('word')
+    expect(collect.notice).toBeNull()
+    expect(collect.added).toBe('xin chào')
+    expect(collect.open).toBe(false)
+  })
+
+
   it('sends the line with its kind, its chapter and the fixed page', async () => {
     const collect = typed('  xin chào ', ' 你好  ')
     collect.setCurrentPage(9)
@@ -290,6 +309,11 @@ describe('a line already in the deck', () => {
 })
 
 describe('a save that fails', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+
   it('keeps the panel open with the text as typed, and says why', async () => {
     api.createCard.mockRejectedValue(new ApiError('unavailable', 'down'))
     const collect = typed()
