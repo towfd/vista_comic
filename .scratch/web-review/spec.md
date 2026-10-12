@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: implemented (2026-10-12) — tickets 10–18 merged in #107–#115; none of it has been checked in a browser yet, which is the developer's
 
 # Web review: finish a real review session in the browser
 

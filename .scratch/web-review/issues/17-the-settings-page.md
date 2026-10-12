@@ -6,7 +6,7 @@ See the spec's *Settings*.
 
 **Blocked by:** 10 — Today's deck on the overview.
 
-**Status:** done (2026-10-12) — merged; the browser checklist below is still the developer's to run
+**Status:** done (2026-10-12) — merged in #114; the browser checklist below is still the developer's to run
 
 - [x] The API client can write study settings, sending both fields whole
 - [x] The page shows the current learning steps, in minutes, and the daily allowance

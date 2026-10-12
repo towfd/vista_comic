@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
 import ErrorState from '../components/ErrorState.vue'
+import CardFixer from '../components/CardFixer.vue'
 
 const router = useRouter()
 const session = useSessionStore()
@@ -189,6 +190,8 @@ function onNextKeydown(event: KeyboardEvent) {
             {{ waitingToAdvance ? '儲存中…' : '下一題' }}
           </button>
         </div>
+
+        <CardFixer />
       </section>
     </template>
   </main>
