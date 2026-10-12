@@ -51,13 +51,12 @@ onMounted(() => store.load())
           </div>
         </dl>
 
-        <!-- Starts nothing until the session exists. -->
-        <button
-          disabled
-          class="mt-8 block w-full rounded-md bg-sky-600 px-4 py-3 text-center font-medium text-white opacity-50"
+        <RouterLink
+          :to="{ name: 'practice-session' }"
+          class="mt-8 block w-full rounded-md bg-sky-600 px-4 py-3 text-center font-medium text-white hover:bg-sky-500"
         >
           開始複習
-        </button>
+        </RouterLink>
       </template>
     </template>
   </main>

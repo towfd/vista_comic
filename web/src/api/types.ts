@@ -91,3 +91,29 @@ export interface StudySettings {
   learningSteps: number[]
   newCardsPerDay: number
 }
+
+/** How a question was asked, as the review log records it. The web asks two of the phone's four. */
+export type QuestionType = 'cloze_typed' | 'sentence_typed'
+
+/** Request body for `POST /cards/{id}/reviews`. */
+export interface ReviewRequest {
+  questionType: QuestionType
+  isCorrect: boolean
+  /** Made once per question. A resubmission carrying it again cannot count twice. */
+  clientToken: string
+  /** The reader's local day, `yyyy-MM-dd`; stamps `introducedOn` when a card leaves `new`. */
+  localDate: string
+  /** When the reader answered, ISO-8601. Scheduling counts from here, not from arrival. */
+  answeredAt: string
+  context: 'review'
+}
+
+/** The card's scheduling block after an answer: what `POST /cards/{id}/reviews` returns about the card. */
+export interface CardSchedule {
+  state: CardState
+  learningStep: number | null
+  ladderStage: number
+  previousStage: number | null
+  introducedOn: string | null
+  dueAt: string
+}

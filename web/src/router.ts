@@ -3,6 +3,7 @@ import LibraryView from './views/LibraryView.vue'
 import ComicView from './views/ComicView.vue'
 import ReaderView from './views/ReaderView.vue'
 import PracticeView from './views/PracticeView.vue'
+import PracticeSessionView from './views/PracticeSessionView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -21,6 +22,7 @@ export const router = createRouter({
     // The reader keeps the whole screen: no navigation bar over the manga.
     { path: '/comic/:comicId/chapter/:chapterId', name: 'reader', component: ReaderView, props: true, meta: { fullBleed: true } },
     { path: '/practice', name: 'practice', component: PracticeView, meta: { section: 'practice' } },
+    { path: '/practice/session', name: 'practice-session', component: PracticeSessionView, meta: { section: 'practice' } },
   ],
   // Without this the router keeps the previous page's scroll offset: a chapter
   // opened from far down a 1162-chapter list would open mid-chapter. Forward

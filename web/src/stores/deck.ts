@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ApiError, fetchCards, fetchStudySettings, type ApiErrorKind } from '../api/client'
-import type { LearningCard, StudySettings } from '../api/types'
+import type { CardSchedule, LearningCard, StudySettings } from '../api/types'
 import { localDay, nextCard, waiting, type QueueEmpty, type Waiting } from '../practice/queue'
 
 /** What is waiting, and why nothing is when nothing is. */
@@ -57,6 +57,18 @@ export const useDeckStore = defineStore('deck', () => {
     }
   }
 
+  /**
+   * Write the schedule an answer earned onto its card. The moment the deck is
+   * true for moves with it, so the count beside 練習 follows a session along.
+   * A card no longer held -- deleted meanwhile -- is ignored.
+   */
+  function applySchedule(cardId: number, schedule: CardSchedule) {
+    const index = cards.value.findIndex((card) => card.id === cardId)
+    if (index === -1) return
+    cards.value[index] = { ...cards.value[index]!, ...schedule }
+    loadedAt.value = new Date()
+  }
+
   const standing = computed<Standing | null>(() => {
     if (!settings.value || !loadedAt.value) return null
     const now = loadedAt.value
@@ -69,5 +81,5 @@ export const useDeckStore = defineStore('deck', () => {
     }
   })
 
-  return { cards, settings, loading, error, loaded, loadedAt, standing, load }
+  return { cards, settings, loading, error, loaded, loadedAt, standing, load, applySchedule }
 })

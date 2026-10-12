@@ -6,7 +6,7 @@ See the spec's *Navigation and routes*.
 
 **Blocked by:** 10 — Today's deck on the overview.
 
-**Status:** implemented 2026-10-12 — awaiting the developer's browser check
+**Status:** done (2026-10-12) — merged in #108; the browser checklist below is still the developer's to run
 
 - [x] The bar appears on the library, the comic page and every practice route, and not on the reader
 - [x] 書庫 and 練習 each lead to their page, and the current one is marked
