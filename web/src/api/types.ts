@@ -58,3 +58,36 @@ export interface ProgressSaved {
   pageCount: number
   updatedAt: string
 }
+
+/** Where a card stands with the scheduler. A card never answered is `new`. */
+export type CardState = 'new' | 'learning' | 'review' | 'relearning'
+
+/**
+ * One card of the deck shared with the phone, as `GET /cards` returns it.
+ * Only what practice reads is typed; the source reference and lookup counts
+ * ride along untyped.
+ */
+export interface LearningCard {
+  id: number
+  sourceText: string
+  translation: string
+  /** `null` for cards collected before the two save buttons existed. */
+  kind: 'word' | 'sentence' | null
+  state: CardState
+  ladderStage: number
+  learningStep: number | null
+  previousStage: number | null
+  /** The reader's local day (`yyyy-MM-dd`) the card left `new`; counts against that day's allowance. */
+  introducedOn: string | null
+  /** ISO-8601, UTC. */
+  dueAt: string
+  /** ISO-8601, UTC. */
+  createdAt: string
+}
+
+/** `GET` / `PUT /study/settings`. */
+export interface StudySettings {
+  /** Minutes. */
+  learningSteps: number[]
+  newCardsPerDay: number
+}

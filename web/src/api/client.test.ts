@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, fetchChapter, fetchComic, fetchComics, getJson, saveProgress, toMediaPath, type Fetcher } from './client'
+import {
+  ApiError,
+  fetchCards,
+  fetchChapter,
+  fetchComic,
+  fetchComics,
+  fetchStudySettings,
+  getJson,
+  saveProgress,
+  toMediaPath,
+  type Fetcher,
+} from './client'
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
@@ -215,5 +226,75 @@ describe('saveProgress', () => {
 
   it('reports an out-of-range page (422) as unexpected', async () => {
     expect(await errorKind(saveProgress('a', 'c1', 99, {}, respondWith(json({ detail: 'out of range' }, 422))))).toBe('unexpected')
+  })
+})
+
+describe('fetchCards', () => {
+  const raw = (extra: object = {}) => ({
+    id: 7,
+    sourceText: 'Tôi không biết',
+    translation: '我不知道',
+    kind: 'sentence',
+    state: 'review',
+    ladderStage: 2,
+    learningStep: null,
+    previousStage: null,
+    introducedOn: '2026-08-30',
+    dueAt: '2026-08-31T20:00:00+00:00',
+    createdAt: '2026-07-29T22:20:10.081902+00:00',
+    ...extra,
+  })
+
+  it('asks for the deck and decodes a card', async () => {
+    let asked = ''
+    const cards = await fetchCards(async (path) => {
+      asked = path
+      return json([raw()])
+    })
+    expect(asked).toBe('/cards')
+    expect(cards[0]).toMatchObject({ id: 7, sourceText: 'Tôi không biết', kind: 'sentence', state: 'review', introducedOn: '2026-08-30' })
+  })
+
+  it('returns an empty deck as empty, not as an error', async () => {
+    expect(await fetchCards(respondWith(json([])))).toEqual([])
+  })
+
+  it('reads a state it does not know as new, and a kind it does not know as none', async () => {
+    const cards = await fetchCards(respondWith(json([raw({ state: 'suspended', kind: 'phrase' }), raw({ kind: null })])))
+    expect(cards.map((c) => [c.state, c.kind])).toEqual([
+      ['new', null],
+      ['review', null],
+    ])
+  })
+
+  it('classifies failures as every other read does', async () => {
+    expect(await errorKind(fetchCards(respondWith(json({}, 503))))).toBe('unavailable')
+    expect(await errorKind(fetchCards(respondWith(json({}, 403))))).toBe('auth')
+    expect(await errorKind(fetchCards(respondWith(new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } }))))).toBe('auth')
+    expect(
+      await errorKind(
+        fetchCards(
+          respondWith(() => {
+            throw new TypeError('offline')
+          }),
+        ),
+      ),
+    ).toBe('unavailable')
+  })
+})
+
+describe('fetchStudySettings', () => {
+  it('asks for the settings and returns both fields', async () => {
+    let asked = ''
+    const settings = await fetchStudySettings(async (path) => {
+      asked = path
+      return json({ learningSteps: [5, 7, 10], newCardsPerDay: 15 })
+    })
+    expect(asked).toBe('/study/settings')
+    expect(settings).toEqual({ learningSteps: [5, 7, 10], newCardsPerDay: 15 })
+  })
+
+  it('reports a missing route as not found', async () => {
+    expect(await errorKind(fetchStudySettings(respondWith(json({}, 404))))).toBe('notFound')
   })
 })
