@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { ApiError, fetchCards, fetchStudySettings, type ApiErrorKind } from '../api/client'
+import { ApiError, fetchCards, fetchStudySettings, saveStudySettings, type ApiErrorKind } from '../api/client'
 import type { CardSchedule, LearningCard, StudySettings } from '../api/types'
 import { localDay, nextCard, waiting, type QueueEmpty, type Waiting } from '../practice/queue'
 
@@ -111,6 +111,16 @@ export const useDeckStore = defineStore('deck', () => {
     loadedAt.value = new Date()
   }
 
+  /**
+   * Save new settings and hold what the server saved, so everything computed
+   * from them -- the allowance, what is waiting -- follows at once. Throws on
+   * failure and leaves the held settings as they were.
+   */
+  async function saveSettings(next: StudySettings) {
+    settings.value = await saveStudySettings(next)
+    loadedAt.value = new Date()
+  }
+
   /** Forget a card that no longer exists on the server. */
   function removeCard(cardId: number) {
     removed.set(cardId, ++tick)
@@ -132,5 +142,5 @@ export const useDeckStore = defineStore('deck', () => {
     }
   })
 
-  return { cards, settings, loading, error, loaded, loadedAt, standing, load, refresh, applySchedule, removeCard }
+  return { cards, settings, loading, error, loaded, loadedAt, standing, load, refresh, saveSettings, applySchedule, removeCard }
 })

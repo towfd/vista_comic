@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import { useDeckStore } from './deck'
 
-const api = vi.hoisted(() => ({ fetchCards: vi.fn(), fetchStudySettings: vi.fn() }))
+const api = vi.hoisted(() => ({ fetchCards: vi.fn(), fetchStudySettings: vi.fn(), saveStudySettings: vi.fn() }))
 
 vi.mock('../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/client')>()
-  return { ...actual, fetchCards: api.fetchCards, fetchStudySettings: api.fetchStudySettings }
+  return { ...actual, fetchCards: api.fetchCards, fetchStudySettings: api.fetchStudySettings, saveStudySettings: api.saveStudySettings }
 })
 
 const settings = { learningSteps: [5, 7, 10], newCardsPerDay: 15 }
@@ -268,5 +268,38 @@ describe('deck store refresh', () => {
     slow.resolve([card(1, -5), card(2, -5)])
     await refreshing
     expect(store.cards.map((c) => c.id)).toEqual([2])
+  })
+})
+
+describe('deck store saveSettings', () => {
+  const NOW = new Date('2026-08-31T12:00:00Z')
+  const fresh = (id: number) => ({ id, state: 'new', dueAt: NOW.toISOString(), createdAt: NOW.toISOString(), introducedOn: null })
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    api.saveStudySettings.mockReset()
+    api.fetchStudySettings.mockResolvedValue({ learningSteps: [5, 7, 10], newCardsPerDay: 1 })
+    api.fetchCards.mockResolvedValue([fresh(1), fresh(2), fresh(3)])
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('holds what the server saved, and what is waiting follows the new allowance at once', async () => {
+    const store = useDeckStore()
+    await store.load()
+    expect(store.standing?.counts.fresh).toBe(1)
+    api.saveStudySettings.mockResolvedValue({ learningSteps: [1], newCardsPerDay: 2 })
+    await store.saveSettings({ learningSteps: [1], newCardsPerDay: 2 })
+    expect(api.saveStudySettings).toHaveBeenCalledWith({ learningSteps: [1], newCardsPerDay: 2 })
+    expect(store.settings).toEqual({ learningSteps: [1], newCardsPerDay: 2 })
+    expect(store.standing?.counts.fresh).toBe(2)
+  })
+
+  it('leaves the held settings alone and passes the failure on when the save fails', async () => {
+    const store = useDeckStore()
+    await store.load()
+    api.saveStudySettings.mockRejectedValue(new ApiError('unavailable', 'down'))
+    await expect(store.saveSettings({ learningSteps: [1], newCardsPerDay: 9 })).rejects.toMatchObject({ kind: 'unavailable' })
+    expect(store.settings?.newCardsPerDay).toBe(1)
   })
 })

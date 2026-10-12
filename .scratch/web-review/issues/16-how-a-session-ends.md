@@ -6,7 +6,7 @@ See the spec's *The session's edges*.
 
 **Blocked by:** 12 — A translate session that saves.
 
-**Status:** done (2026-10-12) — merged; the browser checklist below is still the developer's to run
+**Status:** done (2026-10-12) — merged in #113; the browser checklist below is still the developer's to run
 
 - [x] When the queue is empty, the deck is fetched once more and the queue asked again; the session ends only if it is still empty
 - [x] If that fetch fails, the session ends on what it holds rather than hanging
