@@ -1,5 +1,5 @@
 Type: grilling
-Status: open
+Status: resolved
 
 # Does the translation's provenance need storing?
 
@@ -16,4 +16,13 @@ Small, but it touches both ④ (which writes the card) and ⑤ (which displays i
 
 ## Answer
 
-_Unresolved._
+**No. Provenance is not stored, and the web sends none.**
+
+1. **It is purely a screen state on iOS.** Neither the card-creation request, the card response, nor the `learning_card` table carries a provenance field; a search of the backend and the web client for one finds nothing. The chip is drawn from what the reader's sheet happens to know at that moment and is gone once the card is saved.
+2. **The card library does not need to show it.** [Web card collection](../../web-card-collection/spec.md) made hand-typing the web's only source of a translation, so every card collected there has the same provenance by construction and a label would carry no information. Nothing is added to the request, so iOS clients reading the same rows are unaffected.
+
+**Reopen when explanations reach the web.** At that point a web card's translation can come from two places, and whether the difference is worth a column becomes a real question again.
+
+## Comments
+
+Resolved on 2026-10-12 during the `/grilling` session for [web card collection](../../web-card-collection/spec.md).
