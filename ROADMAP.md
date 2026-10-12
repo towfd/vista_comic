@@ -2,7 +2,7 @@
 
 > **Roadmap & history only.** Active work — specs, tickets, task status, and the next action — now lives as local markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`). This file records milestone history and long-range direction; do not treat it as the live task tracker.
 
-Last updated: 2026-08-09
+Last updated: 2026-10-12
 
 ## Current status
 
@@ -13,6 +13,7 @@ Last updated: 2026-08-09
 - The OCR text-editing defect is **fixed** ([#50](https://github.com/towfd/vista_comic/pull/50)), which closes the last of the three problems reported alongside M10's two.
 - **Alembic owns the schema** ([#55](https://github.com/towfd/vista_comic/pull/55), 2026-08-07) — the migration tool M10 made conditional on its own schema landing. `docs/manual-migrations.md` is closed.
 - **Reader page prefetch is merged** ([#60](https://github.com/towfd/vista_comic/pull/60), 2026-08-09) — Page images are cached and prefetched ahead of the reader, so scrolling no longer waits. Tracked under `.scratch/reader-page-prefetch/`. No milestone is in progress; next action is unclaimed.
+- **The web client reads and reviews** (2026-10-12) — a browser client beside the iOS app: library, reader and shared reading progress ([#102](https://github.com/towfd/vista_comic/pull/102), [#104](https://github.com/towfd/vista_comic/pull/104)), then practice and a card library ([#106](https://github.com/towfd/vista_comic/pull/106)–[#116](https://github.com/towfd/vista_comic/pull/116)). Tracked under `.scratch/web-client/`, `.scratch/web-reader-mvp/`, `.scratch/web-reading-progress/` and `.scratch/web-review/`. See *Web client* below.
 
 ## Current release goal
 
@@ -363,6 +364,36 @@ Download chapters deliberately and read them with no connection at all. Eight ti
 
 **Two accepted failure modes, recorded so they are not later mistaken for defects.** A chapter saved for a journey can be evicted by later downloads before it is read; 已下載 makes that queue visible so it can be seen coming. And chapter thumbnails are not kept offline — one per chapter is 3,000+ images at this library's size, against one per comic for covers — so the chapter list shows placeholder artwork with no connection.
 
+### Web client (post-M10, ticket-driven)
+
+- Architecture of record: `.scratch/web-client/map.md`
+- Specs of record: `.scratch/web-reader-mvp/spec.md`, `.scratch/web-reading-progress/spec.md`, `.scratch/web-review/spec.md`
+- Decisions behind review: `.scratch/web-review/map.md` (nine resolved decision tickets)
+
+A second client for the same backend, in a browser. Three efforts: a reader MVP ([#102](https://github.com/towfd/vista_comic/pull/102)), reading progress shared with the phone ([#104](https://github.com/towfd/vista_comic/pull/104)), and review — ten tickets, [#107](https://github.com/towfd/vista_comic/pull/107)–[#116](https://github.com/towfd/vista_comic/pull/116), merged 2026-10-12 and confirmed complete by the repo owner the same day.
+
+**The iOS app was not modified, and no endpoint was changed.** That was the condition the whole client was planned under. The web is a second caller of routes that already existed; the one addition across all three efforts is `continueChapterId` on the comic detail, for the web's Continue button.
+
+**The web asks two question types, not four.** Cloze typed and translate — the two that are answered at a keyboard. Four choices and rearranging were ruled out for the web rather than deferred. No card is stranded by this: translate can ask every card, word cards included.
+
+**The practice rules are implemented a second time, in TypeScript, and nothing ties them to the phone's.** Queue order, the day's allowance, finding deck words in a sentence, building a cloze, judging — all re-written from the Swift, as decided on the architecture map. Pushing them into the backend was recommended there and declined. What is new here is that **no test asserts parity**: a shared fixture would have meant the iOS tests reading a new file, and porting the cases by hand was declined in favour of judging agreement in use. A wrong verdict is visible to whoever is answering; a count the two devices compute differently is not, since each only ever shows its own.
+
+**Scheduling is the exception, and is not re-implemented.** The phone carries a second scheduler because it must answer offline. The browser has no offline case, so it posts an answer and uses the schedule that comes back. That is why the next question waits for the response: the queue is only ever computed from schedules the server actually returned, which closes by construction the hazard the phone guards against — a card offered again while its own answer is in flight.
+
+**Judging differs from the phone in two intended ways.** Tones are strict, because the reason for leniency — typing tones on glass — does not exist at a keyboard; and tone *placement* is folded, so `hoà` and `hòa` are one answer, because the deck mixes conventions from different scanlation groups and an input method can only be set to one. The second was discovered as a consequence of the first: on the phone the lenient path had been absorbing it unnoticed. One further rule fell out in implementation — spacing is ignored and placement is folded, but not both in the same answer, since folding a tone needs the syllable boundary that removing spaces takes away.
+
+**A failed save holds the session rather than queueing.** Retried after 1, 2 and 4 seconds with the same token and the same moment of answering, then reported, with no way past it and nothing written to browser storage. Closing the tab loses that one answer. Keeping it would be an offline queue, which the web was planned not to have.
+
+**The deck is fetched at three moments, and a fetch may not undo a save.** On entering practice, when the tab returns to the foreground, and before a session says it is over. Between them each review response updates its own card. A fetch that set out before a save and lands after it would put the card back as due, so a card this tab changed after the fetch began keeps the tab's copy.
+
+**The new-card allowance is the one thing nobody enforces.** The server refuses a doubled answer to a review card and tolerates one to a learning card, but `newCardsPerDay` is only stored — each client counts `introducedOn` across the deck it holds, by local calendar day. With a tab visible throughout while the phone introduces cards, the web can exceed the allowance until its next fetch. Accepted.
+
+**Fixing a card moved after it shipped.** It was specified and built as a panel under a session's verdict, then moved the same day to a card library with a page per card — 字卡庫, at `/deck` because the dev proxy forwards `/cards` to the backend. The session keeps a link. The card's source text is still not editable anywhere: the endpoint refuses it by design.
+
+**What was measured rather than assumed.** A Telex input method in Chrome composes one syllable at a time and delivers NFC, so Enter is ignored while composing and nothing is judged before submission. The three text keys agree with the Swift and the Python for Vietnamese only in specific JavaScript forms — `\s` and the general mark category both disagree. Against the real deck, 98 of 105 sentence cards yield a cloze, and 219 of 249 cards are entirely upper case.
+
+**Not covered.** Safari, third-party input methods and touch keyboards were never measured. The web has no OCR, no translation engine and no offline reading, so collecting a card remains the phone's; parts ① and ④ of the architecture map (the OCR service and the learning flow) are untouched. Entering practice from the reader — the one place the navigation bar is hidden — is the remaining item on the review map.
+
 ## Known issues and constraints
 
 - **`PageImageCacheTests` has three intermittently failing tests**, and the attempt to fix them was reverted ([#75](https://github.com/towfd/vista_comic/pull/75), closed). The captured assertions are `(peakConcurrentLoads → 3) == 4`, `(order[4] → …/priority/4) == urls[5]` and `(requests.count → 7) == 6`, and one explanation fits all three: the prefetch window is fire-and-forget, so a test can return while the cache is still fetching and those requests are recorded against whichever test runs next — and nearly every assertion in that suite is an exact count. Two of the three additionally assert a scheduling accident rather than a guarantee. The rewrite that addressed this hung the serialized suite instead of fixing it, so it was withdrawn; the analysis is on the closed branch. Whoever picks it up should capture failures with `-resultBundlePath` pointed somewhere writable, since the default location fails here and leaves nothing but a test name.
@@ -392,7 +423,12 @@ The OCR text-editing defect — the last of the three problems reported alongsid
 
 **Offline download is merged in full** ([#68](https://github.com/towfd/vista_comic/pull/68), [#69](https://github.com/towfd/vista_comic/pull/69), [#70](https://github.com/towfd/vista_comic/pull/70), [#71](https://github.com/towfd/vista_comic/pull/71), [#72](https://github.com/towfd/vista_comic/pull/72), [#73](https://github.com/towfd/vista_comic/pull/73), [#74](https://github.com/towfd/vista_comic/pull/74), [#76](https://github.com/towfd/vista_comic/pull/76)), each ticket device-verified by the repo owner before the next was started. Two of the eight tickets did not exist when the spec was written: comic covers and offline read state were both found on a device and specified afterwards.
 
+**The web client is merged through review and the card library** ([#102](https://github.com/towfd/vista_comic/pull/102), [#104](https://github.com/towfd/vista_comic/pull/104), [#106](https://github.com/towfd/vista_comic/pull/106)–[#116](https://github.com/towfd/vista_comic/pull/116)). What it leaves open is listed at the end of its section above; none of it is in progress.
+
 **Otherwise nothing is in progress. The next action is unclaimed**, in rough order of how much each is already owed:
+
+- **Entering practice from the web reader**, the last item on `.scratch/web-review/map.md`.
+- **The web's OCR service and learning flow** (parts ① and ④ of `.scratch/web-client/map.md`), which is what would let a card be collected in the browser.
 
 - **The three flaky prefetch tests**, now that the failures are captured (see Known issues). Worth doing as its own effort, run by the repo owner rather than in this environment.
 
