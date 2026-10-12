@@ -69,6 +69,21 @@ export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promis
  * recognised exactly as it is on a GET.
  */
 async function requestJson<T>(path: string, init: RequestInit, fetcher: Fetcher): Promise<T> {
+  const response = await send(path, init, fetcher)
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json')) {
+    // A 200 that is not JSON is Access's login page served in place.
+    throw new ApiError('auth', `expected JSON, got ${contentType || 'no content type'}`)
+  }
+  try {
+    return (await response.json()) as T
+  } catch (error) {
+    throw new ApiError('unexpected', `invalid JSON: ${String(error)}`)
+  }
+}
+
+/** The request itself and every failure a status can tell: what a body-less answer and a JSON one share. */
+async function send(path: string, init: RequestInit, fetcher: Fetcher): Promise<Response> {
   let response: Response
   // A timer and a controller rather than AbortSignal.timeout, so the clock a
   // test controls is the clock this runs on.
@@ -101,17 +116,7 @@ async function requestJson<T>(path: string, init: RequestInit, fetcher: Fetcher)
   if (!response.ok) {
     throw new ApiError('unexpected', `status ${response.status}`)
   }
-
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.includes('application/json')) {
-    // A 200 that is not JSON is Access's login page served in place.
-    throw new ApiError('auth', `expected JSON, got ${contentType || 'no content type'}`)
-  }
-  try {
-    return (await response.json()) as T
-  } catch (error) {
-    throw new ApiError('unexpected', `invalid JSON: ${String(error)}`)
-  }
+  return response
 }
 
 export async function fetchComics(fetcher: Fetcher = fetch): Promise<ComicSummary[]> {
@@ -177,11 +182,15 @@ const cardState = (state: unknown): CardState => (CARD_STATES.includes(state as 
  */
 export async function fetchCards(fetcher: Fetcher = fetch): Promise<LearningCard[]> {
   const cards = await getJson<LearningCard[]>('/cards', fetcher)
-  return cards.map((card) => ({
+  return cards.map(decodeCard)
+}
+
+function decodeCard(card: LearningCard): LearningCard {
+  return {
     ...card,
     state: cardState(card.state),
     kind: card.kind === 'word' || card.kind === 'sentence' ? card.kind : null,
-  }))
+  }
 }
 
 export async function fetchStudySettings(fetcher: Fetcher = fetch): Promise<StudySettings> {
@@ -225,4 +234,36 @@ export async function saveStudySettings(settings: StudySettings, fetcher: Fetche
     { method: 'PUT', headers: JSON_BODY, body: JSON.stringify(settings) },
     fetcher,
   )
+}
+
+/** What the reader may correct on a card. The source text is not here: the backend refuses it by design. */
+export interface CardCorrection {
+  translation?: string
+  /** `null` clears the kind. Left out, the kind is untouched. */
+  kind?: 'word' | 'sentence' | null
+}
+
+/** Correct a card's translation, its kind, or both, and return the card as it now stands. */
+export async function updateCard(cardId: number, correction: CardCorrection, fetcher: Fetcher = fetch): Promise<LearningCard> {
+  const card = await requestJson<LearningCard>(
+    `/cards/${cardId}`,
+    { method: 'PATCH', headers: JSON_BODY, body: JSON.stringify(correction) },
+    fetcher,
+  )
+  return decodeCard(card)
+}
+
+/** Put a card back to never having been met, and return it. */
+export async function resetCard(cardId: number, fetcher: Fetcher = fetch): Promise<LearningCard> {
+  const card = await requestJson<LearningCard>(`/cards/${cardId}/reset`, { method: 'POST', headers: { Accept: 'application/json' } }, fetcher)
+  return decodeCard(card)
+}
+
+/**
+ * Delete a card for good. The backend answers 204 with no body, so anything
+ * else that claims success is Access's login page served in place.
+ */
+export async function deleteCard(cardId: number, fetcher: Fetcher = fetch): Promise<void> {
+  const response = await send(`/cards/${cardId}`, { method: 'DELETE' }, fetcher)
+  if (response.status !== 204) throw new ApiError('auth', `expected 204, got ${response.status}`)
 }

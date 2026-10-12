@@ -121,6 +121,15 @@ export const useDeckStore = defineStore('deck', () => {
     loadedAt.value = new Date()
   }
 
+  /** Hold a card as the server just returned it, after a correction or a reset. */
+  function replaceCard(card: LearningCard) {
+    const index = cards.value.findIndex((held) => held.id === card.id)
+    if (index === -1) return
+    cards.value[index] = card
+    touched.set(card.id, ++tick)
+    loadedAt.value = new Date()
+  }
+
   /** Forget a card that no longer exists on the server. */
   function removeCard(cardId: number) {
     removed.set(cardId, ++tick)
@@ -142,5 +151,5 @@ export const useDeckStore = defineStore('deck', () => {
     }
   })
 
-  return { cards, settings, loading, error, loaded, loadedAt, standing, load, refresh, saveSettings, applySchedule, removeCard }
+  return { cards, settings, loading, error, loaded, loadedAt, standing, load, refresh, saveSettings, applySchedule, replaceCard, removeCard }
 })

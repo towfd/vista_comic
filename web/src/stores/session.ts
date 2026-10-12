@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { ApiError, recordReview, type ApiErrorKind } from '../api/client'
+import { ApiError, deleteCard, recordReview, resetCard, updateCard, type ApiErrorKind } from '../api/client'
 import type { LearningCard, QuestionType, ReviewRequest } from '../api/types'
 import { localDay, nextCard, remainingCards } from '../practice/queue'
 import type { Cloze } from '../practice/cloze'
@@ -39,6 +39,12 @@ export interface Verdict {
  * - `finished`: the queue has nothing left.
  */
 export type Phase = 'loading' | 'unavailable' | 'asking' | 'feedback' | 'checking' | 'finished'
+
+/**
+ * What was last done to the card on screen from the feedback screen.
+ * `deleted` and `reset` end what can be done to it here; the others do not.
+ */
+export type Fixed = 'translation' | 'kind' | 'reset' | 'deleted'
 
 /** What a session achieved, counted from answers that were saved. */
 export interface Outcome {
@@ -90,6 +96,11 @@ export const useSessionStore = defineStore('session', () => {
   /** The reader asked for the next question before the answer was saved. */
   const waitingToAdvance = ref(false)
   const outcome = ref<Outcome>({ correct: 0, wrong: 0, graduated: 0 })
+  /** What a fixing action has done to the card on screen, if anything. */
+  const fixed = ref<Fixed | null>(null)
+  const fixing = ref(false)
+  /** Why the last fixing action did nothing. */
+  const fixError = ref<ApiErrorKind | null>(null)
   // By id rather than as a tally: a card that graduates and is then missed in
   // the same session has not graduated, and only a set can take it back out.
   const graduatedIds = new Set<number>()
@@ -114,6 +125,9 @@ export const useSessionStore = defineStore('session', () => {
     saveState.value = null
     saveFailure.value = null
     pending = null
+    fixed.value = null
+    fixing.value = false
+    fixError.value = null
     waitingToAdvance.value = false
     lastCardId = undefined
     await deck.load()
@@ -148,6 +162,9 @@ export const useSessionStore = defineStore('session', () => {
     saveState.value = null
     saveFailure.value = null
     pending = null
+    fixed.value = null
+    fixing.value = false
+    fixError.value = null
     waitingToAdvance.value = false
 
     const asked = ask()
@@ -273,6 +290,93 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  /**
+   * Whether the card on screen can be fixed right now: only after its verdict,
+   * only once the answer is saved -- so a reset can never race the review it
+   * is meant to wipe out -- and not once it has been deleted or reset.
+   */
+  function canFix() {
+    return (
+      phase.value === 'feedback' &&
+      saveState.value === 'saved' &&
+      !fixing.value &&
+      fixed.value !== 'deleted' &&
+      fixed.value !== 'reset' &&
+      question.value !== null
+    )
+  }
+
+  /**
+   * Run one fixing action against the card on screen. The answer just given
+   * stands whatever happens here: there is no undoing a review.
+   *
+   * A card the server no longer has is treated as deleted, since that is what
+   * it is. Any other failure leaves the card exactly as it was.
+   */
+  async function fix(done: Fixed, action: (card: LearningCard) => Promise<LearningCard | null>) {
+    const asked = question.value
+    if (!canFix() || !asked) return
+    fixing.value = true
+    fixError.value = null
+    try {
+      const card = await action(asked.card)
+      if (question.value !== asked) return
+      if (card) {
+        deck.replaceCard(card)
+        // The question keeps its token and its cloze; only the card it shows is refreshed.
+        question.value = { ...asked, card, prompt: card.translation }
+      } else {
+        deck.removeCard(asked.card.id)
+      }
+      if (done === 'reset' || done === 'deleted') forget(asked.card.id)
+      fixed.value = done
+    } catch (e) {
+      if (question.value !== asked) return
+      const kind = e instanceof ApiError ? e.kind : 'unexpected'
+      if (kind === 'notFound') {
+        deck.removeCard(asked.card.id)
+        forget(asked.card.id)
+        fixed.value = 'deleted'
+      } else {
+        console.warn(`could not fix card ${asked.card.id} (${kind}):`, e)
+        fixError.value = kind
+      }
+    } finally {
+      if (question.value === asked || question.value?.token === asked.token) fixing.value = false
+    }
+  }
+
+  /** A card that was reset or deleted is no longer one this session graduated. */
+  function forget(cardId: number) {
+    if (graduatedIds.delete(cardId)) outcome.value = { ...outcome.value, graduated: graduatedIds.size }
+  }
+
+  /** Correct the card's translation. Nothing is sent for an empty one or one that changes nothing. */
+  function fixTranslation(text: string) {
+    const translation = text.trim()
+    if (translation === '' || translation === question.value?.card.translation) return Promise.resolve()
+    return fix('translation', (card) => updateCard(card.id, { translation }))
+  }
+
+  /** Say whether the card is a word or a sentence. Later questions are built from the deck as it then stands. */
+  function fixKind(kind: 'word' | 'sentence') {
+    if (kind === question.value?.card.kind) return Promise.resolve()
+    return fix('kind', (card) => updateCard(card.id, { kind }))
+  }
+
+  /** Put the card back to new. It returns under the day's allowance like any other. */
+  function resetCardOnScreen() {
+    return fix('reset', (card) => resetCard(card.id))
+  }
+
+  /** Delete the card for good. The caller has already asked the reader to confirm. */
+  function deleteCardOnScreen() {
+    return fix('deleted', async (card) => {
+      await deleteCard(card.id)
+      return null
+    })
+  }
+
   /** Try again to save an answer the automatic retries gave up on. */
   function retrySave() {
     if (saveState.value === 'failed' && pending) void save()
@@ -298,9 +402,17 @@ export const useSessionStore = defineStore('session', () => {
     remaining,
     waitingToAdvance,
     outcome,
+    fixed,
+    fixing,
+    fixError,
     start,
     submit,
     advance,
     retrySave,
+    canFix,
+    fixTranslation,
+    fixKind,
+    resetCardOnScreen,
+    deleteCardOnScreen,
   }
 })

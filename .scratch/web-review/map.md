@@ -10,6 +10,8 @@ The map is done when the slice's contents are named, every decision that slice d
 
 **The spec is written:** [`spec.md`](spec.md), 2026-10-12. This map stays the record of why; the spec is what gets built.
 
+**The first slice is built** (2026-10-12): implementation tickets `issues/10`–`18`, all merged. Each carries a browser checklist that has not been run. What remains on this map is one item under *Not yet specified*.
+
 ## Notes
 
 - **The architecture is already locked and is not reopened here.** [`.scratch/web-client/map.md`](../web-client/map.md) is the architecture of record. Three of its decisions are load-bearing for this map: the web writes its own question generation in TypeScript; scheduling always comes from `POST /cards/{id}/reviews`, with no second copy of the state machine; and the iOS app is not modified — the backend may gain endpoints, never change one.

@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
   REQUEST_TIMEOUT_MS,
+  deleteCard,
+  resetCard,
+  updateCard,
   fetchCards,
   fetchChapter,
   fetchComic,
@@ -419,5 +422,78 @@ describe('saveStudySettings', () => {
   it('reports a refused value as unexpected and an outage as unavailable', async () => {
     expect(await errorKind(saveStudySettings(settings, respondWith(json({}, 422))))).toBe('unexpected')
     expect(await errorKind(saveStudySettings(settings, respondWith(json({}, 503))))).toBe('unavailable')
+  })
+})
+
+describe('fixing a card', () => {
+  const stored = {
+    id: 7,
+    sourceText: 'đường',
+    translation: '路',
+    kind: 'word',
+    state: 'review',
+    ladderStage: 2,
+    learningStep: null,
+    previousStage: null,
+    introducedOn: '2026-08-30',
+    dueAt: '2026-08-31T20:00:00+00:00',
+    createdAt: '2026-07-29T22:20:10+00:00',
+  }
+  const capture = (response: Response) => {
+    const seen: { path?: string; init?: RequestInit } = {}
+    const fetcher: Fetcher = async (path, init) => {
+      seen.path = path
+      seen.init = init
+      return response
+    }
+    return { seen, fetcher }
+  }
+
+  it('patches only what is being corrected and returns the card', async () => {
+    const { seen, fetcher } = capture(json({ ...stored, translation: '道路' }))
+    const card = await updateCard(7, { translation: '道路' }, fetcher)
+    expect(seen.path).toBe('/cards/7')
+    expect(seen.init?.method).toBe('PATCH')
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ translation: '道路' })
+    expect(card).toMatchObject({ id: 7, translation: '道路', kind: 'word', state: 'review' })
+  })
+
+  it('can send a kind alone, including clearing it', async () => {
+    const { seen, fetcher } = capture(json({ ...stored, kind: null }))
+    const card = await updateCard(7, { kind: null }, fetcher)
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ kind: null })
+    expect(card.kind).toBeNull()
+  })
+
+  it("resets through the card's own route and returns it as new", async () => {
+    const { seen, fetcher } = capture(json({ ...stored, state: 'new', ladderStage: 0, introducedOn: null }))
+    const card = await resetCard(7, fetcher)
+    expect(seen.path).toBe('/cards/7/reset')
+    expect(seen.init?.method).toBe('POST')
+    expect(seen.init?.body).toBeUndefined()
+    expect(card).toMatchObject({ state: 'new', introducedOn: null })
+  })
+
+  it('deletes, and takes an empty 204 as success', async () => {
+    const { seen, fetcher } = capture(new Response(null, { status: 204 }))
+    await expect(deleteCard(7, fetcher)).resolves.toBeUndefined()
+    expect(seen.path).toBe('/cards/7')
+    expect(seen.init?.method).toBe('DELETE')
+  })
+
+  it("does not take Access's login page for a successful delete", async () => {
+    const page = new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } })
+    expect(await errorKind(deleteCard(7, respondWith(page)))).toBe('auth')
+  })
+
+  it('reports a card already gone as not found, for each of the three', async () => {
+    expect(await errorKind(updateCard(7, { translation: 'x' }, respondWith(json({}, 404))))).toBe('notFound')
+    expect(await errorKind(resetCard(7, respondWith(json({}, 404))))).toBe('notFound')
+    expect(await errorKind(deleteCard(7, respondWith(json({}, 404))))).toBe('notFound')
+  })
+
+  it('reports a refused correction as unexpected and an outage as unavailable', async () => {
+    expect(await errorKind(updateCard(7, {}, respondWith(json({}, 422))))).toBe('unexpected')
+    expect(await errorKind(deleteCard(7, respondWith(json({}, 503))))).toBe('unavailable')
   })
 })
