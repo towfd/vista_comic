@@ -8,7 +8,7 @@ See the spec's *Judging*, *Answering and saving* and *Feedback*, and the measure
 
 **Blocked by:** 10 — Today's deck on the overview.
 
-**Status:** done (2026-10-12) — merged; the browser checklist below is still the developer's to run
+**Status:** done (2026-10-12) — merged in #109; the browser checklist below is still the developer's to run
 
 - [x] The session route asks the queue's next card as a translate question: the card's translation as the prompt, a text field, the count remaining
 - [x] Enter submits; Enter while the input method is composing does not; nothing is judged before submission

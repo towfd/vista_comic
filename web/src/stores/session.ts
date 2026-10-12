@@ -33,8 +33,24 @@ export interface Verdict {
  */
 export type Phase = 'loading' | 'unavailable' | 'asking' | 'feedback' | 'finished'
 
-/** Where the answer on screen stands with the backend. */
-export type SaveState = 'saving' | 'saved' | 'failed'
+/**
+ * Where the answer on screen stands with the backend.
+ *
+ * - `saving`: on its way, including the automatic retries.
+ * - `saved`: the card's new schedule is held; the session may move on.
+ * - `failed`: not saved, and the session will not move on. `saveFailure` says why.
+ * - `gone`: the card was deleted elsewhere. Nothing to save; the session may move on.
+ */
+export type SaveState = 'saving' | 'saved' | 'failed' | 'gone'
+
+/**
+ * How long to wait before each automatic retry. Short, because the reader is
+ * sitting on the feedback screen: a blip should heal before they finish
+ * reading it, and anything longer is theirs to know about.
+ */
+export const RETRY_DELAYS_MS = [1_000, 2_000, 4_000]
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /**
  * One practice session: ask, judge, save, and only then ask again.
@@ -52,11 +68,17 @@ export const useSessionStore = defineStore('session', () => {
   const question = ref<Question | null>(null)
   const verdict = ref<Verdict | null>(null)
   const saveState = ref<SaveState | null>(null)
+  /** Why the answer on screen is not saved, while `saveState` is `failed`. */
+  const saveFailure = ref<ApiErrorKind | null>(null)
   /** Cards still to ask, this question included. */
   const remaining = ref(0)
   /** The reader asked for the next question before the answer was saved. */
   const waitingToAdvance = ref(false)
   let lastCardId: number | undefined
+  // The answer on screen, kept so a retry sends exactly what the first attempt
+  // did: the same token, and the moment the reader answered rather than the
+  // moment the network came back.
+  let pending: { asked: Question; review: ReviewRequest } | null = null
 
   /** Begin from the server: fetch the deck, then draw the first question. */
   async function start() {
@@ -65,6 +87,8 @@ export const useSessionStore = defineStore('session', () => {
     question.value = null
     verdict.value = null
     saveState.value = null
+    saveFailure.value = null
+    pending = null
     waitingToAdvance.value = false
     lastCardId = undefined
     await deck.load()
@@ -85,6 +109,8 @@ export const useSessionStore = defineStore('session', () => {
     const next = nextCard(deck.cards, settings, now, today, lastCardId)
     verdict.value = null
     saveState.value = null
+    saveFailure.value = null
+    pending = null
     waitingToAdvance.value = false
     if (!next.card) {
       question.value = null
@@ -111,31 +137,72 @@ export const useSessionStore = defineStore('session', () => {
     lastCardId = asked.card.id
 
     const answeredAt = new Date()
-    void save(asked, {
-      questionType: asked.type,
-      isCorrect: correct,
-      clientToken: asked.token,
-      localDate: localDay(answeredAt),
-      answeredAt: answeredAt.toISOString(),
-      context: 'review',
-    })
+    pending = {
+      asked,
+      review: {
+        questionType: asked.type,
+        isCorrect: correct,
+        clientToken: asked.token,
+        localDate: localDay(answeredAt),
+        answeredAt: answeredAt.toISOString(),
+        context: 'review',
+      },
+    }
+    void save()
   }
 
-  async function save(asked: Question, review: ReviewRequest) {
+  /**
+   * Send the answer on screen until it is saved or cannot be.
+   *
+   * Only an unreachable backend is retried on its own -- it is the one failure
+   * that time fixes. Every attempt is the same request, so one that reached
+   * the server and lost only its response cannot count twice.
+   */
+  async function save() {
+    const current = pending
+    if (!current) return
+    const { asked, review } = current
+    const stale = () => pending !== current
     saveState.value = 'saving'
-    try {
-      const schedule = await recordReview(asked.card.id, review)
-      // The session may have been restarted while this was in flight.
-      if (question.value !== asked) return
-      deck.applySchedule(asked.card.id, schedule)
-      saveState.value = 'saved'
-      if (waitingToAdvance.value) draw()
-    } catch (e) {
-      if (question.value !== asked) return
-      console.warn(`review for card ${asked.card.id} was not saved:`, e instanceof ApiError ? e.kind : e)
-      saveState.value = 'failed'
-      waitingToAdvance.value = false
+    saveFailure.value = null
+
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const schedule = await recordReview(asked.card.id, review)
+        // The session may have been restarted while this was in flight.
+        if (stale()) return
+        deck.applySchedule(asked.card.id, schedule)
+        saveState.value = 'saved'
+        if (waitingToAdvance.value) draw()
+        return
+      } catch (e) {
+        if (stale()) return
+        const kind = e instanceof ApiError ? e.kind : 'unexpected'
+        if (kind === 'notFound') {
+          // Deleted on the phone while it was on screen here. There is no card
+          // left to schedule, so there is nothing to hold the session for.
+          deck.removeCard(asked.card.id)
+          saveState.value = 'gone'
+          if (waitingToAdvance.value) draw()
+          return
+        }
+        const delay = kind === 'unavailable' ? RETRY_DELAYS_MS[attempt] : undefined
+        if (delay === undefined) {
+          console.warn(`review for card ${asked.card.id} was not saved (${kind}):`, e)
+          saveState.value = 'failed'
+          saveFailure.value = kind
+          waitingToAdvance.value = false
+          return
+        }
+        await sleep(delay)
+        if (stale()) return
+      }
     }
+  }
+
+  /** Try again to save an answer the automatic retries gave up on. */
+  function retrySave() {
+    if (saveState.value === 'failed' && pending) void save()
   }
 
   /**
@@ -144,9 +211,9 @@ export const useSessionStore = defineStore('session', () => {
    */
   function advance() {
     if (phase.value !== 'feedback') return
-    if (saveState.value === 'saved') draw()
+    if (saveState.value === 'saved' || saveState.value === 'gone') draw()
     else if (saveState.value === 'saving') waitingToAdvance.value = true
   }
 
-  return { phase, loadError, question, verdict, saveState, remaining, waitingToAdvance, start, submit, advance }
+  return { phase, loadError, question, verdict, saveState, saveFailure, remaining, waitingToAdvance, start, submit, advance, retrySave }
 })

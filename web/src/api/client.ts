@@ -49,6 +49,13 @@ export function toMediaPath(url: string): string {
   return parsed.pathname + parsed.search
 }
 
+/**
+ * How long a request may take before it counts as the backend being
+ * unreachable. Without it a request into a dead connection never settles, and
+ * a session waiting on a save would wait for ever.
+ */
+export const REQUEST_TIMEOUT_MS = 10_000
+
 /** The fetch implementation, injectable so tests never touch the network. */
 export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -63,13 +70,20 @@ export async function getJson<T>(path: string, fetcher: Fetcher = fetch): Promis
  */
 async function requestJson<T>(path: string, init: RequestInit, fetcher: Fetcher): Promise<T> {
   let response: Response
+  // A timer and a controller rather than AbortSignal.timeout, so the clock a
+  // test controls is the clock this runs on.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     // 'manual' keeps Access's redirect visible to us. Followed, it would land on
     // a cross-origin login page, fail CORS, and surface as a network error --
     // indistinguishable from the server being down.
-    response = await fetcher(path, { ...init, redirect: 'manual' })
+    response = await fetcher(path, { ...init, redirect: 'manual', signal: controller.signal })
   } catch (error) {
-    throw new ApiError('unavailable', `request failed: ${String(error)}`)
+    const reason = controller.signal.aborted ? `timed out after ${REQUEST_TIMEOUT_MS}ms` : `request failed: ${String(error)}`
+    throw new ApiError('unavailable', reason)
+  } finally {
+    clearTimeout(timer)
   }
 
   if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {

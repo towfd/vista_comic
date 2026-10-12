@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import type { CardSchedule, CardState, LearningCard } from '../api/types'
 import { useDeckStore } from './deck'
-import { useSessionStore } from './session'
+import { RETRY_DELAYS_MS, useSessionStore } from './session'
 
 const api = vi.hoisted(() => ({ fetchCards: vi.fn(), fetchStudySettings: vi.fn(), recordReview: vi.fn() }))
 
@@ -255,22 +255,137 @@ describe('moving on', () => {
     expect(session.question?.card.id).toBe(2)
   })
 
-  it('holds the session when the save fails', async () => {
-    api.recordReview.mockRejectedValue(new ApiError('unavailable', 'down'))
-    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
-    session.submit('câu 2')
-    session.advance()
-    await settle()
-    expect(session.saveState).toBe('failed')
-    session.advance()
-    expect(session.phase).toBe('feedback')
-    expect(session.question?.card.id).toBe(2)
-  })
-
   it('does nothing when asked to move on with no answer given', async () => {
     const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
     session.advance()
     expect(session.phase).toBe('asking')
     expect(session.question?.card.id).toBe(2)
+  })
+})
+
+describe('an answer that will not save', () => {
+  const down = () => new ApiError('unavailable', 'down')
+  const allDelays = RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0)
+
+  it('retries an unreachable backend on its own and saves once it answers', async () => {
+    api.recordReview.mockRejectedValueOnce(down()).mockRejectedValueOnce(down()).mockResolvedValue(promoted)
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    expect(session.saveState).toBe('saving')
+    await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[0]! + RETRY_DELAYS_MS[1]!)
+    expect(api.recordReview).toHaveBeenCalledTimes(3)
+    expect(session.saveState).toBe('saved')
+  })
+
+  it('sends the same token, moment and local date on every attempt', async () => {
+    api.recordReview.mockRejectedValue(down())
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    // Long enough for the day to have changed by the last attempt.
+    vi.setSystemTime(new Date(NOW.getTime() + 13 * 60 * 60_000))
+    await vi.advanceTimersByTimeAsync(allDelays)
+    session.retrySave()
+    await settle()
+    const bodies = api.recordReview.mock.calls.map((call) => call[1])
+    expect(bodies).toHaveLength(RETRY_DELAYS_MS.length + 2)
+    for (const body of bodies) expect(body).toEqual(bodies[0])
+    expect(bodies[0]).toMatchObject({ answeredAt: NOW.toISOString(), localDate: '2026-08-31' })
+  })
+
+  it('reports the answer unsaved once the automatic attempts are spent, and will not move on', async () => {
+    api.recordReview.mockRejectedValue(down())
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('câu 2')
+    session.advance()
+    await vi.advanceTimersByTimeAsync(allDelays)
+    expect(api.recordReview).toHaveBeenCalledTimes(RETRY_DELAYS_MS.length + 1)
+    expect(session.saveState).toBe('failed')
+    expect(session.saveFailure).toBe('unavailable')
+    expect(session.waitingToAdvance).toBe(false)
+    session.advance()
+    expect(session.phase).toBe('feedback')
+    expect(session.question?.card.id).toBe(2)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(api.recordReview).toHaveBeenCalledTimes(RETRY_DELAYS_MS.length + 1)
+  })
+
+  it('saves on a manual retry and then moves on when asked', async () => {
+    api.recordReview.mockRejectedValue(down())
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('câu 2')
+    await vi.advanceTimersByTimeAsync(allDelays)
+    api.recordReview.mockResolvedValue(promoted)
+    session.retrySave()
+    await settle()
+    expect(session.saveState).toBe('saved')
+    expect(session.saveFailure).toBeNull()
+    session.advance()
+    expect(session.question?.card.id).toBe(1)
+  })
+
+  it('ignores a manual retry while nothing has failed', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    session.retrySave()
+    await settle()
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops a card deleted elsewhere and lets the session carry on, with no retry', async () => {
+    api.recordReview.mockRejectedValue(new ApiError('notFound', 'gone'))
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('câu 2')
+    await settle()
+    expect(session.saveState).toBe('gone')
+    expect(useDeckStore().cards.map((c) => c.id)).toEqual([1])
+    await vi.advanceTimersByTimeAsync(allDelays)
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+    session.advance()
+    expect(session.question?.card.id).toBe(1)
+  })
+
+  it('moves on by itself from a deleted card when the reader had already asked to', async () => {
+    const pending = deferred<CardSchedule>()
+    api.recordReview.mockReturnValue(pending.promise)
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('câu 2')
+    session.advance()
+    pending.reject(new ApiError('notFound', 'gone'))
+    await settle()
+    expect(session.phase).toBe('asking')
+    expect(session.question?.card.id).toBe(1)
+  })
+
+  it('says a lapsed sign-in is one, without retrying', async () => {
+    api.recordReview.mockRejectedValue(new ApiError('auth', 'refused'))
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await vi.advanceTimersByTimeAsync(allDelays)
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+    expect(session.saveState).toBe('failed')
+    expect(session.saveFailure).toBe('auth')
+  })
+
+  it('shows any other refusal as unsaved, without retrying on its own', async () => {
+    api.recordReview.mockRejectedValue(new ApiError('unexpected', 'status 422'))
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await vi.advanceTimersByTimeAsync(allDelays)
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+    expect(session.saveFailure).toBe('unexpected')
+  })
+
+  it('abandons its retries when the session is started again', async () => {
+    api.recordReview.mockRejectedValue(down())
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    await settle()
+    await session.start()
+    await vi.advanceTimersByTimeAsync(allDelays)
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+    expect(session.saveState).toBeNull()
+    expect(session.phase).toBe('asking')
   })
 })
