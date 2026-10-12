@@ -8,6 +8,8 @@ The map is done when nothing architectural is left to decide and each part's bou
 
 **Execution has since been re-scoped and started.** The first thing built is thinner than any one part — see [The MVP](issues/13-mvp-thin-display-path.md) — and lives in its own feature directory, `.scratch/web-reader-mvp/`. This map stays the architecture of record; it is not the tracker for that work.
 
+**Part ⑥ (review) has its own map** — [`.scratch/web-review/map.md`](../web-review/map.md), charted 2026-10-12 — which finds the first slice of review to build. It takes this map's decisions as fixed.
+
 ## Notes
 
 - **The iOS app is not modified by anything on this map.** This was the developer's explicit condition and it is load-bearing: the web is a second caller of endpoints that already exist. Anything the backend does not yet expose is an *added* endpoint, never a changed one. If a decision anywhere seems to require touching `vista_comic/`, that is the signal to stop and bring it back to the map.
