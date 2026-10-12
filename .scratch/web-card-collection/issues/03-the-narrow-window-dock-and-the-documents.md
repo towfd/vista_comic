@@ -8,16 +8,16 @@
 
 **Blocked by:** 02 — A line already collected, and a failed save. The dock needs only ticket 01; it waits for 02 because both change the same panel.
 
-**Status:** in review (2026-10-12) — browser checks are with the developer
+**Status:** done (2026-10-12) — merged in #122; browser checks confirmed by the developer
 
-- [ ] On a window too narrow for both, the open panel docks to the bottom edge; on a wide one it still docks right
-- [ ] Resizing across the threshold with the panel open moves the panel without losing what was typed or the fixed page
-- [ ] The page column's position and width are the same with the panel open or collapsed, at both widths
-- [ ] Every control is reachable and nothing is clipped in the bottom dock, including the notices from ticket 02
-- [ ] The README describes collecting on the web, no longer says it is phone-only, and carries the current web test count
-- [ ] The web review spec's note on re-collecting a misread card is brought up to date
-- [ ] This feature's spec is marked done once the developer has confirmed the browser checks
-- [ ] The developer is handed the browser checks: both docks at a compact and a large window, and the column not shifting in either
+- [x] On a window too narrow for both, the open panel docks to the bottom edge; on a wide one it still docks right
+- [x] Resizing across the threshold with the panel open moves the panel without losing what was typed or the fixed page
+- [x] The page column's position and width are the same with the panel open or collapsed, at both widths
+- [x] Every control is reachable and nothing is clipped in the bottom dock, including the notices from ticket 02
+- [x] The README describes collecting on the web, no longer says it is phone-only, and carries the current web test count
+- [x] The web review spec's note on re-collecting a misread card is brought up to date
+- [x] This feature's spec is marked done once the developer has confirmed the browser checks
+- [x] The developer is handed the browser checks: both docks at a compact and a large window, and the column not shifting in either
 
 ## Comments
 

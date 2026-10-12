@@ -1,4 +1,4 @@
-Status: implemented (2026-10-12) — tickets 01–02 merged in #119 and #121, 03 in review; not yet marked done, which waits on the developer's browser checks
+Status: done (2026-10-12) — tickets 01–03 merged in #119, #121 and #122; browser checks confirmed by the developer
 
 # Web card collection: type a line into the deck while reading
 
