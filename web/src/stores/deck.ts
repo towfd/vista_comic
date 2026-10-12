@@ -50,14 +50,21 @@ export const useDeckStore = defineStore('deck', () => {
   const touched = new Map<number, number>()
   const removed = new Map<number, number>()
 
-  /** The fetched deck, with every card changed here since `began` kept as held. */
+  /**
+   * The fetched deck, with every card changed here since `began` kept as held.
+   * A card collected since then is not in the fetch at all, so it is carried
+   * over from what is held -- in front, where the newest card belongs.
+   */
   function reconcile(fetched: LearningCard[], began: number): LearningCard[] {
     const held = new Map(cards.value.map((card) => [card.id, card]))
-    return fetched.flatMap((card) => {
+    const fetchedIds = new Set(fetched.map((card) => card.id))
+    const collectedSince = cards.value.filter((card) => !fetchedIds.has(card.id) && (touched.get(card.id) ?? 0) > began)
+    const kept = fetched.flatMap((card) => {
       if ((removed.get(card.id) ?? 0) > began) return []
       if ((touched.get(card.id) ?? 0) > began) return [held.get(card.id) ?? card]
       return [card]
     })
+    return [...collectedSince, ...kept]
   }
 
   /**
@@ -140,6 +147,22 @@ export const useDeckStore = defineStore('deck', () => {
     loadedAt.value = new Date()
   }
 
+  /**
+   * Take in a card the reader just collected: put in front if it is new to
+   * the held deck, replaced where it stands if it is not. The second case is a
+   * line collected again -- and a card deleted here earlier comes back, so it
+   * is no longer one to keep out of a fetch.
+   */
+  function takeCard(card: LearningCard) {
+    removed.delete(card.id)
+    const index = cards.value.findIndex((held) => held.id === card.id)
+    if (index === -1) cards.value.unshift(card)
+    else cards.value[index] = card
+    touched.set(card.id, ++tick)
+    // Before a first load there is no moment the deck is true for yet.
+    if (loaded.value) loadedAt.value = new Date()
+  }
+
   /** Forget a card that no longer exists on the server. */
   function removeCard(cardId: number) {
     removed.set(cardId, ++tick)
@@ -206,6 +229,7 @@ export const useDeckStore = defineStore('deck', () => {
     refresh,
     saveSettings,
     applySchedule,
+    takeCard,
     removeCard,
     correctCard,
     resetCardToNew,

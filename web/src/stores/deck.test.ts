@@ -274,6 +274,59 @@ describe('deck store refresh', () => {
     expect(store.cards[0]).toMatchObject({ ladderStage: 2 })
   })
 
+  it('holds a collected card in front, where the newest card belongs', async () => {
+    const store = await loadedWith([card(1, -5)])
+    store.takeCard(card(2, -5) as never)
+    expect(store.cards.map((c) => c.id)).toEqual([2, 1])
+  })
+
+  it('replaces a card it already holds rather than holding it twice', async () => {
+    const store = await loadedWith([card(1, -5), card(2, -5)])
+    store.takeCard(card(2, -5, 4) as never)
+    expect(store.cards.map((c) => c.id)).toEqual([1, 2])
+    expect(store.cards[1]).toMatchObject({ ladderStage: 4 })
+  })
+
+  it('keeps a card collected while the fetch was on its way', async () => {
+    const store = await loadedWith([card(1, -5)])
+    const slow = deferred<object[]>()
+    api.fetchCards.mockReturnValue(slow.promise)
+    const refreshing = store.refresh()
+    store.takeCard(card(2, -5) as never)
+    // What the server held when it answered: card 2 not yet collected.
+    slow.resolve([card(1, -5)])
+    await refreshing
+    expect(store.cards.map((c) => c.id)).toEqual([2, 1])
+  })
+
+  it('takes the server at its word for a card collected before the fetch set out', async () => {
+    const store = await loadedWith([card(1, -5)])
+    store.takeCard(card(2, -5) as never)
+    // Deleted on the phone since: the fetch no longer has it.
+    api.fetchCards.mockResolvedValue([card(1, -5)])
+    await store.refresh()
+    expect(store.cards.map((c) => c.id)).toEqual([1])
+  })
+
+  it('holds a card collected again after it was removed here', async () => {
+    const store = await loadedWith([card(1, -5), card(2, -5)])
+    const slow = deferred<object[]>()
+    api.fetchCards.mockReturnValue(slow.promise)
+    const refreshing = store.refresh()
+    store.removeCard(2)
+    store.takeCard(card(2, -5) as never)
+    slow.resolve([card(1, -5), card(2, -5)])
+    await refreshing
+    expect(store.cards.map((c) => c.id).sort()).toEqual([1, 2])
+  })
+
+  it('counts a collected card in what is waiting at once', async () => {
+    const store = await loadedWith([])
+    expect(store.standing?.remaining).toBe(0)
+    store.takeCard({ ...card(2, -5), state: 'new', introducedOn: null } as never)
+    expect(store.standing?.counts.fresh).toBe(1)
+  })
+
   it('does not bring back a card removed while the fetch was on its way', async () => {
     const store = await loadedWith([card(1, -5), card(2, -5)])
     const slow = deferred<object[]>()

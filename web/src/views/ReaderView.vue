@@ -3,16 +3,19 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { ChapterDetail } from '../api/types'
 import { useChaptersStore } from '../stores/chapters'
+import { useCollectStore } from '../stores/collect'
 import { useComicsStore } from '../stores/comics'
 import { currentPage, isScrollKey, resumeStartPage } from '../reader/progress'
 import { createProgressSaver, type ProgressSaver } from '../reader/progressSaver'
 import { nextChapter, START_AT_TOP_KEY, takeStartAtTopFlag } from '../reader/nextChapter'
+import CollectPanel from '../components/CollectPanel.vue'
 import ErrorState from '../components/ErrorState.vue'
 import ReaderPage from '../components/ReaderPage.vue'
 
 const props = defineProps<{ comicId: string; chapterId: string }>()
 const chapters = useChaptersStore()
 const comics = useComicsStore()
+const collect = useCollectStore()
 const router = useRouter()
 
 const state = computed(() => chapters.entry(props.comicId, props.chapterId))
@@ -71,6 +74,8 @@ function openChapter(comicId: string, chapterId: string) {
   saver?.dispose()
   stopObserving()
   positioned = false
+  // A line half typed belonged to the chapter being left.
+  collect.enter(comicId, chapterId)
   saver = createProgressSaver((page, options) => chapters.saveProgress(comicId, chapterId, page, options))
   // Always a fresh fetch: a cached lastReadPage would resume at a stale page.
   chapters.load(comicId, chapterId)
@@ -88,7 +93,10 @@ function observe(pageCount: number) {
         else visiblePages.delete(page)
       }
     }
-    saver?.update(currentPage(visiblePages, endVisible, pageCount))
+    const page = currentPage(visiblePages, endVisible, pageCount)
+    saver?.update(page)
+    // The page a card collected now would record.
+    collect.setCurrentPage(page)
   })
   pagesEl.value?.querySelectorAll<HTMLElement>('[data-page]').forEach((el) => observer?.observe(el))
   if (endEl.value) observer.observe(endEl.value)
@@ -130,6 +138,8 @@ function onScrollInput() {
   if (positioned) saver?.openGate()
 }
 function onKeydown(event: KeyboardEvent) {
+  // A space typed into the collecting panel is writing, not scrolling.
+  if (event.target instanceof Element && event.target.closest('[data-collect-panel]')) return
   if (isScrollKey(event.key)) onScrollInput()
 }
 function onVisibilityChange() {
@@ -157,6 +167,7 @@ onUnmounted(() => {
   stopObserving()
   saver?.dispose()
   saver = null
+  collect.collapse()
 })
 
 // ---- Next chapter ---------------------------------------------------------
@@ -227,6 +238,8 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
           <ReaderPage :src="src" :page-number="index + 1" />
         </div>
       </div>
+
+      <CollectPanel v-if="state.data.pages.length > 0" />
 
       <div ref="endEl" class="mt-12 flex flex-col items-center text-center">
         <p class="text-sm text-neutral-500">本話完</p>

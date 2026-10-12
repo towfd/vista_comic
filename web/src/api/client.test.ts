@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
   REQUEST_TIMEOUT_MS,
+  createCard,
   deleteCard,
   resetCard,
   updateCard,
@@ -495,5 +496,69 @@ describe('fixing a card', () => {
   it('reports a refused correction as unexpected and an outage as unavailable', async () => {
     expect(await errorKind(updateCard(7, {}, respondWith(json({}, 422))))).toBe('unexpected')
     expect(await errorKind(deleteCard(7, respondWith(json({}, 503))))).toBe('unavailable')
+  })
+})
+
+describe('createCard', () => {
+  const stored = {
+    id: 12,
+    sourceText: 'xin chào',
+    translation: '你好',
+    kind: 'sentence',
+    state: 'new',
+    ladderStage: 1,
+    learningStep: null,
+    previousStage: null,
+    introducedOn: null,
+    dueAt: '2026-08-31T12:00:00+00:00',
+    createdAt: '2026-08-31T12:00:00+00:00',
+  }
+  const draft = {
+    sourceText: 'xin chào',
+    translation: '你好',
+    kind: 'sentence' as const,
+    comicId: 'comic-a',
+    chapterId: 'chapter-1',
+    pageNumber: 7,
+  }
+
+  it('posts the line with where it was read, as Traditional Chinese', async () => {
+    const seen: { path?: string; init?: RequestInit } = {}
+    const fetcher: Fetcher = async (path, init) => {
+      seen.path = path
+      seen.init = init
+      return json(stored, 201)
+    }
+    await createCard(draft, fetcher)
+    expect(seen.path).toBe('/cards')
+    expect(seen.init?.method).toBe('POST')
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ ...draft, targetLanguage: 'zh-Hant' })
+  })
+
+  it('reports a new card as created', async () => {
+    const collected = await createCard(draft, respondWith(json(stored, 201)))
+    expect(collected.created).toBe(true)
+    expect(collected.card).toMatchObject({ id: 12, sourceText: 'xin chào', kind: 'sentence' })
+  })
+
+  it('reports a line already in the deck as not created, with the card the deck holds', async () => {
+    const collected = await createCard(draft, respondWith(json({ ...stored, translation: '哈囉', kind: 'word' }, 200)))
+    expect(collected.created).toBe(false)
+    expect(collected.card).toMatchObject({ translation: '哈囉', kind: 'word' })
+  })
+
+  it('decodes the card as leniently as the deck is decoded', async () => {
+    const collected = await createCard(draft, respondWith(json({ ...stored, state: 'suspended', kind: 'phrase' }, 201)))
+    expect(collected.card).toMatchObject({ state: 'new', kind: null })
+  })
+
+  it('reports a refused source text as unexpected', async () => {
+    expect(await errorKind(createCard(draft, respondWith(json({ detail: 'nothing to learn' }, 422))))).toBe('unexpected')
+  })
+
+  it('reports an Access refusal as auth and a server error as unavailable', async () => {
+    const page = new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } })
+    expect(await errorKind(createCard(draft, respondWith(page)))).toBe('auth')
+    expect(await errorKind(createCard(draft, respondWith(json({}, 503))))).toBe('unavailable')
   })
 })
