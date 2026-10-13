@@ -35,7 +35,7 @@ const badges: Record<string, { label: string; class: string }> = {
 
 <template>
   <main class="mx-auto max-w-3xl px-4 py-8">
-    <RouterLink to="/" class="text-sm text-neutral-400 hover:text-neutral-200">← 書庫</RouterLink>
+    <RouterLink to="/" class="-mx-2 inline-block px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">← 書庫</RouterLink>
 
     <p v-if="state.loading && !state.data" class="py-24 text-center text-neutral-400">載入中…</p>
 
@@ -53,10 +53,10 @@ const badges: Record<string, { label: string; class: string }> = {
     </ErrorState>
 
     <template v-else-if="state.data">
-      <header class="mt-4 mb-6 flex items-end gap-4">
-        <img :src="state.data.coverUrl" :alt="state.data.title" class="h-32 w-24 rounded-md bg-neutral-800 object-cover" />
-        <div>
-          <h1 class="text-2xl font-semibold text-neutral-100">{{ state.data.title }}</h1>
+      <header class="mt-2 mb-6 flex items-end gap-4">
+        <img :src="state.data.coverUrl" :alt="state.data.title" class="h-32 w-24 shrink-0 rounded-md bg-neutral-800 object-cover" />
+        <div class="min-w-0">
+          <h1 class="text-xl font-semibold break-words text-neutral-100 sm:text-2xl">{{ state.data.title }}</h1>
           <p class="mt-1 text-sm text-neutral-400">{{ state.data.chapters.length }} 章</p>
         </div>
       </header>
@@ -77,11 +77,11 @@ const badges: Record<string, { label: string; class: string }> = {
             :to="{ name: 'reader', params: { comicId, chapterId: chapter.id } }"
             class="flex items-center gap-3 px-2 py-3 hover:bg-neutral-900"
           >
-          <span class="text-neutral-100">第 {{ chapter.number }} 話</span>
+          <span class="shrink-0 text-neutral-100">第 {{ chapter.number }} 話</span>
           <span v-if="extraTitle(chapter)" class="truncate text-sm text-neutral-400">{{ extraTitle(chapter) }}</span>
           <span
             v-if="badges[chapter.readState]"
-            class="rounded px-2 py-0.5 text-xs"
+            class="shrink-0 rounded px-2 py-0.5 text-xs"
             :class="badges[chapter.readState]!.class"
           >
             {{ badges[chapter.readState]!.label }}

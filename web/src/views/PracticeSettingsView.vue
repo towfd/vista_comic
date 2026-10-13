@@ -69,8 +69,8 @@ const saveErrorText: Record<ApiErrorKind, string> = {
 
 <template>
   <main class="mx-auto max-w-xl px-4 py-8">
-    <RouterLink :to="{ name: 'practice' }" class="text-sm text-neutral-400 hover:text-neutral-200">← 總覽</RouterLink>
-    <h1 class="mt-4 mb-8 text-2xl font-semibold text-neutral-100">設定</h1>
+    <RouterLink :to="{ name: 'practice' }" class="-mx-2 inline-block px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">← 總覽</RouterLink>
+    <h1 class="mt-2 mb-8 text-2xl font-semibold text-neutral-100">設定</h1>
 
     <p v-if="!fetched || (loading && !settings)" class="py-24 text-center text-neutral-400">載入中…</p>
 

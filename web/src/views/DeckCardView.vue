@@ -98,7 +98,7 @@ function remove() {
 
 <template>
   <main class="mx-auto max-w-2xl px-4 py-8">
-    <RouterLink :to="{ name: 'deck' }" class="text-sm text-neutral-400 hover:text-neutral-200">← 字卡庫</RouterLink>
+    <RouterLink :to="{ name: 'deck' }" class="-mx-2 inline-block px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">← 字卡庫</RouterLink>
 
     <p v-if="loading && !loaded" class="py-24 text-center text-neutral-400">載入中…</p>
 
@@ -113,8 +113,8 @@ function remove() {
     </ErrorState>
 
     <template v-else-if="card">
-      <section class="mt-6">
-        <h1 class="text-2xl leading-relaxed whitespace-pre-wrap text-neutral-100" lang="vi">{{ card.sourceText }}</h1>
+      <section class="mt-4">
+        <h1 class="text-xl leading-relaxed break-words whitespace-pre-wrap text-neutral-100 sm:text-2xl" lang="vi">{{ card.sourceText }}</h1>
         <p class="mt-3 text-sm text-neutral-400">{{ summary }}</p>
         <p class="mt-1 text-xs text-neutral-500">原文不能修改。打錯或辨識錯誤的卡片請刪除，再重新收集。</p>
       </section>

@@ -203,11 +203,12 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
 
 <template>
   <main class="pb-24">
-    <header class="mx-auto flex max-w-[800px] items-baseline gap-3 px-4 py-4">
-      <RouterLink :to="backTo" class="text-sm text-neutral-400 hover:text-neutral-200">
+    <!-- Clear of the collecting button, which is fixed over this corner until the window is wide. -->
+    <header class="mx-auto flex max-w-[800px] items-baseline gap-3 py-2 pr-24 pl-4 lg:pr-4">
+      <RouterLink :to="backTo" class="-mx-2 min-w-0 truncate px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">
         ← {{ comicTitle ?? '章節列表' }}
       </RouterLink>
-      <h1 v-if="state.data" class="text-sm text-neutral-200">第 {{ state.data.number }} 話</h1>
+      <h1 v-if="state.data" class="shrink-0 text-sm text-neutral-200">第 {{ state.data.number }} 話</h1>
     </header>
 
     <p v-if="state.loading && !state.data" class="py-24 text-center text-neutral-400">載入中…</p>
@@ -251,7 +252,7 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
         >
           下一話 · 第 {{ next.number }} 話
         </button>
-        <RouterLink :to="backTo" class="mt-3 text-sm text-neutral-300 hover:text-neutral-100">
+        <RouterLink :to="backTo" class="mt-1 px-3 py-2 text-sm text-neutral-300 hover:text-neutral-100">
           回到章節列表
         </RouterLink>
       </div>

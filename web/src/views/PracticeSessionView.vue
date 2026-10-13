@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
+import { useDeckStore } from '../stores/deck'
+import { scheduleState } from '../practice/library'
 import ErrorState from '../components/ErrorState.vue'
 
 const router = useRouter()
@@ -13,7 +15,19 @@ const field = ref<HTMLInputElement | null>(null)
 const nextButton = ref<HTMLButtonElement | null>(null)
 const doneLink = ref<{ $el: HTMLElement } | null>(null)
 
+const { settings } = storeToRefs(useDeckStore())
+
+// Where the card stood when it was asked, in the card library's own words.
+// It stays put through feedback: the answer moves the card, not the question.
+const standing = computed(() =>
+  question.value && settings.value ? scheduleState(question.value.card, settings.value.learningSteps) : null,
+)
+
 const answered = () => outcome.value.correct + outcome.value.wrong
+
+// The button a touch keyboard needs: its Enter can arrive as a composing key
+// and never reach `onFieldKeydown` as one.
+const submit = () => session.submit(field.value?.value ?? '')
 
 const reload = () => window.location.reload()
 
@@ -50,8 +64,7 @@ function onFieldKeydown(event: KeyboardEvent) {
   if (event.key !== 'Enter') return
   if (event.isComposing || event.keyCode === 229) return
   event.preventDefault()
-  if (event.repeat) return
-  session.submit(field.value?.value ?? '')
+  if (!event.repeat) submit()
 }
 
 /**
@@ -66,7 +79,7 @@ function onNextKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <main class="mx-auto max-w-2xl px-4 py-8">
+  <main class="mx-auto max-w-2xl px-4 py-5 sm:py-8">
     <p v-if="phase === 'loading'" class="py-24 text-center text-neutral-400">載入中…</p>
 
     <ErrorState v-else-if="phase === 'unavailable' && loadError" :kind="loadError" @retry="session.start()" />
@@ -100,10 +113,12 @@ function onNextKeydown(event: KeyboardEvent) {
     </section>
 
     <template v-else-if="question">
-      <div class="mb-8 flex items-center justify-between text-sm text-neutral-400">
-        <p>還剩 {{ remaining }} 張</p>
+      <div class="mb-5 flex items-center justify-between gap-3 text-sm text-neutral-400 sm:mb-8">
+        <p>
+          還剩 {{ remaining }} 張<template v-if="standing"> · <span class="text-neutral-200">{{ standing }}</span></template>
+        </p>
         <!-- Answers already saved stay saved; only the one on screen is given up. -->
-        <RouterLink :to="{ name: 'practice' }" class="hover:text-neutral-200">結束</RouterLink>
+        <RouterLink :to="{ name: 'practice' }" class="-m-2 shrink-0 p-2 hover:text-neutral-200">結束</RouterLink>
       </div>
 
       <template v-if="question.cloze">
@@ -129,14 +144,24 @@ function onNextKeydown(event: KeyboardEvent) {
         autocapitalize="off"
         autocorrect="off"
         spellcheck="false"
+        enterkeyhint="send"
         aria-label="你的答案"
         :readonly="phase !== 'asking'"
         class="mt-6 w-full rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-xl text-neutral-100 outline-none focus:border-sky-500 read-only:text-neutral-400"
         @keydown="onFieldKeydown"
       />
-      <p v-if="phase === 'asking'" class="mt-2 text-right text-xs text-neutral-500">Enter 送出</p>
+      <div v-if="phase === 'asking'" class="mt-3 flex items-center justify-end gap-3">
+        <p class="hidden text-xs text-neutral-500 pointer-fine:block">Enter 送出</p>
+        <button
+          type="button"
+          class="w-full rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 sm:w-auto"
+          @click="submit"
+        >
+          送出
+        </button>
+      </div>
 
-      <section v-if="phase === 'feedback' && verdict" class="mt-8" aria-live="polite">
+      <section v-if="phase === 'feedback' && verdict" class="mt-6 sm:mt-8" aria-live="polite">
         <p class="text-lg font-semibold" :class="verdict.correct ? 'text-emerald-400' : 'text-rose-400'">
           {{ verdict.correct ? '正確' : '不對' }}
         </p>
@@ -182,7 +207,7 @@ function onNextKeydown(event: KeyboardEvent) {
           <button
             ref="nextButton"
             :disabled="saveState === 'failed'"
-            class="rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+            class="w-full rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 disabled:opacity-50 sm:w-auto"
             @click="session.advance()"
             @keydown="onNextKeydown"
           >
