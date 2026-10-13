@@ -8,6 +8,18 @@ import { drawAsking } from '../practice/question'
 import { isBlank, judgeCloze, judgeSentence } from '../practice/text'
 import { useDeckStore } from './deck'
 
+/**
+ * A fresh idempotency key. `crypto.randomUUID` exists only in a secure context
+ * -- HTTPS or localhost -- so the page opened by IP address or over plain HTTP
+ * has none, and a question could not be drawn at all. `getRandomValues` carries
+ * no such restriction.
+ */
+export function newToken(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 /** One question, as data: what is asked, of which card, and the token its answer will carry. */
 export interface Question {
   card: LearningCard
@@ -171,7 +183,7 @@ export const useSessionStore = defineStore('session', () => {
 
   function show(card: LearningCard, left: number) {
     const asking = drawAsking(card, deck.cards, Math.random)
-    question.value = { card, ...asking, prompt: card.translation, token: crypto.randomUUID() }
+    question.value = { card, ...asking, prompt: card.translation, token: newToken() }
     remaining.value = left
     phase.value = 'asking'
   }

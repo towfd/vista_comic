@@ -4,7 +4,7 @@ import { ApiError } from '../api/client'
 import type { CardSchedule, CardState, LearningCard } from '../api/types'
 import { localDay } from '../practice/queue'
 import { useDeckStore } from './deck'
-import { RETRY_DELAYS_MS, useSessionStore } from './session'
+import { RETRY_DELAYS_MS, newToken, useSessionStore } from './session'
 
 const api = vi.hoisted(() => ({ fetchCards: vi.fn(), fetchStudySettings: vi.fn(), recordReview: vi.fn() }))
 
@@ -175,6 +175,18 @@ describe('answering', () => {
     await settle()
     session.advance()
     expect(session.question!.token).not.toBe(first)
+  })
+
+  it('still makes a token where randomUUID is missing', () => {
+    // An insecure context: the page opened over plain HTTP by IP address.
+    vi.stubGlobal('crypto', { getRandomValues: crypto.getRandomValues.bind(crypto) })
+    try {
+      const first = newToken()
+      expect(first).toMatch(/^[0-9a-f]{32}$/)
+      expect(newToken()).not.toBe(first)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 
