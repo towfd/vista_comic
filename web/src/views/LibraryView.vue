@@ -22,7 +22,7 @@ onMounted(() => {
       書庫裡還沒有漫畫。
     </p>
 
-    <ul v-else class="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <ul v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 md:grid-cols-4 lg:grid-cols-5">
       <li v-for="comic in comics" :key="comic.id">
         <RouterLink :to="{ name: 'comic', params: { comicId: comic.id } }" class="group block">
           <div class="aspect-[3/4] overflow-hidden rounded-md bg-neutral-800">

@@ -76,7 +76,7 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
     v-else
     data-collect-panel
     aria-label="收卡"
-    class="fixed inset-x-0 bottom-0 z-20 max-h-[70vh] overflow-y-auto border-t border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-3 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-1.5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
+    class="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-y-auto border-t border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-3 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-1.5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
   >
     <!-- Along the bottom the contents keep to the page column's width. -->
     <div class="mx-auto max-w-[800px] p-4">
@@ -161,7 +161,7 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
 
       <div class="mt-3 flex items-center justify-between">
         <p class="text-xs text-neutral-500" aria-live="polite">{{ collect.saving ? '儲存中…' : '' }}</p>
-        <button type="button" class="text-xs text-neutral-400 hover:text-neutral-200" @click="collect.collapse()">收合</button>
+        <button type="button" class="-m-2 p-2 text-xs text-neutral-400 hover:text-neutral-200" @click="collect.collapse()">收合</button>
       </div>
     </div>
   </aside>

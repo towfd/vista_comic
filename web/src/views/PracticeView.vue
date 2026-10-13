@@ -14,7 +14,7 @@ onMounted(() => store.load())
   <main class="mx-auto max-w-3xl px-4 py-8">
     <header class="mb-8 flex items-center justify-between">
       <h1 class="text-2xl font-semibold text-neutral-100">今天</h1>
-      <RouterLink :to="{ name: 'practice-settings' }" class="rounded-md px-3 py-1.5 text-sm text-neutral-400 hover:text-neutral-200">
+      <RouterLink :to="{ name: 'practice-settings' }" class="-mr-3 rounded-md px-3 py-2 text-sm text-neutral-400 hover:text-neutral-200">
         ⚙ 設定
       </RouterLink>
     </header>
