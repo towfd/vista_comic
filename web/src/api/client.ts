@@ -86,8 +86,11 @@ async function readJson<T>(response: Response): Promise<T> {
   }
 }
 
-/** The request itself and every failure a status can tell: what a body-less answer and a JSON one share. */
-async function send(path: string, init: RequestInit, fetcher: Fetcher): Promise<Response> {
+/**
+ * The request itself and every failure a status can tell: what a body-less answer and a JSON one share.
+ * `answers` names a refusal the caller reads for itself rather than as a failure.
+ */
+async function send(path: string, init: RequestInit, fetcher: Fetcher, answers: readonly number[] = []): Promise<Response> {
   let response: Response
   // A timer and a controller rather than AbortSignal.timeout, so the clock a
   // test controls is the clock this runs on.
@@ -117,7 +120,7 @@ async function send(path: string, init: RequestInit, fetcher: Fetcher): Promise<
   if (response.status >= 500) {
     throw new ApiError('unavailable', `status ${response.status}`)
   }
-  if (!response.ok) {
+  if (!response.ok && !answers.includes(response.status)) {
     throw new ApiError('unexpected', `status ${response.status}`)
   }
   return response
@@ -240,7 +243,7 @@ export async function saveStudySettings(settings: StudySettings, fetcher: Fetche
   )
 }
 
-/** What the reader may correct on a card. The source text is not here: the backend refuses it by design. */
+/** What the reader may correct on a card besides its source text, which has its own route: `changeSourceText`. */
 export interface CardCorrection {
   translation?: string
   /** `null` clears the kind. Left out, the kind is untouched. */
@@ -255,6 +258,30 @@ export async function updateCard(cardId: number, correction: CardCorrection, fet
     fetcher,
   )
   return decodeCard(card)
+}
+
+/** A corrected source text: the card as it now stands, or the other card that already holds the text. */
+export type SourceTextChange = { card: LearningCard; taken?: undefined } | { card?: undefined; taken: LearningCard }
+
+/**
+ * Correct a typo in a card's source text. The card keeps its schedule, history
+ * and translation. When the text is already another card's, the backend
+ * answers 409 with that card and changes nothing; it comes back as `taken`.
+ * Text with nothing to learn, or too long, surfaces as `unexpected`.
+ */
+export async function changeSourceText(cardId: number, sourceText: string, fetcher: Fetcher = fetch): Promise<SourceTextChange> {
+  const response = await send(
+    `/cards/${cardId}/source-text`,
+    { method: 'PUT', headers: JSON_BODY, body: JSON.stringify({ sourceText }) },
+    fetcher,
+    [409],
+  )
+  if (response.status === 409) {
+    const refusal = await readJson<{ card?: LearningCard }>(response)
+    if (!refusal.card) throw new ApiError('unexpected', 'status 409 without the card that holds the text')
+    return { taken: decodeCard(refusal.card) }
+  }
+  return { card: decodeCard(await readJson<LearningCard>(response)) }
 }
 
 /** Put a card back to never having been met, and return it. */

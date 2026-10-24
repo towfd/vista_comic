@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
   ApiError,
+  changeSourceText,
   deleteCard,
   fetchCards,
   fetchStudySettings,
@@ -192,8 +193,27 @@ export const useDeckStore = defineStore('deck', () => {
     }
   }
 
-  /** Correct a card's translation, its kind, or both. The source text is not correctable: the backend refuses it. */
+  /** Correct a card's translation, its kind, or both. */
   const correctCard = (cardId: number, correction: CardCorrection) => fix(cardId, () => updateCard(cardId, correction))
+
+  /**
+   * Correct a typo in a card's source text. When another card already holds
+   * the text nothing changes, and that card is returned for the reader to go to.
+   */
+  async function correctSourceText(cardId: number, sourceText: string): Promise<'done' | 'gone' | { taken: LearningCard }> {
+    try {
+      const change = await changeSourceText(cardId, sourceText)
+      if (change.taken) return { taken: change.taken }
+      replaceCard(change.card)
+      return 'done'
+    } catch (e) {
+      if (e instanceof ApiError && e.kind === 'notFound') {
+        removeCard(cardId)
+        return 'gone'
+      }
+      throw e
+    }
+  }
 
   /** Put a card back to new. It returns under the day's allowance like any other. */
   const resetCardToNew = (cardId: number) => fix(cardId, () => resetCard(cardId))
@@ -232,6 +252,7 @@ export const useDeckStore = defineStore('deck', () => {
     takeCard,
     removeCard,
     correctCard,
+    correctSourceText,
     resetCardToNew,
     deleteCardForGood,
   }

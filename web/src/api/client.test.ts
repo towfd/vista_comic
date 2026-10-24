@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
   REQUEST_TIMEOUT_MS,
+  changeSourceText,
   createCard,
   deleteCard,
   resetCard,
@@ -464,6 +465,29 @@ describe('fixing a card', () => {
     const card = await updateCard(7, { kind: null }, fetcher)
     expect(JSON.parse(String(seen.init?.body))).toEqual({ kind: null })
     expect(card.kind).toBeNull()
+  })
+
+  it('puts a corrected source text to its own route and returns the card', async () => {
+    const { seen, fetcher } = capture(json({ ...stored, sourceText: 'đường' }))
+    const change = await changeSourceText(7, 'đường', fetcher)
+    expect(seen.path).toBe('/cards/7/source-text')
+    expect(seen.init?.method).toBe('PUT')
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ sourceText: 'đường' })
+    expect(change.card).toMatchObject({ id: 7, sourceText: 'đường', state: 'review' })
+    expect(change.taken).toBeUndefined()
+  })
+
+  it('returns the card that already holds the text instead of failing', async () => {
+    const other = { ...stored, id: 9, sourceText: 'Đường' }
+    const change = await changeSourceText(7, 'đường', respondWith(json({ detail: 'taken', card: other }, 409)))
+    expect(change.card).toBeUndefined()
+    expect(change.taken).toMatchObject({ id: 9, sourceText: 'Đường' })
+  })
+
+  it('treats a 409 without the card as unexpected, and a refused text too', async () => {
+    expect(await errorKind(changeSourceText(7, 'x', respondWith(json({ detail: 'taken' }, 409))))).toBe('unexpected')
+    expect(await errorKind(changeSourceText(7, ' ', respondWith(json({}, 422))))).toBe('unexpected')
+    expect(await errorKind(changeSourceText(7, 'x', respondWith(json({}, 404))))).toBe('notFound')
   })
 
   it("resets through the card's own route and returns it as new", async () => {
