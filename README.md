@@ -307,16 +307,18 @@ The browser only ever talks to the dev server, which forwards `/comics`, `/media
 `/cards` and `/study` to the backend. Collecting a card, answering a question, saving
 settings and fixing a card all write to the real deck.
 
-On the server, the web client runs as the `web` service instead: a built bundle
-behind nginx, which forwards the same four paths to `api` over the compose
-network — no Cloudflare and no Service Token involved.
+To run it without a window left open, start the `web` service instead: a built
+bundle behind nginx, which forwards the same four paths with the same `web/.env`
+— `VISTA_API_ORIGIN` and the Service Token. It does not need `api` on the same
+machine, so it starts alone:
 
 ```bash
-docker compose up -d --build api web   # → http://<server>:8080
+docker compose up -d --build web   # → http://<this machine>:8080
 ```
 
-Like `api` on 8000, port 8080 is published on every interface, so anyone who can
-reach the machine — the tailnet, the local network — can open it. Set
+With `api` in the same compose project, `VISTA_API_ORIGIN=http://api:8000` reaches
+it directly. Port 8080 is published on every interface, and whoever reaches it
+reads the library through the token — the tailnet, the local network. Set
 `WEB_BIND_ADDRESS` in the repo-root `.env` to the machine's Tailscale IP to limit
 it to the tailnet.
 

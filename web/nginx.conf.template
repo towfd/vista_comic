@@ -1,0 +1,36 @@
+# The same split the Vite dev server makes (vite.config.ts), read from the same
+# web/.env: the API's paths go to VISTA_API_ORIGIN with the Cloudflare Access
+# Service Token attached here, everything else is the app. The nginx image
+# fills ${...} from the container's environment when it starts, so the token
+# lives in the running container and never in an image layer.
+#
+# VISTA_API_ORIGIN is the backend wherever it runs: the public hostname through
+# the tunnel (the default), or http://api:8000 when `api` runs in this same
+# compose project.
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+
+    location ~ ^/(comics|media|cards|study)(/|$) {
+        proxy_pass ${VISTA_API_ORIGIN};
+        # Cloudflare routes by hostname, and TLS needs it too: the request
+        # carries the backend's host, not this page's (Vite's changeOrigin).
+        proxy_set_header Host $proxy_host;
+        proxy_ssl_server_name on;
+        proxy_set_header CF-Access-Client-Id "${CF_ACCESS_CLIENT_ID}";
+        proxy_set_header CF-Access-Client-Secret "${CF_ACCESS_CLIENT_SECRET}";
+    }
+
+    # Built assets carry a content hash in their name, so they never change.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Any other path is a page of the app: the router reads it in the browser.
+    # index.html itself is never cached, so a redeploy is seen on the next load.
+    location / {
+        try_files $uri /index.html;
+        add_header Cache-Control "no-cache";
+    }
+}

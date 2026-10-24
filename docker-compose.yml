@@ -49,21 +49,25 @@ services:
       retries: 5
       start_period: 10s
 
-  # The web client, built and served by nginx, which forwards the API's paths
-  # to `api` over the compose network (see web/nginx.conf). No Cloudflare and no
-  # Service Token: like `api` on 8000, the page is open to whoever can reach
-  # this machine -- every interface by default, so the tailnet and the local
-  # network. WEB_BIND_ADDRESS in the repo-root .env narrows that, e.g. to the
-  # machine's Tailscale IP for the tailnet only.
+  # The web client, built and served by nginx, which forwards the API's paths to
+  # VISTA_API_ORIGIN with the Service Token -- the same web/.env the dev server
+  # reads (see web/nginx.conf.template). Independent of `api`: it can run on
+  # another machine than the backend, so `docker compose up -d web` starts it
+  # alone.
+  #
+  # Anyone who reaches port 8080 reads the library through that token -- every
+  # interface by default, so the tailnet and the local network.
+  # WEB_BIND_ADDRESS in the repo-root .env narrows it, e.g. to this machine's
+  # Tailscale IP for the tailnet only.
   web:
     build:
       context: ./web
       dockerfile: Dockerfile
+    env_file:
+      - path: ./web/.env
+        required: false
     ports:
       - "${WEB_BIND_ADDRESS:-0.0.0.0}:8080:80"
-    depends_on:
-      api:
-        condition: service_healthy
     restart: unless-stopped
 
   postgres:
