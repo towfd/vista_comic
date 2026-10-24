@@ -307,6 +307,19 @@ The browser only ever talks to the dev server, which forwards `/comics`, `/media
 `/cards` and `/study` to the backend. Collecting a card, answering a question, saving
 settings and fixing a card all write to the real deck.
 
+On the server, the web client runs as the `web` service instead: a built bundle
+behind nginx, which forwards the same four paths to `api` over the compose
+network — no Cloudflare and no Service Token involved.
+
+```bash
+docker compose up -d --build api web   # → http://<server>:8080
+```
+
+Like `api` on 8000, port 8080 is published on every interface, so anyone who can
+reach the machine — the tailnet, the local network — can open it. Set
+`WEB_BIND_ADDRESS` in the repo-root `.env` to the machine's Tailscale IP to limit
+it to the tailnet.
+
 ### 4. Tests
 
 ```bash
