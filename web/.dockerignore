@@ -1,6 +1,6 @@
-# web/.env holds the Cloudflare Access service token for the dev server. The
-# container never needs it -- it talks to `api` directly -- and it must not end
-# up in an image layer.
+# web/.env holds the Cloudflare Access service token. The container reads it as
+# its environment when it starts (docker-compose.yml); it must never be copied
+# into an image layer.
 .env
 .env.*
 node_modules

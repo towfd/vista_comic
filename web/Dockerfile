@@ -14,6 +14,12 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Defaults for what web/.env normally sets (see docker-compose.yml). Declared
+# so an unset one becomes empty rather than a literal ${...} in the config.
+ENV VISTA_API_ORIGIN=https://api.vistabanana.com \
+    CF_ACCESS_CLIENT_ID= \
+    CF_ACCESS_CLIENT_SECRET=
+# Filled from the environment into conf.d/default.conf at container start.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
