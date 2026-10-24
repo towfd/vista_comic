@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => {
         '/media': upstream,
         '/cards': upstream,
         '/study': upstream,
+        '/rescan': upstream,
       },
     },
     test: {
