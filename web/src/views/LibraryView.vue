@@ -5,7 +5,7 @@ import { useLibraryStore } from '../stores/library'
 import ErrorState from '../components/ErrorState.vue'
 
 const store = useLibraryStore()
-const { comics, loading, error, loaded } = storeToRefs(store)
+const { comics, loading, error, loaded, refreshing, refreshFailed } = storeToRefs(store)
 
 onMounted(() => {
   if (!loaded.value) store.load()
@@ -14,6 +14,18 @@ onMounted(() => {
 
 <template>
   <main class="mx-auto max-w-6xl px-4 py-8">
+    <div v-if="loaded" class="mb-4 flex items-center justify-end gap-3">
+      <p v-if="refreshFailed && !refreshing" class="text-sm text-amber-400">重新整理失敗，顯示的是先前的書庫。</p>
+      <button
+        type="button"
+        class="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+        :disabled="refreshing"
+        @click="store.refresh()"
+      >
+        {{ refreshing ? '重新整理中…' : '重新整理' }}
+      </button>
+    </div>
+
     <p v-if="loading && !loaded" class="py-24 text-center text-neutral-400">載入中…</p>
 
     <ErrorState v-else-if="error" :kind="error" @retry="store.load()" />

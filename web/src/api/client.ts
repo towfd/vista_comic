@@ -90,19 +90,25 @@ async function readJson<T>(response: Response): Promise<T> {
  * The request itself and every failure a status can tell: what a body-less answer and a JSON one share.
  * `answers` names a refusal the caller reads for itself rather than as a failure.
  */
-async function send(path: string, init: RequestInit, fetcher: Fetcher, answers: readonly number[] = []): Promise<Response> {
+async function send(
+  path: string,
+  init: RequestInit,
+  fetcher: Fetcher,
+  answers: readonly number[] = [],
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
   let response: Response
   // A timer and a controller rather than AbortSignal.timeout, so the clock a
   // test controls is the clock this runs on.
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     // 'manual' keeps Access's redirect visible to us. Followed, it would land on
     // a cross-origin login page, fail CORS, and surface as a network error --
     // indistinguishable from the server being down.
     response = await fetcher(path, { ...init, redirect: 'manual', signal: controller.signal })
   } catch (error) {
-    const reason = controller.signal.aborted ? `timed out after ${REQUEST_TIMEOUT_MS}ms` : `request failed: ${String(error)}`
+    const reason = controller.signal.aborted ? `timed out after ${timeoutMs}ms` : `request failed: ${String(error)}`
     throw new ApiError('unavailable', reason)
   } finally {
     clearTimeout(timer)
@@ -129,6 +135,18 @@ async function send(path: string, init: RequestInit, fetcher: Fetcher, answers: 
 export async function fetchComics(fetcher: Fetcher = fetch): Promise<ComicSummary[]> {
   const comics = await getJson<ComicSummary[]>('/comics', fetcher)
   return comics.map((comic) => ({ ...comic, coverUrl: toMediaPath(comic.coverUrl) }))
+}
+
+/** How long a rescan may take: it walks the whole library folder, which an ordinary read never waits on. */
+export const RESCAN_TIMEOUT_MS = 60_000
+
+/**
+ * Have the backend walk the library folder again. Its catalog is scanned once
+ * at startup and held in memory, so without this a re-fetch hands back the
+ * same list. The counts it answers with are not read: the caller re-fetches.
+ */
+export async function rescanLibrary(fetcher: Fetcher = fetch): Promise<void> {
+  await send('/rescan', { method: 'POST', headers: { Accept: 'application/json' } }, fetcher, [], RESCAN_TIMEOUT_MS)
 }
 
 export async function fetchComic(comicId: string, fetcher: Fetcher = fetch): Promise<ComicDetail> {

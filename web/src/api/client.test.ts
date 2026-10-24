@@ -14,6 +14,8 @@ import {
   fetchStudySettings,
   getJson,
   recordReview,
+  rescanLibrary,
+  RESCAN_TIMEOUT_MS,
   saveProgress,
   saveStudySettings,
   toMediaPath,
@@ -105,6 +107,34 @@ describe('getJson error shaping', () => {
 
   it('reports 404 as notFound', async () => {
     expect(await errorKind(getJson('/comics/nope', respondWith(json({ detail: 'Comic not found' }, 404))))).toBe('notFound')
+  })
+})
+
+describe('rescanLibrary', () => {
+  it('posts to /rescan', async () => {
+    const fetcher = vi.fn<Fetcher>(async () => json({ status: 'rescanned', comics: 3, chapters: 40 }))
+    await rescanLibrary(fetcher)
+    expect(fetcher).toHaveBeenCalledWith('/rescan', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('waits past the ordinary timeout, since a scan walks the whole folder', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetcher: Fetcher = (_path, init) =>
+        new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))))
+      let settled = false
+      const pending = errorKind(rescanLibrary(fetcher)).finally(() => (settled = true))
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS + 1)
+      expect(settled).toBe(false)
+      await vi.advanceTimersByTimeAsync(RESCAN_TIMEOUT_MS)
+      expect(await pending).toBe('unavailable')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports a refusal like any other request', async () => {
+    expect(await errorKind(rescanLibrary(respondWith(new Response('', { status: 403 }))))).toBe('auth')
   })
 })
 
