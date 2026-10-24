@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from . import (
@@ -68,6 +68,7 @@ from .models import (
     ComprehensionRecordResponse,
     LearningCardCreate,
     LearningCardResponse,
+    LearningCardSourceText,
     LearningCardUpdate,
     ProgressResponse,
     ProgressUpdate,
@@ -960,6 +961,45 @@ def update_card(card_id: int, body: LearningCardUpdate) -> LearningCardResponse:
     if row is None:
         raise HTTPException(status_code=404, detail="Learning card not found")
     return _to_card_response(row)
+
+
+@app.put(
+    "/cards/{card_id}/source-text",
+    response_model=LearningCardResponse,
+    responses={409: {"description": "Another card already holds this text"}},
+)
+def change_card_source_text(card_id: int, body: LearningCardSourceText):
+    """Correct a typo in what was collected. The card keeps everything else.
+
+    Its own route rather than a third ``PATCH`` field because it is the one
+    correction that can change *which card this is*: the new text may already
+    be another card's. That answers **409 with the other card** under
+    ``card``, so the client can point at it -- nothing is merged and nothing on
+    either card changes. Answering 200 with the other card, as collecting does,
+    would read as a save that happened.
+
+    Unchanged text answers 200 with the card as it is: a ``PUT`` that is
+    repeated says the same thing twice.
+    """
+    if not normalized_key(body.sourceText):
+        raise HTTPException(
+            status_code=422, detail="sourceText contains nothing to learn"
+        )
+    with _card_session() as session:
+        changed, other = learning_card_store.change_source_text(
+            session, card_id, body.sourceText
+        )
+        if other is not None:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "Another card already holds this text",
+                    "card": _to_card_response(other).model_dump(mode="json"),
+                },
+            )
+    if changed is None:
+        raise HTTPException(status_code=404, detail="Learning card not found")
+    return _to_card_response(changed)
 
 
 @app.delete("/cards/{card_id}", status_code=204)

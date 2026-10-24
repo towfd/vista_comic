@@ -171,7 +171,8 @@ def update(
 
     Nothing else is touched. ``ladder_stage``, ``due_at``, ``lookup_count`` and
     ``created_at`` are the scheduler's business, and the identity columns
-    are nobody's -- see ``models.LearningCardUpdate``.
+    are not changed here -- see ``models.LearningCardUpdate`` and
+    ``change_source_text``.
     """
     values = {}
     if translation is not None:
@@ -186,6 +187,58 @@ def update(
     )
     session.commit()
     return result.rowcount > 0
+
+
+def change_source_text(
+    session: Session, card_id: int, source_text: str
+) -> Tuple[Optional[LearningCard], Optional[LearningCard]]:
+    """Correct a card's source text; return ``(card, None)`` or ``(None, other)``.
+
+    For a typo made while collecting. The card stays the card it was: its
+    schedule, review log, lookup count, translation, kind and source reference
+    are untouched, because the reader is fixing a spelling, not meeting a new
+    line. Resetting it, if that is wanted too, is a separate press.
+
+    **The new text may name a card that already exists**, and then nothing is
+    changed and that other card comes back as ``other`` -- the reader decides
+    what to keep, as when collecting a line already collected. Merging was
+    considered and not done: which schedule, translation and history survive
+    is a question with no answer the server could give on the reader's behalf.
+
+    ``(None, None)`` when there is no such card. The caller is responsible for
+    rejecting an empty normalised key, as with ``create_or_get``.
+    """
+    card = session.get(LearningCard, card_id)
+    if card is None:
+        return None, None
+
+    key = normalized_key(source_text)
+    other = _holder_of(session, key, card.target_language, besides=card_id)
+    if other is not None:
+        return None, other
+
+    card.source_text = source_text
+    card.normalized_key = key
+    try:
+        session.commit()
+    except IntegrityError:
+        # Another request took the key between the select and this commit.
+        session.rollback()
+        return None, _holder_of(session, key, card.target_language, besides=card_id)
+    session.refresh(card)
+    return card, None
+
+
+def _holder_of(
+    session: Session, key: str, target_language: str, *, besides: int
+) -> Optional[LearningCard]:
+    return session.execute(
+        select(LearningCard).where(
+            LearningCard.normalized_key == key,
+            LearningCard.target_language == target_language,
+            LearningCard.id != besides,
+        )
+    ).scalar_one_or_none()
 
 
 def delete(session: Session, card_id: int) -> bool:

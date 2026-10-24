@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ApiError, type ApiErrorKind, type CardCorrection } from '../api/client'
 import { useDeckStore } from '../stores/deck'
+import { SOURCE_TEXT_LIMIT } from '../stores/collect'
+import type { LearningCard } from '../api/types'
 import { scheduleSummary } from '../practice/library'
 import ErrorState from '../components/ErrorState.vue'
 
@@ -16,16 +18,36 @@ const { cards, settings, loading, error, loaded, loadedAt } = storeToRefs(store)
 const id = computed(() => Number(props.cardId))
 const card = computed(() => cards.value.find((held) => held.id === id.value) ?? null)
 
+const sourceText = ref('')
 const translation = ref('')
 const working = ref(false)
 const done = ref<string | null>(null)
 const failure = ref<ApiErrorKind | null>(null)
+// The card that already holds the source text the reader tried to give this one.
+const taken = ref<LearningCard | null>(null)
 // Which of the two actions that cannot be taken back is waiting for a second press.
 const confirming = ref<'reset' | 'delete' | null>(null)
 
 // Fetched fresh on arrival: this page changes what the phone also holds, and
 // should start from what is true now rather than from a copy kept for a count.
 onMounted(() => store.load())
+
+watch(
+  () => card.value?.sourceText,
+  (text) => {
+    sourceText.value = text ?? ''
+  },
+  { immediate: true },
+)
+
+// Going to the card that holds the text is the same page with another id:
+// what was said about the last card is not about this one.
+watch(id, () => {
+  done.value = null
+  failure.value = null
+  taken.value = null
+  confirming.value = null
+})
 
 watch(
   () => card.value?.translation,
@@ -39,6 +61,13 @@ const summary = computed(() =>
   card.value ? scheduleSummary(card.value, settings.value?.learningSteps ?? [], loadedAt.value ?? new Date()) : '',
 )
 
+const sourceUnchanged = computed(
+  () =>
+    sourceText.value.trim() === '' ||
+    sourceText.value.trim().length > SOURCE_TEXT_LIMIT ||
+    sourceText.value.trim() === card.value?.sourceText,
+)
+
 const unchanged = computed(() => translation.value.trim() === '' || translation.value.trim() === card.value?.translation)
 
 const failed: Record<ApiErrorKind, string> = {
@@ -48,17 +77,22 @@ const failed: Record<ApiErrorKind, string> = {
   unexpected: '伺服器拒絕了這個修改，卡片沒有變動。',
 }
 
-/** Run one action, say what happened, and leave if the card is no longer there. */
-async function run(action: () => Promise<'done' | 'gone'>, message: string, leaves = false) {
+/**
+ * Run one action, say what happened, and leave if the card is no longer there.
+ * `'kept'`: the server refused without changing anything, and the action has
+ * already said why.
+ */
+async function run(action: () => Promise<'done' | 'gone' | 'kept'>, message: string, leaves = false) {
   if (working.value) return
   working.value = true
   done.value = null
   failure.value = null
+  taken.value = null
   confirming.value = null
   try {
     const result = await action()
     if (leaves || result === 'gone') router.replace({ name: 'deck' })
-    else done.value = message
+    else if (result === 'done') done.value = message
   } catch (e) {
     failure.value = e instanceof ApiError ? e.kind : 'unexpected'
   } finally {
@@ -67,6 +101,16 @@ async function run(action: () => Promise<'done' | 'gone'>, message: string, leav
 }
 
 const correct = (correction: CardCorrection, message: string) => run(() => store.correctCard(id.value, correction), message)
+
+function saveSourceText() {
+  if (sourceUnchanged.value) return
+  run(async () => {
+    const result = await store.correctSourceText(id.value, sourceText.value.trim())
+    if (typeof result === 'string') return result
+    taken.value = result.taken
+    return 'kept'
+  }, '原文已更新。')
+}
 
 function saveTranslation() {
   if (!unchanged.value) correct({ translation: translation.value.trim() }, '譯文已更新。')
@@ -116,13 +160,54 @@ function remove() {
       <section class="mt-4">
         <h1 class="text-xl leading-relaxed break-words whitespace-pre-wrap text-neutral-100 sm:text-2xl" lang="vi">{{ card.sourceText }}</h1>
         <p class="mt-3 text-sm text-neutral-400">{{ summary }}</p>
-        <p class="mt-1 text-xs text-neutral-500">原文不能修改。打錯或辨識錯誤的卡片請刪除，再重新收集。</p>
       </section>
 
       <p v-if="done" class="mt-6 text-sm text-emerald-400" role="status">{{ done }}</p>
       <p v-if="failure" class="mt-6 text-sm text-amber-400" role="alert">{{ failed[failure] }}</p>
 
       <section class="mt-8 space-y-8">
+        <div>
+          <label for="card-source" class="block text-sm font-medium text-neutral-100">原文</label>
+          <p class="mt-1 text-xs text-neutral-500">修正收卡時打錯的字。學習進度和作答紀錄都會保留。</p>
+          <!-- A textarea: a sentence can be collected with its line breaks, and keeps them. -->
+          <div class="mt-2 flex items-start gap-2">
+            <textarea
+              id="card-source"
+              v-model="sourceText"
+              lang="vi"
+              rows="2"
+              :maxlength="SOURCE_TEXT_LIMIT"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              :disabled="working"
+              class="min-w-0 flex-1 resize-y rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-sky-500"
+            />
+            <button
+              type="button"
+              :disabled="working || sourceUnchanged"
+              class="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-40"
+              @click="saveSourceText"
+            >
+              儲存
+            </button>
+          </div>
+
+          <!-- Nothing is merged: which card to keep is the reader's to decide, as when collecting a line twice. -->
+          <div v-if="taken" class="mt-3 rounded-md border border-amber-900/60 p-3" role="alert">
+            <p class="text-sm text-amber-400">字卡庫已經有這張卡片，原文沒有修改。</p>
+            <p class="mt-2 text-sm whitespace-pre-wrap text-neutral-100" lang="vi">{{ taken.sourceText }}</p>
+            <p class="mt-1 text-sm whitespace-pre-wrap text-neutral-400">{{ taken.translation }}</p>
+            <RouterLink
+              :to="{ name: 'deck-card', params: { cardId: taken.id } }"
+              class="-mx-2 mt-1 inline-block px-2 py-2 text-sm text-neutral-400 underline decoration-neutral-600 underline-offset-4 hover:text-neutral-200"
+            >
+              到那張卡片 →
+            </RouterLink>
+          </div>
+        </div>
+
         <div>
           <label for="card-translation" class="block text-sm font-medium text-neutral-100">譯文</label>
           <div class="mt-2 flex gap-2">

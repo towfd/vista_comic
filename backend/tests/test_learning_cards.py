@@ -457,6 +457,108 @@ def test_patching_a_card_that_is_gone_is_a_404(client):
     assert client.patch("/cards/999999", json={"translation": "x"}).status_code == 404
 
 
+def _fix(client, card_id, text):
+    return client.put(f"/cards/{card_id}/source-text", json={"sourceText": text})
+
+
+def test_a_typo_in_the_source_text_can_be_corrected(client):
+    card = _add(client, sourceText="khong biet").json()
+
+    resp = _fix(client, card["id"], "không biết")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["sourceText"] == "không biết"
+    assert client.get("/cards").json()[0]["sourceText"] == "không biết"
+
+
+def test_the_corrected_text_is_the_cards_identity_from_then_on(client):
+    """Collecting the corrected line finds this card; the typo is free again."""
+    card = _add(client, sourceText="khong biet").json()
+    _fix(client, card["id"], "không biết")
+
+    again = _add(client, sourceText="không biết")
+    assert again.status_code == 200
+    assert again.json()["id"] == card["id"]
+    assert _add(client, sourceText="khong biet").status_code == 201
+
+
+def test_a_correction_keeps_everything_else_about_the_card(client):
+    """A spelling fixed is the same card: schedule, history, words, origin."""
+    card = _add(client, sourceText="khong biet", kind="sentence").json()
+    client.post(f"/cards/{card['id']}/lookups")
+    client.post(
+        f"/cards/{card['id']}/reviews",
+        json={
+            "questionType": "sentence_typed",
+            "isCorrect": True,
+            "clientToken": "fix-1",
+            "localDate": "2026-10-24",
+            "answeredAt": "2026-10-24T08:00:00+00:00",
+            "context": "review",
+        },
+    )
+    before = client.get("/cards").json()[0]
+
+    after = _fix(client, card["id"], "không biết").json()
+
+    for field in (
+        "id", "translation", "kind", "state", "learningStep", "ladderStage",
+        "previousStage", "introducedOn", "dueAt", "lookupCount", "createdAt",
+        "targetLanguage", "comicId", "chapterId", "pageNumber",
+    ):
+        assert after[field] == before[field], field
+
+
+def test_a_correction_onto_another_card_is_refused_and_names_it(client):
+    typo = _add(client, sourceText="khong biet").json()
+    other = _add(client, sourceText="Không  biết").json()
+
+    resp = _fix(client, typo["id"], "không biết")
+
+    assert resp.status_code == 409
+    assert resp.json()["card"]["id"] == other["id"]
+    assert resp.json()["card"]["sourceText"] == "Không  biết"
+    texts = sorted(card["sourceText"] for card in client.get("/cards").json())
+    assert texts == sorted(["khong biet", "Không  biết"])
+
+
+def test_changing_only_case_or_spacing_is_not_a_collision_with_itself(client):
+    card = _add(client, sourceText="khong  biet").json()
+
+    resp = _fix(client, card["id"], "Khong biet")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["sourceText"] == "Khong biet"
+
+
+def test_the_same_text_again_is_answered_with_the_card(client):
+    card = _add(client).json()
+
+    resp = _fix(client, card["id"], _BODY["sourceText"])
+
+    assert resp.status_code == 200
+    assert resp.json()["sourceText"] == _BODY["sourceText"]
+
+
+def test_a_correction_to_nothing_is_refused(client):
+    card = _add(client).json()
+
+    assert _fix(client, card["id"], "").status_code == 422
+    assert _fix(client, card["id"], "   ").status_code == 422
+    assert client.get("/cards").json()[0]["sourceText"] == _BODY["sourceText"]
+
+
+def test_a_correction_past_the_cap_is_refused(client):
+    card = _add(client).json()
+
+    assert _fix(client, card["id"], "x" * 201).status_code == 422
+    assert _fix(client, card["id"], "x" * 200).status_code == 200
+
+
+def test_correcting_a_card_that_is_gone_is_a_404(client):
+    assert _fix(client, 999999, "x").status_code == 404
+
+
 def test_a_card_can_be_deleted(client):
     card = _add(client).json()
 

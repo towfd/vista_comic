@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   updateCard: vi.fn(),
   resetCard: vi.fn(),
   deleteCard: vi.fn(),
+  changeSourceText: vi.fn(),
 }))
 
 vi.mock('../api/client', async (importOriginal) => {
@@ -22,6 +23,7 @@ vi.mock('../api/client', async (importOriginal) => {
     updateCard: api.updateCard,
     resetCard: api.resetCard,
     deleteCard: api.deleteCard,
+    changeSourceText: api.changeSourceText,
   }
 })
 
@@ -425,6 +427,29 @@ describe('deck store fixing a card', () => {
     expect(await store.resetCardToNew(1)).toBe('done')
     expect(api.resetCard).toHaveBeenCalledWith(1)
     expect(store.standing?.counts).toEqual({ due: 0, fresh: 1, learning: 0 })
+  })
+
+  it('holds a card whose source text was corrected', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    api.changeSourceText.mockResolvedValue({ card: card(2, { sourceText: 'fixed' }) })
+    expect(await store.correctSourceText(2, 'fixed')).toBe('done')
+    expect(api.changeSourceText).toHaveBeenCalledWith(2, 'fixed')
+    expect(held(store, 2)).toMatchObject({ sourceText: 'fixed', ladderStage: 2 })
+  })
+
+  it('hands back the card that already holds the text, and changes nothing', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    const before = store.cards.map((c) => ({ ...c }))
+    api.changeSourceText.mockResolvedValue({ taken: card(1) })
+    expect(await store.correctSourceText(2, 'same as one')).toEqual({ taken: card(1) })
+    expect(store.cards).toEqual(before)
+  })
+
+  it('forgets a card gone before its source text could be corrected', async () => {
+    const store = await loadedWith([card(1), card(2)])
+    api.changeSourceText.mockRejectedValue(new ApiError('notFound', 'gone'))
+    expect(await store.correctSourceText(1, 'x')).toBe('gone')
+    expect(store.cards.map((c) => c.id)).toEqual([2])
   })
 
   it('forgets a deleted card', async () => {

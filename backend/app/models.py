@@ -283,12 +283,13 @@ class LearningCardUpdate(BaseModel):
 
     **Exactly two fields, and refusing the rest is the point.** ``sourceText``
     is half the card's identity and ``targetLanguage`` is the other half;
-    changing either could collide with another card under the unique constraint,
-    and changing the source would detach the row from the
-    ``comicId``/``chapterId``/``pageNumber`` still pointing at where that exact
-    line was read. The source reference is a fact about the past. A field that
-    is accepted and then quietly changes which card this *is* would be a trap
-    for whoever touches this next.
+    changing either could collide with another card under the unique constraint.
+    The source text is corrected through its own route,
+    ``PUT /cards/{id}/source-text`` (``LearningCardSourceText``), which can
+    answer that collision; ``targetLanguage`` and the source reference are not
+    changed at all -- the reference is a fact about where the line was read. A
+    field that is accepted here and then quietly changes which card this *is*
+    would be a trap for whoever touches this next.
 
     **A null ``kind`` is a value, not an omission.** Cards collected before the
     two save buttons existed have none, and the reader must be able to clear a
@@ -299,6 +300,17 @@ class LearningCardUpdate(BaseModel):
 
     translation: Optional[str] = Field(default=None, min_length=1)
     kind: Optional[Literal["word", "sentence"]] = None
+
+
+class LearningCardSourceText(BaseModel):
+    """Request body for ``PUT /cards/{id}/source-text``.
+
+    The same cap as collecting, so a correction cannot make a card no
+    collection could have made. Text that normalises to nothing is refused by
+    the route, as there.
+    """
+
+    sourceText: str = Field(min_length=1, max_length=200)
 
 
 class CardReviewCreate(BaseModel):
