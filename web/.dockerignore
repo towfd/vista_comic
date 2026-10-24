@@ -1,0 +1,7 @@
+# web/.env holds the Cloudflare Access service token for the dev server. The
+# container never needs it -- it talks to `api` directly -- and it must not end
+# up in an image layer.
+.env
+.env.*
+node_modules
+dist

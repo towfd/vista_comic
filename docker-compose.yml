@@ -1,6 +1,7 @@
 # Local one-command stack for the vista_comic backend (M5 Slice 4, sub-step B).
 #
-# Two services: the FastAPI `api` and a `postgres` reading-progress store.
+# Services: the FastAPI `api`, a `postgres` reading-progress store, the `web`
+# client, and the `cloudflared` tunnel.
 # The catalog stays scan-derived in memory; Postgres holds ONLY folder-external
 # reading progress (a single `progress` table).
 #
@@ -47,6 +48,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  # The web client, built and served by nginx, which forwards the API's paths
+  # to `api` over the compose network (see web/nginx.conf). No Cloudflare and no
+  # Service Token: like `api` on 8000, the page is open to whoever can reach
+  # this machine -- every interface by default, so the tailnet and the local
+  # network. WEB_BIND_ADDRESS in the repo-root .env narrows that, e.g. to the
+  # machine's Tailscale IP for the tailnet only.
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "${WEB_BIND_ADDRESS:-0.0.0.0}:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
