@@ -417,3 +417,24 @@ export async function requestLineAnalysis(request: LineAnalysisRequest, fetcher:
 export async function fetchLineAnalysis(id: number, fetcher: Fetcher = fetch): Promise<LineAnalysis> {
   return getJson<LineAnalysis>(`/line-analyses/${id}`, fetcher)
 }
+
+/**
+ * The stored analysis of a line with a model, whatever its status, or `null`
+ * when there is none. Never queues and never spends: what the panel asks
+ * before the reader presses 開始解析.
+ */
+export async function lookupLineAnalysis(
+  identity: Pick<LineAnalysisRequest, 'sourceText' | 'translation' | 'model'>,
+  fetcher: Fetcher = fetch,
+): Promise<LineAnalysis | null> {
+  try {
+    return await requestJson<LineAnalysis>(
+      '/line-analyses/lookup',
+      { method: 'POST', headers: JSON_BODY, body: JSON.stringify(identity) },
+      fetcher,
+    )
+  } catch (e) {
+    if (e instanceof ApiError && e.kind === 'notFound') return null
+    throw e
+  }
+}

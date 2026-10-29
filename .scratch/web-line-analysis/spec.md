@@ -110,6 +110,10 @@ The backend runs the call in the background and keeps the result, so a line alre
 - No component or browser tests; a device checklist is handed to the developer (CLAUDE.md, Verification rule 4).
 - Real Claude calls happen only in ticket 02, a handful of lines, with the developer's go-ahead on the cost.
 
+## Change after release (2026-10-29): 開始解析
+
+Opening the panel, or switching model, no longer asks for an analysis: it was too easy to start a paid call by accident. The panel looks the line up (`POST /line-analyses/lookup`, identity only, never queues or reserves; 404 when there is none) and shows a stored analysis — done, pending (and polls it) or failed — at once. With none, it shows **用 <model> 開始解析**, and only that button (or 重試 / 重新查詢) calls `POST /line-analyses`. A failed lookup is treated as nothing stored.
+
 ## Out of Scope
 
 - A history or list page of past analyses; editing an analysis.

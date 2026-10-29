@@ -3,11 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type LineAnalysis } from '../api/client'
 import { POLL_MS, useAnalysisStore, wordTranslation, type AnalysedBubble } from './analysis'
 
-const api = vi.hoisted(() => ({ requestLineAnalysis: vi.fn(), fetchLineAnalysis: vi.fn() }))
+const api = vi.hoisted(() => ({ requestLineAnalysis: vi.fn(), fetchLineAnalysis: vi.fn(), lookupLineAnalysis: vi.fn() }))
 
 vi.mock('../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/client')>()
-  return { ...actual, requestLineAnalysis: api.requestLineAnalysis, fetchLineAnalysis: api.fetchLineAnalysis }
+  return {
+    ...actual,
+    requestLineAnalysis: api.requestLineAnalysis,
+    fetchLineAnalysis: api.fetchLineAnalysis,
+    lookupLineAnalysis: api.lookupLineAnalysis,
+  }
 })
 
 const BUBBLE: AnalysedBubble = {
@@ -53,6 +58,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   api.requestLineAnalysis.mockReset().mockResolvedValue({ analysis: done() })
   api.fetchLineAnalysis.mockReset()
+  api.lookupLineAnalysis.mockReset().mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -64,6 +70,7 @@ describe('opening the panel for a bubble', () => {
   it('opens and asks for the line with its translation, the model and the names', async () => {
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     expect(store.open).toBe(true)
     expect(store.requesting).toBe(true)
     await vi.runAllTimersAsync()
@@ -81,9 +88,88 @@ describe('opening the panel for a bubble', () => {
   it('shows a stored analysis without polling', async () => {
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.runAllTimersAsync()
 
     expect(api.fetchLineAnalysis).not.toHaveBeenCalled()
+  })
+})
+
+describe('nothing is spent until 開始解析', () => {
+  it('opening looks the line up but asks for nothing', async () => {
+    const store = useAnalysisStore()
+    store.openFor(BUBBLE)
+    expect(store.looking).toBe(true)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(api.lookupLineAnalysis).toHaveBeenCalledWith({
+      sourceText: BUBBLE.sourceText,
+      translation: BUBBLE.translation,
+      model: 'sonnet',
+    })
+    expect(api.requestLineAnalysis).not.toHaveBeenCalled()
+    expect(store.looking).toBe(false)
+    expect(store.analysis).toBeNull()
+    expect(store.problem).toBeNull()
+  })
+
+  it('shows a stored analysis on opening', async () => {
+    api.lookupLineAnalysis.mockResolvedValue(done())
+    const store = useAnalysisStore()
+    store.openFor(BUBBLE)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(store.analysis?.result).toEqual(RESULT)
+    expect(api.requestLineAnalysis).not.toHaveBeenCalled()
+  })
+
+  it('keeps polling a stored analysis that is still pending', async () => {
+    api.lookupLineAnalysis.mockResolvedValue(analysis())
+    api.fetchLineAnalysis.mockResolvedValue(done())
+    const store = useAnalysisStore()
+    store.openFor(BUBBLE)
+    await vi.advanceTimersByTimeAsync(POLL_MS)
+
+    expect(store.analysis?.status).toBe('done')
+    expect(api.requestLineAnalysis).not.toHaveBeenCalled()
+  })
+
+  it('treats a failed lookup as nothing stored, still asking for nothing', async () => {
+    api.lookupLineAnalysis.mockRejectedValue(new ApiError('unavailable', 'down'))
+    const store = useAnalysisStore()
+    store.openFor(BUBBLE)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(store.analysis).toBeNull()
+    expect(store.problem).toBeNull()
+    expect(store.looking).toBe(false)
+    expect(api.requestLineAnalysis).not.toHaveBeenCalled()
+  })
+
+  it('start asks for the analysis with the chosen model', async () => {
+    const store = useAnalysisStore()
+    store.openFor(BUBBLE)
+    await vi.advanceTimersByTimeAsync(0)
+    store.start()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(api.requestLineAnalysis).toHaveBeenCalledTimes(1)
+    expect(store.analysis?.result).toEqual(RESULT)
+  })
+
+  it('a start pressed during the lookup wins over it', async () => {
+    let found!: (value: unknown) => void
+    api.lookupLineAnalysis.mockReturnValue(new Promise((resolve) => (found = resolve)))
+    api.requestLineAnalysis.mockResolvedValue({ analysis: analysis() })
+    const store = useAnalysisStore()
+    store.openFor(BUBBLE)
+    store.start()
+    await vi.advanceTimersByTimeAsync(0)
+    found(null)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(store.looking).toBe(false)
+    expect(store.analysis?.status).toBe('pending')
   })
 })
 
@@ -93,6 +179,7 @@ describe('waiting for a pending analysis', () => {
     api.fetchLineAnalysis.mockResolvedValueOnce(analysis()).mockResolvedValueOnce(done())
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
     expect(store.analysis?.status).toBe('pending')
 
@@ -112,6 +199,7 @@ describe('waiting for a pending analysis', () => {
     api.fetchLineAnalysis.mockResolvedValue(analysis({ status: 'failed', failure: 'refused' }))
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(POLL_MS)
 
     expect(store.analysis?.failure).toBe('refused')
@@ -124,6 +212,7 @@ describe('waiting for a pending analysis', () => {
     api.fetchLineAnalysis.mockRejectedValueOnce(new ApiError('unavailable', 'blip')).mockResolvedValueOnce(done())
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(POLL_MS * 2)
 
     expect(store.analysis?.status).toBe('done')
@@ -135,6 +224,7 @@ describe('waiting for a pending analysis', () => {
     api.fetchLineAnalysis.mockResolvedValue(analysis())
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
 
     store.close()
@@ -150,6 +240,7 @@ describe('waiting for a pending analysis', () => {
     api.requestLineAnalysis.mockReturnValue(new Promise((resolve) => (answer = resolve)))
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     store.close()
 
     answer({ analysis: done() })
@@ -159,17 +250,20 @@ describe('waiting for a pending analysis', () => {
     expect(store.requesting).toBe(false)
   })
 
-  it('reopening the bubble finds the result', async () => {
-    api.requestLineAnalysis.mockResolvedValueOnce({ analysis: analysis() }).mockResolvedValueOnce({ analysis: done() })
+  it('reopening the bubble finds the result without pressing start', async () => {
+    api.requestLineAnalysis.mockResolvedValueOnce({ analysis: analysis() })
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
     store.close()
 
+    api.lookupLineAnalysis.mockResolvedValue(done())
     store.openFor(BUBBLE)
     await vi.advanceTimersByTimeAsync(0)
 
     expect(store.analysis?.result).toEqual(RESULT)
+    expect(api.requestLineAnalysis).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -178,6 +272,7 @@ describe('failures', () => {
     api.requestLineAnalysis.mockResolvedValue({ capped: true })
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
 
     expect(store.problem).toBe('capped')
@@ -188,6 +283,7 @@ describe('failures', () => {
     api.requestLineAnalysis.mockRejectedValue(new ApiError('auth', 'refused'))
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
 
     expect(store.problem).toBe('auth')
@@ -198,6 +294,7 @@ describe('failures', () => {
     api.requestLineAnalysis.mockRejectedValueOnce(new ApiError('unavailable', 'down'))
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
 
     store.retry()
@@ -215,16 +312,21 @@ describe('choosing a model', () => {
     expect(useAnalysisStore().model).toBe('sonnet')
   })
 
-  it('switching asks for that model and is remembered', async () => {
+  it('switching looks that model up, starts it only on request, and is remembered', async () => {
     const storage = memoryStorage()
     vi.stubGlobal('localStorage', storage)
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
 
     store.setModel('fable')
     await vi.advanceTimersByTimeAsync(0)
+    expect(api.lookupLineAnalysis).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'fable' }))
+    expect(api.requestLineAnalysis).toHaveBeenCalledTimes(1)
 
+    store.start()
+    await vi.advanceTimersByTimeAsync(0)
     expect(api.requestLineAnalysis.mock.calls[1]![0]).toMatchObject({ model: 'fable' })
     expect(storage.getItem('vista.analysisModel')).toBe('fable')
 
@@ -261,6 +363,7 @@ describe('refreshing', () => {
   it('asks for a new call that replaces the result', async () => {
     const store = useAnalysisStore()
     store.openFor(BUBBLE)
+    store.start()
     await vi.advanceTimersByTimeAsync(0)
     api.requestLineAnalysis.mockResolvedValue({ analysis: analysis() })
 

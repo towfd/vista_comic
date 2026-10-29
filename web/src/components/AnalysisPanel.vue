@@ -110,7 +110,19 @@ const problems: Record<RequestProblem, string> = {
       </div>
 
       <div class="mt-4" aria-live="polite">
-        <p v-if="pending" class="text-sm text-neutral-400">{{ modelLabel }} 解析中… {{ waited }} 秒</p>
+        <p v-if="analysis.looking" class="text-sm text-neutral-500">查詢中…</p>
+
+        <p v-else-if="pending" class="text-sm text-neutral-400">{{ modelLabel }} 解析中… {{ waited }} 秒</p>
+
+        <!-- Nothing stored for this model: a call costs money, so it waits for the reader. -->
+        <button
+          v-else-if="!analysis.analysis && !analysis.problem"
+          type="button"
+          class="w-full rounded-md bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-500"
+          @click="analysis.start()"
+        >
+          用 {{ modelLabel }} 開始解析
+        </button>
 
         <div v-else-if="analysis.problem || analysis.analysis?.status === 'failed'" role="alert">
           <p class="text-sm text-amber-400">
