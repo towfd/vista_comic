@@ -80,9 +80,13 @@ const problems: Record<RequestProblem, string> = {
     class="fixed inset-x-0 bottom-0 z-10 max-h-[70dvh] overflow-y-auto border-t border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-16 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
   >
     <div class="mx-auto max-w-[800px] p-4">
-      <div class="flex items-baseline justify-between gap-3">
+      <div class="flex items-center justify-between gap-3">
         <h2 class="text-sm font-medium text-neutral-100">深入查詢</h2>
-        <button type="button" class="-m-2 p-2 text-xs text-neutral-400 hover:text-neutral-200" @click="analysis.close()">
+        <button
+          type="button"
+          class="min-h-10 min-w-16 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
+          @click="analysis.close()"
+        >
           關閉
         </button>
       </div>
