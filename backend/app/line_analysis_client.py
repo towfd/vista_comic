@@ -95,7 +95,7 @@ Split the line into words, not syllables. Vietnamese puts a space between every 
 
 Cover every unit in reading order, including pronouns, particles and sentence-final words (à, nhé, đi) — those are where a learner gets lost.
 
-For each unit: text exactly as written in the line; meaning in this line, worded to match the given translation; partOfSpeech from the list; hanViet — the Traditional Chinese characters if it is a Sino-Vietnamese word (viện phí → 院費), empty if it is not or you are not sure; note — one short sentence only when it helps (who a pronoun points to and the relationship or attitude it shows, a particle's nuance, why the translation words it this way), otherwise empty.
+For each unit: text exactly as written in the line; meaning in this line, worded to match the given translation; partOfSpeech from the list; hanViet — the Traditional Chinese characters if it is a Sino-Vietnamese word (viện phí → 院費), empty if it is not or you are not sure (only give characters when every syllable is Sino-Vietnamese and you know the standard characters; native words such as có, yêu, mới, mùa stay empty); note — one short sentence only when it helps (who a pronoun points to and the relationship or attitude it shows, a particle's nuance, why the translation words it this way), otherwise empty.
 
 Then grammar: 2–4 sentences on how the line is built, referring to the units; and tone: 1–2 sentences on emotion, register and politeness."""
 

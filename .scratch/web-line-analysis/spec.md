@@ -122,6 +122,8 @@ The backend runs the call in the background and keeps the result, so a line alre
 
 ## Further Notes
 
-- Prices at spec time ($/MTok in/out): Sonnet 5.5 2/10, Opus 5.5 4/20, Fable 5.1 10/50. Rough per-line estimate: US$0.03 / 0.06 / 0.15; ticket 02 measures the real figure.
+- Prices at spec time ($/MTok in/out): Sonnet 5.5 2/10, Opus 5.5 4/20, Fable 5.1 10/50.
+- **Measured in ticket 02** (six real lines, 2026-10-29): about 1,250–1,400 input and 260–1,800 output tokens a line, thinking included. Per line on average: Sonnet US$0.011 (6–17 s), Opus US$0.025 (4–19 s), Fable US$0.069 (6–24 s). No refusals, every answer usable. Settings kept: `max_tokens` 8000 (the most used was 1,784), effort at each model's default.
+- The prompt's `hanViet` instruction gained one clause after ticket 02 (Sonnet was giving native words such as yêu, mới, mùa characters): *only give characters when every syllable is Sino-Vietnamese and you know the standard characters; native words such as có, yêu, mới, mùa stay empty.* Re-checked on Sonnet: those are gone; `có thể → 可體` remains.
 - Web requests pass through Cloudflare, which drops a request after about 100 seconds — the reason for the background run and polling.
 - Deploying this needs the `api` container rebuilt as well as `web`; the API key is already in the server's `.env`.
