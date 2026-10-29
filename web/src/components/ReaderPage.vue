@@ -9,8 +9,10 @@ const props = withDefaults(
     // OCR boxes for this page (reader/overlay.ts) and the open one.
     regions?: OverlayRegion[]
     selectedId?: string | null
+    // Outline every box, or only the open one.
+    hints?: boolean
   }>(),
-  { regions: () => [], selectedId: null },
+  { regions: () => [], selectedId: null, hints: true },
 )
 const emit = defineEmits<{
   select: [segmentId: string | null]
@@ -70,14 +72,28 @@ function popoverStyle(r: OverlayRegion) {
       @load="state = 'loaded'"
       @error="state = 'error'"
     />
-    <!-- Invisible OCR boxes over the loaded image, in percent of it. -->
+    <!--
+      OCR boxes over the loaded image, in percent of it. Each carries a faint
+      outline so a box that missed its bubble can still be found: sky for a
+      translated line, amber for one with only the original, solid for the open one.
+      With hints off, only the open one is outlined.
+    -->
     <template v-if="state === 'loaded'">
       <button
         v-for="r in regions"
         :key="r.segmentId + r.left + r.top"
         type="button"
         :aria-label="r.source"
-        class="absolute cursor-pointer"
+        class="absolute cursor-pointer rounded-md ring-1 transition-colors duration-150"
+        :class="
+          r.segmentId === selectedId
+            ? 'bg-sky-400/15 ring-2 ring-sky-400'
+            : !hints
+              ? 'ring-transparent'
+              : r.text === null
+                ? 'bg-amber-400/5 ring-amber-400/40 hover:bg-amber-400/15 hover:ring-amber-400/80'
+                : 'bg-sky-400/5 ring-sky-400/40 hover:bg-sky-400/15 hover:ring-sky-400/80'
+        "
         :style="{ left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: `${r.height}%` }"
         @click.stop="emit('select', r.segmentId === selectedId ? null : r.segmentId)"
       />

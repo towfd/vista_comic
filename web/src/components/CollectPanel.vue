@@ -55,6 +55,8 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
     >
       已加入：<span lang="vi">{{ collect.added }}</span>
     </p>
+    <!-- The reader's own controls, kept beside this button as the page scrolls. -->
+    <slot name="controls" />
     <button
       type="button"
       class="rounded-md bg-neutral-800/95 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
