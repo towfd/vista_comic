@@ -34,3 +34,6 @@ cloudflared/*.json
 # Token) — machine-specific, never commit. Secrets.xcconfig.example is a
 # committed template and is NOT covered by this pattern.
 vista_comic/vista_comic/Config/Secrets.xcconfig
+
+# Empty default mount for the web container's /ocr-data (docker-compose.yml).
+/ocr-data

@@ -21,6 +21,15 @@ server {
         proxy_set_header CF-Access-Client-Secret "${CF_ACCESS_CLIENT_SECRET}";
     }
 
+    # The chapters' OCR boxes and translations (reader/overlay.ts): the
+    # comic-ocr-data folder, mounted read-only at /ocr-data by docker-compose.yml.
+    # A chapter without data is a plain 404, never the app's index.html.
+    location /ocr-data/ {
+        alias /ocr-data/;
+        default_type application/json;
+        add_header Cache-Control "no-cache";
+    }
+
     # Built assets carry a content hash in their name, so they never change.
     location /assets/ {
         expires 1y;
