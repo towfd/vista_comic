@@ -72,3 +72,12 @@ export async function loadOverlay(comicId: string, episode: number, lang = 'zh-T
   }
   return byPage
 }
+
+/**
+ * A bubble's original as it goes into the collecting panel: upper case, the
+ * way the reader is used to reading these lines -- most are lettered that way
+ * already. Only the panel's copy; the translation card shows OCR's casing.
+ */
+export function bubbleSourceText(source: string): string {
+  return source.toLocaleUpperCase('vi')
+}

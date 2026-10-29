@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { ApiError, createCard, type ApiErrorKind, type Collected } from '../api/client'
 import type { LearningCard } from '../api/types'
 import { isBlank } from '../practice/text'
+import { bubbleSourceText } from '../reader/overlay'
 import { useDeckStore } from './deck'
 
 /** The longest source text the deck accepts. The backend refuses anything longer. */
@@ -68,6 +69,22 @@ export const useCollectStore = defineStore('collect', () => {
   function openPanel() {
     open.value = true
     added.value = null
+  }
+
+  /**
+   * Open the panel filled from a tapped speech bubble, replacing whatever was
+   * in it -- pressing the button means this is the line wanted now, and the
+   * panel keeps no drafts. The page is the bubble's own, which near a page
+   * boundary need not be the current one; from here on it behaves as typed.
+   * See .scratch/web-bubble-collect/spec.md.
+   */
+  function fillFromBubble(bubble: { sourceText: string; translation: string | null; page: number }) {
+    reset()
+    open.value = true
+    added.value = null
+    sourceText.value = bubbleSourceText(bubble.sourceText)
+    translation.value = bubble.translation ?? ''
+    page.value = bubble.page
   }
 
   /** Close the panel and discard everything in it. There is no draft. */
@@ -161,6 +178,7 @@ export const useCollectStore = defineStore('collect', () => {
     enter,
     setCurrentPage,
     openPanel,
+    fillFromBubble,
     collapse,
     setSourceText,
     setTranslation,

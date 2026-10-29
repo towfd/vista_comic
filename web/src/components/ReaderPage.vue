@@ -12,7 +12,7 @@ const props = withDefaults(
   }>(),
   { regions: () => [], selectedId: null },
 )
-const emit = defineEmits<{ select: [segmentId: string | null] }>()
+const emit = defineEmits<{ select: [segmentId: string | null]; collect: [region: OverlayRegion] }>()
 
 type State = 'loading' | 'loaded' | 'error'
 const state = ref<State>('loading')
@@ -86,6 +86,15 @@ function popoverStyle(r: OverlayRegion) {
         >
           <p class="text-base leading-relaxed text-neutral-50">{{ r.text ?? '（這句還沒有翻譯）' }}</p>
           <p class="mt-2 border-t border-neutral-700 pt-2 text-xs leading-relaxed text-neutral-400">{{ r.source }}</p>
+          <div class="mt-3 flex justify-end">
+            <button
+              type="button"
+              class="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"
+              @click="emit('collect', r)"
+            >
+              加入句子
+            </button>
+          </div>
         </div>
       </template>
     </template>
