@@ -127,14 +127,14 @@ describe('answering', () => {
     const session = await started([card(1, 'review', -5)])
     session.submit('câu 1')
     expect(session.phase).toBe('feedback')
-    expect(session.verdict).toEqual({ correct: true, given: 'câu 1', expected: 'câu 1', sentence: null })
+    expect(session.verdict).toEqual({ correct: true, given: 'câu 1', expected: 'câu 1', sentence: null, overridden: false })
     expect(session.saveState).toBe('saving')
   })
 
   it('marks a missing tone wrong and keeps what was typed', async () => {
     const session = await started([card(1, 'review', -5)])
     session.submit('  cau 1 ')
-    expect(session.verdict).toEqual({ correct: false, given: 'cau 1', expected: 'câu 1', sentence: null })
+    expect(session.verdict).toEqual({ correct: false, given: 'cau 1', expected: 'câu 1', sentence: null, overridden: false })
   })
 
   it('ignores an empty or blank field', async () => {
@@ -157,6 +157,7 @@ describe('answering', () => {
     const session = await started([card(7, 'review', -5)])
     const token = session.question!.token
     session.submit('wrong')
+    session.advance()
     expect(api.recordReview).toHaveBeenCalledWith(7, {
       questionType: 'sentence_typed',
       isCorrect: false,
@@ -233,8 +234,8 @@ describe('moving on', () => {
     api.recordReview.mockResolvedValue({ ...promoted, state: 'relearning', learningStep: 0, dueAt: minutes(5) })
     const session = await started([card(1, 'review', -5)])
     session.submit('wrong')
-    await settle()
     session.advance()
+    await settle()
     expect(session.phase).toBe('asking')
     expect(session.question?.card.id).toBe(1)
   })
@@ -245,8 +246,8 @@ describe('moving on', () => {
     api.recordReview.mockResolvedValue({ ...promoted, dueAt: minutes(-100) })
     const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
     session.submit('wrong')
-    await settle()
     session.advance()
+    await settle()
     expect(session.question?.card.id).toBe(1)
   })
 
@@ -434,6 +435,7 @@ describe('cloze questions', () => {
       given: 'đường',
       expected: 'ĐƯỜNG',
       sentence: 'Tôi không biết ĐƯỜNG đến trường.',
+      overridden: false,
     })
     expect(api.recordReview).toHaveBeenCalledWith(1, expect.objectContaining({ questionType: 'cloze_typed', isCorrect: true }))
   })
@@ -443,6 +445,7 @@ describe('cloze questions', () => {
     const session = await started(deck())
     session.submit('duong')
     expect(session.verdict?.correct).toBe(false)
+    session.advance()
     expect(api.recordReview).toHaveBeenCalledWith(1, expect.objectContaining({ isCorrect: false }))
   })
 
@@ -571,6 +574,7 @@ describe('how a session ends', () => {
     await settle()
     session.advance()
     session.submit('wrong')
+    session.advance()
     await settle()
     expect(session.outcome).toEqual({ correct: 1, wrong: 1, graduated: 1 })
   })
@@ -591,6 +595,7 @@ describe('how a session ends', () => {
     expect(session.outcome.graduated).toBe(1)
     session.advance()
     session.submit('wrong')
+    session.advance()
     await settle()
     expect(session.outcome).toEqual({ correct: 1, wrong: 1, graduated: 0 })
   })
@@ -624,5 +629,106 @@ describe('how a session ends', () => {
     await settle()
     expect(session.phase).toBe('asking')
     expect(session.question?.card.id).toBe(3)
+  })
+})
+
+describe('counting a wrong answer as correct (算我對)', () => {
+  it('holds a wrong answer unsent until the reader chooses', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('wrong')
+    await settle()
+    expect(session.phase).toBe('feedback')
+    expect(session.saveState).toBeNull()
+    expect(api.recordReview).not.toHaveBeenCalled()
+  })
+
+  it('still sends a right answer at once', async () => {
+    const session = await started([card(1, 'review', -5)])
+    session.submit('câu 1')
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends the answer as correct, keeping the moment it was answered', async () => {
+    const session = await started([card(7, 'review', -5)])
+    const token = session.question!.token
+    session.submit('cau 7')
+    vi.setSystemTime(new Date(NOW.getTime() + 30_000))
+    session.countAsCorrect()
+    expect(api.recordReview).toHaveBeenCalledWith(7, {
+      questionType: 'sentence_typed',
+      isCorrect: true,
+      clientToken: token,
+      localDate: '2026-08-31',
+      answeredAt: NOW.toISOString(),
+      context: 'review',
+    })
+    expect(session.verdict).toEqual({ correct: true, given: 'cau 7', expected: 'câu 7', sentence: null, overridden: true })
+  })
+
+  it('stays on the screen until 下一題, and counts as correct', async () => {
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('wrong')
+    session.countAsCorrect()
+    await settle()
+    expect(session.phase).toBe('feedback')
+    expect(session.saveState).toBe('saved')
+    expect(session.outcome).toMatchObject({ correct: 1, wrong: 0 })
+
+    session.advance()
+    expect(session.phase).toBe('asking')
+    expect(session.question?.card.id).toBe(1)
+  })
+
+  it('cannot be pressed twice, after 下一題, or on a right answer', async () => {
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('wrong')
+    session.countAsCorrect()
+    session.countAsCorrect()
+    await settle()
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+
+    session.advance()
+    session.submit('câu 1')
+    session.countAsCorrect()
+    expect(session.verdict?.overridden).toBe(false)
+    expect(api.recordReview).toHaveBeenCalledTimes(2)
+  })
+
+  it('is not offered once the wrong answer has been accepted', async () => {
+    const pending = deferred<CardSchedule>()
+    api.recordReview.mockReturnValue(pending.promise)
+    const session = await started([card(1, 'review', -5)])
+    session.submit('wrong')
+    session.advance()
+    session.countAsCorrect()
+    expect(api.recordReview).toHaveBeenCalledWith(1, expect.objectContaining({ isCorrect: false }))
+    expect(api.recordReview).toHaveBeenCalledTimes(1)
+    expect(session.verdict?.correct).toBe(false)
+  })
+
+  it('accepting a wrong answer sends it as wrong and moves on once it is saved', async () => {
+    const pending = deferred<CardSchedule>()
+    api.recordReview.mockReturnValue(pending.promise)
+    const session = await started([card(1, 'review', -5), card(2, 'review', -50)])
+    session.submit('wrong')
+    session.advance()
+    expect(session.waitingToAdvance).toBe(true)
+    expect(session.phase).toBe('feedback')
+
+    pending.resolve(promoted)
+    await settle()
+    expect(session.phase).toBe('asking')
+    expect(session.outcome).toMatchObject({ correct: 0, wrong: 1 })
+  })
+
+  it('holds the session on an override that fails to save, as for any answer', async () => {
+    api.recordReview.mockRejectedValue(new ApiError('unexpected', 'refused'))
+    const session = await started([card(1, 'review', -5)])
+    session.submit('wrong')
+    session.countAsCorrect()
+    await settle()
+    expect(session.saveState).toBe('failed')
+    session.advance()
+    expect(session.phase).toBe('feedback')
   })
 })

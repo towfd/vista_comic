@@ -67,6 +67,12 @@ function onFieldKeydown(event: KeyboardEvent) {
   if (!event.repeat) submit()
 }
 
+/** 算我對 removes itself, so the keyboard goes back to the way onward. */
+function countAsCorrect() {
+  session.countAsCorrect()
+  nextButton.value?.focus()
+}
+
 /**
  * Enter moves on. Handled here rather than left to the button's own click so
  * a held key cannot answer one question and skip its feedback in one press.
@@ -163,11 +169,11 @@ function onNextKeydown(event: KeyboardEvent) {
 
       <section v-if="phase === 'feedback' && verdict" class="mt-6 sm:mt-8" aria-live="polite">
         <p class="text-lg font-semibold" :class="verdict.correct ? 'text-emerald-400' : 'text-rose-400'">
-          {{ verdict.correct ? '正確' : '不對' }}
+          {{ verdict.overridden ? '正確（已改判）' : verdict.correct ? '正確' : '不對' }}
         </p>
 
         <dl class="mt-4 space-y-3">
-          <div v-if="!verdict.correct">
+          <div v-if="!verdict.correct || verdict.overridden">
             <dt class="text-xs text-neutral-500">你的答案</dt>
             <dd class="mt-1 text-xl text-neutral-300" lang="vi">{{ verdict.given }}</dd>
           </div>
@@ -204,6 +210,14 @@ function onNextKeydown(event: KeyboardEvent) {
         </div>
 
         <div class="mt-8 flex items-center justify-end gap-3">
+          <!-- Only while a wrong answer is unsent: the judge is strict, and the reader may know better. -->
+          <button
+            v-if="!verdict.correct && saveState === null && !waitingToAdvance"
+            class="w-full rounded-md bg-neutral-800 px-5 py-2.5 font-medium text-emerald-300 hover:bg-neutral-700 sm:w-auto"
+            @click="countAsCorrect"
+          >
+            算我對
+          </button>
           <button
             ref="nextButton"
             :disabled="saveState === 'failed'"

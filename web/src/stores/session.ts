@@ -40,6 +40,8 @@ export interface Verdict {
   expected: string
   /** The whole sentence, when the question was a cloze. */
   sentence: string | null
+  /** Judged wrong, then counted as correct by the reader (算我對). */
+  overridden: boolean
 }
 
 /**
@@ -67,6 +69,10 @@ export interface Outcome {
  * - `saved`: the card's new schedule is held; the session may move on.
  * - `failed`: not saved, and the session will not move on. `saveFailure` says why.
  * - `gone`: the card was deleted elsewhere. Nothing to save; the session may move on.
+ *
+ * `null` while there is no answer on screen -- and while a wrong answer waits
+ * for the reader to accept it (下一題) or count it as correct (算我對): it is
+ * not sent until they choose.
  */
 export type SaveState = 'saving' | 'saved' | 'failed' | 'gone'
 
@@ -189,7 +195,9 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   /**
-   * Judge what was typed and send it. The verdict does not wait for the
+   * Judge what was typed. A right answer is sent at once; a wrong one waits
+   * for the reader to accept it or count it as correct, since the judge is
+   * strict and they may know better. The verdict does not wait for the
    * request; the next question does. Nothing happens for an empty field, or
    * when no question is waiting for an answer.
    */
@@ -205,6 +213,7 @@ export const useSessionStore = defineStore('session', () => {
       given: typed.trim(),
       expected: cloze ? cloze.removed : asked.card.sourceText,
       sentence: cloze ? asked.card.sourceText : null,
+      overridden: false,
     }
     phase.value = 'feedback'
     lastCardId = asked.card.id
@@ -221,6 +230,19 @@ export const useSessionStore = defineStore('session', () => {
         context: 'review',
       },
     }
+    if (correct) void save()
+  }
+
+  /**
+   * 算我對: the wrong answer on screen was right after all. Sent as correct, at
+   * once and for good, keeping the moment the reader answered. Only while that
+   * answer is still unsent.
+   */
+  function countAsCorrect() {
+    const verdictNow = verdict.value
+    if (phase.value !== 'feedback' || !verdictNow || verdictNow.correct || !pending || saveState.value !== null) return
+    verdict.value = { ...verdictNow, correct: true, overridden: true }
+    pending = { asked: pending.asked, review: { ...pending.review, isCorrect: true } }
     void save()
   }
 
@@ -292,11 +314,16 @@ export const useSessionStore = defineStore('session', () => {
 
   /**
    * Move to the next question -- at once if the answer is saved, and as soon
-   * as it is if not. An answer that failed to save holds the session here.
+   * as it is if not. A wrong answer not yet sent is sent as wrong first. An
+   * answer that failed to save holds the session here.
    */
   function advance() {
     if (phase.value !== 'feedback') return
-    if (saveState.value === 'saved' || saveState.value === 'gone') draw()
+    if (saveState.value === null && pending) {
+      // A wrong answer the reader accepts: send it now, move on once it is in.
+      waitingToAdvance.value = true
+      void save()
+    } else if (saveState.value === 'saved' || saveState.value === 'gone') draw()
     else if (saveState.value === 'saving') waitingToAdvance.value = true
   }
 
@@ -313,6 +340,7 @@ export const useSessionStore = defineStore('session', () => {
     start,
     submit,
     advance,
+    countAsCorrect,
     retrySave,
   }
 })
