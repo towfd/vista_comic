@@ -166,6 +166,14 @@ def comprehension_db(_progress_engine):
 
 
 @pytest.fixture
+def line_analysis_db(_progress_engine):
+    """Truncate the line analyses and the daily cap they share with comprehensions."""
+    with _progress_engine.begin() as conn:
+        conn.execute(text("TRUNCATE TABLE line_analysis, comprehend_usage"))
+    return _progress_engine
+
+
+@pytest.fixture
 def learning_card_db(_progress_engine):
     """Truncate the ``learning_card`` table before each test that uses it."""
     with _progress_engine.begin() as conn:
