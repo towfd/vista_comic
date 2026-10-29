@@ -4,13 +4,18 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** done (2026-10-29) — on `feature/web-line-analysis`; device checks pending
+
+**Notes from implementation**
+
+- The fill text is `wordTranslation` in `stores/analysis.ts` (tested there); the word goes through `fillFromBubble`, so it is upper-cased by the same rule as a bubble line.
+- The analysis panel's visibility depends only on its own store, so 收卡 opening or closing never remounts it — its scroll position stays.
 
 **Acceptance criteria**
 
-- [ ] 加入 opens 收卡 above the analysis panel with the word and its meaning text as specified
-- [ ] Adding a card or collapsing 收卡 reveals the analysis panel at the same scroll position
-- [ ] Unit tests cover the fill text; the web suite and `vue-tsc` pass
+- [x] 加入 opens 收卡 above the analysis panel with the word and its meaning text as specified
+- [x] Adding a card or collapsing 收卡 reveals the analysis panel at the same scroll position
+- [x] Unit tests cover the fill text; the web suite and `vue-tsc` pass
 
 **Developer device checklist**
 

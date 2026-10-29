@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import type { AnalysisFailure } from '../api/client'
+import type { AnalysisFailure, AnalysisWord } from '../api/client'
 import { bubbleSourceText } from '../reader/overlay'
-import { ANALYSIS_MODELS, useAnalysisStore, type RequestProblem } from '../stores/analysis'
+import { ANALYSIS_MODELS, useAnalysisStore, wordTranslation, type RequestProblem } from '../stores/analysis'
+import { useCollectStore } from '../stores/collect'
 
 // Everything this panel does is decided in the analysis store; this renders it
 // and keeps what belongs to the screen: the waiting clock and the 重新查詢 check.
 const analysis = useAnalysisStore()
+const collect = useCollectStore()
+
+/**
+ * A word's 加入: 收卡 opens on top of this panel, filled as a bubble line is,
+ * on the bubble's page. This panel stays mounted underneath, scroll and all.
+ */
+function collectWord(word: AnalysisWord) {
+  if (!analysis.bubble) return
+  collect.fillFromBubble({ sourceText: word.text, translation: wordTranslation(word), page: analysis.bubble.page })
+}
 
 const pending = computed(() => analysis.requesting || analysis.analysis?.status === 'pending')
 const modelLabel = computed(() => ANALYSIS_MODELS.find((m) => m.id === analysis.model)?.label ?? analysis.model)
@@ -112,14 +123,24 @@ const problems: Record<RequestProblem, string> = {
 
         <template v-else-if="analysis.analysis?.result">
           <ol class="divide-y divide-neutral-800">
-            <li v-for="(word, i) in analysis.analysis.result.words" :key="i" class="py-2.5">
-              <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span class="font-medium text-neutral-50" lang="vi">{{ bubbleSourceText(word.text) }}</span>
-                <span v-if="word.hanViet" class="text-sm text-neutral-300">{{ word.hanViet }}</span>
-                <span class="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-400">{{ word.partOfSpeech }}</span>
-              </p>
-              <p class="mt-1 text-sm text-neutral-200">{{ word.meaning }}</p>
-              <p v-if="word.note" class="mt-1 text-xs leading-relaxed text-neutral-400">{{ word.note }}</p>
+            <li v-for="(word, i) in analysis.analysis.result.words" :key="i" class="flex items-start gap-3 py-2.5">
+              <div class="min-w-0 flex-1">
+                <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span class="font-medium text-neutral-50" lang="vi">{{ bubbleSourceText(word.text) }}</span>
+                  <span v-if="word.hanViet" class="text-sm text-neutral-300">{{ word.hanViet }}</span>
+                  <span class="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-400">{{ word.partOfSpeech }}</span>
+                </p>
+                <p class="mt-1 text-sm text-neutral-200">{{ word.meaning }}</p>
+                <p v-if="word.note" class="mt-1 text-xs leading-relaxed text-neutral-400">{{ word.note }}</p>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-sky-500"
+                :aria-label="`加入 ${word.text}`"
+                @click="collectWord(word)"
+              >
+                加入
+              </button>
             </li>
           </ol>
 
