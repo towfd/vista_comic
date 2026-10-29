@@ -228,6 +228,26 @@ watch(
 function closeOverlay() {
   selectedSegment.value = null
 }
+
+// Whether the boxes are outlined, remembered in this browser. Storage may be missing or refuse.
+const HINTS_KEY = 'vista.overlayHints'
+function rememberedHints(): boolean {
+  try {
+    return localStorage.getItem(HINTS_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+const showHints = ref(rememberedHints())
+function toggleHints() {
+  showHints.value = !showHints.value
+  try {
+    localStorage.setItem(HINTS_KEY, showHints.value ? 'on' : 'off')
+  } catch {
+    // Not remembered, still applied.
+  }
+}
+
 /** The card's 加入句子: the card gives way to the collecting panel, filled from the bubble. */
 function collectBubble(region: OverlayRegion, page: number) {
   closeOverlay()
@@ -276,7 +296,7 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
 <template>
   <main class="pb-24">
     <!-- Clear of the collecting button, which is fixed over this corner until the window is wide. -->
-    <header class="mx-auto flex max-w-[800px] items-baseline gap-3 py-2 pr-24 pl-4 lg:pr-4">
+    <header class="mx-auto flex max-w-[800px] items-baseline gap-3 py-2 pr-48 pl-4 lg:pr-4">
       <RouterLink :to="backTo" class="-mx-2 min-w-0 truncate px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">
         ← {{ comicTitle ?? '章節列表' }}
       </RouterLink>
@@ -313,6 +333,7 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
             :page-number="index + 1"
             :regions="overlay.get(index + 1)"
             :selected-id="selectedSegment"
+            :hints="showHints"
             @select="selectedSegment = $event"
             @collect="collectBubble($event, index + 1)"
             @analyse="analyseBubble($event, index + 1)"
@@ -321,7 +342,26 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
       </div>
 
       <AnalysisPanel />
-      <CollectPanel v-if="state.data.pages.length > 0" />
+      <CollectPanel v-if="state.data.pages.length > 0">
+        <!-- Only for a chapter that has boxes to outline. -->
+        <template v-if="overlay.size > 0" #controls>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="showHints"
+            class="flex items-center gap-2 rounded-md bg-neutral-800/95 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
+            @click="toggleHints"
+          >
+            標示
+            <span class="relative h-4 w-7 rounded-full transition-colors" :class="showHints ? 'bg-sky-600' : 'bg-neutral-600'">
+              <span
+                class="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition-transform"
+                :class="showHints ? 'translate-x-3' : ''"
+              />
+            </span>
+          </button>
+        </template>
+      </CollectPanel>
 
       <div ref="endEl" class="mt-12 flex flex-col items-center text-center">
         <p class="text-sm text-neutral-500">本話完</p>
