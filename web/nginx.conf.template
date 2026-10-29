@@ -11,7 +11,7 @@ server {
     listen 80;
     root /usr/share/nginx/html;
 
-    location ~ ^/(comics|media|cards|study|rescan)(/|$) {
+    location ~ ^/(comics|media|cards|study|rescan|line-analyses)(/|$) {
         proxy_pass ${VISTA_API_ORIGIN};
         # Cloudflare routes by hostname, and TLS needs it too: the request
         # carries the backend's host, not this page's (Vite's changeOrigin).

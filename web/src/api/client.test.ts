@@ -11,9 +11,11 @@ import {
   fetchChapter,
   fetchComic,
   fetchComics,
+  fetchLineAnalysis,
   fetchStudySettings,
   getJson,
   recordReview,
+  requestLineAnalysis,
   rescanLibrary,
   RESCAN_TIMEOUT_MS,
   saveProgress,
@@ -614,5 +616,57 @@ describe('createCard', () => {
     const page = new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } })
     expect(await errorKind(createCard(draft, respondWith(page)))).toBe('auth')
     expect(await errorKind(createCard(draft, respondWith(json({}, 503))))).toBe('unavailable')
+  })
+})
+
+describe('line analyses', () => {
+  const pending = {
+    id: 3,
+    status: 'pending',
+    model: 'sonnet',
+    sourceText: 'Anh à',
+    translation: '哥啊',
+    failure: null,
+    result: null,
+    updatedAt: '2026-10-29T12:00:00+00:00',
+  }
+  const request = {
+    sourceText: 'Anh à',
+    translation: '哥啊',
+    model: 'sonnet' as const,
+    names: [{ source: 'Dok-ja', target: '獨子' }],
+  }
+
+  it('posts the line, its translation, the model and the names', async () => {
+    const seen: { path?: string; init?: RequestInit } = {}
+    const fetcher: Fetcher = async (path, init) => {
+      seen.path = path
+      seen.init = init
+      return json(pending)
+    }
+    const requested = await requestLineAnalysis({ ...request, refresh: true }, fetcher)
+    expect(seen.path).toBe('/line-analyses')
+    expect(seen.init?.method).toBe('POST')
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ ...request, refresh: true })
+    expect(requested.analysis).toEqual(pending)
+  })
+
+  it('reports a spent daily cap as capped, not as a failure', async () => {
+    expect(await requestLineAnalysis(request, respondWith(json({ detail: 'cap' }, 429)))).toEqual({ capped: true })
+  })
+
+  it('reports a server error as unavailable', async () => {
+    expect(await errorKind(requestLineAnalysis(request, respondWith(json({}, 503))))).toBe('unavailable')
+  })
+
+  it('reads one analysis, and a missing one as notFound', async () => {
+    const seen: string[] = []
+    const fetcher: Fetcher = async (path) => {
+      seen.push(path)
+      return json({ ...pending, status: 'done' })
+    }
+    expect((await fetchLineAnalysis(3, fetcher)).status).toBe('done')
+    expect(seen).toEqual(['/line-analyses/3'])
+    expect(await errorKind(fetchLineAnalysis(4, respondWith(json({}, 404))))).toBe('notFound')
   })
 })
