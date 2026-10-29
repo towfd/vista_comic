@@ -6,7 +6,7 @@ This is the whole feature in one thin path: the pure upper-case function, the co
 
 **Blocked by:** None — can start immediately.
 
-**Status:** in review (2026-10-29) — PR open; device checklist pending with the developer
+**Status:** done (2026-10-29) — merged in #131 and deployed; device checks confirmed by the developer
 
 **Acceptance criteria**
 
@@ -16,7 +16,7 @@ This is the whole feature in one thin path: the pure upper-case function, the co
 - [x] The panel shows the bubble's page number, even when the reader's current page is a different one
 - [x] Text already typed into the panel is replaced, with no prompt
 - [x] The translation card still shows the original in OCR casing
-- [ ] Adding, the already-collected notice, a failed save and the 已加入 confirmation behave as for a typed card
+- [x] Adding, the already-collected notice, a failed save and the 已加入 confirmation behave as for a typed card
 - [x] Unit tests cover the fill action and the upper-case function (see the spec's *Testing Decisions*); the web suite and `vue-tsc` pass
 
 **Developer device checklist (handed over, not automated)**

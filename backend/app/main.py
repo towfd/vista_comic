@@ -12,6 +12,8 @@ Endpoints (see docs/backend-architecture.md):
     PATCH  /comprehensions/{id}                -> set one record's read flag
     POST   /comprehensions/{id}/retry          -> re-enqueue a failed record
     DELETE /comprehensions/{id}                -> delete one record
+    POST   /line-analyses                      -> a line's word-by-word analysis, stored or queued
+    GET    /line-analyses/{id}                 -> one analysis (the web reader polls this)
 
 The comprehension work is deferred: POST /comprehensions only enqueues, and the
 worker (comprehension_worker) calls Claude on its own. The app never uploads an
@@ -44,13 +46,16 @@ from . import (
     comprehend_usage_store,
     comprehension_store,
     learning_card_store,
+    line_analysis_store,
     progress_store,
 )
 from .comprehension_worker import ComprehensionWorker
+from .line_analysis_worker import LineAnalysisWorker
 from .config import get_library_root
 from .db import (
     ComprehensionRecord,
     LearningCard,
+    LineAnalysis,
     init_engine,
     new_session,
     upgrade_schema,
@@ -70,6 +75,8 @@ from .models import (
     LearningCardResponse,
     LearningCardSourceText,
     LearningCardUpdate,
+    LineAnalysisCreate,
+    LineAnalysisResponse,
     ProgressResponse,
     ProgressUpdate,
     StudySettings as StudySettingsModel,
@@ -152,10 +159,15 @@ async def lifespan(_: FastAPI):
     # `start()`, before the loop begins.
     worker = ComprehensionWorker(page_path_for=page_file_path)
     worker.start()
+    # The web reader's line analyses: their own queue and worker, the same
+    # shape. Interrupted rows are failed (and refunded) inside `start()`.
+    analysis_worker = LineAnalysisWorker()
+    analysis_worker.start()
     try:
         yield
     finally:
         worker.stop()
+        analysis_worker.stop()
 
 
 app = FastAPI(title="vista_comic backend", version="0.1.0", lifespan=lifespan)
@@ -749,6 +761,118 @@ def _reserve_daily_cap() -> date:
             status_code=429, detail="Daily comprehension request cap reached"
         )
     return usage_date
+
+
+# ---------------------------------------------------------------------------
+# Line analyses (web-line-analysis): the web reader's word-by-word breakdown of
+# a bubble line. Stored per (line, reviewed translation, model) and produced in
+# the background, because a Fable call can outlast Cloudflare's ~100s request
+# limit; the reader polls GET until it is no longer pending.
+# ---------------------------------------------------------------------------
+
+
+@contextmanager
+def _line_analysis_session():
+    with _store_session(
+        "Line analysis store unavailable", "Line analysis store operation failed."
+    ) as session:
+        yield session
+
+
+def _to_line_analysis_response(row: LineAnalysis) -> LineAnalysisResponse:
+    return LineAnalysisResponse(
+        id=row.id,
+        # Running is still pending to the reader: queued or under way, they wait.
+        status=(
+            line_analysis_store.STATUS_PENDING
+            if row.status == line_analysis_store.STATUS_RUNNING
+            else row.status
+        ),
+        model=row.model,
+        sourceText=row.source_text,
+        translation=row.translation,
+        failure=row.failure,
+        result=row.result,
+        updatedAt=progress_store.iso_utc(row.updated_at),
+    )
+
+
+@app.post("/line-analyses", response_model=LineAnalysisResponse)
+def request_line_analysis(body: LineAnalysisCreate) -> LineAnalysisResponse:
+    """Return the stored analysis of this line, or queue one.
+
+    A ``done`` or ``pending`` analysis with the same identity comes back as it
+    is: no call, no reservation. Otherwise -- a new line, a ``failed`` one, or a
+    ``done`` one with ``refresh`` -- one request is reserved against the shared
+    daily cap (429 when spent, and nothing changes) and the row is queued.
+
+    ``refresh`` on a ``pending`` analysis changes nothing: it is already being
+    made, and re-queueing it mid-run would race the worker for no benefit.
+
+    Every path that ends up not queueing anything gives its reservation back.
+    """
+    source_key = normalized_key(body.sourceText)
+    if not source_key:
+        raise HTTPException(status_code=422, detail="sourceText holds no text")
+    names = [name.model_dump() for name in body.names]
+
+    with _line_analysis_session() as session:
+        existing = line_analysis_store.find(
+            session,
+            source_key=source_key,
+            translation=body.translation,
+            model=body.model,
+        )
+    if existing is not None and (
+        existing.status in (line_analysis_store.STATUS_PENDING, line_analysis_store.STATUS_RUNNING)
+        or (existing.status == line_analysis_store.STATUS_DONE and not body.refresh)
+    ):
+        return _to_line_analysis_response(existing)
+
+    usage_date = _reserve_daily_cap()
+    try:
+        with _line_analysis_session() as session:
+            if existing is not None:
+                row = line_analysis_store.requeue(
+                    session,
+                    existing.id,
+                    source_text=body.sourceText,
+                    names=names,
+                    usage_date=usage_date,
+                )
+            else:
+                row = line_analysis_store.create(
+                    session,
+                    source_text=body.sourceText,
+                    source_key=source_key,
+                    translation=body.translation,
+                    model=body.model,
+                    names=names,
+                    usage_date=usage_date,
+                )
+            if row is None:
+                # Lost a race: someone else created or re-queued it first.
+                # Theirs is the one the reader is waiting for.
+                _refund_daily_cap(usage_date)
+                row = line_analysis_store.find(
+                    session,
+                    source_key=source_key,
+                    translation=body.translation,
+                    model=body.model,
+                )
+    except HTTPException:
+        _refund_daily_cap(usage_date)
+        raise
+    return _to_line_analysis_response(row)
+
+
+@app.get("/line-analyses/{analysis_id}", response_model=LineAnalysisResponse)
+def get_line_analysis(analysis_id: int) -> LineAnalysisResponse:
+    with _line_analysis_session() as session:
+        row = line_analysis_store.get(session, analysis_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Line analysis not found")
+    return _to_line_analysis_response(row)
 
 
 @app.get("/media/{comic_id}/{chapter_id}/cover")

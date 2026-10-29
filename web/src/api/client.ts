@@ -361,3 +361,59 @@ export async function deleteCard(cardId: number, fetcher: Fetcher = fetch): Prom
   const response = await send(`/cards/${cardId}`, { method: 'DELETE' }, fetcher)
   if (response.status !== 204) throw new ApiError('auth', `expected 204, got ${response.status}`)
 }
+
+/** The models a line analysis can be asked of, by the names the backend maps to model IDs. */
+export type AnalysisModel = 'sonnet' | 'opus' | 'fable'
+
+/** One unit of a line: a word or set phrase, explained against the line's reviewed translation. */
+export interface AnalysisWord {
+  text: string
+  meaning: string
+  partOfSpeech: string
+  /** Sino-Vietnamese characters; empty when it is not one or the model was unsure. */
+  hanViet: string
+  /** Empty when there was nothing worth adding. */
+  note: string
+}
+
+/** Why an analysis failed: the call errored, was refused, answered unusably, or was cut off by a restart. */
+export type AnalysisFailure = 'error' | 'refused' | 'invalid' | 'interrupted'
+
+export interface LineAnalysis {
+  id: number
+  status: 'pending' | 'done' | 'failed'
+  model: AnalysisModel
+  sourceText: string
+  translation: string
+  failure: AnalysisFailure | null
+  result: { words: AnalysisWord[]; grammar: string; tone: string } | null
+  updatedAt: string
+}
+
+export interface LineAnalysisRequest {
+  sourceText: string
+  translation: string
+  model: AnalysisModel
+  /** The name-table entries that appear in the line. */
+  names: { source: string; target: string }[]
+  /** Replace a stored result with a new call. */
+  refresh?: boolean
+}
+
+/** The analysis asked for, or the day's shared allowance of Claude calls is spent. */
+export type AnalysisRequested = { analysis: LineAnalysis; capped?: undefined } | { analysis?: undefined; capped: true }
+
+/**
+ * Ask for a line's analysis. A stored or running one comes straight back;
+ * otherwise one is queued, and comes back `pending` -- poll `fetchLineAnalysis`.
+ * 429 (the shared daily cap) is an answer, not a failure: nothing was queued.
+ */
+export async function requestLineAnalysis(request: LineAnalysisRequest, fetcher: Fetcher = fetch): Promise<AnalysisRequested> {
+  const response = await send('/line-analyses', { method: 'POST', headers: JSON_BODY, body: JSON.stringify(request) }, fetcher, [429])
+  if (response.status === 429) return { capped: true }
+  return { analysis: await readJson<LineAnalysis>(response) }
+}
+
+export async function fetchLineAnalysis(id: number, fetcher: Fetcher = fetch): Promise<LineAnalysis> {
+  return getJson<LineAnalysis>(`/line-analyses/${id}`, fetcher)
+}

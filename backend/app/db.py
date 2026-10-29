@@ -28,7 +28,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -353,6 +353,57 @@ class StudySettings(Base):
     #: question, and writing three down assumes an answer to the first.
     learning_steps: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False)
     new_cards_per_day: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class LineAnalysis(Base):
+    """A word-by-word breakdown of one bubble line, made by Claude for the web reader.
+
+    The row is both the stored result and the work queue, the same shape as
+    ``ComprehensionRecord``: created ``pending``, claimed ``running`` by the
+    worker, ending ``done`` or ``failed``. See ``.scratch/web-line-analysis/``.
+
+    **Identity is (``source_key``, ``translation``, ``model``)** -- one stored
+    analysis per line, per reviewed translation, per model, so a line already
+    analysed opens without another call wherever it appears. ``source_key`` is
+    ``normalization.normalized_key`` of the line, so case and spacing do not
+    split one line into several. The translation is kept as sent: an analysis
+    explains *that* wording, and a re-done translation deserves a fresh one.
+
+    ``names`` is the slice of the work's name table the reader sent with the
+    line. Context for the call, not identity -- but stored, because the worker
+    runs after the request has returned.
+
+    ``result`` is Claude's structured answer (``words``/``grammar``/``tone``)
+    kept as the JSON it arrived as; nothing queries inside it. ``failure`` says
+    why a ``failed`` row failed (``error``/``refused``/``invalid``/
+    ``interrupted``).
+    """
+
+    __tablename__ = "line_analysis"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_key", "translation", "model", name="uq_line_analysis_identity"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_text: Mapped[str] = mapped_column(String, nullable=False)
+    source_key: Mapped[str] = mapped_column(String, nullable=False)
+    translation: Mapped[str] = mapped_column(String, nullable=False)
+    model: Mapped[str] = mapped_column(String, nullable=False)
+    names: Mapped[list] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    failure: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    result: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    #: The day the current run's cap reservation was taken against, so a refund
+    #: goes back to that day (see ``comprehend_usage_store.refund``).
+    usage_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 # Module-level engine/session factory, installed by ``init_engine`` at startup

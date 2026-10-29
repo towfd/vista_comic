@@ -439,3 +439,64 @@ class ComprehensionRecordReadUpdate(BaseModel):
     """
 
     isRead: bool
+
+
+# ---------------------------------------------------------------------------
+# Line analysis models (web-line-analysis): the web reader's word-by-word
+# breakdown of a bubble line.
+# ---------------------------------------------------------------------------
+
+
+class LineAnalysisName(BaseModel):
+    """One name-table entry that appears in the line: its Vietnamese and official name."""
+
+    source: str = Field(min_length=1, max_length=100)
+    target: str = Field(min_length=1, max_length=100)
+
+
+class LineAnalysisCreate(BaseModel):
+    """Request body for ``POST /line-analyses``.
+
+    ``model`` is the reader's choice by name; the backend maps it to a model ID
+    (``line_analysis_client.MODEL_IDS``). ``names`` is context for the call, not
+    part of the analysis's identity. ``refresh`` asks for a stored result to be
+    replaced by a new call.
+    """
+
+    sourceText: str = Field(min_length=1, max_length=500)
+    translation: str = Field(min_length=1, max_length=500)
+    model: Literal["sonnet", "opus", "fable"]
+    names: List[LineAnalysisName] = Field(default_factory=list, max_length=50)
+    refresh: bool = False
+
+
+class LineAnalysisWord(BaseModel):
+    text: str
+    meaning: str
+    partOfSpeech: str
+    hanViet: str
+    note: str
+
+
+class LineAnalysisResult(BaseModel):
+    words: List[LineAnalysisWord]
+    grammar: str
+    tone: str
+
+
+class LineAnalysisResponse(BaseModel):
+    """One line analysis.
+
+    ``status`` is ``pending`` (queued or running -- the reader cannot tell them
+    apart and does not need to), ``done`` with ``result``, or ``failed`` with
+    ``failure`` (``error``/``refused``/``invalid``/``interrupted``).
+    """
+
+    id: int
+    status: Literal["pending", "done", "failed"]
+    model: str
+    sourceText: str
+    translation: str
+    failure: Optional[str] = None
+    result: Optional[LineAnalysisResult] = None
+    updatedAt: str  # ISO-8601 UTC

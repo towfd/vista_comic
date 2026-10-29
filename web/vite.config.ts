@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => {
         '/cards': upstream,
         '/study': upstream,
         '/rescan': upstream,
+        '/line-analyses': upstream,
       },
     },
     test: {

@@ -2,21 +2,25 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { ChapterDetail } from '../api/types'
+import { useAnalysisStore } from '../stores/analysis'
 import { useChaptersStore } from '../stores/chapters'
 import { useCollectStore } from '../stores/collect'
 import { useComicsStore } from '../stores/comics'
 import { currentPage, isScrollKey, resumeStartPage } from '../reader/progress'
 import { createProgressSaver, type ProgressSaver } from '../reader/progressSaver'
 import { nextChapter, START_AT_TOP_KEY, takeStartAtTopFlag } from '../reader/nextChapter'
+import AnalysisPanel from '../components/AnalysisPanel.vue'
 import CollectPanel from '../components/CollectPanel.vue'
 import ErrorState from '../components/ErrorState.vue'
 import ReaderPage from '../components/ReaderPage.vue'
+import { loadNameTable, namesInLine, type NameEntry } from '../reader/names'
 import { loadOverlay, type OverlayRegion } from '../reader/overlay'
 
 const props = defineProps<{ comicId: string; chapterId: string }>()
 const chapters = useChaptersStore()
 const comics = useComicsStore()
 const collect = useCollectStore()
+const analysis = useAnalysisStore()
 const router = useRouter()
 
 const state = computed(() => chapters.entry(props.comicId, props.chapterId))
@@ -75,8 +79,9 @@ function openChapter(comicId: string, chapterId: string) {
   saver?.dispose()
   stopObserving()
   positioned = false
-  // A line half typed belonged to the chapter being left.
+  // A line half typed belonged to the chapter being left, as does a line being studied.
   collect.enter(comicId, chapterId)
+  analysis.close()
   saver = createProgressSaver((page, options) => chapters.saveProgress(comicId, chapterId, page, options))
   // Always a fresh fetch: a cached lastReadPage would resume at a stale page.
   chapters.load(comicId, chapterId)
@@ -169,6 +174,7 @@ onUnmounted(() => {
   saver?.dispose()
   saver = null
   collect.collapse()
+  analysis.close()
 })
 
 // ---- Next chapter ---------------------------------------------------------
@@ -227,6 +233,31 @@ function collectBubble(region: OverlayRegion, page: number) {
   closeOverlay()
   collect.fillFromBubble({ sourceText: region.source, translation: region.text, page })
 }
+/** The card's 深入查詢: the card gives way to the analysis panel, for the names in this line only. */
+function analyseBubble(region: OverlayRegion, page: number) {
+  if (region.text === null) return
+  closeOverlay()
+  analysis.openFor({
+    sourceText: region.source,
+    translation: region.text,
+    page,
+    names: namesInLine(nameTable.value, region.source),
+  })
+}
+
+// The work's name table, for the analysis. Per work rather than per chapter.
+const nameTable = ref<NameEntry[]>([])
+watch(
+  comicTitle,
+  async (title) => {
+    nameTable.value = []
+    if (!title) return
+    const table = await loadNameTable(title)
+    if (comicTitle.value === title) nameTable.value = table
+  },
+  { immediate: true },
+)
+
 function onOverlayKey(event: KeyboardEvent) {
   if (event.key === 'Escape') closeOverlay()
 }
@@ -284,10 +315,12 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
             :selected-id="selectedSegment"
             @select="selectedSegment = $event"
             @collect="collectBubble($event, index + 1)"
+            @analyse="analyseBubble($event, index + 1)"
           />
         </div>
       </div>
 
+      <AnalysisPanel />
       <CollectPanel v-if="state.data.pages.length > 0" />
 
       <div ref="endEl" class="mt-12 flex flex-col items-center text-center">

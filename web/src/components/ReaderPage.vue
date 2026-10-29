@@ -12,7 +12,11 @@ const props = withDefaults(
   }>(),
   { regions: () => [], selectedId: null },
 )
-const emit = defineEmits<{ select: [segmentId: string | null]; collect: [region: OverlayRegion] }>()
+const emit = defineEmits<{
+  select: [segmentId: string | null]
+  collect: [region: OverlayRegion]
+  analyse: [region: OverlayRegion]
+}>()
 
 type State = 'loading' | 'loaded' | 'error'
 const state = ref<State>('loading')
@@ -86,7 +90,16 @@ function popoverStyle(r: OverlayRegion) {
         >
           <p class="text-base leading-relaxed text-neutral-50">{{ r.text ?? '（這句還沒有翻譯）' }}</p>
           <p class="mt-2 border-t border-neutral-700 pt-2 text-xs leading-relaxed text-neutral-400">{{ r.source }}</p>
-          <div class="mt-3 flex justify-end">
+          <div class="mt-3 flex justify-end gap-2">
+            <!-- Only a line with a reviewed translation: the analysis explains that translation. -->
+            <button
+              v-if="r.text !== null"
+              type="button"
+              class="rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-100 hover:bg-neutral-700"
+              @click="emit('analyse', r)"
+            >
+              深入查詢
+            </button>
             <button
               type="button"
               class="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"

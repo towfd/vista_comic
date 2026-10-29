@@ -84,6 +84,7 @@ def test_migrating_creates_every_table_the_app_uses(migration_engine):
         "comprehend_usage",
         "learning_card",
         "card_review",
+        "line_analysis",
     } <= tables
     # Alembic's own bookkeeping, which is what makes a stamped database
     # distinguishable from an unmanaged one.
@@ -115,6 +116,7 @@ def test_the_migrations_are_reversible(migration_engine):
     assert "comprehend_usage" not in tables
     assert "learning_card" not in tables
     assert "card_review" not in tables
+    assert "line_analysis" not in tables
 
 
 # --- what the app does when migrating fails ---------------------------------
