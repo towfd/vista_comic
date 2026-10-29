@@ -11,6 +11,7 @@ import { nextChapter, START_AT_TOP_KEY, takeStartAtTopFlag } from '../reader/nex
 import CollectPanel from '../components/CollectPanel.vue'
 import ErrorState from '../components/ErrorState.vue'
 import ReaderPage from '../components/ReaderPage.vue'
+import { loadOverlay, type OverlayRegion } from '../reader/overlay'
 
 const props = defineProps<{ comicId: string; chapterId: string }>()
 const chapters = useChaptersStore()
@@ -198,6 +199,41 @@ function openNext() {
   })
 }
 
+// ---- Translation overlay ------------------------------------------------
+// Tap a speech bubble to see its translation. One open at a time; a tap
+// elsewhere or Esc closes it.
+const overlay = ref(new Map<number, OverlayRegion[]>())
+const selectedSegment = ref<string | null>(null)
+
+// comic-ocr-data is keyed by the library folder name, which the API exposes as
+// the comic's title; its episode is the chapter number.
+watch(
+  () => (state.value.data && comicTitle.value ? ([comicTitle.value, state.value.data.number] as const) : null),
+  async (key) => {
+    overlay.value = new Map()
+    selectedSegment.value = null
+    if (!key) return
+    const result = await loadOverlay(key[0], key[1])
+    if (state.value.data?.number === key[1] && comicTitle.value === key[0]) overlay.value = result
+  },
+  { immediate: true },
+)
+
+function closeOverlay() {
+  selectedSegment.value = null
+}
+function onOverlayKey(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeOverlay()
+}
+onMounted(() => {
+  window.addEventListener('click', closeOverlay)
+  window.addEventListener('keydown', onOverlayKey)
+})
+onUnmounted(() => {
+  window.removeEventListener('click', closeOverlay)
+  window.removeEventListener('keydown', onOverlayKey)
+})
+
 const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId } }))
 </script>
 
@@ -236,7 +272,13 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
       -->
       <div v-else ref="pagesEl" class="mx-auto max-w-[800px]">
         <div v-for="(src, index) in state.data.pages" :key="src" :data-page="index + 1">
-          <ReaderPage :src="src" :page-number="index + 1" />
+          <ReaderPage
+            :src="src"
+            :page-number="index + 1"
+            :regions="overlay.get(index + 1)"
+            :selected-id="selectedSegment"
+            @select="selectedSegment = $event"
+          />
         </div>
       </div>
 

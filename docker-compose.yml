@@ -66,6 +66,11 @@ services:
     env_file:
       - path: ./web/.env
         required: false
+    volumes:
+      # The comic-ocr-data folder (OCR boxes + translations), served by nginx
+      # at /ocr-data. Set OCR_DATA_PATH in the repo-root .env; unset, an empty
+      # ./ocr-data is mounted and the reader simply shows no boxes.
+      - ${OCR_DATA_PATH:-./ocr-data}:/ocr-data:ro
     ports:
       - "${WEB_BIND_ADDRESS:-0.0.0.0}:8080:80"
     restart: unless-stopped
