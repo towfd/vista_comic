@@ -222,6 +222,11 @@ watch(
 function closeOverlay() {
   selectedSegment.value = null
 }
+/** The card's 加入句子: the card gives way to the collecting panel, filled from the bubble. */
+function collectBubble(region: OverlayRegion, page: number) {
+  closeOverlay()
+  collect.fillFromBubble({ sourceText: region.source, translation: region.text, page })
+}
 function onOverlayKey(event: KeyboardEvent) {
   if (event.key === 'Escape') closeOverlay()
 }
@@ -278,6 +283,7 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
             :regions="overlay.get(index + 1)"
             :selected-id="selectedSegment"
             @select="selectedSegment = $event"
+            @collect="collectBubble($event, index + 1)"
           />
         </div>
       </div>

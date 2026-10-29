@@ -141,6 +141,78 @@ describe('the page a card records', () => {
   })
 })
 
+describe('filling the panel from a tapped bubble', () => {
+  const bubble = { sourceText: 'Không nghe máy à?', translation: '不接電話嗎？', page: 5 }
+
+  it('opens the panel with the original upper-cased and the translation', () => {
+    const collect = useCollectStore()
+    collect.enter('comic-a', 'chapter-1')
+    collect.setCurrentPage(7)
+    collect.fillFromBubble(bubble)
+    expect(collect.open).toBe(true)
+    expect(collect.sourceText).toBe('KHÔNG NGHE MÁY À?')
+    expect(collect.translation).toBe('不接電話嗎？')
+  })
+
+  it("records the bubble's page, not the page then current", () => {
+    const collect = reading()
+    collect.fillFromBubble(bubble)
+    expect(collect.page).toBe(5)
+  })
+
+  it('replaces whatever was typed', () => {
+    const collect = typed('xin chào', '你好')
+    collect.fillFromBubble(bubble)
+    expect(collect.sourceText).toBe('KHÔNG NGHE MÁY À?')
+    expect(collect.translation).toBe('不接電話嗎？')
+    expect(collect.page).toBe(5)
+  })
+
+  it('leaves the translation empty for a bubble without one', () => {
+    const collect = typed('xin chào', '你好')
+    collect.fillFromBubble({ ...bubble, translation: null })
+    expect(collect.translation).toBe('')
+    expect(collect.canAdd).toBe(false)
+  })
+
+  it('clears a notice and the last confirmation', async () => {
+    api.createCard.mockResolvedValueOnce({ card: card(9, 'xin chào'), created: false })
+    const collect = typed()
+    await collect.add('word')
+    expect(collect.notice).not.toBeNull()
+    collect.fillFromBubble(bubble)
+    expect(collect.notice).toBeNull()
+
+    await collect.add('sentence')
+    expect(collect.added).not.toBeNull()
+    collect.fillFromBubble(bubble)
+    expect(collect.added).toBeNull()
+  })
+
+  it('treats the page like a typed one afterwards: emptying the source releases it', () => {
+    const collect = reading()
+    collect.fillFromBubble(bubble)
+    collect.setSourceText('')
+    expect(collect.page).toBeNull()
+    collect.setSourceText('x')
+    expect(collect.page).toBe(7)
+  })
+
+  it('adds through the usual path, with the bubble page and the kind chosen', async () => {
+    const collect = reading()
+    collect.fillFromBubble(bubble)
+    await collect.add('sentence')
+    expect(api.createCard).toHaveBeenCalledWith({
+      sourceText: 'KHÔNG NGHE MÁY À?',
+      translation: '不接電話嗎？',
+      kind: 'sentence',
+      comicId: 'comic-a',
+      chapterId: 'chapter-1',
+      pageNumber: 5,
+    })
+  })
+})
+
 describe('when a card can be added', () => {
   it('can once both fields hold something', () => {
     expect(typed().canAdd).toBe(true)
