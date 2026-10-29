@@ -13,6 +13,7 @@ Endpoints (see docs/backend-architecture.md):
     POST   /comprehensions/{id}/retry          -> re-enqueue a failed record
     DELETE /comprehensions/{id}                -> delete one record
     POST   /line-analyses                      -> a line's word-by-word analysis, stored or queued
+    POST   /line-analyses/lookup               -> the stored analysis only (404 if none); never queues
     GET    /line-analyses/{id}                 -> one analysis (the web reader polls this)
 
 The comprehension work is deferred: POST /comprehensions only enqueues, and the
@@ -76,6 +77,7 @@ from .models import (
     LearningCardSourceText,
     LearningCardUpdate,
     LineAnalysisCreate,
+    LineAnalysisLookup,
     LineAnalysisResponse,
     ProgressResponse,
     ProgressUpdate,
@@ -863,6 +865,29 @@ def request_line_analysis(body: LineAnalysisCreate) -> LineAnalysisResponse:
     except HTTPException:
         _refund_daily_cap(usage_date)
         raise
+    return _to_line_analysis_response(row)
+
+
+@app.post("/line-analyses/lookup", response_model=LineAnalysisResponse)
+def lookup_line_analysis(body: LineAnalysisLookup) -> LineAnalysisResponse:
+    """The analysis with this identity, whatever its status; 404 when there is none.
+
+    What the panel asks when it opens or switches model, so a stored result
+    shows at once while a new call waits for 開始解析. Never queues and never
+    reserves: a POST in disguise that could spend would defeat the button.
+    """
+    source_key = normalized_key(body.sourceText)
+    row = None
+    if source_key:
+        with _line_analysis_session() as session:
+            row = line_analysis_store.find(
+                session,
+                source_key=source_key,
+                translation=body.translation,
+                model=body.model,
+            )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Line analysis not found")
     return _to_line_analysis_response(row)
 
 

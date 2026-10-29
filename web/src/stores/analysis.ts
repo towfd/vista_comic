@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import {
   ApiError,
   fetchLineAnalysis,
+  lookupLineAnalysis,
   requestLineAnalysis,
   type AnalysisModel,
   type AnalysisWord,
@@ -70,6 +71,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const model = ref<AnalysisModel>(rememberedModel())
   const analysis = ref<LineAnalysis | null>(null)
   const requesting = ref(false)
+  /** Checking for a stored analysis, before anything is asked of Claude. */
+  const looking = ref(false)
   const problem = ref<RequestProblem | null>(null)
 
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -112,6 +115,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const mine = ++epoch
     analysis.value = null
     problem.value = null
+    looking.value = false
     requesting.value = true
     try {
       const requested = await requestLineAnalysis({
@@ -136,19 +140,52 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
-  /** Study this bubble: open the panel and show its stored analysis, or ask for one. */
+  /**
+   * Show the stored analysis of the line with the chosen model, if there is
+   * one -- free, and nothing is queued. Without one the panel waits for
+   * 開始解析: a call costs money, so it is never made by opening the panel or
+   * switching model. A lookup that fails is the same as none; 開始解析 still
+   * returns a stored analysis rather than paying for another.
+   */
+  async function lookup() {
+    const target = bubble.value
+    if (!target) return
+    stopPolling()
+    const mine = ++epoch
+    analysis.value = null
+    problem.value = null
+    requesting.value = false
+    looking.value = true
+    try {
+      const found = await lookupLineAnalysis({ sourceText: target.sourceText, translation: target.translation, model: model.value })
+      if (mine !== epoch) return
+      analysis.value = found
+      if (found?.status === 'pending') poll(found.id, mine)
+    } catch (e) {
+      console.warn('looking up a line analysis failed:', e)
+    } finally {
+      if (mine === epoch) looking.value = false
+    }
+  }
+
+  /** Study this bubble: open the panel on its stored analysis, or ready to start one. */
   function openFor(target: AnalysedBubble) {
     bubble.value = target
     open.value = true
-    void run(false)
+    void lookup()
   }
 
-  /** Switch model: that model's stored analysis of the line, or a new one. Remembered for next time. */
+  /** Switch model: that model's stored analysis, or ready to start one. Remembered for next time. */
   function setModel(next: AnalysisModel) {
     if (next === model.value) return
     model.value = next
     remember(next)
-    if (open.value) void run(false)
+    if (open.value) void lookup()
+  }
+
+  /** 開始解析: ask for the analysis -- the stored one if it exists, otherwise a new call. */
+  function start() {
+    void run(false)
   }
 
   /** Run the failed analysis again; the backend re-queues a failed one. */
@@ -170,7 +207,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     analysis.value = null
     problem.value = null
     requesting.value = false
+    looking.value = false
   }
 
-  return { open, bubble, model, analysis, requesting, problem, openFor, setModel, retry, refresh, close }
+  return { open, bubble, model, analysis, requesting, looking, problem, openFor, setModel, start, retry, refresh, close }
 })

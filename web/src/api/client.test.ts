@@ -12,6 +12,7 @@ import {
   fetchComic,
   fetchComics,
   fetchLineAnalysis,
+  lookupLineAnalysis,
   fetchStudySettings,
   getJson,
   recordReview,
@@ -668,5 +669,19 @@ describe('line analyses', () => {
     expect((await fetchLineAnalysis(3, fetcher)).status).toBe('done')
     expect(seen).toEqual(['/line-analyses/3'])
     expect(await errorKind(fetchLineAnalysis(4, respondWith(json({}, 404))))).toBe('notFound')
+  })
+
+  it('looks one up by its identity alone, and a missing one is null', async () => {
+    const seen: { path?: string; init?: RequestInit } = {}
+    const fetcher: Fetcher = async (path, init) => {
+      seen.path = path
+      seen.init = init
+      return json(pending)
+    }
+    expect(await lookupLineAnalysis({ sourceText: 'Anh à', translation: '哥啊', model: 'opus' }, fetcher)).toEqual(pending)
+    expect(seen.path).toBe('/line-analyses/lookup')
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ sourceText: 'Anh à', translation: '哥啊', model: 'opus' })
+    expect(await lookupLineAnalysis(request, respondWith(json({}, 404)))).toBeNull()
+    expect(await errorKind(lookupLineAnalysis(request, respondWith(json({}, 503))))).toBe('unavailable')
   })
 })

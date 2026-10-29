@@ -331,3 +331,42 @@ def test_a_restart_fails_interrupted_claims_and_refunds_them(client, session, cl
     # A row still waiting its turn is not interrupted; the worker runs it next.
     assert client.get(f"/line-analyses/{waiting['id']}").json()["status"] == "pending"
     assert _count(session) == 1
+
+
+# --- looking one up without asking for it ------------------------------------
+
+
+def _lookup(client, **overrides):
+    body = {k: v for k, v in {**_BODY, **overrides}.items() if k in ("sourceText", "translation", "model")}
+    return client.post("/line-analyses/lookup", json=body)
+
+
+def test_lookup_finds_a_stored_analysis_ignoring_case_and_spacing(client, claude):
+    first = _post(client).json()
+    _drain()
+
+    resp = _lookup(client, sourceText="ANH DOK-JA,  VIỆN PHÍ ĐÃ THANH TOÁN RỒI À?")
+
+    assert resp.status_code == 200
+    assert resp.json()["id"] == first["id"]
+    assert resp.json()["status"] == "done"
+
+
+def test_lookup_is_404_and_queues_nothing_when_there_is_none(client, session, claude):
+    assert _lookup(client).status_code == 404
+    assert _lookup(client, model="fable").status_code == 404
+    assert _lookup(client, sourceText="   ").status_code == 404
+
+    assert session.execute(text("SELECT count(*) FROM line_analysis")).scalar() == 0
+    assert _count(session) == 0
+    assert claude.calls == []
+
+
+def test_lookup_returns_a_pending_or_failed_analysis_as_it_is(client, session, claude):
+    _post(client)
+    assert _lookup(client).json()["status"] == "pending"
+
+    claude.answer = line_analysis_client.REFUSED
+    _drain()
+    assert _lookup(client).json()["failure"] == "refused"
+    assert _count(session) == 0

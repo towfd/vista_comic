@@ -470,6 +470,14 @@ class LineAnalysisCreate(BaseModel):
     refresh: bool = False
 
 
+class LineAnalysisLookup(BaseModel):
+    """Request body for ``POST /line-analyses/lookup``: an analysis's identity, nothing more."""
+
+    sourceText: str = Field(min_length=1, max_length=500)
+    translation: str = Field(min_length=1, max_length=500)
+    model: Literal["sonnet", "opus", "fable"]
+
+
 class LineAnalysisWord(BaseModel):
     text: str
     meaning: str
