@@ -165,6 +165,20 @@ describe('drawAsking', () => {
   it('asks a word card by translation whatever the draw', () => {
     expect(drawAsking(word, deck, () => 0)).toEqual({ type: 'sentence_typed', cloze: null })
   })
+
+  it('asks only clozes of a card that supports one when only clozes are wanted', () => {
+    expect(drawAsking(asked, deck, () => 0, 'cloze').type).toBe('cloze_typed')
+    expect(drawAsking(asked, deck, () => 0.99, 'cloze').type).toBe('cloze_typed')
+  })
+
+  it('asks only translations when only translations are wanted', () => {
+    expect(drawAsking(asked, deck, () => 0, 'sentence')).toEqual({ type: 'sentence_typed', cloze: null })
+    expect(drawAsking(asked, deck, () => 0.99, 'sentence')).toEqual({ type: 'sentence_typed', cloze: null })
+  })
+
+  it('still asks a card with no cloze by translation when only clozes are wanted', () => {
+    expect(drawAsking(word, deck, () => 0, 'cloze')).toEqual({ type: 'sentence_typed', cloze: null })
+  })
 })
 
 describe('judgeCloze', () => {
