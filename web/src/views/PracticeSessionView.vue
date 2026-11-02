@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
@@ -11,7 +11,7 @@ const router = useRouter()
 const session = useSessionStore()
 const { phase, loadError, question, verdict, saveState, saveFailure, remaining, waitingToAdvance, outcome } = storeToRefs(session)
 
-const field = ref<HTMLInputElement | null>(null)
+const field = ref<HTMLTextAreaElement | null>(null)
 const nextButton = ref<HTMLButtonElement | null>(null)
 const doneLink = ref<{ $el: HTMLElement } | null>(null)
 
@@ -31,7 +31,20 @@ const submit = () => session.submit(field.value?.value ?? '')
 
 const reload = () => window.location.reload()
 
-onMounted(() => session.start())
+/** As tall as what is typed, so nothing is ever cut off. `auto` first, or it could only grow. */
+function fitField() {
+  const el = field.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+}
+
+onMounted(() => {
+  session.start()
+  // A narrower window wraps the same text onto more lines.
+  window.addEventListener('resize', fitField)
+})
+onUnmounted(() => window.removeEventListener('resize', fitField))
 
 // The keyboard never has to hunt for where it is: the field while a question
 // is open, the way onward once it is answered.
@@ -41,6 +54,7 @@ watch(
     await nextTick()
     if (phase.value === 'asking') {
       if (field.value) field.value.value = ''
+      fitField()
       field.value?.focus()
     } else if (phase.value === 'feedback') {
       nextButton.value?.focus()
@@ -65,6 +79,12 @@ function onFieldKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.keyCode === 229) return
   event.preventDefault()
   if (!event.repeat) submit()
+}
+
+/** An answer is one line that wraps: an Enter `onFieldKeydown` left alone must not start a second. */
+function refuseLineBreak(event: Event) {
+  const { inputType } = event as InputEvent
+  if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') event.preventDefault()
 }
 
 /** 算我對 removes itself, so the keyboard goes back to the way onward. */
@@ -141,10 +161,11 @@ function onNextKeydown(event: KeyboardEvent) {
         <p class="mt-2 text-2xl leading-relaxed text-neutral-100">{{ question.prompt }}</p>
       </template>
 
-      <!-- Kept mounted through feedback, read-only, so what was typed stays where it was typed. -->
-      <input
+      <!-- Kept mounted through feedback, read-only, so what was typed stays where it was typed.
+           A textarea so a long sentence wraps into view instead of scrolling out of it. -->
+      <textarea
         ref="field"
-        type="text"
+        :rows="question.cloze ? 1 : 2"
         lang="vi"
         autocomplete="off"
         autocapitalize="off"
@@ -153,8 +174,10 @@ function onNextKeydown(event: KeyboardEvent) {
         enterkeyhint="send"
         aria-label="你的答案"
         :readonly="phase !== 'asking'"
-        class="mt-6 w-full rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-xl text-neutral-100 outline-none focus:border-sky-500 read-only:text-neutral-400"
+        class="mt-6 block w-full resize-none overflow-hidden rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-xl text-neutral-100 outline-none focus:border-sky-500 read-only:text-neutral-400"
         @keydown="onFieldKeydown"
+        @beforeinput="refuseLineBreak"
+        @input="fitField"
       />
       <div v-if="phase === 'asking'" class="mt-3 flex items-center justify-end gap-3">
         <p class="hidden text-xs text-neutral-500 pointer-fine:block">Enter 送出</p>
@@ -232,7 +255,7 @@ function onNextKeydown(event: KeyboardEvent) {
         <!-- Fixing a card happens in the library. A new tab, so the session is
              not left: coming back to this one refetches the deck, and the fix
              applies from the next question. -->
-        <p v-if="saveState === 'saved'" class="mt-8 border-t border-neutral-800 pt-4 text-sm">
+        <p v-if="saveState !== 'gone'" class="mt-8 border-t border-neutral-800 pt-4 text-sm">
           <RouterLink
             :to="{ name: 'deck-card', params: { cardId: question.card.id } }"
             target="_blank"
