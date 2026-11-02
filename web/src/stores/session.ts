@@ -5,6 +5,7 @@ import type { LearningCard, QuestionType, ReviewRequest } from '../api/types'
 import { localDay, nextCard, remainingCards } from '../practice/queue'
 import type { Cloze } from '../practice/cloze'
 import { drawAsking } from '../practice/question'
+import { rememberedQuestionMix } from '../practice/questionMix'
 import { isBlank, judgeCloze, judgeSentence } from '../practice/text'
 import { useDeckStore } from './deck'
 
@@ -188,7 +189,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function show(card: LearningCard, left: number) {
-    const asking = drawAsking(card, deck.cards, Math.random)
+    const asking = drawAsking(card, deck.cards, Math.random, rememberedQuestionMix())
     question.value = { card, ...asking, prompt: card.translation, token: newToken() }
     remaining.value = left
     phase.value = 'asking'

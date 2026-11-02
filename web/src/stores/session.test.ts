@@ -406,6 +406,28 @@ describe('an answer that will not save', () => {
   })
 })
 
+describe('the question mix', () => {
+  const clozeDeck = () => [card(1, 'review', -5, 'Tôi không biết đường'), { ...card(2, 'review', 600, 'đường'), kind: 'word' as const }]
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('never draws a cloze when only translations are wanted', async () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'sentence', setItem: () => {} })
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const session = await started(clozeDeck())
+    expect(session.question).toMatchObject({ type: 'sentence_typed', cloze: null })
+  })
+
+  it('always draws a cloze when only clozes are wanted', async () => {
+    vi.stubGlobal('localStorage', { getItem: () => 'cloze', setItem: () => {} })
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    const session = await started(clozeDeck())
+    expect(session.question?.type).toBe('cloze_typed')
+  })
+})
+
 describe('cloze questions', () => {
   // Card 1 is a sentence holding card 2's word; card 2 is that word, not due.
   const deck = () => [
