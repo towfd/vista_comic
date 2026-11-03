@@ -16,10 +16,11 @@ export const NOTE_LIMIT = 1000
  * Why the last add made no new card.
  *
  * - `exists`: the line was already in the deck. `card` is the one it holds --
- *   untouched, so what was typed here was not saved onto it.
+ *   untouched, so what was typed here was not saved onto it. `noteDropped`
+ *   says a note was typed, and so is one of the things not saved.
  * - `failed`: the request did not go through.
  */
-export type Notice = { kind: 'exists'; card: LearningCard } | { kind: 'failed'; error: ApiErrorKind }
+export type Notice = { kind: 'exists'; card: LearningCard; noteDropped: boolean } | { kind: 'failed'; error: ApiErrorKind }
 
 /**
  * The collecting panel: one line typed into the deck from the chapter being
@@ -33,6 +34,8 @@ export const useCollectStore = defineStore('collect', () => {
   const open = ref(false)
   const sourceText = ref('')
   const translation = ref('')
+  /** Optional: blank sends no note. */
+  const note = ref('')
   // The page the card will record, fixed when the reader starts typing so that
   // scrolling on mid-card cannot change where the line is said to come from.
   const page = ref<number | null>(null)
@@ -52,6 +55,7 @@ export const useCollectStore = defineStore('collect', () => {
     open.value = false
     sourceText.value = ''
     translation.value = ''
+    note.value = ''
     page.value = null
     notice.value = null
   }
@@ -103,6 +107,11 @@ export const useCollectStore = defineStore('collect', () => {
     else if (wasEmpty || page.value === null) page.value = currentPage
   }
 
+  function setNote(text: string) {
+    note.value = text
+    notice.value = null
+  }
+
   function setTranslation(text: string) {
     translation.value = text
     notice.value = null
@@ -114,7 +123,8 @@ export const useCollectStore = defineStore('collect', () => {
       page.value !== null &&
       !isBlank(sourceText.value) &&
       !isBlank(translation.value) &&
-      sourceText.value.trim().length <= SOURCE_TEXT_LIMIT,
+      sourceText.value.trim().length <= SOURCE_TEXT_LIMIT &&
+      note.value.trim().length <= NOTE_LIMIT,
   )
 
   /**
@@ -127,6 +137,7 @@ export const useCollectStore = defineStore('collect', () => {
     if (!canAdd.value || !chapter || page.value === null) return
     const mine = epoch
     const line = sourceText.value.trim()
+    const typedNote = note.value.trim()
     saving.value = true
     notice.value = null
     let collected: Collected
@@ -138,6 +149,7 @@ export const useCollectStore = defineStore('collect', () => {
         comicId: chapter.comicId,
         chapterId: chapter.chapterId,
         pageNumber: page.value,
+        ...(typedNote ? { note: typedNote } : {}),
       })
     } catch (e) {
       // Only the request is in here. Anything that goes wrong after the server
@@ -155,7 +167,7 @@ export const useCollectStore = defineStore('collect', () => {
       added.value = line
       if (mine === epoch) reset()
     } else if (mine === epoch) {
-      notice.value = { kind: 'exists', card }
+      notice.value = { kind: 'exists', card, noteDropped: typedNote !== '' }
     }
     try {
       deck.takeCard(card)
@@ -173,6 +185,7 @@ export const useCollectStore = defineStore('collect', () => {
     open,
     sourceText,
     translation,
+    note,
     page,
     saving,
     notice,
@@ -185,6 +198,7 @@ export const useCollectStore = defineStore('collect', () => {
     collapse,
     setSourceText,
     setTranslation,
+    setNote,
     add,
     dismissAdded,
   }

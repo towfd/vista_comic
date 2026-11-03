@@ -329,6 +329,8 @@ export interface CardDraft {
   comicId: string
   chapterId: string
   pageNumber: number
+  /** Left out when the reader wrote none. Kept only if the line is new. */
+  note?: string
 }
 
 /** The card the deck now holds for a line, and whether this request is what made it. */
