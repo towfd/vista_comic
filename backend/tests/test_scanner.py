@@ -184,3 +184,31 @@ def test_scan_is_idempotent(sample_library):
         ]
 
     assert snapshot(first) == snapshot(second)
+
+
+def test_decimal_chapter_numbers_keep_their_decimal_part(tmp_path, write_page):
+    # Split chapters like 01 / 01.5 / 07.1 / 07.2 are distinct chapters: the web
+    # reader finds a chapter's OCR and translation files by this number, so
+    # truncating 01.5 to 1 shows chapter 1's translations on chapter 1.5.
+    root = tmp_path / "library"
+    for name in ["08", "07.2", "01.5", "02", "07.1", "01"]:
+        write_page(root / "Comic" / name / "001.jpg")
+
+    chapters = scan_library(root).comics[0].chapters
+
+    assert [ch.number for ch in chapters] == [1, 1.5, 2, 7.1, 7.2, 8]
+    assert [ch.title for ch in chapters] == [
+        "Chapter 1", "Chapter 1.5", "Chapter 2", "Chapter 7.1", "Chapter 7.2", "Chapter 8",
+    ]
+    # Whole numbers stay integers, so the API keeps sending 8 and not 8.0.
+    assert all(type(ch.number) is int for ch in chapters if ch.number == int(ch.number))
+
+
+def test_decimal_chapter_number_with_a_title(tmp_path, write_page):
+    root = tmp_path / "library"
+    write_page(root / "Comic" / "01.5 - Side Story" / "001.jpg")
+    write_page(root / "Comic" / "12.Finale" / "001.jpg")
+
+    chapters = scan_library(root).comics[0].chapters
+
+    assert [(ch.number, ch.title) for ch in chapters] == [(1.5, "Side Story"), (12, "Finale")]

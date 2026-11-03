@@ -66,6 +66,27 @@ def test_get_comic_detail_shape_and_counts(client):
     assert ch["id"] == stable_id("Alpha/01 - The Journey")
 
 
+def test_decimal_chapter_numbers_on_the_wire(tmp_path, write_page, progress_db):
+    root = tmp_path / "library"
+    for name in ["01", "01.5", "02"]:
+        write_page(root / "Comic" / name / "001.jpg")
+    main.load_catalog(root)
+    client = TestClient(main.app)
+    comic_id = stable_id("Comic")
+
+    resp = client.get(f"/comics/{comic_id}")
+    assert resp.status_code == 200
+    assert '"number":1,' in resp.text  # whole numbers are not sent as 1.0
+    chapters = resp.json()["chapters"]
+    assert [ch["number"] for ch in chapters] == [1, 1.5, 2]
+
+    split = chapters[1]
+    assert split["id"] == stable_id("Comic/01.5")  # ids still hash the folder path
+    reader = client.get(f"/comics/{comic_id}/chapters/{split['id']}").json()
+    assert reader["number"] == 1.5
+    assert reader["title"] == "Chapter 1.5"
+
+
 def test_a_chapters_own_cover_is_advertised_and_is_not_a_page(client):
     comic_id = stable_id("Alpha")
     chapters = client.get(f"/comics/{comic_id}").json()["chapters"]
