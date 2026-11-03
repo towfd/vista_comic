@@ -28,7 +28,7 @@ from typing import Dict, List, Optional, Tuple
 # ``Path.is_relative_to`` requires Python 3.9+ (we target 3.12).
 
 from .ids import stable_id
-from .models import ChapterEntry, ComicEntry
+from .models import ChapterEntry, ChapterNumber, ComicEntry
 
 logger = logging.getLogger("vista_comic.scanner")
 
@@ -36,7 +36,9 @@ logger = logging.getLogger("vista_comic.scanner")
 PAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 # Chapter directory name -> (number, optional title). Separators: - _ . and en-dash.
-_CHAPTER_RE = re.compile(r"^\s*(\d+)\s*(?:[-–_.]\s*(.*))?$")
+# A dot followed by digits is a decimal part, not a separator: "01.5" is chapter
+# 1.5 (a split chapter), while "12.Finale" is chapter 12 titled "Finale".
+_CHAPTER_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(?:[-–_.]\s*(.*))?$")
 
 _NUM_SPLIT_RE = re.compile(r"(\d+)")
 
@@ -147,12 +149,16 @@ class Catalog:
         )
 
 
-def _parse_chapter_name(name: str) -> Optional[Tuple[int, str]]:
-    """Return (number, title) or None if the name is not a chapter."""
+def _parse_chapter_name(name: str) -> Optional[Tuple[ChapterNumber, str]]:
+    """Return (number, title) or None if the name is not a chapter.
+
+    Whole numbers stay ``int`` so the API keeps sending ``8`` rather than ``8.0``.
+    """
     m = _CHAPTER_RE.match(name)
     if not m:
         return None
-    number = int(m.group(1))
+    value = float(m.group(1))
+    number: ChapterNumber = int(value) if value.is_integer() else value
     remainder = (m.group(2) or "").strip()
     title = remainder if remainder else f"Chapter {number}"
     return number, title
@@ -199,7 +205,7 @@ def _scan_comic(
     comic_real = comic_dir.resolve()
 
     # Collect chapter directories (sorted by parsed number, then natural name).
-    parsed: List[Tuple[int, str, Path]] = []
+    parsed: List[Tuple[ChapterNumber, str, Path]] = []
     for entry in comic_dir.iterdir():
         if not entry.is_dir() or _is_hidden(entry):
             continue

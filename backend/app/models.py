@@ -12,9 +12,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
+
+# A chapter's number as its folder names it: ``8``, or ``1.5`` for a split chapter
+# (folder ``01.5``). Whole numbers are ints so they serialize as ``8``, not ``8.0``.
+ChapterNumber = Union[int, float]
 
 # ---------------------------------------------------------------------------
 # Internal in-memory catalog (source of truth held in memory after a scan).
@@ -25,7 +29,7 @@ from pydantic import BaseModel, Field, field_validator
 @dataclass(frozen=True)
 class ChapterEntry:
     id: str
-    number: int
+    number: ChapterNumber
     title: str
     # Relative POSIX page paths under the library root, in reading order.
     # Held now for Slice 2 (reader + /media); not exposed in Slice 1 JSON.
@@ -62,7 +66,7 @@ class ComicEntry:
 
 class ChapterSummary(BaseModel):
     id: str
-    number: int
+    number: ChapterNumber
     title: str
     pageCount: int
     # This chapter's own first page, so the chapter list can show what the
@@ -108,7 +112,7 @@ class ChapterDetail(BaseModel):
     """
 
     id: str
-    number: int
+    number: ChapterNumber
     title: str
     pages: List[str]
     # 1-based resume position from the progress store; omitted when no progress
