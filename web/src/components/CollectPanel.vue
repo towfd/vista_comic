@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import type { ApiErrorKind } from '../api/client'
-import { useCollectStore, SOURCE_TEXT_LIMIT } from '../stores/collect'
+import { useCollectStore, NOTE_LIMIT, SOURCE_TEXT_LIMIT } from '../stores/collect'
 
 // Everything this panel does is decided in the collect store; this only
 // renders it and handles what belongs to the DOM: focus and a timer.
@@ -117,6 +117,18 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
         </div>
       </div>
 
+      <div class="mt-3">
+        <label for="collect-note" class="block text-xs text-neutral-400">註解<span class="ml-1 text-neutral-600">選填</span></label>
+        <textarea
+          id="collect-note"
+          rows="2"
+          :maxlength="NOTE_LIMIT"
+          :value="collect.note"
+          class="mt-1 w-full resize-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-sky-500"
+          @input="collect.setNote(value($event))"
+        />
+      </div>
+
       <!--
         The card the deck already holds, in its own words: a line counts as the
         same whatever its case and spacing, so it may not look like what was
@@ -126,6 +138,11 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
         <p class="text-sm text-amber-400">已經收過了，沒有新增，也沒有改動原本的卡片。</p>
         <p class="mt-2 text-sm whitespace-pre-wrap text-neutral-100" lang="vi">{{ collect.notice.card.sourceText }}</p>
         <p class="mt-1 text-sm whitespace-pre-wrap text-neutral-400">{{ collect.notice.card.translation }}</p>
+        <p v-if="collect.notice.card.note" class="mt-2 text-sm break-words whitespace-pre-wrap text-neutral-400">
+          <span class="text-xs text-neutral-500">註解：</span>{{ collect.notice.card.note }}
+        </p>
+        <!-- Still in the field below, so it can be copied over on the card page. -->
+        <p v-if="collect.notice.noteDropped" class="mt-2 text-sm text-amber-400">註解沒有存進去，到字卡庫修改。</p>
         <p class="mt-2 flex items-baseline justify-between gap-2 text-xs">
           <span class="text-neutral-500">{{ collect.notice.card.kind ? kinds[collect.notice.card.kind] : '未分類' }}</span>
           <!-- A new tab, as from a practice session: leaving the reader would discard what is typed here. -->

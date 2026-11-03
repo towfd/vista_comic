@@ -2,7 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import type { LearningCard } from '../api/types'
-import { SOURCE_TEXT_LIMIT, useCollectStore } from './collect'
+import { NOTE_LIMIT, SOURCE_TEXT_LIMIT, useCollectStore } from './collect'
 import { useDeckStore } from './deck'
 
 const api = vi.hoisted(() => ({ createCard: vi.fn() }))
@@ -294,6 +294,28 @@ describe('adding a card', () => {
     })
   })
 
+  it('sends a note when one is typed, trimmed with its line breaks', async () => {
+    const collect = typed()
+    collect.setNote('  口語\n常和 đi 一起 ')
+    await collect.add('word')
+    expect(api.createCard.mock.calls[0]![0]).toMatchObject({ note: '口語\n常和 đi 一起' })
+  })
+
+  it('sends no note when the field is blank', async () => {
+    const collect = typed()
+    collect.setNote(' \n ')
+    await collect.add('word')
+    expect(api.createCard.mock.calls[0]![0]).not.toHaveProperty('note')
+  })
+
+  it('cannot add with a note over the limit', () => {
+    const collect = typed()
+    collect.setNote('註'.repeat(NOTE_LIMIT))
+    expect(collect.canAdd).toBe(true)
+    collect.setNote('註'.repeat(NOTE_LIMIT + 1))
+    expect(collect.canAdd).toBe(false)
+  })
+
   it('sends the kind of the button pressed', async () => {
     await typed().add('word')
     expect(api.createCard.mock.calls[0]![0]).toMatchObject({ kind: 'word' })
@@ -301,10 +323,12 @@ describe('adding a card', () => {
 
   it('clears and collapses once a new card is saved, and names the line added', async () => {
     const collect = typed()
+    collect.setNote('註解')
     await collect.add('word')
     expect(collect.open).toBe(false)
     expect(collect.sourceText).toBe('')
     expect(collect.translation).toBe('')
+    expect(collect.note).toBe('')
     expect(collect.page).toBeNull()
     expect(collect.added).toBe('xin chào')
   })
@@ -347,7 +371,23 @@ describe('a line already in the deck', () => {
   it('says so, with the card the deck holds', async () => {
     const collect = typed()
     await collect.add('word')
-    expect(collect.notice).toEqual({ kind: 'exists', card: card(4, 'Xin chào', '哈囉') })
+    expect(collect.notice).toEqual({ kind: 'exists', card: card(4, 'Xin chào', '哈囉'), noteDropped: false })
+  })
+
+  it('says a typed note was not saved, and keeps it in the field', async () => {
+    const collect = typed()
+    collect.setNote('新的註解')
+    await collect.add('word')
+    expect(collect.notice).toMatchObject({ kind: 'exists', noteDropped: true })
+    expect(collect.note).toBe('新的註解')
+  })
+
+  it('stops saying so once the reader edits the note', async () => {
+    const collect = typed()
+    collect.setNote('新的註解')
+    await collect.add('word')
+    collect.setNote('新的註解。')
+    expect(collect.notice).toBeNull()
   })
 
   it('puts that card in the deck, so one deleted here earlier is back', async () => {
@@ -366,7 +406,7 @@ describe('a line already in the deck', () => {
     const collect = typed()
     await collect.add('word')
     await collect.add('sentence')
-    expect(collect.notice).toEqual({ kind: 'exists', card: card(4, 'Xin chào', '哈囉') })
+    expect(collect.notice).toEqual({ kind: 'exists', card: card(4, 'Xin chào', '哈囉'), noteDropped: false })
     expect(useDeckStore().cards).toHaveLength(1)
   })
 
