@@ -500,6 +500,19 @@ describe('fixing a card', () => {
     expect(card.kind).toBeNull()
   })
 
+  it('can send a note alone, and reads one back with its line breaks', async () => {
+    const { seen, fetcher } = capture(json({ ...stored, note: '口語\n常和 đi 一起' }))
+    const card = await updateCard(7, { note: '口語\n常和 đi 一起' }, fetcher)
+    expect(JSON.parse(String(seen.init?.body))).toEqual({ note: '口語\n常和 đi 一起' })
+    expect(card.note).toBe('口語\n常和 đi 一起')
+  })
+
+  it('reads a card from a backend that predates notes as having none', async () => {
+    // `stored` carries no `note`, as an older backend's response does not.
+    const card = await updateCard(7, { translation: '道路' }, respondWith(json(stored)))
+    expect(card.note).toBeNull()
+  })
+
   it('puts a corrected source text to its own route and returns the card', async () => {
     const { seen, fetcher } = capture(json({ ...stored, sourceText: 'đường' }))
     const change = await changeSourceText(7, 'đường', fetcher)

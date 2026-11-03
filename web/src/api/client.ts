@@ -215,6 +215,8 @@ function decodeCard(card: LearningCard): LearningCard {
     ...card,
     state: cardState(card.state),
     kind: card.kind === 'word' || card.kind === 'sentence' ? card.kind : null,
+    // Missing from a backend that predates notes.
+    note: typeof card.note === 'string' && card.note !== '' ? card.note : null,
   }
 }
 
@@ -266,9 +268,11 @@ export interface CardCorrection {
   translation?: string
   /** `null` clears the kind. Left out, the kind is untouched. */
   kind?: 'word' | 'sentence' | null
+  /** `null` or blank clears the note. Left out, the note is untouched. */
+  note?: string | null
 }
 
-/** Correct a card's translation, its kind, or both, and return the card as it now stands. */
+/** Correct a card's translation, kind, or note, and return the card as it now stands. */
 export async function updateCard(cardId: number, correction: CardCorrection, fetcher: Fetcher = fetch): Promise<LearningCard> {
   const card = await requestJson<LearningCard>(
     `/cards/${cardId}`,

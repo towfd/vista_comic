@@ -1011,6 +1011,7 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
         comicTitle=comic_title,
         chapterTitle=chapter_title,
         kind=row.kind,
+        note=row.note,
         state=row.state,
         learningStep=row.learning_step,
         ladderStage=row.ladder_stage,
@@ -1056,6 +1057,7 @@ def create_card(body: LearningCardCreate, response: Response) -> LearningCardRes
             chapter_id=body.chapterId,
             page_number=body.pageNumber,
             kind=body.kind,
+            note=body.note,
         )
     if not created:
         response.status_code = 200
@@ -1077,16 +1079,18 @@ def list_cards() -> list[LearningCardResponse]:
 
 @app.patch("/cards/{card_id}", response_model=LearningCardResponse)
 def update_card(card_id: int, body: LearningCardUpdate) -> LearningCardResponse:
-    """Correct what the reader is allowed to correct: the translation, the kind.
+    """Correct what the reader is allowed to correct: the translation, the kind, the note.
 
-    Two fields, and the refusal of everything else is deliberate — the identity
+    Three fields, and the refusal of everything else is deliberate — the identity
     columns and the source reference are not the client's to move (see
     ``models.LearningCardUpdate``).
 
     ``kind`` is read from ``model_fields_set`` rather than by testing for
     ``None``, because clearing a kind is a real thing to want: a card collected
     before the two save buttons existed has none, and a mis-tapped one is
-    corrected here since re-collecting deliberately leaves it alone.
+    corrected here since re-collecting deliberately leaves it alone. ``note``
+    is read the same way, so a client that does not send one -- the phone --
+    never clears it.
 
     A body that changes nothing is refused rather than answered with a
     no-op, so a client bug shows up as an error instead of as a save that
@@ -1095,7 +1099,7 @@ def update_card(card_id: int, body: LearningCardUpdate) -> LearningCardResponse:
     fields = body.model_fields_set
     if not fields:
         raise HTTPException(
-            status_code=422, detail="Provide translation, kind, or both"
+            status_code=422, detail="Provide translation, kind, note, or any of them"
         )
 
     with _card_session() as session:
@@ -1105,6 +1109,8 @@ def update_card(card_id: int, body: LearningCardUpdate) -> LearningCardResponse:
             translation=body.translation,
             kind=body.kind,
             set_kind="kind" in fields,
+            note=body.note,
+            set_note="note" in fields,
         )
         row = learning_card_store.get(session, card_id) if found else None
     if row is None:

@@ -11,6 +11,7 @@ function card(sourceText: string, extra: Partial<LearningCard> = {}): LearningCa
     sourceText,
     translation: `meaning of ${sourceText}`,
     kind: 'word',
+    note: null,
     state: 'review',
     ladderStage: 0,
     learningStep: null,

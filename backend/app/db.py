@@ -197,6 +197,10 @@ class LearningCard(Base):
         nullable=True,
     )
     kind: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    #: The reader's own explanation, written while collecting or later in the
+    #: card library, and shown only after an answer. NULL when they wrote none;
+    #: never generated. See ``.scratch/card-notes/spec.md``.
+    note: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     #: Where the card is in the scheduling model -- see ``scheduler.CardState``.
     #:
     #: **Stored, not derived**, which reverses the three-step day's design and is

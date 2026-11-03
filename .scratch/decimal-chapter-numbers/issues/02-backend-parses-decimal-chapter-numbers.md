@@ -1,4 +1,4 @@
-Status: implemented — awaiting deploy check by owner (2026-11-03)
+Status: done — owner confirmed on the deployed web reader (2026-11-04)
 Blocked by: — (was 01; owner waived the iOS-first order on 2026-11-03, web-only for now)
 
 # 02 — Backend parses decimal chapter numbers

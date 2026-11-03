@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ApiError, type ApiErrorKind, type CardCorrection } from '../api/client'
 import { useDeckStore } from '../stores/deck'
-import { SOURCE_TEXT_LIMIT } from '../stores/collect'
+import { NOTE_LIMIT, SOURCE_TEXT_LIMIT } from '../stores/collect'
 import type { LearningCard } from '../api/types'
 import { scheduleSummary } from '../practice/library'
 import ErrorState from '../components/ErrorState.vue'
@@ -70,6 +70,17 @@ const sourceUnchanged = computed(
 
 const unchanged = computed(() => translation.value.trim() === '' || translation.value.trim() === card.value?.translation)
 
+// Unlike the translation, an empty note is a value: saving it clears the note.
+const note = ref('')
+watch(
+  () => card.value?.note,
+  (text) => {
+    note.value = text ?? ''
+  },
+  { immediate: true },
+)
+const noteUnchanged = computed(() => note.value.trim() === (card.value?.note ?? ''))
+
 const failed: Record<ApiErrorKind, string> = {
   unavailable: '連不上伺服器，卡片沒有變動。',
   auth: '登入已經過期，卡片沒有變動。請重新整理頁面。',
@@ -122,6 +133,12 @@ function onTranslationKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.keyCode === 229) return
   event.preventDefault()
   if (!event.repeat) saveTranslation()
+}
+
+function saveNote() {
+  if (noteUnchanged.value) return
+  const text = note.value.trim()
+  correct({ note: text || null }, text ? '註解已更新。' : '註解已清除。')
 }
 
 function setKind(kind: 'word' | 'sentence') {
@@ -225,6 +242,31 @@ function remove() {
               :disabled="working || unchanged"
               class="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-40"
               @click="saveTranslation"
+            >
+              儲存
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label for="card-note" class="block text-sm font-medium text-neutral-100">註解</label>
+          <p class="mt-1 text-xs text-neutral-500">選填。練習答完後會顯示在最下面。清空後儲存就是刪除。</p>
+          <!-- Enter is a line break here, not a save: a note is often more than one line. -->
+          <div class="mt-2 flex items-start gap-2">
+            <textarea
+              id="card-note"
+              v-model="note"
+              rows="3"
+              :maxlength="NOTE_LIMIT"
+              autocomplete="off"
+              :disabled="working"
+              class="min-w-0 flex-1 resize-y rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none focus:border-sky-500"
+            />
+            <button
+              type="button"
+              :disabled="working || noteUnchanged"
+              class="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-40"
+              @click="saveNote"
             >
               儲存
             </button>

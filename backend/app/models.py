@@ -201,6 +201,25 @@ class ComprehensionRecordResponse(BaseModel):
     createdAt: str  # ISO-8601 UTC
 
 
+#: The longest note a card can carry, counted after trimming. Room for a few
+#: paragraphs on usage; a guard against a stray paste, as the source text cap is.
+MAX_NOTE_LENGTH = 1000
+
+
+def clean_note(note: Optional[str]) -> Optional[str]:
+    """A note as stored: trimmed, and ``None`` when nothing is left.
+
+    Line breaks inside are the reader's and are kept. A note of only
+    whitespace is no note, so clearing the field and saving clears it.
+    """
+    if note is None:
+        return None
+    trimmed = note.strip()
+    if len(trimmed) > MAX_NOTE_LENGTH:
+        raise ValueError(f"a note is at most {MAX_NOTE_LENGTH} characters")
+    return trimmed or None
+
+
 class LearningCardCreate(BaseModel):
     """Request body for ``POST /cards``.
 
@@ -226,6 +245,14 @@ class LearningCardCreate(BaseModel):
     # value is refused here rather than reaching stage 3 as a card no question
     # type knows what to do with.
     kind: Optional[Literal["word", "sentence"]] = None
+    # The reader's own explanation. Applied only when the card is created: a
+    # line already collected keeps its note, as it keeps its kind.
+    note: Optional[str] = None
+
+    @field_validator("note")
+    @classmethod
+    def _note_as_stored(cls, note: Optional[str]) -> Optional[str]:
+        return clean_note(note)
 
 
 class LearningCardResponse(BaseModel):
@@ -262,6 +289,9 @@ class LearningCardResponse(BaseModel):
     comicTitle: Optional[str] = None
     chapterTitle: Optional[str] = None
     kind: Optional[str] = None
+    #: The reader's own explanation, shown after an answer. ``None`` when they
+    #: wrote none. Clients that predate it ignore the key.
+    note: Optional[str] = None
     #: The scheduling block, all five of them together. The app caches this
     #: response wholesale as its deck snapshot and builds the session queue out
     #: of it with no further calls, so a field missing here is a session that
@@ -285,7 +315,8 @@ class LearningCardResponse(BaseModel):
 class LearningCardUpdate(BaseModel):
     """Request body for ``PATCH /cards/{id}``.
 
-    **Exactly two fields, and refusing the rest is the point.** ``sourceText``
+    **Three fields, none of them identity, and refusing the rest is the point.**
+    ``sourceText``
     is half the card's identity and ``targetLanguage`` is the other half;
     changing either could collide with another card under the unique constraint.
     The source text is corrected through its own route,
@@ -304,6 +335,15 @@ class LearningCardUpdate(BaseModel):
 
     translation: Optional[str] = Field(default=None, min_length=1)
     kind: Optional[Literal["word", "sentence"]] = None
+    # Read from ``model_fields_set`` like ``kind``: absent leaves the note
+    # alone, which is what keeps the phone -- whose PATCH knows nothing of
+    # notes -- from clearing one. Null or blank clears it.
+    note: Optional[str] = None
+
+    @field_validator("note")
+    @classmethod
+    def _note_as_stored(cls, note: Optional[str]) -> Optional[str]:
+        return clean_note(note)
 
 
 class LearningCardSourceText(BaseModel):

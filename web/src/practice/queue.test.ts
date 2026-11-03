@@ -14,6 +14,7 @@ function card(id: number, state: CardState, dueInMinutes = 0, extra: Partial<Lea
     sourceText: `text ${id}`,
     translation: `meaning ${id}`,
     kind: 'sentence',
+    note: null,
     state,
     ladderStage: 0,
     learningStep: null,
