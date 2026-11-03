@@ -22,6 +22,7 @@ function card(id: number, state: CardState, dueIn: number, sourceText = `câu ${
     sourceText,
     translation: `meaning ${id}`,
     kind: 'sentence',
+    note: null,
     state,
     ladderStage: 1,
     learningStep: null,

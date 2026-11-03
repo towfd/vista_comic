@@ -52,6 +52,7 @@ def create_or_get(
     chapter_id: str,
     page_number: int,
     kind: Optional[str] = None,
+    note: Optional[str] = None,
 ) -> Tuple[LearningCard, bool]:
     """Collect ``source_text``; return the card and whether it was new.
 
@@ -63,7 +64,8 @@ def create_or_get(
     **An existing card keeps its ``kind``**, even when this call carries a
     different one. Collecting the same line under the other button is not a
     correction — the system does not silently rewrite something the reader
-    already approved. Changing it is done in 單字庫.
+    already approved. Changing it is done in 單字庫. The same holds for
+    ``note``.
 
     An archived card is **revived** rather than returned as-is. The unique
     constraint spans archived rows, so without this the reader could press add,
@@ -93,6 +95,7 @@ def create_or_get(
         page_number=page_number,
         comprehension_record_id=None,
         kind=kind,
+        note=note,
         state=scheduler.CardState.NEW.value,
         learning_step=None,
         ladder_stage=INITIAL_LADDER_STAGE,
@@ -161,13 +164,16 @@ def update(
     translation: Optional[str] = None,
     kind: Optional[str] = None,
     set_kind: bool = False,
+    note: Optional[str] = None,
+    set_note: bool = False,
 ) -> bool:
     """Change what the reader is allowed to change; report whether a row existed.
 
     ``set_kind`` exists because ``None`` is a legitimate new value here: a card
     collected before the two save buttons has no kind, and clearing a wrong
     answer has to be possible. The caller decides whether ``kind`` was *given*;
-    this function does not try to infer it from the value.
+    this function does not try to infer it from the value. ``set_note`` is the
+    same, for clearing a note.
 
     Nothing else is touched. ``ladder_stage``, ``due_at``, ``lookup_count`` and
     ``created_at`` are the scheduler's business, and the identity columns
@@ -179,6 +185,8 @@ def update(
         values["translation"] = translation
     if set_kind:
         values["kind"] = kind
+    if set_note:
+        values["note"] = note
     if not values:
         return session.get(LearningCard, card_id) is not None
 

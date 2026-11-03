@@ -12,6 +12,7 @@ function card(sourceText: string, translation: string, extra: Partial<LearningCa
     sourceText,
     translation,
     kind: 'word',
+    note: null,
     state: 'review',
     ladderStage: 0,
     learningStep: null,

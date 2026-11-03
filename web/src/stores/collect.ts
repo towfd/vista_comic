@@ -9,6 +9,9 @@ import { useDeckStore } from './deck'
 /** The longest source text the deck accepts. The backend refuses anything longer. */
 export const SOURCE_TEXT_LIMIT = 200
 
+/** The longest note a card can carry. The backend refuses anything longer. */
+export const NOTE_LIMIT = 1000
+
 /**
  * Why the last add made no new card.
  *

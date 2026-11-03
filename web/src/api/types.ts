@@ -73,6 +73,8 @@ export interface LearningCard {
   translation: string
   /** `null` for cards collected before the two save buttons existed. */
   kind: 'word' | 'sentence' | null
+  /** The reader's own explanation, shown after an answer. `null` when they wrote none. */
+  note: string | null
   state: CardState
   ladderStage: number
   learningStep: number | null

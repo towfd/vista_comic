@@ -21,7 +21,7 @@ from datetime import date, datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from app import learning_card_store, main
+from app import learning_card_store, main, models
 from app.normalization import normalized_key
 
 _BODY = {
@@ -455,6 +455,73 @@ def test_an_empty_translation_is_refused(client):
 
 def test_patching_a_card_that_is_gone_is_a_404(client):
     assert client.patch("/cards/999999", json={"translation": "x"}).status_code == 404
+
+
+# --- the reader's note (card-notes ticket 01) -------------------------------
+
+
+def test_a_card_has_no_note_until_one_is_written(client):
+    assert _add(client).json()["note"] is None
+    assert client.get("/cards").json()[0]["note"] is None
+
+
+def test_a_note_written_while_collecting_is_kept_trimmed_with_its_line_breaks(client):
+    card = _add(client, note="  口語。\n和「大丈夫」一起記  ").json()
+
+    assert card["note"] == "口語。\n和「大丈夫」一起記"
+    assert client.get("/cards").json()[0]["note"] == card["note"]
+
+
+def test_a_blank_note_while_collecting_is_no_note(client):
+    assert _add(client, note=" \n ").json()["note"] is None
+
+
+def test_collecting_again_leaves_the_note_alone(client):
+    """As with ``kind``: re-collecting is not a correction."""
+    first = _add(client, note="第一次寫的").json()
+
+    again = _add(client, note="第二次寫的")
+
+    assert again.status_code == 200
+    assert again.json()["id"] == first["id"]
+    assert again.json()["note"] == "第一次寫的"
+
+
+def test_the_note_can_be_written_changed_and_cleared_on_its_own(client):
+    card = _add(client).json()
+    patch = lambda body: client.patch(f"/cards/{card['id']}", json=body)  # noqa: E731
+
+    written = patch({"note": "  兩行\n註解  "})
+    assert written.status_code == 200, written.text
+    assert written.json()["note"] == "兩行\n註解"
+    assert written.json()["translation"] == _BODY["translation"]
+
+    assert patch({"note": "改過"}).json()["note"] == "改過"
+    assert patch({"note": "   "}).json()["note"] is None
+    patch({"note": "又寫了"})
+    assert patch({"note": None}).json()["note"] is None
+
+
+def test_a_patch_without_a_note_leaves_it_alone(client):
+    """The phone's PATCH sends ``translation`` and ``kind`` and knows nothing of
+    notes; correcting a translation there must not wipe one written here."""
+    card = _add(client, note="留著").json()
+
+    after = client.patch(
+        f"/cards/{card['id']}", json={"translation": "你沒事吧", "kind": "sentence"}
+    ).json()
+
+    assert after["note"] == "留著"
+
+
+def test_a_note_is_capped_after_trimming(client):
+    card = _add(client).json()
+    at_cap = "註" * models.MAX_NOTE_LENGTH
+
+    assert client.patch(f"/cards/{card['id']}", json={"note": f"  {at_cap}  "}).status_code == 200
+    assert client.patch(f"/cards/{card['id']}", json={"note": at_cap + "註"}).status_code == 422
+    assert _add(client, sourceText="ほかの", note=at_cap + "註").status_code == 422
+    assert client.get("/cards").json()[0]["note"] == at_cap
 
 
 def _fix(client, card_id, text):

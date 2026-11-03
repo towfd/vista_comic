@@ -18,6 +18,7 @@ function card(id: number, sourceText: string, translation = '意思'): LearningC
     sourceText,
     translation,
     kind: 'word',
+    note: null,
     state: 'new',
     ladderStage: 1,
     learningStep: null,
