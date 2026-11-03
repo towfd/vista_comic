@@ -252,6 +252,12 @@ function onNextKeydown(event: KeyboardEvent) {
           </button>
         </div>
 
+        <!-- Only after an answer: a note often gives the answer away. -->
+        <section v-if="question.card.note" class="mt-8 rounded-md bg-neutral-900 px-4 py-3" aria-labelledby="card-note-heading">
+          <h2 id="card-note-heading" class="text-xs font-medium text-neutral-500">註解</h2>
+          <p class="mt-1 break-words whitespace-pre-wrap text-neutral-200">{{ question.card.note }}</p>
+        </section>
+
         <!-- Fixing a card happens in the library. A new tab, so the session is
              not left: coming back to this one refetches the deck, and the fix
              applies from the next question. -->
