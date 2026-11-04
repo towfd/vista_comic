@@ -1,4 +1,4 @@
-Status: implemented — awaiting deploy check by owner (2026-11-04)
+Status: done — owner confirmed on the deployed web (2026-11-04)
 Blocked by: —
 
 # 01 — Write a note on the card page
@@ -22,7 +22,7 @@ Blocked by: —
 - [x] `PATCH` with only `note` updates it. `null` or blank clears it. A `PATCH` without `note` (iOS's body: `translation` + `kind`) leaves it unchanged.
 - [x] A note over 1000 characters after trimming is refused with `422`. Exactly 1000 is accepted.
 - [x] Every `/cards` response carries `note`.
-- [ ] Card page: shows the note and saves an edit. Clearing the field and saving clears it. Line breaks survive a round trip. Saving only the note does not touch the translation.
+- [x] Card page: shows the note and saves an edit. Clearing the field and saving clears it. Line breaks survive a round trip. Saving only the note does not touch the translation.
 - [x] Full backend test suite passes. `npm run typecheck`, `npm run build`, `npm test` pass.
 
 **Owner check after deploy:** On a card page, write a two-line note, save, reload: both lines are still there. Clear it, save, reload: it is gone. Edit the translation on the phone: the note is still there on the web.
@@ -32,3 +32,5 @@ Blocked by: —
 2026-11-04: implemented. Backend: 397 tests pass (7 new: no note by default, trimmed with line breaks kept, blank is none, re-collecting keeps the note, note-only PATCH writes/changes/clears, a PATCH without `note` leaves it, cap at 1000 after trimming). Migration `b6e2f0c4a913` upgraded, downgraded and re-upgraded on a throwaway database. Web: typecheck, build and 417 tests pass (2 new in `client.test.ts`: a note sent alone, a response without `note` reads as none). The card page itself is not unit-tested.
 
 The note's cap lives in `models.py` (`MAX_NOTE_LENGTH`) rather than `learning_card_store.py`: `models` imports no app module, and reaching the store would pull in the database config. The card page saves the note with its own 儲存 button, as each field there does.
+
+2026-11-04: merged (#140, #141, #142), deployed with `api` + `web` rebuilt (migration `b6e2f0c4a913` applied on start), and confirmed by the owner on the deployed web.
