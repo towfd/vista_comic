@@ -15,6 +15,7 @@ import ErrorState from '../components/ErrorState.vue'
 import ReaderPage from '../components/ReaderPage.vue'
 import { loadNameTable, namesInLine, type NameEntry } from '../reader/names'
 import { loadOverlay, type OverlayRegion } from '../reader/overlay'
+import { initialHeader, trackHeader } from '../reader/headerReveal'
 
 const props = defineProps<{ comicId: string; chapterId: string }>()
 const chapters = useChaptersStore()
@@ -148,6 +149,13 @@ function onKeydown(event: KeyboardEvent) {
   if (event.target instanceof Element && event.target.closest('[data-collect-panel]')) return
   if (isScrollKey(event.key)) onScrollInput()
 }
+// The top bar slides away while reading down and back on a small scroll up
+// (reader/headerReveal.ts): the way back out of a chapter, never far off.
+const header = ref(initialHeader)
+function onScroll() {
+  header.value = trackHeader(header.value, window.scrollY)
+}
+
 function onVisibilityChange() {
   // Also what Chrome fires on closing the tab or reloading; keepalive lets the
   // request outlive the page.
@@ -158,6 +166,7 @@ onMounted(() => {
   window.addEventListener('wheel', onScrollInput, { passive: true })
   window.addEventListener('touchmove', onScrollInput, { passive: true })
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('scroll', onScroll, { passive: true })
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
@@ -169,6 +178,7 @@ onUnmounted(() => {
   window.removeEventListener('wheel', onScrollInput)
   window.removeEventListener('touchmove', onScrollInput)
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('scroll', onScroll)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   stopObserving()
   saver?.dispose()
@@ -295,13 +305,22 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
 
 <template>
   <main class="pb-24">
-    <!-- Clear of the collecting button, which is fixed over this corner until the window is wide. -->
-    <header class="mx-auto flex max-w-[800px] items-baseline gap-3 py-2 pr-48 pl-4 lg:pr-4">
-      <RouterLink :to="backTo" class="-mx-2 min-w-0 truncate px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">
-        ← {{ comicTitle ?? '章節列表' }}
-      </RouterLink>
-      <h1 v-if="state.data" class="shrink-0 text-sm text-neutral-200">第 {{ state.data.number }} 話</h1>
-    </header>
+    <!--
+      Held just under the status bar; hidden, it slides up behind the strip
+      style.css lays under it. Below the collecting button, which stays.
+    -->
+    <div
+      class="sticky top-[env(safe-area-inset-top)] z-10 bg-neutral-950/95 transition-transform duration-200"
+      :class="header.visible ? '' : '-translate-y-full'"
+    >
+      <!-- Clear of the collecting button, which is fixed over this corner until the window is wide. -->
+      <header class="mx-auto flex max-w-[800px] items-baseline gap-3 py-2 pr-48 pl-4 lg:pr-4">
+        <RouterLink :to="backTo" class="-mx-2 min-w-0 truncate px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">
+          ← {{ comicTitle ?? '章節列表' }}
+        </RouterLink>
+        <h1 v-if="state.data" class="shrink-0 text-sm text-neutral-200">第 {{ state.data.number }} 話</h1>
+      </header>
+    </div>
 
     <p v-if="state.loading && !state.data" class="py-24 text-center text-neutral-400">載入中…</p>
 
