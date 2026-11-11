@@ -77,7 +77,7 @@ const problems: Record<RequestProblem, string> = {
     v-if="analysis.open && analysis.bubble"
     data-analysis-panel
     aria-label="深入查詢"
-    class="fixed inset-x-0 bottom-0 z-10 max-h-[70dvh] overflow-y-auto border-t border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-16 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
+    class="fixed inset-x-0 bottom-0 z-10 max-h-[70dvh] overflow-y-auto border-t pb-[env(safe-area-inset-bottom)] border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-16 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
   >
     <div class="mx-auto max-w-[800px] p-4">
       <div class="flex items-center justify-between gap-3">

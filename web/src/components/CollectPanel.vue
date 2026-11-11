@@ -47,7 +47,7 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
 </script>
 
 <template>
-  <div v-if="!collect.open" class="fixed top-3 right-4 z-20 flex items-center gap-3">
+  <div v-if="!collect.open" class="fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-[calc(1rem+env(safe-area-inset-right))] z-20 flex items-center gap-3">
     <p
       v-if="collect.added"
       class="max-w-[16rem] truncate rounded-md bg-neutral-900/95 px-3 py-2 text-sm text-emerald-400"
@@ -78,7 +78,7 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
     v-else
     data-collect-panel
     aria-label="收卡"
-    class="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-y-auto border-t border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-3 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-1.5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
+    class="fixed inset-x-0 bottom-0 z-20 max-h-[70dvh] overflow-y-auto border-t pb-[env(safe-area-inset-bottom)] border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-3 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-1.5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
   >
     <!-- Along the bottom the contents keep to the page column's width. -->
     <div class="mx-auto max-w-[800px] p-4">
