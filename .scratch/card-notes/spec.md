@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done — shipped in #140, #141, #142 (2026-11-04)
 
 # Card notes: an optional explanation the reader writes, shown after answering
 
