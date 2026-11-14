@@ -212,3 +212,112 @@ def test_decimal_chapter_number_with_a_title(tmp_path, write_page):
     chapters = scan_library(root).comics[0].chapters
 
     assert [(ch.number, ch.title) for ch in chapters] == [(1.5, "Side Story"), (12, "Finale")]
+
+
+# ---------------------------------------------------------------------------
+# Display title from an optional <comic>/title.txt.
+# ---------------------------------------------------------------------------
+
+
+def _comic_with_title_file(tmp_path, write_page, data):
+    root = tmp_path / "library"
+    write_page(root / "lam_nong_dan" / "01" / "001.jpg")
+    if data is not None:
+        (root / "lam_nong_dan" / "title.txt").write_bytes(data)
+    return root
+
+
+def test_display_title_is_read_from_title_txt(tmp_path, write_page):
+    root = _comic_with_title_file(
+        tmp_path, write_page, "Làm Nông Dân Trong Tòa Tháp Thử Thách\n".encode("utf-8")
+    )
+    comic = scan_library(root).comics[0]
+    assert comic.display_title == "Làm Nông Dân Trong Tòa Tháp Thử Thách"
+    assert comic.title == "lam_nong_dan"  # the folder name is untouched
+
+
+def test_display_title_is_none_without_title_txt(tmp_path, write_page):
+    root = _comic_with_title_file(tmp_path, write_page, None)
+    assert scan_library(root).comics[0].display_title is None
+
+
+def test_display_title_is_none_for_a_blank_file(tmp_path, write_page):
+    root = _comic_with_title_file(tmp_path, write_page, b"  \n\t\n\r\n")
+    assert scan_library(root).comics[0].display_title is None
+
+
+def test_display_title_is_none_for_an_empty_file(tmp_path, write_page):
+    root = _comic_with_title_file(tmp_path, write_page, b"")
+    assert scan_library(root).comics[0].display_title is None
+
+
+def test_display_title_is_trimmed(tmp_path, write_page):
+    root = _comic_with_title_file(tmp_path, write_page, b"  \tSket Dance  \r\n")
+    assert scan_library(root).comics[0].display_title == "Sket Dance"
+
+
+def test_display_title_takes_the_first_non_blank_line(tmp_path, write_page):
+    root = _comic_with_title_file(
+        tmp_path, write_page, "\n   \nThám Tử Conan\nDetective Conan\n".encode("utf-8")
+    )
+    assert scan_library(root).comics[0].display_title == "Thám Tử Conan"
+
+
+def test_display_title_ignores_a_utf8_bom(tmp_path, write_page):
+    root = _comic_with_title_file(
+        tmp_path, write_page, "﻿Sousou no Frieren".encode("utf-8")
+    )
+    assert scan_library(root).comics[0].display_title == "Sousou no Frieren"
+
+
+def test_display_title_is_none_for_non_utf8_bytes(tmp_path, write_page):
+    # Latin-1 bytes, not valid UTF-8: dropped rather than shown as mojibake.
+    root = _comic_with_title_file(tmp_path, write_page, b"Th\xe1m T\xf6 Conan\n")
+    comic = scan_library(root).comics[0]
+    assert comic.display_title is None
+    assert [ch.number for ch in comic.chapters] == [1]  # comic still scanned
+
+
+def test_display_title_ignores_a_directory_named_title_txt(tmp_path, write_page):
+    root = _comic_with_title_file(tmp_path, write_page, None)
+    (root / "lam_nong_dan" / "title.txt").mkdir()
+    comic = scan_library(root).comics[0]
+    assert comic.display_title is None
+    assert [ch.number for ch in comic.chapters] == [1]
+
+
+def test_display_title_symlink_escaping_root_is_ignored(tmp_path, write_page):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("Leaked", encoding="utf-8")
+    root = _comic_with_title_file(tmp_path, write_page, None)
+    (root / "lam_nong_dan" / "title.txt").symlink_to(outside)
+    assert scan_library(root).comics[0].display_title is None
+
+
+def test_title_txt_does_not_affect_chapters_cover_or_ids(tmp_path, write_page):
+    without = tmp_path / "a"
+    with_title = tmp_path / "b"
+    for root in (without, with_title):
+        write_page(root / "Comic" / "01" / "001.jpg")
+        write_page(root / "Comic" / "02" / "001.jpg")
+    (with_title / "Comic" / "title.txt").write_text("Comic Title\n", encoding="utf-8")
+
+    plain = scan_library(without)
+    titled = scan_library(with_title)
+
+    a, b = plain.comics[0], titled.comics[0]
+    assert b.display_title == "Comic Title"
+    assert a.id == b.id
+    assert [ch.id for ch in a.chapters] == [ch.id for ch in b.chapters]
+    assert [ch.number for ch in b.chapters] == [1, 2]
+    assert b.cover_path == "Comic/01/001.jpg"  # first page, not title.txt
+    assert all("title.txt" not in p for ch in b.chapters for p in ch.page_paths)
+    assert titled.report.skipped_chapters == []
+    assert titled.report.skipped_files == plain.report.skipped_files
+
+
+def test_rescan_picks_up_a_changed_title_txt(tmp_path, write_page):
+    root = _comic_with_title_file(tmp_path, write_page, b"Old Title")
+    assert scan_library(root).comics[0].display_title == "Old Title"
+    (root / "lam_nong_dan" / "title.txt").write_bytes(b"New Title")
+    assert scan_library(root).comics[0].display_title == "New Title"

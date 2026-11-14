@@ -32,12 +32,14 @@ def test_list_comics_shape_and_counts(client):
     assert set(alpha) == {
         "id",
         "title",
+        "displayTitle",
         "coverUrl",
         "chapterCount",
         "lastReadAt",
         "continueChapterId",
     }
     assert alpha["id"] == stable_id("Alpha")
+    assert alpha["displayTitle"] is None  # no title.txt -> null, not omitted
     assert alpha["chapterCount"] == 2
     # coverUrl is now an absolute URL derived from the request origin.
     assert alpha["coverUrl"] == f"http://testserver/media/{stable_id('Alpha')}/cover"
@@ -52,7 +54,15 @@ def test_get_comic_detail_shape_and_counts(client):
     assert resp.status_code == 200
 
     detail = resp.json()
-    assert set(detail) == {"id", "title", "coverUrl", "chapters", "continueChapterId"}
+    assert set(detail) == {
+        "id",
+        "title",
+        "displayTitle",
+        "coverUrl",
+        "chapters",
+        "continueChapterId",
+    }
+    assert detail["displayTitle"] is None
     assert detail["id"] == comic_id
     assert detail["title"] == "Alpha"
     assert len(detail["chapters"]) == 2
@@ -64,6 +74,26 @@ def test_get_comic_detail_shape_and_counts(client):
     assert ch["pageCount"] == 2
     assert ch["readState"] == "unread"  # always unread in v1
     assert ch["id"] == stable_id("Alpha/01 - The Journey")
+
+
+def test_display_title_on_list_and_detail(tmp_path, write_page, progress_db):
+    root = tmp_path / "library"
+    write_page(root / "hoa_son_tai_xuat" / "01" / "001.jpg")
+    (root / "hoa_son_tai_xuat" / "title.txt").write_text(
+        "  Hoa Sơn Tái Xuất \n", encoding="utf-8"
+    )
+    write_page(root / "untitled" / "01" / "001.jpg")
+    main.load_catalog(root)
+    client = TestClient(main.app)
+
+    by_title = {c["title"]: c for c in client.get("/comics").json()}
+    assert by_title["hoa_son_tai_xuat"]["displayTitle"] == "Hoa Sơn Tái Xuất"
+    assert by_title["untitled"]["displayTitle"] is None
+
+    detail = client.get(f"/comics/{stable_id('hoa_son_tai_xuat')}").json()
+    assert detail["title"] == "hoa_son_tai_xuat"
+    assert detail["displayTitle"] == "Hoa Sơn Tái Xuất"
+    assert [ch["number"] for ch in detail["chapters"]] == [1]
 
 
 def test_decimal_chapter_numbers_on_the_wire(tmp_path, write_page, progress_db):

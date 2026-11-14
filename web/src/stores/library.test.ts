@@ -11,7 +11,7 @@ vi.mock('../api/client', async (importOriginal) => {
   return { ...actual, fetchComics: api.fetchComics, rescanLibrary: api.rescanLibrary }
 })
 
-const comic = (id: string): ComicSummary => ({ id, title: id, coverUrl: `/media/${id}/cover`, chapterCount: 1, continueChapterId: 'c1' })
+const comic = (id: string): ComicSummary => ({ id, title: id, displayTitle: null, coverUrl: `/media/${id}/cover`, chapterCount: 1, continueChapterId: 'c1' })
 
 beforeEach(() => {
   setActivePinia(createPinia())

@@ -4,7 +4,10 @@
 
 export interface ComicSummary {
   id: string
+  /** The comic's folder name. Stays the key for OCR data and the name table. */
   title: string
+  /** From the folder's optional title.txt; show `displayTitle ?? title`. */
+  displayTitle: string | null
   coverUrl: string
   chapterCount: number
   lastReadAt?: string | null
@@ -27,7 +30,10 @@ export interface ChapterSummary {
 
 export interface ComicDetail {
   id: string
+  /** The comic's folder name. Stays the key for OCR data and the name table. */
   title: string
+  /** From the folder's optional title.txt; show `displayTitle ?? title`. */
+  displayTitle: string | null
   coverUrl: string
   /**
    * The chapter the Continue button opens (same rule as the library's). Optional

@@ -53,6 +53,9 @@ class ComicEntry:
     # or None if the comic has no pages at all (then it is skipped upstream).
     cover_path: Optional[str]
     chapters: List[ChapterEntry] = field(default_factory=list)
+    # First non-blank line of the comic folder's optional ``title.txt``, or None.
+    # ``title`` stays the folder name: OCR data and name tables are keyed by it.
+    display_title: Optional[str] = None
 
     @property
     def chapter_count(self) -> int:
@@ -81,7 +84,11 @@ class ComicSummary(BaseModel):
     """One entry in ``GET /comics``."""
 
     id: str
+    # The comic folder's name. Stable key for OCR data and name tables; clients
+    # show ``displayTitle`` when present and fall back to this.
     title: str
+    # From the folder's optional ``title.txt``; null when absent or blank.
+    displayTitle: Optional[str] = None
     coverUrl: str
     chapterCount: int
     lastReadAt: Optional[str] = None  # null in v1 (folder has no such value)
@@ -95,7 +102,10 @@ class ComicDetail(BaseModel):
     """Response for ``GET /comics/{comicId}``."""
 
     id: str
+    # Folder name; see ComicSummary.title.
     title: str
+    # Same value GET /comics reports for this comic; null when absent or blank.
+    displayTitle: Optional[str] = None
     coverUrl: str
     chapters: List[ChapterSummary]
     # Same value GET /comics reports for this comic: computed by the same

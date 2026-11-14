@@ -280,6 +280,7 @@ def _to_summary(
     return ComicSummary(
         id=comic.id,
         title=comic.title,
+        displayTitle=comic.display_title,
         coverUrl=_cover_url(base, comic.id),
         chapterCount=comic.chapter_count,
         lastReadAt=last_read_at,
@@ -336,6 +337,7 @@ def get_comic(comic_id: str, request: Request) -> ComicDetail:
     return ComicDetail(
         id=comic.id,
         title=comic.title,
+        displayTitle=comic.display_title,
         coverUrl=_cover_url(base, comic.id),
         chapters=[
             ChapterSummary(
