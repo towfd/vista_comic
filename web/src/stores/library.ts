@@ -60,5 +60,19 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  return { comics, loading, error, loaded, refreshing, refreshFailed, load, refresh }
+  /**
+   * Fetch the list again, quietly, when the library comes back on screen: the
+   * continue card follows `lastReadAt`, which moves with every chapter read.
+   * No rescan, no loading state, and a failure keeps what is on screen.
+   */
+  async function revalidate() {
+    if (!loaded.value || loading.value || refreshing.value) return
+    try {
+      comics.value = await fetchComics()
+    } catch (e) {
+      console.warn('library re-fetch failed; keeping the list on screen:', e)
+    }
+  }
+
+  return { comics, loading, error, loaded, refreshing, refreshFailed, load, refresh, revalidate }
 })
