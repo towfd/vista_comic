@@ -5,7 +5,10 @@ import { ApiError, type ApiErrorKind } from '../api/client'
 import { useDeckStore } from '../stores/deck'
 import { rememberQuestionMix, rememberedQuestionMix, type QuestionMix } from '../practice/questionMix'
 import { formatLearningSteps, parseLearningSteps, parseNewCardsPerDay } from '../practice/settings'
+import AppIcon from '../components/AppIcon.vue'
 import ErrorState from '../components/ErrorState.vue'
+import LoadingState from '../components/LoadingState.vue'
+import { iconButton, primaryLg } from '../components/buttons'
 
 const store = useDeckStore()
 const { settings, loading, error } = storeToRefs(store)
@@ -54,6 +57,9 @@ watch([steps, allowance], () => {
 })
 
 async function save() {
+  // The button keeps its colour while saving (DESIGN 7.1), so a second press
+  // is turned away here rather than by disabling it.
+  if (saving.value) return
   const learningSteps = parseLearningSteps(steps.value)
   const newCardsPerDay = parseNewCardsPerDay(allowance.value)
   stepsProblem.value = learningSteps ? null : '請輸入至少一個大於 0 的整數分鐘數，用逗號或空格分開，例如 5, 7, 10。'
@@ -80,19 +86,29 @@ const saveErrorText: Record<ApiErrorKind, string> = {
   notFound: '伺服器沒有這個設定，沒有存進去。',
   unexpected: '伺服器拒絕了這組設定，沒有存進去。',
 }
+
+// DESIGN 7.8: the field, its focus, and its error.
+const fieldClass =
+  'mt-3 block rounded-card bg-paper px-4 py-3 text-body text-ink inset-ring-2 inset-ring-line-strong focus:inset-ring-3 focus:inset-ring-brand focus-visible:outline-none aria-[invalid=true]:inset-ring-3 aria-[invalid=true]:inset-ring-danger'
 </script>
 
 <template>
-  <main class="mx-auto max-w-xl px-4 py-8">
-    <RouterLink :to="{ name: 'practice' }" class="-mx-2 inline-block px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">← 總覽</RouterLink>
-    <h1 class="mt-2 mb-8 text-2xl font-semibold text-neutral-100">設定</h1>
+  <main class="mx-auto max-w-narrow px-4 pt-6 pb-10">
+    <header class="mb-5 flex items-center gap-3">
+      <RouterLink :to="{ name: 'practice' }" :class="iconButton" aria-label="回到總覽">
+        <AppIcon name="back" />
+      </RouterLink>
+      <h1 class="text-page text-ink">設定</h1>
+    </header>
 
-    <section class="mb-8">
-      <h2 class="font-medium text-neutral-100">玩法</h2>
-      <p class="mt-1 text-sm text-neutral-400">
+    <section class="rounded-panel bg-blush px-4.5 pt-4 pb-1.5" aria-labelledby="mix-heading">
+      <h2 id="mix-heading" class="text-heading text-ink">玩法</h2>
+      <p class="mt-1 text-caption text-ink-soft">
         至少要開一個。不能填空的卡片（例如單字）一律考整句，只開填空時也一樣。這個選擇只記在這個瀏覽器，按下就生效。
       </p>
-      <div class="mt-3 flex flex-wrap gap-3">
+      <div class="mt-2 divide-y divide-line">
+        <!-- The whole row is the switch. The one still on cannot be turned off:
+             its track stays pink, a lighter pink, so it still reads as on. -->
         <button
           v-for="item in mixSwitches"
           :key="item.label"
@@ -100,28 +116,32 @@ const saveErrorText: Record<ApiErrorKind, string> = {
           role="switch"
           :aria-checked="item.on"
           :disabled="item.on && mix !== 'both'"
-          class="flex items-center gap-3 rounded-md bg-neutral-900 px-4 py-2.5 text-neutral-100 hover:bg-neutral-800 disabled:opacity-50 disabled:hover:bg-neutral-900"
+          class="flex min-h-13 w-full items-center justify-between gap-3 py-2.5 text-left text-body text-ink disabled:cursor-not-allowed disabled:text-ink-faint"
           @click="toggleMix(item.only, item.other)"
         >
           {{ item.label }}
-          <span class="relative h-4 w-7 rounded-full transition-colors" :class="item.on ? 'bg-sky-600' : 'bg-neutral-600'">
+          <span
+            class="relative h-7 w-11 shrink-0 rounded-full transition-colors duration-120"
+            :class="!item.on ? 'bg-line-strong' : item.on && mix !== 'both' ? 'bg-brand-vivid' : 'bg-brand'"
+            aria-hidden="true"
+          >
             <span
-              class="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition-transform"
-              :class="item.on ? 'translate-x-3' : ''"
+              class="absolute top-0.75 left-0.75 size-5.5 rounded-full bg-white transition-[translate] duration-120 ease-standard"
+              :class="item.on && 'translate-x-4'"
             />
           </span>
         </button>
       </div>
     </section>
 
-    <p v-if="!fetched || (loading && !settings)" class="py-24 text-center text-neutral-400">載入中…</p>
+    <LoadingState v-if="!fetched || (loading && !settings)" />
 
     <ErrorState v-else-if="error || !settings" :kind="error ?? 'unexpected'" @retry="store.load().then(fill)" />
 
-    <form v-else class="space-y-8" novalidate @submit.prevent="save">
+    <form v-else class="mt-7 space-y-7" novalidate @submit.prevent="save">
       <div>
-        <label for="learning-steps" class="block font-medium text-neutral-100">學習步驟（分鐘）</label>
-        <p class="mt-1 text-sm text-neutral-400">
+        <label for="learning-steps" class="block text-label text-ink">學習步驟（分鐘）</label>
+        <p class="mt-1 text-caption text-ink-soft">
           新卡片和答錯的卡片，要依序隔這些分鐘各答對一次，才會進入以天計算的複習。
         </p>
         <input
@@ -132,14 +152,14 @@ const saveErrorText: Record<ApiErrorKind, string> = {
           autocomplete="off"
           :aria-invalid="stepsProblem ? 'true' : undefined"
           aria-describedby="learning-steps-problem"
-          class="mt-3 w-full rounded-md border border-neutral-700 bg-neutral-900 px-4 py-2.5 text-neutral-100 outline-none focus:border-sky-500 aria-[invalid=true]:border-rose-500"
+          :class="[fieldClass, 'w-full']"
         />
-        <p v-if="stepsProblem" id="learning-steps-problem" class="mt-2 text-sm text-rose-400">{{ stepsProblem }}</p>
+        <p v-if="stepsProblem" id="learning-steps-problem" class="mt-2 text-meta text-danger">{{ stepsProblem }}</p>
       </div>
 
       <div>
-        <label for="new-cards" class="block font-medium text-neutral-100">每天的新卡片數</label>
-        <p class="mt-1 text-sm text-neutral-400">一天最多第一次遇到幾張卡片。手機和網頁共用這個額度，設成 0 就不出新卡。</p>
+        <label for="new-cards" class="block text-label text-ink">每天的新卡片數</label>
+        <p class="mt-1 text-caption text-ink-soft">一天最多第一次遇到幾張卡片。手機和網頁共用這個額度，設成 0 就不出新卡。</p>
         <input
           id="new-cards"
           v-model="allowance"
@@ -148,21 +168,26 @@ const saveErrorText: Record<ApiErrorKind, string> = {
           autocomplete="off"
           :aria-invalid="allowanceProblem ? 'true' : undefined"
           aria-describedby="new-cards-problem"
-          class="mt-3 w-32 rounded-md border border-neutral-700 bg-neutral-900 px-4 py-2.5 text-neutral-100 outline-none focus:border-sky-500 aria-[invalid=true]:border-rose-500"
+          :class="[fieldClass, 'w-30']"
         />
-        <p v-if="allowanceProblem" id="new-cards-problem" class="mt-2 text-sm text-rose-400">{{ allowanceProblem }}</p>
+        <p v-if="allowanceProblem" id="new-cards-problem" class="mt-2 text-meta text-danger">{{ allowanceProblem }}</p>
       </div>
 
-      <div class="flex items-center gap-4">
-        <button
-          type="submit"
-          :disabled="saving"
-          class="rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
-        >
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <button type="submit" :aria-busy="saving" :class="[primaryLg, 'sm:w-auto sm:min-w-40']">
           {{ saving ? '儲存中…' : '儲存' }}
         </button>
-        <p v-if="saved" class="text-sm text-emerald-400" role="status">已儲存</p>
-        <p v-else-if="saveError" class="text-sm text-amber-400" role="alert">{{ saveErrorText[saveError] }}</p>
+        <p
+          v-if="saved"
+          class="inline-flex h-9 items-center gap-1.5 self-start rounded-full bg-success-tint px-3.5 text-meta text-success sm:self-auto"
+          role="status"
+        >
+          <AppIcon name="check" class="size-4" />
+          已儲存
+        </p>
+        <p v-else-if="saveError" class="rounded-tile bg-danger-tint px-3.5 py-3 text-body text-danger" role="alert">
+          {{ saveErrorText[saveError] }}
+        </p>
       </div>
     </form>
   </main>

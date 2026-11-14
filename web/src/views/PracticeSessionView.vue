@@ -5,7 +5,11 @@ import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
 import { useDeckStore } from '../stores/deck'
 import { scheduleState } from '../practice/library'
+import type { CardState } from '../api/types'
+import AppIcon from '../components/AppIcon.vue'
 import ErrorState from '../components/ErrorState.vue'
+import LoadingState from '../components/LoadingState.vue'
+import { iconButtonBlush, primaryLg, secondaryLg, secondaryMd } from '../components/buttons'
 
 const router = useRouter()
 const session = useSessionStore()
@@ -24,6 +28,29 @@ const standing = computed(() =>
 )
 
 const answered = () => outcome.value.correct + outcome.value.wrong
+
+// How far through the round, as far as is known: a card answered wrong comes
+// back to the queue, so the bar can step back a little. That is the truth.
+const progress = computed(() => {
+  const done = answered()
+  const total = done + remaining.value
+  return { done, total, percent: total === 0 ? 0 : (done / total) * 100 }
+})
+
+const chipTone: Record<CardState, string> = {
+  new: 'bg-st-new-tint text-st-new',
+  learning: 'bg-st-learn-tint text-st-learn',
+  relearning: 'bg-st-relearn-tint text-st-relearn',
+  review: 'bg-st-review-tint text-st-review',
+}
+
+/** The answer field: pink while asking; read-only on the verdict's colour after. */
+const fieldTone = computed(() => {
+  if (phase.value === 'asking' || !verdict.value) return 'bg-paper text-ink inset-ring-3 inset-ring-brand'
+  return verdict.value.correct
+    ? 'bg-blush text-ink-soft inset-ring-3 inset-ring-st-review-graphic'
+    : 'bg-blush text-ink-soft inset-ring-3 inset-ring-st-relearn-graphic'
+})
 
 // The button a touch keyboard needs: its Enter can arrive as a composing key
 // and never reach `onFieldKeydown` as one.
@@ -105,61 +132,91 @@ function onNextKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <main class="mx-auto max-w-2xl px-4 py-5 sm:py-8">
-    <p v-if="phase === 'loading'" class="py-24 text-center text-neutral-400">載入中…</p>
+  <main class="mx-auto max-w-page px-4 pt-3 pb-10 sm:pt-6">
+    <LoadingState v-if="phase === 'loading'" />
 
     <ErrorState v-else-if="phase === 'unavailable' && loadError" :kind="loadError" @retry="session.start()" />
 
-    <p v-else-if="phase === 'checking'" class="py-24 text-center text-neutral-400">確認還有沒有卡片…</p>
+    <LoadingState v-else-if="phase === 'checking'" text="確認還有沒有卡片…" />
 
-    <section v-else-if="phase === 'finished' && answered() > 0" class="py-16 text-center">
-      <h1 class="text-2xl font-semibold text-neutral-100">這一輪做完了</h1>
-      <dl class="mx-auto mt-8 grid max-w-md grid-cols-3 gap-3">
-        <div class="rounded-md bg-neutral-900 px-2 py-5">
-          <dd class="text-3xl font-semibold text-emerald-400">{{ outcome.correct }}</dd>
-          <dt class="mt-1 text-sm text-neutral-400">答對</dt>
-        </div>
-        <div class="rounded-md bg-neutral-900 px-2 py-5">
-          <dd class="text-3xl font-semibold text-rose-400">{{ outcome.wrong }}</dd>
-          <dt class="mt-1 text-sm text-neutral-400">答錯</dt>
-        </div>
-        <div class="rounded-md bg-neutral-900 px-2 py-5">
-          <dd class="text-3xl font-semibold text-neutral-100">{{ outcome.graduated }}</dd>
-          <dt class="mt-1 text-sm text-neutral-400">畢業</dt>
-        </div>
-      </dl>
-      <p class="mt-4 text-xs text-neutral-500">畢業：這一輪最後一次作答後，進入以天計算的複習階段的卡片。</p>
-      <RouterLink
-        ref="doneLink"
-        :to="{ name: 'practice' }"
-        class="mt-8 inline-block rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500"
+    <section v-else-if="phase === 'finished' && answered() > 0" class="pt-8 text-center">
+      <div
+        class="mx-auto grid size-21 -rotate-8 place-items-center rounded-full bg-sun text-ink ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
       >
-        回到總覽
-      </RouterLink>
+        <AppIcon name="check" class="size-11 stroke-3" />
+      </div>
+      <h1 class="mt-4 text-headline text-ink">這一輪做完了</h1>
+      <div class="mt-4.5 rounded-panel bg-blush px-4.5 py-4 text-left">
+        <dl class="flex flex-wrap gap-2">
+          <div class="inline-flex h-9 items-center gap-1.5 rounded-full bg-st-review-tint px-3.5 text-meta text-st-review">
+            <dt>答對</dt>
+            <dd class="text-label font-black tabular-nums">{{ outcome.correct }}</dd>
+          </div>
+          <div class="inline-flex h-9 items-center gap-1.5 rounded-full bg-st-relearn-tint px-3.5 text-meta text-st-relearn">
+            <dt>答錯</dt>
+            <dd class="text-label font-black tabular-nums">{{ outcome.wrong }}</dd>
+          </div>
+          <div class="inline-flex h-9 items-center gap-1.5 rounded-full bg-blush-strong px-3.5 text-meta text-brand">
+            <dt>畢業</dt>
+            <dd class="text-label font-black tabular-nums">{{ outcome.graduated }}</dd>
+          </div>
+        </dl>
+        <p class="mt-3 text-caption text-ink-soft">畢業：這一輪最後一次作答後，進入以天計算的複習階段的卡片。</p>
+      </div>
+      <RouterLink ref="doneLink" :to="{ name: 'practice' }" :class="[primaryLg, 'mt-6']">回到總覽</RouterLink>
     </section>
 
     <template v-else-if="question">
-      <div class="mb-5 flex items-center justify-between gap-3 text-sm text-neutral-400 sm:mb-8">
-        <p>
-          還剩 {{ remaining }} 張<template v-if="standing"> · <span class="text-neutral-200">{{ standing }}</span></template>
-        </p>
+      <div class="flex items-center gap-3">
         <!-- Answers already saved stay saved; only the one on screen is given up. -->
-        <RouterLink :to="{ name: 'practice' }" class="-m-2 shrink-0 p-2 hover:text-neutral-200">結束</RouterLink>
+        <RouterLink :to="{ name: 'practice' }" :class="iconButtonBlush" aria-label="結束">
+          <AppIcon name="close" />
+        </RouterLink>
+        <div
+          class="h-3 flex-1 overflow-hidden rounded-full bg-paper inset-ring-2 inset-ring-line"
+          role="progressbar"
+          aria-label="這一輪的進度"
+          :aria-valuenow="progress.done"
+          aria-valuemin="0"
+          :aria-valuemax="progress.total"
+        >
+          <div
+            class="h-full rounded-full bg-brand-vivid transition-[width] duration-200 ease-standard"
+            :style="{ width: `${progress.percent}%` }"
+          />
+        </div>
+        <p class="shrink-0 text-meta font-extrabold text-ink-soft tabular-nums">還剩 {{ remaining }} 張</p>
       </div>
 
-      <template v-if="question.cloze">
-        <p class="text-sm text-neutral-400">填入空格裡的字</p>
-        <!-- pre-wrap: the sentence is shown exactly as collected, line breaks and all. -->
-        <p class="mt-2 text-2xl leading-relaxed whitespace-pre-wrap text-neutral-100" lang="vi">
-          {{ question.cloze.before }}<span class="mx-1 inline-block w-20 border-b-2 border-sky-500 align-baseline" aria-label="空格">&nbsp;</span
-          >{{ question.cloze.after }}
-        </p>
-        <p class="mt-3 text-base text-neutral-400">{{ question.prompt }}</p>
-      </template>
-      <template v-else>
-        <p class="text-sm text-neutral-400">把這句話寫成越南文</p>
-        <p class="mt-2 text-2xl leading-relaxed text-neutral-100">{{ question.prompt }}</p>
-      </template>
+      <section class="mt-7 rounded-panel bg-blush px-5 pt-5.5 pb-5">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-meta text-ink-soft">{{ question.cloze ? '填入空格裡的字' : '把這句話寫成越南文' }}</p>
+          <span
+            v-if="standing"
+            class="inline-flex h-6.5 shrink-0 items-center rounded-full px-2.5 text-caption"
+            :class="chipTone[question.card.state]"
+          >
+            {{ standing }}
+          </span>
+        </div>
+
+        <template v-if="question.cloze">
+          <!-- pre-wrap: the sentence is shown exactly as collected, line breaks and all.
+               The blank has one width for every word, so it gives no length away. -->
+          <p class="mt-2.5 text-headline leading-relaxed font-extrabold break-words whitespace-pre-wrap text-ink" lang="vi">
+            {{ question.cloze.before }}<span
+              class="inline-block h-[1.2em] w-30 max-w-[40%] rounded-full bg-paper align-[-0.22em] inset-ring-2 inset-ring-brand-vivid"
+              aria-label="空格"
+            ></span
+            >{{ question.cloze.after }}
+          </p>
+          <div class="mt-4 rounded-tile bg-paper px-3.5 py-2.5">
+            <p class="text-caption text-ink-faint">中文提示</p>
+            <p class="text-label leading-relaxed text-ink">{{ question.prompt }}</p>
+          </div>
+        </template>
+        <p v-else class="mt-2.5 text-headline leading-relaxed break-words text-ink">{{ question.prompt }}</p>
+      </section>
 
       <!-- Kept mounted through feedback, read-only, so what was typed stays where it was typed.
            A textarea so a long sentence wraps into view instead of scrolling out of it. -->
@@ -174,77 +231,86 @@ function onNextKeydown(event: KeyboardEvent) {
         enterkeyhint="send"
         aria-label="你的答案"
         :readonly="phase !== 'asking'"
-        class="mt-6 block w-full resize-none overflow-hidden rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-xl text-neutral-100 outline-none focus:border-sky-500 read-only:text-neutral-400"
+        class="mt-5.5 block w-full resize-none overflow-hidden rounded-card px-4.5 py-3.5 text-heading font-extrabold focus-visible:outline-none"
+        :class="fieldTone"
         @keydown="onFieldKeydown"
         @beforeinput="refuseLineBreak"
         @input="fitField"
       />
+      <!-- In the flow under the field, never pinned to the bottom: the phone's
+           keyboard would cover a bottom bar. -->
       <div v-if="phase === 'asking'" class="mt-3 flex items-center justify-end gap-3">
-        <p class="hidden text-xs text-neutral-500 pointer-fine:block">Enter 送出</p>
-        <button
-          type="button"
-          class="w-full rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 sm:w-auto"
-          @click="submit"
-        >
-          送出
-        </button>
+        <p class="hidden shrink-0 text-caption text-ink-faint pointer-fine:block">Enter 送出</p>
+        <button type="button" :class="[primaryLg, 'sm:w-auto sm:min-w-40']" @click="submit">送出</button>
       </div>
 
-      <section v-if="phase === 'feedback' && verdict" class="mt-6 sm:mt-8" aria-live="polite">
-        <p class="text-lg font-semibold" :class="verdict.correct ? 'text-emerald-400' : 'text-rose-400'">
-          {{ verdict.overridden ? '正確（已改判）' : verdict.correct ? '正確' : '不對' }}
-        </p>
+      <section v-if="phase === 'feedback' && verdict" class="mt-5" aria-live="polite">
+        <div class="flex items-center gap-3">
+          <span
+            class="grid size-10 -rotate-6 place-items-center rounded-full"
+            :class="verdict.correct ? 'bg-sun text-ink' : 'bg-st-relearn-tint text-st-relearn'"
+            aria-hidden="true"
+          >
+            <AppIcon :name="verdict.correct ? 'check' : 'close'" class="size-6 stroke-3" />
+          </span>
+          <p class="text-heading" :class="verdict.correct ? 'text-st-review' : 'text-st-relearn'">
+            {{ verdict.overridden ? '正確（已改判）' : verdict.correct ? '正確' : '不對' }}
+          </p>
+        </div>
 
         <dl class="mt-4 space-y-3">
           <div v-if="!verdict.correct || verdict.overridden">
-            <dt class="text-xs text-neutral-500">你的答案</dt>
-            <dd class="mt-1 text-xl text-neutral-300" lang="vi">{{ verdict.given }}</dd>
+            <dt class="text-caption text-ink-faint">你的答案</dt>
+            <dd class="mt-0.5 text-heading font-bold break-words text-ink-soft" lang="vi">{{ verdict.given }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-neutral-500">{{ verdict.sentence ? '空格裡的字' : '卡片' }}</dt>
-            <dd class="mt-1 text-xl text-neutral-100" lang="vi">{{ verdict.expected }}</dd>
+            <dt class="text-caption text-ink-faint">{{ verdict.sentence ? '空格裡的字' : '卡片' }}</dt>
+            <dd class="mt-0.5 text-headline font-extrabold break-words text-ink" lang="vi">{{ verdict.expected }}</dd>
           </div>
           <div v-if="verdict.sentence">
-            <dt class="text-xs text-neutral-500">整句</dt>
-            <dd class="mt-1 text-lg whitespace-pre-wrap text-neutral-300" lang="vi">{{ verdict.sentence }}</dd>
+            <dt class="text-caption text-ink-faint">整句</dt>
+            <!-- The word that was blanked is underlined where it stands. -->
+            <dd class="mt-0.5 text-label font-bold break-words whitespace-pre-wrap text-ink-soft" lang="vi">
+              <template v-if="question.cloze"
+                >{{ question.cloze.before
+                }}<span class="underline decoration-brand-vivid decoration-3 underline-offset-4">{{ question.cloze.removed }}</span
+                >{{ question.cloze.after }}</template
+              ><template v-else>{{ verdict.sentence }}</template>
+            </dd>
           </div>
         </dl>
 
-        <p v-if="saveState === 'gone'" class="mt-6 text-sm text-neutral-400">這張卡片已經在別的裝置上刪除了。</p>
+        <p v-if="saveState === 'gone'" class="mt-5 text-meta text-ink-soft">這張卡片已經在別的裝置上刪除了。</p>
 
-        <div v-if="saveState === 'failed'" class="mt-6 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3" role="alert">
+        <div v-if="saveState === 'failed'" class="mt-5 rounded-tile bg-danger-tint px-3.5 py-3 text-danger" role="alert">
           <template v-if="saveFailure === 'auth'">
-            <p class="text-sm font-medium text-amber-300">登入已經過期，這個答案沒有存進去。</p>
-            <p class="mt-1 text-sm text-amber-200/80">重新整理後登入，這一題會再出一次。</p>
-            <button class="mt-3 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700" @click="reload">
-              重新整理
-            </button>
+            <p class="text-body font-bold">登入已經過期，這個答案沒有存進去。</p>
+            <p class="mt-1 text-meta">重新整理後登入，這一題會再出一次。</p>
+            <button type="button" :class="[secondaryMd, 'mt-3']" @click="reload">重新整理</button>
           </template>
           <template v-else>
-            <p class="text-sm font-medium text-amber-300">這個答案還沒有存進去。</p>
-            <p class="mt-1 text-sm text-amber-200/80">存好之前不會出下一題。關掉這個分頁會遺失這一個答案。</p>
-            <button
-              class="mt-3 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
-              @click="session.retrySave()"
-            >
-              重試
-            </button>
+            <p class="text-body font-bold">這個答案還沒有存進去。</p>
+            <p class="mt-1 text-meta">存好之前不會出下一題。關掉這個分頁會遺失這一個答案。</p>
+            <button type="button" :class="[secondaryMd, 'mt-3']" @click="session.retrySave()">重試</button>
           </template>
         </div>
 
-        <div class="mt-8 flex items-center justify-end gap-3">
+        <div class="mt-6 flex items-center gap-3 sm:justify-end">
           <!-- Only while a wrong answer is unsent: the judge is strict, and the reader may know better. -->
           <button
             v-if="!verdict.correct && saveState === null && !waitingToAdvance"
-            class="w-full rounded-md bg-neutral-800 px-5 py-2.5 font-medium text-emerald-300 hover:bg-neutral-700 sm:w-auto"
+            type="button"
+            :class="[secondaryLg, 'min-w-0 flex-1 text-st-review sm:min-w-40 sm:flex-none']"
             @click="countAsCorrect"
           >
             算我對
           </button>
           <button
             ref="nextButton"
+            type="button"
             :disabled="saveState === 'failed'"
-            class="w-full rounded-md bg-sky-600 px-5 py-2.5 font-medium text-white hover:bg-sky-500 disabled:opacity-50 sm:w-auto"
+            :aria-busy="waitingToAdvance"
+            :class="[primaryLg, 'min-w-0 flex-1 sm:w-auto sm:min-w-40 sm:flex-none']"
             @click="session.advance()"
             @keydown="onNextKeydown"
           >
@@ -253,19 +319,19 @@ function onNextKeydown(event: KeyboardEvent) {
         </div>
 
         <!-- Only after an answer: a note often gives the answer away. -->
-        <section v-if="question.card.note" class="mt-8 rounded-md bg-neutral-900 px-4 py-3" aria-labelledby="card-note-heading">
-          <h2 id="card-note-heading" class="text-xs font-medium text-neutral-500">註解</h2>
-          <p class="mt-1 break-words whitespace-pre-wrap text-neutral-200">{{ question.card.note }}</p>
+        <section v-if="question.card.note" class="mt-6 rounded-card bg-blush px-4 py-3.5" aria-labelledby="card-note-heading">
+          <h2 id="card-note-heading" class="text-caption text-ink-faint">註解</h2>
+          <p class="mt-1 text-body break-words whitespace-pre-wrap text-ink">{{ question.card.note }}</p>
         </section>
 
         <!-- Fixing a card happens in the library. A new tab, so the session is
              not left: coming back to this one refetches the deck, and the fix
              applies from the next question. -->
-        <p v-if="saveState !== 'gone'" class="mt-8 border-t border-neutral-800 pt-4 text-sm">
+        <p v-if="saveState !== 'gone'" class="mt-8 border-t border-line pt-4 text-meta">
           <RouterLink
             :to="{ name: 'deck-card', params: { cardId: question.card.id } }"
             target="_blank"
-            class="text-neutral-400 underline decoration-neutral-600 underline-offset-4 hover:text-neutral-200"
+            class="text-ink-soft underline decoration-line-strong underline-offset-4 hover:text-ink"
           >
             這張卡片有問題？到字卡庫修改 ↗
           </RouterLink>
