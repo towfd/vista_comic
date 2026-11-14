@@ -4,20 +4,35 @@
     <meta charset="UTF-8" />
     <!-- viewport-fit=cover: the page runs under the notch and home bar, and style.css keeps content clear of them. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <!-- Light only, with the phone in dark mode too. -->
+    <meta name="color-scheme" content="light" />
     <title>vista_comic</title>
+
+    <!--
+      Nunito for Vietnamese, Latin and digits; Huninn for Chinese, which the
+      font service splits by unicode-range so only the characters on screen
+      are fetched. Nunito 400/500 are left out: beside Huninn they read thin,
+      so text is set at 600. display=swap shows the system font until they land.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&family=Nunito:wght@600;700;800;900&display=swap" />
 
     <!--
       Added to the home screen, the site opens as its own app with no browser
       bars. The manifest is fetched with credentials because the site sits
       behind Cloudflare Access; the apple-* tags cover iOS where it is ignored.
+      The status bar is `default` (dark clock on white): black-translucent
+      always draws a white clock, unreadable on the white pages. iOS may keep
+      the style it saw when the app was added -- re-add it if the clock stays white.
     -->
     <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="vista" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <div id="app"></div>

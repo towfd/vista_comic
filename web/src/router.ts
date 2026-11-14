@@ -10,9 +10,15 @@ import DeckCardView from './views/DeckCardView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
-    /** Which entry of the navigation bar is current on this route. */
+    /** Which tab is current on this route. */
     section?: 'library' | 'deck' | 'practice'
-    /** Hides the navigation bar. */
+    /**
+     * Shows the bottom tab bar: only the first page of each tab has it. Pages
+     * below have a back button, and those with fields would have the bar
+     * covering them once the keyboard is up.
+     */
+    tabBar?: boolean
+    /** The manga reader: the whole screen, and nothing about cards. */
     fullBleed?: boolean
   }
 }
@@ -20,15 +26,15 @@ declare module 'vue-router' {
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'library', component: LibraryView, meta: { section: 'library' } },
+    { path: '/', name: 'library', component: LibraryView, meta: { section: 'library', tabBar: true } },
     { path: '/comic/:comicId', name: 'comic', component: ComicView, props: true, meta: { section: 'library' } },
     // The reader keeps the whole screen: no navigation bar over the manga.
     { path: '/comic/:comicId/chapter/:chapterId', name: 'reader', component: ReaderView, props: true, meta: { fullBleed: true } },
     // Not /cards: the dev proxy forwards that path to the backend, so a page
     // there could be neither opened directly nor reloaded.
-    { path: '/deck', name: 'deck', component: DeckView, meta: { section: 'deck' } },
+    { path: '/deck', name: 'deck', component: DeckView, meta: { section: 'deck', tabBar: true } },
     { path: '/deck/:cardId(\\d+)', name: 'deck-card', component: DeckCardView, props: true, meta: { section: 'deck' } },
-    { path: '/practice', name: 'practice', component: PracticeView, meta: { section: 'practice' } },
+    { path: '/practice', name: 'practice', component: PracticeView, meta: { section: 'practice', tabBar: true } },
     { path: '/practice/session', name: 'practice-session', component: PracticeSessionView, meta: { section: 'practice' } },
     { path: '/practice/settings', name: 'practice-settings', component: PracticeSettingsView, meta: { section: 'practice' } },
   ],
