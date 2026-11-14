@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { OverlayRegion } from '../reader/overlay'
+import { primarySm, secondaryMd } from './buttons'
+
+/** DESIGN 7.1 secondary at 36px, beside a primary sm; touch area padded to 44. */
+const secondarySm =
+  "relative inline-flex h-9 items-center justify-center rounded-full bg-paper px-4 text-meta font-extrabold text-ink inset-ring-2 inset-ring-line before:absolute before:-inset-1 before:content-[''] hover:bg-blush active:bg-blush"
 
 const props = withDefaults(
   defineProps<{
@@ -68,14 +73,17 @@ function popoverStyle(r: OverlayRegion) {
       loading="lazy"
       decoding="async"
       class="mx-auto block"
-      :class="state === 'loaded' ? 'h-auto w-auto max-w-full' : 'aspect-[900/1549] w-full bg-neutral-900'"
+      :class="state === 'loaded' ? 'h-auto w-auto max-w-full' : 'aspect-[900/1549] w-full bg-mist'"
       @load="state = 'loaded'"
       @error="state = 'error'"
     />
     <!--
-      OCR boxes over the loaded image, in percent of it. Each carries a faint
-      outline so a box that missed its bubble can still be found: sky for a
-      translated line, amber for one with only the original, solid for the open one.
+      OCR boxes over the loaded image, in percent of it. Each carries an outline
+      so a box that missed its bubble can still be found. The outlines are three
+      stacked rings (DESIGN 7.17): no single colour stays visible on every
+      manga, but one of pink, white and ink always does. A translated line has
+      the pink ring, a line with only the original has none -- a difference in
+      shape, not only in colour. The open one is twice as thick and filled.
       With hints off, only the open one is outlined.
     -->
     <template v-if="state === 'loaded'">
@@ -84,54 +92,41 @@ function popoverStyle(r: OverlayRegion) {
         :key="r.segmentId + r.left + r.top"
         type="button"
         :aria-label="r.source"
-        class="absolute cursor-pointer rounded-md ring-1 transition-colors duration-150"
-        :class="
-          r.segmentId === selectedId
-            ? 'bg-sky-400/15 ring-2 ring-sky-400'
-            : !hints
-              ? 'ring-transparent'
-              : r.text === null
-                ? 'bg-amber-400/5 ring-amber-400/40 hover:bg-amber-400/15 hover:ring-amber-400/80'
-                : 'bg-sky-400/5 ring-sky-400/40 hover:bg-sky-400/15 hover:ring-sky-400/80'
-        "
+        class="absolute cursor-pointer rounded-tile transition-[background-color,box-shadow] duration-120 ease-standard hover:bg-brand-wash focus-visible:bg-brand-wash focus-visible:shadow-ring-selected focus-visible:outline-none"
+        :class="r.segmentId === selectedId ? 'bg-brand-wash shadow-ring-selected' : !hints ? '' : r.text === null ? 'shadow-ring-hint-plain' : 'shadow-ring-hint'"
         :style="{ left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: `${r.height}%` }"
         @click.stop="emit('select', r.segmentId === selectedId ? null : r.segmentId)"
       />
       <template v-for="r in regions" :key="'pop' + r.segmentId + r.left + r.top">
+        <!-- White with an ink frame, like a speech balloon. Grows in with `scale`, which leaves popoverStyle's transform alone. -->
         <div
           v-if="r.segmentId === selectedId"
-          class="absolute z-10 my-2 w-72 max-w-[90%] rounded-lg bg-neutral-900/95 p-3 text-left shadow-xl ring-1 ring-neutral-700"
+          class="absolute z-10 my-3 w-72 max-w-[90%] rounded-card border-2 border-ink bg-paper p-3.5 text-left shadow-overlay motion-safe:animate-[popover-in_120ms_var(--ease-standard)]"
           :style="popoverStyle(r)"
           @click.stop
         >
-          <p class="text-base leading-relaxed text-neutral-50">{{ r.text ?? '（這句還沒有翻譯）' }}</p>
-          <p class="mt-2 border-t border-neutral-700 pt-2 text-xs leading-relaxed text-neutral-400">{{ r.source }}</p>
+          <p class="text-body" :class="r.text === null ? 'text-ink-faint' : 'text-ink'">{{ r.text ?? '（這句還沒有翻譯）' }}</p>
+          <p class="mt-2 border-t border-line pt-2 text-meta font-bold text-ink-soft" lang="vi">{{ r.source }}</p>
           <div class="mt-3 flex justify-end gap-2">
             <!-- Only a line with a reviewed translation: the analysis explains that translation. -->
-            <button
-              v-if="r.text !== null"
-              type="button"
-              class="rounded-md bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-100 hover:bg-neutral-700"
-              @click="emit('analyse', r)"
-            >
-              深入查詢
-            </button>
-            <button
-              type="button"
-              class="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"
-              @click="emit('collect', r)"
-            >
-              加入句子
-            </button>
+            <button v-if="r.text !== null" type="button" :class="secondarySm" @click="emit('analyse', r)">深入查詢</button>
+            <button type="button" :class="primarySm" @click="emit('collect', r)">加入句子</button>
           </div>
         </div>
       </template>
     </template>
   </div>
-  <div v-else class="flex aspect-[900/1549] w-full flex-col items-center justify-center gap-3 bg-neutral-900">
-    <p class="text-sm text-neutral-400">第 {{ pageNumber }} 頁載入失敗</p>
-    <button class="rounded-md bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 hover:bg-neutral-700" @click="retry">
-      重試
-    </button>
+  <div v-else class="flex aspect-[900/1549] w-full flex-col items-center justify-center gap-3 bg-mist">
+    <p class="text-meta text-ink-soft">第 {{ pageNumber }} 頁載入失敗</p>
+    <button type="button" :class="secondaryMd" @click="retry">重試</button>
   </div>
 </template>
+
+<style>
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+</style>

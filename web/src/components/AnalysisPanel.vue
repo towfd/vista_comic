@@ -4,6 +4,11 @@ import type { AnalysisFailure, AnalysisWord } from '../api/client'
 import { bubbleSourceText } from '../reader/overlay'
 import { ANALYSIS_MODELS, useAnalysisStore, wordTranslation, type RequestProblem } from '../stores/analysis'
 import { useCollectStore } from '../stores/collect'
+import { primaryLg, primarySm, secondaryMd, soft, textButton } from './buttons'
+
+/** DESIGN 7.1 secondary at 36px, its touch area padded to 44. */
+const secondarySm =
+  "relative inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-paper px-4 text-meta font-extrabold text-ink inset-ring-2 inset-ring-line before:absolute before:-inset-1 before:content-[''] hover:bg-blush active:bg-blush"
 
 // Everything this panel does is decided in the analysis store; this renders it
 // and keeps what belongs to the screen: the waiting clock and the 重新查詢 check.
@@ -69,40 +74,33 @@ const problems: Record<RequestProblem, string> = {
 <template>
   <!--
     Where 收卡 sits -- along the bottom on a phone, beside the page column from
-    the `dock` width up -- but one layer below it, so 收卡 opened from a word
-    covers this and closing it reveals this untouched. Docked, it starts below
-    the ＋收卡 button rather than under it.
+    the `dock` width up -- but one layer below it (z-39 against 收卡's z-40), so
+    收卡 opened from a word covers this and closing it reveals this untouched.
+    Docked, it starts below the ＋收卡 button rather than under it.
   -->
   <aside
     v-if="analysis.open && analysis.bubble"
     data-analysis-panel
     aria-label="深入查詢"
-    class="fixed inset-x-0 bottom-0 z-10 max-h-[70dvh] overflow-y-auto border-t pb-[env(safe-area-inset-bottom)] border-neutral-800 bg-neutral-950/95 dock:inset-x-auto dock:top-16 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-lg dock:border"
+    class="fixed inset-x-0 bottom-0 z-39 max-h-[70dvh] overflow-y-auto rounded-t-panel bg-paper px-4 pt-5 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-chrome-up max-dock:motion-safe:animate-[sheet-up_280ms_var(--ease-standard)] dock:inset-x-auto dock:top-16 dock:bottom-auto dock:left-[calc(50%+416px)] dock:max-h-[calc(100vh-5rem)] dock:w-[min(20rem,calc(50vw-432px))] dock:rounded-card dock:pb-4 dock:shadow-overlay dock:inset-ring-2 dock:inset-ring-line"
   >
-    <div class="mx-auto max-w-[800px] p-4">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="text-sm font-medium text-neutral-100">深入查詢</h2>
-        <button
-          type="button"
-          class="min-h-10 min-w-16 rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
-          @click="analysis.close()"
-        >
-          關閉
-        </button>
+    <div class="mx-auto max-w-reader">
+      <div class="flex items-start justify-between gap-3">
+        <h2 class="text-heading text-ink">深入查詢</h2>
+        <button type="button" :class="secondarySm" @click="analysis.close()">關閉</button>
       </div>
 
-      <p class="mt-3 text-sm leading-relaxed text-neutral-300" lang="vi">{{ analysis.bubble.sourceText }}</p>
-      <p class="mt-1 text-sm leading-relaxed text-neutral-100">{{ analysis.bubble.translation }}</p>
+      <p class="mt-3 text-meta font-bold text-ink-soft" lang="vi">{{ analysis.bubble.sourceText }}</p>
+      <p class="mt-1 text-body text-ink">{{ analysis.bubble.translation }}</p>
 
-      <div class="mt-3 flex gap-1 rounded-md bg-neutral-900 p-1" role="radiogroup" aria-label="模型">
+      <div class="mt-4 inline-flex max-w-full rounded-full bg-blush p-1" role="radiogroup" aria-label="模型">
         <button
           v-for="m in ANALYSIS_MODELS"
           :key="m.id"
           type="button"
           role="radio"
           :aria-checked="analysis.model === m.id"
-          class="flex-1 rounded px-2 py-1.5 text-xs"
-          :class="analysis.model === m.id ? 'bg-sky-600 font-medium text-white' : 'text-neutral-400 hover:text-neutral-200'"
+          class="h-9 rounded-full px-3 text-meta text-ink-soft transition-colors duration-120 ease-standard hover:text-ink aria-checked:bg-brand aria-checked:text-white"
           @click="analysis.setModel(m.id)"
         >
           {{ m.label }}
@@ -110,82 +108,63 @@ const problems: Record<RequestProblem, string> = {
       </div>
 
       <div class="mt-4" aria-live="polite">
-        <p v-if="analysis.looking" class="text-sm text-neutral-500">查詢中…</p>
+        <p v-if="analysis.looking" class="text-caption text-ink-faint">查詢中…</p>
 
-        <p v-else-if="pending" class="text-sm text-neutral-400">{{ modelLabel }} 解析中… {{ waited }} 秒</p>
+        <div v-else-if="pending">
+          <p class="text-meta text-ink-soft">{{ modelLabel }} 解析中… {{ waited }} 秒</p>
+          <!-- How long it takes is unknown: the words above carry the wait, the bar only shows it is moving. -->
+          <div class="mt-2 h-1 overflow-hidden rounded-full bg-blush-strong" aria-hidden="true">
+            <div class="h-full w-[30%] rounded-full bg-brand motion-safe:animate-[analysis-slide_1.4s_ease-in-out_infinite]" />
+          </div>
+        </div>
 
         <!-- Nothing stored for this model: a call costs money, so it waits for the reader. -->
-        <button
-          v-else-if="!analysis.analysis && !analysis.problem"
-          type="button"
-          class="w-full rounded-md bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-500"
-          @click="analysis.start()"
-        >
+        <button v-else-if="!analysis.analysis && !analysis.problem" type="button" :class="primaryLg" @click="analysis.start()">
           用 {{ modelLabel }} 開始解析
         </button>
 
         <div v-else-if="analysis.problem || analysis.analysis?.status === 'failed'" role="alert">
-          <p class="text-sm text-amber-400">
+          <p class="rounded-tile bg-danger-tint px-3.5 py-3 text-body text-danger">
             {{ analysis.problem ? problems[analysis.problem] : failed[analysis.analysis?.failure ?? 'error'] }}
           </p>
-          <button
-            type="button"
-            class="mt-3 rounded-md bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 hover:bg-neutral-700"
-            @click="analysis.retry()"
-          >
-            重試
-          </button>
+          <button type="button" :class="[secondaryMd, 'mt-3']" @click="analysis.retry()">重試</button>
         </div>
 
         <template v-else-if="analysis.analysis?.result">
-          <ol class="divide-y divide-neutral-800">
+          <ol class="divide-y divide-line">
             <li v-for="(word, i) in analysis.analysis.result.words" :key="i" class="flex items-start gap-3 py-2.5">
               <div class="min-w-0 flex-1">
-                <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span class="font-medium text-neutral-50" lang="vi">{{ bubbleSourceText(word.text) }}</span>
-                  <span v-if="word.hanViet" class="text-sm text-neutral-300">{{ word.hanViet }}</span>
-                  <span class="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-400">{{ word.partOfSpeech }}</span>
+                <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span class="text-label font-extrabold text-ink" lang="vi">{{ bubbleSourceText(word.text) }}</span>
+                  <span v-if="word.hanViet" class="text-meta text-ink-soft">{{ word.hanViet }}</span>
+                  <span class="inline-flex h-6.5 items-center rounded-full bg-blush px-2.5 text-caption text-ink-soft">
+                    {{ word.partOfSpeech }}
+                  </span>
                 </p>
-                <p class="mt-1 text-sm text-neutral-200">{{ word.meaning }}</p>
-                <p v-if="word.note" class="mt-1 text-xs leading-relaxed text-neutral-400">{{ word.note }}</p>
+                <p class="mt-1 text-body text-ink">{{ word.meaning }}</p>
+                <p v-if="word.note" class="mt-1 text-caption text-ink-soft">{{ word.note }}</p>
               </div>
-              <button
-                type="button"
-                class="shrink-0 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-sky-500"
-                :aria-label="`加入 ${word.text}`"
-                @click="collectWord(word)"
-              >
+              <button type="button" :class="[soft, 'mt-0.5 shrink-0']" :aria-label="`加入 ${word.text}`" @click="collectWord(word)">
                 加入
               </button>
             </li>
           </ol>
 
-          <h3 class="mt-4 text-xs text-neutral-500">文法</h3>
-          <p class="mt-1 text-sm leading-relaxed text-neutral-200">{{ analysis.analysis.result.grammar }}</p>
-          <h3 class="mt-3 text-xs text-neutral-500">語氣</h3>
-          <p class="mt-1 text-sm leading-relaxed text-neutral-200">{{ analysis.analysis.result.tone }}</p>
+          <h3 class="mt-4 text-caption text-ink-faint">文法</h3>
+          <p class="mt-1 text-body text-ink">{{ analysis.analysis.result.grammar }}</p>
+          <h3 class="mt-3 text-caption text-ink-faint">語氣</h3>
+          <p class="mt-1 text-body text-ink">{{ analysis.analysis.result.tone }}</p>
 
-          <div class="mt-4 border-t border-neutral-800 pt-3">
-            <button
-              v-if="!confirmingRefresh"
-              type="button"
-              class="-m-2 p-2 text-xs text-neutral-400 hover:text-neutral-200"
-              @click="confirmingRefresh = true"
-            >
+          <div class="mt-4 border-t border-line pt-3">
+            <button v-if="!confirmingRefresh" type="button" :class="[textButton, '-ml-2']" @click="confirmingRefresh = true">
               重新查詢
             </button>
-            <div v-else class="flex flex-wrap items-center gap-2">
-              <p class="text-xs text-amber-400">會再呼叫一次 {{ modelLabel }}，取代目前的結果。</p>
-              <button
-                type="button"
-                class="rounded-md bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-500"
-                @click="refresh"
-              >
-                確定
-              </button>
-              <button type="button" class="px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200" @click="confirmingRefresh = false">
-                取消
-              </button>
+            <div v-else>
+              <p class="rounded-tile bg-warning-tint px-3.5 py-3 text-body text-warning">會再呼叫一次 {{ modelLabel }}，取代目前的結果。</p>
+              <div class="mt-3 flex items-center gap-2">
+                <button type="button" :class="primarySm" @click="refresh">確定</button>
+                <button type="button" :class="textButton" @click="confirmingRefresh = false">取消</button>
+              </div>
             </div>
           </div>
         </template>
@@ -193,3 +172,17 @@ const problems: Record<RequestProblem, string> = {
     </div>
   </aside>
 </template>
+
+<style>
+@keyframes sheet-up {
+  from {
+    translate: 0 100%;
+  }
+}
+/* There and back across the track: the 30% slider travels 70% of the track, 233% of itself. */
+@keyframes analysis-slide {
+  50% {
+    translate: 233% 0;
+  }
+}
+</style>

@@ -10,8 +10,12 @@ import { currentPage, isScrollKey, resumeStartPage } from '../reader/progress'
 import { createProgressSaver, type ProgressSaver } from '../reader/progressSaver'
 import { nextChapter, START_AT_TOP_KEY, takeStartAtTopFlag } from '../reader/nextChapter'
 import AnalysisPanel from '../components/AnalysisPanel.vue'
+import AppIcon from '../components/AppIcon.vue'
+import { iconButtonBlush, primaryLg, primaryMd, textButton } from '../components/buttons'
 import CollectPanel from '../components/CollectPanel.vue'
+import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
+import LoadingState from '../components/LoadingState.vue'
 import ReaderPage from '../components/ReaderPage.vue'
 import { loadNameTable, namesInLine, type NameEntry } from '../reader/names'
 import { loadOverlay, type OverlayRegion } from '../reader/overlay'
@@ -28,6 +32,12 @@ const state = computed(() => chapters.entry(props.comicId, props.chapterId))
 // The comic's title, if the chapter list was visited first. Arriving straight
 // on a reader URL it is simply absent; it is not worth a second request.
 const comicTitle = computed(() => comics.entry(props.comicId).data?.title)
+// What the top bar shows. Only for the eye: the folder name above stays the
+// key for the OCR data and the name table.
+const shownTitle = computed(() => {
+  const comic = comics.entry(props.comicId).data
+  return comic ? (comic.displayTitle ?? comic.title) : undefined
+})
 
 const pagesEl = ref<HTMLElement | null>(null)
 const endEl = ref<HTMLElement | null>(null)
@@ -304,98 +314,108 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
 </script>
 
 <template>
-  <main class="pb-24">
+  <!-- From 1024px the column stands on blush, so it has edges (DESIGN 7.17). -->
+  <main class="min-h-dvh lg:bg-blush">
     <!--
       Held just under the status bar; hidden, it slides up behind the strip
-      style.css lays under it. Below the collecting button, which stays.
+      style.css lays under it -- 1rem past its own height, so its shadow goes
+      too. Opaque: the manga never shows through. Below the collecting button,
+      which stays.
     -->
     <div
-      class="sticky top-[env(safe-area-inset-top)] z-10 bg-neutral-950/95 transition-transform duration-200"
-      :class="header.visible ? '' : '-translate-y-full'"
+      class="sticky top-[env(safe-area-inset-top)] z-10 rounded-b-panel bg-paper shadow-chrome-down transition-transform duration-200 ease-standard"
+      :class="header.visible ? '' : '-translate-y-[calc(100%+1rem)]'"
     >
-      <!-- Clear of the collecting button, which is fixed over this corner until the window is wide. -->
-      <header class="mx-auto flex max-w-[800px] items-baseline gap-3 py-2 pr-48 pl-4 lg:pr-4">
-        <RouterLink :to="backTo" class="-mx-2 min-w-0 truncate px-2 py-2 text-sm text-neutral-400 hover:text-neutral-200">
-          ← {{ comicTitle ?? '章節列表' }}
+      <!-- Clear of the floating 標示 and ＋收卡, which sit over this corner until the window is wide. -->
+      <header class="mx-auto flex h-14.5 max-w-reader items-center gap-2 pr-52 pl-2.5 lg:pr-3">
+        <RouterLink :to="backTo" :class="iconButtonBlush" aria-label="回到章節列表">
+          <AppIcon name="back" class="size-5.5" />
         </RouterLink>
-        <h1 v-if="state.data" class="shrink-0 text-sm text-neutral-200">第 {{ state.data.number }} 話</h1>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-body leading-title font-extrabold text-ink" :lang="shownTitle ? 'vi' : undefined">
+            {{ shownTitle ?? '章節列表' }}
+          </p>
+          <h1 v-if="state.data" class="text-caption text-ink-soft">第 {{ state.data.number }} 話</h1>
+        </div>
       </header>
     </div>
 
-    <p v-if="state.loading && !state.data" class="py-24 text-center text-neutral-400">載入中…</p>
+    <!-- The page column: 800px at most, the full window below that. -->
+    <div class="mx-auto min-h-dvh max-w-reader bg-paper pb-24">
+      <LoadingState v-if="state.loading && !state.data" />
 
-    <ErrorState
-      v-else-if="state.error && !state.data"
-      :kind="state.error"
-      not-found-title="找不到這一話"
-      @retry="chapters.load(comicId, chapterId)"
-    >
-      <template #actions>
-        <RouterLink :to="backTo" class="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700">
-          回到章節列表
-        </RouterLink>
-      </template>
-    </ErrorState>
-
-    <template v-else-if="state.data">
-      <p v-if="state.data.pages.length === 0" class="py-24 text-center text-neutral-400">這一話沒有頁面。</p>
-
-      <!--
-        The column: 800px at most, the full window below that. Each page sits in
-        a wrapper that stays the same element whether its image is loading,
-        loaded or failed -- the wrapper is what is observed and scrolled to.
-      -->
-      <div v-else ref="pagesEl" class="mx-auto max-w-[800px]">
-        <div v-for="(src, index) in state.data.pages" :key="src" :data-page="index + 1">
-          <ReaderPage
-            :src="src"
-            :page-number="index + 1"
-            :regions="overlay.get(index + 1)"
-            :selected-id="selectedSegment"
-            :hints="showHints"
-            @select="selectedSegment = $event"
-            @collect="collectBubble($event, index + 1)"
-            @analyse="analyseBubble($event, index + 1)"
-          />
-        </div>
-      </div>
-
-      <AnalysisPanel />
-      <CollectPanel v-if="state.data.pages.length > 0">
-        <!-- Only for a chapter that has boxes to outline. -->
-        <template v-if="overlay.size > 0" #controls>
-          <button
-            type="button"
-            role="switch"
-            :aria-checked="showHints"
-            class="flex items-center gap-2 rounded-md bg-neutral-800/95 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
-            @click="toggleHints"
-          >
-            標示
-            <span class="relative h-4 w-7 rounded-full transition-colors" :class="showHints ? 'bg-sky-600' : 'bg-neutral-600'">
-              <span
-                class="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition-transform"
-                :class="showHints ? 'translate-x-3' : ''"
-              />
-            </span>
-          </button>
+      <ErrorState
+        v-else-if="state.error && !state.data"
+        :kind="state.error"
+        not-found-title="找不到這一話"
+        @retry="chapters.load(comicId, chapterId)"
+      >
+        <template #actions="{ buttonClass }">
+          <RouterLink :to="backTo" :class="buttonClass">回到章節列表</RouterLink>
         </template>
-      </CollectPanel>
+      </ErrorState>
 
-      <div ref="endEl" class="mt-12 flex flex-col items-center text-center">
-        <p class="text-sm text-neutral-500">本話完</p>
-        <button
-          v-if="next"
-          type="button"
-          class="mt-4 rounded-md bg-sky-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-sky-500"
-          @click="openNext"
-        >
-          下一話 · 第 {{ next.number }} 話
-        </button>
-        <RouterLink :to="backTo" class="mt-1 px-3 py-2 text-sm text-neutral-300 hover:text-neutral-100">
-          回到章節列表
-        </RouterLink>
-      </div>
-    </template>
+      <template v-else-if="state.data">
+        <EmptyState v-if="state.data.pages.length === 0" icon="book" title="這一話沒有頁面。">
+          <template #actions>
+            <RouterLink :to="backTo" :class="primaryMd">回到章節列表</RouterLink>
+          </template>
+        </EmptyState>
+
+        <!--
+          Each page sits in a wrapper that stays the same element whether its
+          image is loading, loaded or failed -- the wrapper is what is observed
+          and scrolled to.
+        -->
+        <div v-else ref="pagesEl">
+          <div v-for="(src, index) in state.data.pages" :key="src" :data-page="index + 1">
+            <ReaderPage
+              :src="src"
+              :page-number="index + 1"
+              :regions="overlay.get(index + 1)"
+              :selected-id="selectedSegment"
+              :hints="showHints"
+              @select="selectedSegment = $event"
+              @collect="collectBubble($event, index + 1)"
+              @analyse="analyseBubble($event, index + 1)"
+            />
+          </div>
+        </div>
+
+        <AnalysisPanel />
+        <CollectPanel v-if="state.data.pages.length > 0">
+          <!-- Only for a chapter that has boxes to outline. Floats over the manga, so shadow-float. -->
+          <template v-if="overlay.size > 0" #controls>
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="showHints"
+              class="relative inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-paper px-3 text-meta text-ink-soft shadow-float before:absolute before:-inset-1 before:content-[''] hover:bg-blush"
+              @click="toggleHints"
+            >
+              標示
+              <span
+                class="relative h-7 w-11 rounded-full transition-colors duration-120"
+                :class="showHints ? 'bg-brand' : 'bg-line-strong'"
+              >
+                <span
+                  class="absolute top-0.75 left-0.75 size-5.5 rounded-full bg-white transition-[translate] duration-120 ease-standard"
+                  :class="showHints ? 'translate-x-4' : ''"
+                />
+              </span>
+            </button>
+          </template>
+        </CollectPanel>
+
+        <div ref="endEl" class="mt-12 flex flex-col items-center px-4 text-center">
+          <p class="inline-block -rotate-3 rounded-full bg-sun px-3 py-0.5 text-caption text-ink">本話完</p>
+          <button v-if="next" type="button" :class="[primaryLg, 'mt-6 max-w-90']" @click="openNext">
+            下一話
+            <span class="text-meta font-bold opacity-90">第 {{ next.number }} 話</span>
+          </button>
+          <RouterLink :to="backTo" :class="[textButton, next ? 'mt-2' : 'mt-4']">回到章節列表</RouterLink>
+        </div>
+      </template>
+    </div>
   </main>
 </template>
