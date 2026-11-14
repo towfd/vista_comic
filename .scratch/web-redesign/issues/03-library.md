@@ -23,3 +23,5 @@ Blocked by: 01, 02
 - New string: progress bar `aria-label` 「閱讀進度」 (not in §8). The sticker's link duplicates the title link, so it is `aria-hidden` / `tabindex=-1`.
 - Known limit (outside this ticket's files): `useLibraryStore` loads once per session, so after reading a *different* comic the card keeps pointing at the previous one until 重新整理. For the same comic, the detail revalidation keeps the chapter current.
 
+
+Follow-up from visual QA (2026-11-14, branch `feature/web-redesign-08-polish`): the continue card's title now wraps anywhere (a folder name with no spaces was clipped), the library quietly re-fetches its list on every return (`useLibraryStore().revalidate()`, tested) so 繼續看 follows the last chapter read, and `index.html` gets a favicon.

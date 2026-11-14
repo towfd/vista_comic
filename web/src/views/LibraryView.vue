@@ -15,8 +15,11 @@ const store = useLibraryStore()
 const { comics, loading, error, loaded, refreshing, refreshFailed } = storeToRefs(store)
 const comicsStore = useComicsStore()
 
+// Back from the reader the list is a chapter behind: the continue card goes by
+// lastReadAt. Re-fetch it quietly behind what is already on screen.
 onMounted(() => {
   if (!loaded.value) store.load()
+  else store.revalidate()
 })
 
 const titleOf = (comic: { title: string; displayTitle: string | null }) => comic.displayTitle ?? comic.title
@@ -108,7 +111,7 @@ const covers = reactive<Record<string, 'loaded' | 'failed'>>({})
             <span class="inline-block rounded-full bg-sun px-2.5 text-caption text-ink">繼續看</span>
             <RouterLink
               :to="{ name: 'comic', params: { comicId: continueComic.id } }"
-              class="mt-1.5 line-clamp-3 rounded-tile text-body leading-title font-extrabold text-ink"
+              class="mt-1.5 line-clamp-3 rounded-tile text-body leading-title font-extrabold wrap-anywhere text-ink"
             >
               {{ titleOf(continueComic) }}
             </RouterLink>

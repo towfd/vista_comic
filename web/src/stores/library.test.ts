@@ -71,3 +71,30 @@ describe('library refresh', () => {
     expect(api.rescanLibrary).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('library revalidate', () => {
+  it('re-fetches the list without rescanning, so the continue card follows the last chapter read', async () => {
+    api.fetchComics.mockResolvedValueOnce([comic('a')]).mockResolvedValueOnce([comic('b'), comic('a')])
+    const store = useLibraryStore()
+    await store.load()
+    await store.revalidate()
+    expect(api.rescanLibrary).not.toHaveBeenCalled()
+    expect(store.comics.map((c) => c.id)).toEqual(['b', 'a'])
+  })
+
+  it('keeps the list on screen when the re-fetch fails, with no error page', async () => {
+    api.fetchComics.mockResolvedValueOnce([comic('a')]).mockRejectedValueOnce(new ApiError('unavailable', 'down'))
+    const store = useLibraryStore()
+    await store.load()
+    await store.revalidate()
+    expect(store.comics.map((c) => c.id)).toEqual(['a'])
+    expect(store.error).toBeNull()
+    expect(store.loading).toBe(false)
+  })
+
+  it('does nothing before the first load has finished', async () => {
+    const store = useLibraryStore()
+    await store.revalidate()
+    expect(api.fetchComics).not.toHaveBeenCalled()
+  })
+})
