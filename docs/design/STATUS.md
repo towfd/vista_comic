@@ -30,10 +30,10 @@
 | ⛔ 選定方向 | 完成 | visual-decision.md | 使用者選第 2 輪方向 C 粉紅貼紙 |
 | 3 Design System | 完成，待使用者確認 | DESIGN.md（專案根目錄）、design-tokens.json、contrast-report.md | 只做亮色。token：色 31 個語意＋狀態 12 個、字級 8 階、圓角 3＋全圓、陰影 3 層＋厚邊與框 7 種、版寬 6、時長 3＋曲線 2。對比全過（沒過的 9 項已調整或禁止）。第 15 節是 Tailwind v4 `@theme` 實作對照與 page-design-spec 數值對照 |
 | ⛔ 實作前確認 | 未開始 | | |
-| 4 Implementation | 未開始 | | |
-| 5 Visual QA | 未開始 | 第 n 輪 | |
-| 6 Refinement | 未開始 | 第 n 輪 / 最多 3 輪 | |
-| 7 Delivery | 未開始 | DELIVERY.md | |
+| 4 Implementation | 完成 | PR #146–#152 | 01 地基、02 書名、03–07 各頁；整合後 24 檔 481 測試通過 |
+| 5 Visual QA | 第 1 輪完成 | screenshots/r1/ | 390／1440 無水平捲動；修 3 項（書名溢出、書庫不會重抓、缺 favicon）併入 03 |
+| 6 Refinement | 完成 | 第 1 輪 | QA 的 3 項併入 #148 |
+| 7 Delivery | 完成 | DELIVERY.md | 已合併 #146–#152 並部署（bd364db）；title.txt 已放到主機 |
 
 ## 工具狀態
 
