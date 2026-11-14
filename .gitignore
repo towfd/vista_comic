@@ -37,3 +37,9 @@ vista_comic/vista_comic/Config/Secrets.xcconfig
 
 # Empty default mount for the web container's /ocr-data (docker-compose.yml).
 /ocr-data
+
+# Playwright MCP console logs and page snapshots
+.playwright-mcp/
+
+# Website Studio screenshots (large; kept locally, not versioned)
+docs/design/screenshots/

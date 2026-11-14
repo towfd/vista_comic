@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>第 2 輪 方向 C：粉紅貼紙</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Huninn&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/*
+  第 2 輪 方向 C：粉紅貼紙
+  骨架：兩欄大封面、封面像貼紙一樣微微歪著貼上去；章節是可以直接點的數字格；字卡是一張張圓角小卡。
+  主色取自 App 圖示的粉色頭髮，配一點黃色當點綴（徽章、繼續看標籤、完成貼紙）。
+  字體：Nunito（越南文、數字，圓頭）＋ 粉圓 Huninn（中文，只有一個字重，層級靠字級與顏色）。
+*/
+:root{
+  color-scheme:light;
+  --bg:#FFFFFF;
+  --blush:#FFF0F5;
+  --blush-2:#FFE0EC;
+  --line:#F3DDE6;
+  --text:#2B1F27;
+  --text-2:#6A5560;
+  --text-3:#765F6B;
+  --pink:#FF4F8B;         /* 大面積粉、進度條（白底 3.11，不放文字） */
+  --pink-strong:#C81A60;  /* 按鈕底（白字 5.57）、粉色文字 */
+  --sun:#FFD23F;          /* 黃色點綴，上面放深色字（10.95） */
+  --st-new:#1D63D1;--st-new-bg:#E8F0FD;
+  --st-learn:#9A5B00;--st-learn-bg:#FFF3D6;
+  --st-relearn:#C8322A;--st-relearn-bg:#FDECEA;
+  --st-review:#17734A;--st-review-bg:#E6F5EC;
+  --g-due:#E5484D;--g-new:#2E6FE0;--g-learn:#C98400;--g-review:#2B9A5E;
+  --font:"Nunito","Huninn","PingFang TC","Heiti TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:#F6E9EF;color:var(--text);font-family:var(--font);font-synthesis-weight:none;line-height:1.6}
+svg.i{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button,a{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-decoration:none}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--pink-strong);outline-offset:2px}
+ol,ul{list-style:none}
+.zh{font-family:"Huninn","PingFang TC","Heiti TC",sans-serif}
+
+/* ---------- 展示框架 ---------- */
+.intro{max-width:1260px;margin:0 auto;padding:36px 20px 8px}
+.intro h1{font-size:26px;font-weight:400}
+.intro p{color:var(--text-2);font-size:15px;margin-top:6px;max-width:42em;line-height:1.7}
+.stage{display:flex;flex-wrap:wrap;justify-content:center;gap:48px 36px;padding:28px 20px 96px;max-width:1300px;margin:0 auto}
+.shot{width:390px;min-width:0}
+.shot__name{font-size:15px;color:var(--text-2);margin-bottom:12px}
+.phone{position:relative;width:390px;height:844px;overflow:hidden;border-radius:46px;background:var(--bg);box-shadow:0 0 0 1px #EBCFDB,0 30px 60px -30px rgba(120,30,70,.4)}
+@media (max-width:480px){
+  .intro{padding:28px 20px 4px}
+  .stage{padding:20px 0 64px;gap:36px}
+  .shot{width:100%}
+  .shot__name{padding:0 20px}
+  .phone{width:100%;border-radius:0;box-shadow:0 0 0 1px #EBCFDB}
+}
+.sb{position:absolute;inset:0 0 auto;height:47px;z-index:20;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 7px 36px;font:600 16px/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--text)}
+.sb__bat{width:25px;height:12px;border:1.5px solid currentColor;border-radius:4px;padding:1.5px}
+.sb__bat::before{content:"";display:block;width:70%;height:100%;background:currentColor;border-radius:1.5px}
+.home{position:absolute;bottom:8px;left:50%;width:134px;height:5px;border-radius:3px;background:var(--text);transform:translateX(-50%);z-index:40}
+.page{position:absolute;inset:47px 0 0;overflow:hidden}
+.page--full{inset:0}
+
+/* ---------- 封面佔位（三個方向同一組封面） ---------- */
+.art{position:relative;overflow:hidden;container-type:inline-size;background:
+  linear-gradient(112deg,transparent 0 60%,rgba(255,255,255,.3) 60% 67%,transparent 67%),
+  radial-gradient(circle at var(--hx,40%) 132%,var(--fig) 0 44%,transparent 44.5%),
+  radial-gradient(circle at var(--hx,40%) 58%,var(--fig) 0 17%,transparent 17.5%),
+  radial-gradient(circle at 80% 18%,var(--sun-c) 0 12%,transparent 12.5%),
+  linear-gradient(168deg,var(--a),var(--b))}
+.art::after{content:attr(data-t);position:absolute;left:8%;top:7%;right:8%;font:900 italic 15cqw/0.95 "Nunito",sans-serif;color:var(--ink,#fff);text-shadow:0 .06em 0 var(--fig)}
+.k1{--a:#8EDBFF;--b:#47C26E;--sun-c:#FFE45C;--fig:#2E7D4F}
+.k2{--a:#FFC2D6;--b:#9B7BEA;--sun-c:#FFFFFF;--fig:#5B3A8E}
+.k3{--a:#7FE3D0;--b:#1BA59A;--sun-c:#FFD66B;--fig:#0E5E66}
+.k4{--a:#FF5A5A;--b:#2A2440;--sun-c:#FFE0E0;--fig:#14101F}
+.k5{--a:#E6F6FF;--b:#8CC4F0;--sun-c:#FFFFFF;--fig:#4E7FB8;--ink:#24507F}
+.k6{--a:#FFB347;--b:#E2382B;--sun-c:#FFF0B3;--fig:#3A1410}
+.k7{--a:#FFE3EE;--b:#FF8DB5;--sun-c:#FFFFFF;--fig:#C2477A;--ink:#9E2D5E}
+.k8{--a:#4D8DFF;--b:#13306E;--sun-c:#FF4B4B;--fig:#0B1A3D}
+.sticker{aspect-ratio:3/4;border-radius:16px;border:4px solid #fff;box-shadow:0 10px 22px -10px rgba(120,30,70,.55)}
+
+/* ---------- 共用 ---------- */
+[lang="vi"]{font-family:"Nunito",var(--font)}
+.num{font-family:"Nunito",sans-serif;font-weight:800;font-variant-numeric:tabular-nums}
+.head{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 12px 20px}
+.head h2{font-family:"Huninn",var(--font);font-size:28px;font-weight:400;line-height:1.3}
+.round{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--text-2);box-shadow:0 0 0 2px var(--line)}
+.round--blush{background:var(--blush);box-shadow:none}
+.pillbtn{display:flex;align-items:center;gap:6px;height:40px;padding:0 14px 0 12px;border-radius:20px;background:#fff;box-shadow:0 0 0 2px var(--line);font-size:15px;color:var(--text-2)}
+.pillbtn svg{width:20px;height:20px}
+.count{display:inline-block;padding:1px 10px;border-radius:12px;background:var(--blush);color:var(--pink-strong);font-size:14px}
+.bar{height:10px;border-radius:5px;background:var(--blush-2);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--pink);border-radius:5px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:56px;border-radius:28px;background:var(--pink-strong);color:#fff;font-size:18px;box-shadow:0 6px 0 -1px #8F1244}
+.btn__sub{font-family:"Nunito",sans-serif;font-weight:700;font-size:15px;opacity:.88}
+.sec{display:flex;align-items:center;gap:10px;padding:22px 20px 12px}
+.sec h3{font-family:"Huninn",var(--font);font-size:20px;font-weight:400}
+
+/* 底部分頁列：貼底、上緣圓角；選中的圖示有一塊粉色底 */
+.tabs{position:absolute;inset:auto 0 0;height:86px;padding:6px 0 34px;background:#fff;border-radius:24px 24px 0 0;box-shadow:0 -1px 0 var(--line),0 -8px 24px -12px rgba(200,26,96,.25);display:grid;grid-template-columns:repeat(3,1fr);z-index:30}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--text-3)}
+.tab__ic{display:grid;place-items:center;width:56px;height:28px;border-radius:14px}
+.tab.is-on{color:var(--pink-strong)}
+.tab.is-on .tab__ic{background:var(--blush-2)}
+.tab__badge{position:absolute;top:-4px;left:calc(50% + 10px);min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:var(--sun);color:var(--text);font:900 12px/20px "Nunito",sans-serif;text-align:center;box-shadow:0 0 0 2px #fff}
+
+/* ---------- 1 書庫 ---------- */
+.lib-top{background:var(--blush);border-radius:0 0 32px 32px;padding-bottom:20px}
+.cont{display:grid;grid-template-columns:96px 1fr;gap:16px;margin:0 16px;padding:16px;border-radius:24px;background:#fff}
+.cont .sticker{transform:rotate(-4deg);margin-top:4px}
+.tag{display:inline-block;padding:1px 10px;border-radius:10px;background:var(--sun);color:var(--text);font-size:13px}
+.cont__title{font-size:16px;font-weight:800;line-height:1.35;margin-top:6px}
+.cont__row{grid-column:1/-1;display:flex;align-items:center;gap:14px}
+.cont__prog{flex:1}
+.cont__nums{display:flex;justify-content:space-between;font-size:13px;color:var(--text-2);margin-top:6px}
+.play{width:52px;height:52px;border-radius:50%;background:var(--pink-strong);color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 4px 0 -1px #8F1244}
+.play svg{fill:currentColor;stroke:none;width:20px;height:20px;margin-left:3px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px 14px;padding:0 16px}
+.grid .art{aspect-ratio:3/4;border-radius:20px}
+.cell__t{font-size:15px;font-weight:800;line-height:1.35;margin-top:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cell__m{font-size:13px;color:var(--text-2);margin-top:2px}
+.cell__m.is-on{color:var(--pink-strong)}
+
+/* ---------- 2 章節列表：數字格 ---------- */
+.ch-top{position:relative;background:var(--blush);border-radius:0 0 32px 32px;padding:47px 24px 26px;text-align:center}
+.ch-top .round{position:absolute;left:16px;top:55px}
+.ch-top .sticker{width:124px;margin:14px auto 0;transform:rotate(3deg)}
+.ch-top__title{font-size:19px;font-weight:800;line-height:1.35;margin-top:16px}
+.ch-top__meta{font-size:14px;color:var(--text-2);margin-top:2px}
+.ch-top .btn{margin-top:16px}
+.sheet{padding:18px 16px 0}
+.sheet__h{display:flex;align-items:center;justify-content:space-between;padding:0 4px 12px}
+.sheet__h h3{font-family:"Huninn",var(--font);font-size:19px;font-weight:400}
+.key{display:flex;gap:12px;font-size:13px;color:var(--text-2)}
+.key li{display:flex;align-items:center;gap:5px}
+.key li::before{content:"";width:12px;height:12px;border-radius:4px;background:var(--b,#fff);box-shadow:inset 0 0 0 2px var(--o,transparent)}
+.nums{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.nums li{height:52px;border-radius:16px;display:grid;place-items:center;font:800 18px "Nunito",sans-serif;background:#fff;box-shadow:inset 0 0 0 2px var(--line);color:var(--text)}
+.nums li.r{background:#F5EEF1;box-shadow:none;color:var(--text-3);font-weight:700}
+.nums li.now{background:var(--pink-strong);color:#fff;box-shadow:0 4px 0 -1px #8F1244;position:relative}
+.nums li.now::after{content:"";position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:var(--sun);box-shadow:0 0 0 2px #fff}
+
+/* ---------- 3 閱讀器 ---------- */
+.rbar{position:absolute;inset:0 0 auto;padding-top:47px;background:rgba(255,255,255,.97);z-index:10;border-radius:0 0 22px 22px;box-shadow:0 1px 0 var(--line),0 8px 20px -14px rgba(120,30,70,.4)}
+.rbar__in{display:flex;align-items:center;gap:8px;height:58px;padding:0 12px 0 10px}
+.rbar .round{width:40px;height:40px;flex:none}
+.rbar__t{flex:1;min-width:0}
+.rbar__name{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.rbar__ch{font-size:12px;color:var(--text-2)}
+.tog{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text-2);flex:none}
+.tog__sw{width:44px;height:28px;border-radius:14px;background:var(--pink-strong);position:relative}
+.tog__sw::after{content:"";position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff}
+.collect{height:36px;padding:0 13px;border-radius:18px;background:var(--pink-strong);color:#fff;font-size:15px;flex:none}
+.mpage{position:absolute;inset:0;background:#fff}
+.pnl{position:absolute;border:3px solid #2B1F27;overflow:hidden}
+.bub{position:absolute;background:#fff;border:2.5px solid #2B1F27;border-radius:50%;display:grid;place-items:center;z-index:2}
+.hl{font:900 15px/1.15 "Nunito",sans-serif;color:#2B1F27;padding:3px 7px;border-radius:8px;background:rgba(255,79,139,.2);box-shadow:0 0 0 1.5px var(--pink);text-align:center}
+.txt{font:900 15px/1.15 "Nunito",sans-serif;color:#2B1F27;text-align:center}
+
+/* ---------- 4 字卡庫 ---------- */
+.search{display:flex;align-items:center;gap:8px;margin:0 16px;height:48px;padding:0 16px;border-radius:24px;background:var(--blush);color:var(--text-3);font-size:15px}
+.search svg{width:20px;height:20px}
+.cards{display:flex;flex-direction:column;gap:10px;padding:0 16px}
+.card{padding:12px 16px 14px;border-radius:20px;background:#fff;box-shadow:inset 0 0 0 2px var(--line)}
+.card__top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chip{display:inline-block;padding:1px 10px;border-radius:12px;font-size:13px;color:var(--c);background:var(--cb)}
+.due{font-size:13px;color:var(--text-3)}
+.due.is-due{color:var(--st-relearn)}
+.card__vi{font-size:19px;font-weight:800;line-height:1.3;margin-top:6px}
+.card__zh{font-size:14px;color:var(--text-2);margin-top:2px}
+.s-new{--c:var(--st-new);--cb:var(--st-new-bg)}
+.s-learn{--c:var(--st-learn);--cb:var(--st-learn-bg)}
+.s-relearn{--c:var(--st-relearn);--cb:var(--st-relearn-bg)}
+.s-review{--c:var(--st-review);--cb:var(--st-review-bg)}
+
+/* ---------- 5 練習總覽：三顆泡泡 ---------- */
+.today{margin:4px 16px 0;padding:22px 20px 24px;border-radius:28px;background:var(--blush)}
+.today h3{font-family:"Huninn",var(--font);font-size:24px;font-weight:400;line-height:1.4}
+.today h3 .num{font-size:28px;font-weight:900;color:var(--pink-strong)}
+.bubbles{position:relative;height:178px;margin-top:10px}
+.bb{position:absolute;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--cb);box-shadow:inset 0 0 0 3px var(--c);color:var(--c);font-size:13px;line-height:1.2}
+.bb b{font:900 var(--n,24px)/1 "Nunito",sans-serif;margin-bottom:3px}
+.today .btn{margin-top:14px}
+
+/* ---------- 6 今天做完了 ---------- */
+.done{text-align:center;padding:4px 32px 0}
+.done__mark{width:84px;height:84px;margin:0 auto;border-radius:50%;background:var(--sun);color:var(--text);display:grid;place-items:center;transform:rotate(-8deg);box-shadow:0 0 0 5px #fff,0 0 0 7px var(--blush-2)}
+.done__mark svg{width:44px;height:44px;stroke-width:3}
+.done h3{font-family:"Huninn",var(--font);font-size:26px;font-weight:400;margin-top:16px}
+.done p{font-size:15px;color:var(--text-2);line-height:1.7;margin-top:4px}
+.box{margin:18px 16px 0;padding:16px 18px;border-radius:24px;background:var(--blush)}
+.box--line{background:#fff;box-shadow:inset 0 0 0 2px var(--line)}
+.box__h{display:flex;align-items:center;justify-content:space-between;font-size:16px}
+.box__h span{font-size:14px;color:var(--text-2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chips li{display:flex;align-items:baseline;gap:6px;height:36px;padding:0 14px;align-items:center;border-radius:18px;background:var(--cb);color:var(--c);font-size:14px}
+.chips b{font:900 18px "Nunito",sans-serif}
+.tmr{display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px 14px;border-radius:16px;background:#fff;font-size:15px;color:var(--text-2)}
+.tmr svg{width:20px;height:20px;color:var(--pink-strong)}
+.tmr b{margin-left:auto;font:900 18px "Nunito",sans-serif;color:var(--text)}
+.dist{display:flex;gap:3px;height:16px;margin-top:12px}
+.dist i{background:var(--c);border-radius:8px;min-width:8px}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-top:12px;font-size:14px;color:var(--text-2)}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend li::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+.legend b{margin-left:auto;font:800 15px "Nunito",sans-serif;color:var(--text)}
+
+/* ---------- 7 練習中 ---------- */
+.sess{display:flex;align-items:center;gap:12px;padding:6px 20px 0 16px}
+.sess .bar{flex:1;height:12px;border-radius:6px}
+.sess__n{font:800 15px "Nunito",sans-serif;color:var(--text-2)}
+.qcard{margin:28px 16px 0;padding:22px 20px 20px;border-radius:28px;background:var(--blush)}
+.q__k{font-size:15px;color:var(--text-2)}
+.q__s{font-size:25px;line-height:1.6;font-weight:800;margin-top:10px}
+.blank{display:inline-block;width:120px;height:1.2em;vertical-align:-.22em;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 2px var(--pink)}
+.hint{margin-top:16px;padding:10px 14px;border-radius:18px;background:#fff}
+.hint__k{font-size:12px;color:var(--text-3)}
+.hint__v{font-size:17px;line-height:1.6}
+.field{margin:22px 16px 0;height:58px;border-radius:20px;background:#fff;box-shadow:inset 0 0 0 2.5px var(--pink-strong);display:flex;align-items:center;padding:0 18px;font:800 20px "Nunito",sans-serif}
+.caret{width:2px;height:24px;background:var(--pink-strong);margin-left:1px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.caret{animation:none}}
+.dock{position:absolute;inset:auto 0 0;padding:12px 16px 44px;z-index:25;background:#fff}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-lib" viewBox="0 0 24 24"><rect x="3.5" y="4" width="4.5" height="16" rx="1.6"/><rect x="10" y="4" width="4.5" height="16" rx="1.6"/><path d="M16.7 5.3l3.3-.9 3 14.9-3.3.9z"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><rect x="7.5" y="3.5" width="13" height="15" rx="3"/><path d="M4 7.5v10.5a2.5 2.5 0 0 0 2.5 2.5H15"/></symbol>
+  <symbol id="i-prac" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+</svg>
+
+<header class="intro">
+  <h1>第 2 輪 方向 C：粉紅貼紙</h1>
+  <p>從 App 圖示的粉色頭髮出發，圓頭字體、大圓角、封面像貼紙一樣微微歪著貼上去；章節變成一格格可以直接點的數字，翻起來輕快。</p>
+</header>
+
+<main class="stage">
+
+  <!-- 1 書庫 -->
+  <section class="shot">
+    <h2 class="shot__name">1　書庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="lib-top">
+          <div class="head"><h2>書庫</h2><button class="round" aria-label="重新整理"><svg class="i"><use href="#i-refresh"/></svg></button></div>
+          <article class="cont">
+            <div class="art k1 sticker" data-t="LÀM NÔNG"></div>
+            <div>
+              <span class="tag">繼續看</span>
+              <p class="cont__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+            </div>
+            <div class="cont__row">
+              <div class="cont__prog">
+                <div class="bar"><i style="width:36%"></i></div>
+                <div class="cont__nums"><span>看到第 54 話</span><span class="num">54 / 149</span></div>
+              </div>
+              <button class="play" aria-label="繼續閱讀第 54 話"><svg class="i"><use href="#i-play"/></svg></button>
+            </div>
+          </article>
+        </div>
+        <div class="sec"><h3>全部漫畫</h3><span class="count">8 部</span></div>
+        <div class="grid">
+          <div><div class="art k1" data-t="LÀM NÔNG"></div><p class="cell__t" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="cell__m is-on">看到第 54 / 149 話</p></div>
+          <div><div class="art k2" data-t="KẾT HÔN"></div><p class="cell__t" lang="vi">Cô Đi Mà Kết Hôn Với Chồng Tôi Đi</p><p class="cell__m">76 話</p></div>
+          <div><div class="art k3" data-t="HOÀNG TỬ"></div><p class="cell__t" lang="vi">Hoàng Tử Bán Thuốc</p><p class="cell__m">129 話</p></div>
+          <div><div class="art k4" data-t="PETER"></div><p class="cell__t" lang="vi">Sát Thủ Peter</p><p class="cell__m">201 話</p></div>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab is-on" aria-current="page"><span class="tab__ic"><svg class="i"><use href="#i-lib"/></svg></span>書庫</a>
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-cards"/></svg></span>字卡</a>
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-prac"/></svg></span>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 2 章節列表 -->
+  <section class="shot">
+    <h2 class="shot__name">2　章節列表</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page page--full">
+        <header class="ch-top">
+          <button class="round" aria-label="回書庫"><svg class="i"><use href="#i-back"/></svg></button>
+          <div class="art k1 sticker" data-t="LÀM NÔNG"></div>
+          <p class="ch-top__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+          <p class="ch-top__meta">149 話</p>
+          <button class="btn">繼續閱讀<span class="btn__sub">第 54 話</span></button>
+        </header>
+        <section class="sheet">
+          <div class="sheet__h">
+            <h3>章節</h3>
+            <ul class="key">
+              <li style="--b:#F5EEF1">看過</li>
+              <li style="--b:var(--pink-strong)">正在看</li>
+              <li style="--o:var(--line)">還沒看</li>
+            </ul>
+          </div>
+          <ol class="nums">
+            <li class="r">41</li><li class="r">42</li><li class="r">43</li><li class="r">44</li><li class="r">45</li>
+            <li class="r">46</li><li class="r">47</li><li class="r">48</li><li class="r">49</li><li class="r">50</li>
+            <li class="r">51</li><li class="r">52</li><li class="r">53</li><li class="now" aria-label="第 54 話，正在看">54</li><li>55</li>
+            <li>56</li><li>57</li><li>58</li><li>59</li><li>60</li>
+            <li>61</li><li>62</li><li>63</li><li>64</li><li>65</li>
+          </ol>
+        </section>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 3 閱讀器頂端列 -->
+  <section class="shot">
+    <h2 class="shot__name">3　閱讀器（頂端列出現時）</h2>
+    <div class="phone">
+      <div class="mpage">
+        <div class="pnl" style="left:12px;right:12px;top:118px;height:200px;background:linear-gradient(170deg,#BFE6FF,#E8F7FF)">
+          <div style="position:absolute;left:30px;bottom:-40px;width:140px;height:170px;border-radius:70px 70px 0 0;background:#F6D7BE;border:3px solid #2B1F27"></div>
+        </div>
+        <div class="bub" style="left:170px;top:134px;width:190px;height:120px"><span class="hl">THƯA NGÀI</span></div>
+        <div class="pnl" style="left:12px;width:170px;top:332px;height:250px;background:linear-gradient(160deg,#FFD9A8,#FF9F6B)"></div>
+        <div class="pnl" style="left:194px;right:12px;top:332px;height:250px;background:linear-gradient(200deg,#C9F0D5,#7CCB95)"></div>
+        <div class="bub" style="left:206px;top:350px;width:160px;height:96px"><span class="txt">ĐƯỢC RỒI.</span></div>
+        <div class="pnl" style="left:12px;right:12px;top:596px;height:240px;background:linear-gradient(180deg,#FFF4C2,#FFE07A)"></div>
+        <div class="bub" style="left:40px;top:640px;width:180px;height:130px"><span class="hl" style="font-size:24px">AH...<br>AHHH.</span></div>
+      </div>
+      <div class="rbar">
+        <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+        <div class="rbar__in">
+          <button class="round round--blush" aria-label="回章節列表"><svg class="i"><use href="#i-back"/></svg></button>
+          <div class="rbar__t"><p class="rbar__name" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="rbar__ch">第 54 話</p></div>
+          <span class="tog">標示<span class="tog__sw" role="switch" aria-checked="true" aria-label="標示"></span></span>
+          <button class="collect">＋收卡</button>
+        </div>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 4 字卡庫 -->
+  <section class="shot">
+    <h2 class="shot__name">4　字卡庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>字卡庫</h2><span class="count">共 316 張</span></div>
+        <div class="search"><svg class="i"><use href="#i-search"/></svg>搜尋原文或譯文</div>
+        <div class="sec"><h3>單字</h3><span class="count">171</span></div>
+        <ul class="cards">
+          <li class="card s-new"><div class="card__top"><span class="chip">新卡</span></div><p class="card__vi" lang="vi">THỨ HAI KHÔNG AI THỨ NHẤT</p><p class="card__zh">天下無敵</p></li>
+          <li class="card s-learn"><div class="card__top"><span class="chip">學習中 1/2</span><span class="due">3 小時後</span></div><p class="card__vi" lang="vi">chấm dứt hết</p><p class="card__zh">徹底結束、一刀兩斷</p></li>
+          <li class="card s-relearn"><div class="card__top"><span class="chip">重新學習 1/2</span><span class="due is-due">已到期</span></div><p class="card__vi" lang="vi">SỈ NHỤC</p><p class="card__zh">羞辱</p></li>
+          <li class="card s-review"><div class="card__top"><span class="chip">間隔 7 天</span><span class="due">2 天後</span></div><p class="card__vi" lang="vi">dứt khoát</p><p class="card__zh">果斷、堅決、毫不猶豫</p></li>
+          <li class="card s-new"><div class="card__top"><span class="chip">新卡</span></div><p class="card__vi" lang="vi">đảm đang</p><p class="card__zh">賢慧、能幹、善於持家</p></li>
+        </ul>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-lib"/></svg></span>書庫</a>
+        <a class="tab is-on" aria-current="page"><span class="tab__ic"><svg class="i"><use href="#i-cards"/></svg></span>字卡</a>
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-prac"/></svg></span>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 5 練習總覽 -->
+  <section class="shot">
+    <h2 class="shot__name">5　練習總覽（有卡片要複習）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>今天</h2><button class="pillbtn"><svg class="i"><use href="#i-set"/></svg>設定</button></div>
+        <section class="today">
+          <h3>今天有 <span class="num">20</span> 張要複習</h3>
+          <div class="bubbles" role="img" aria-label="到期 12 張、新卡 5 張、學習中 3 張">
+            <div class="bb s-relearn" style="left:calc(50% - 124px);top:20px;width:136px;height:136px;--n:34px"><b>12</b>到期</div>
+            <div class="bb s-new" style="left:calc(50% + 18px);top:4px;width:92px;height:92px;--n:26px"><b>5</b>新卡</div>
+            <div class="bb s-learn" style="left:calc(50% + 48px);top:102px;width:72px;height:72px;--n:22px"><b>3</b>學習中</div>
+          </div>
+          <button class="btn">開始複習</button>
+        </section>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-lib"/></svg></span>書庫</a>
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-cards"/></svg></span>字卡</a>
+        <a class="tab is-on" aria-current="page"><span class="tab__ic"><svg class="i"><use href="#i-prac"/></svg></span>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 6 今天做完了 -->
+  <section class="shot">
+    <h2 class="shot__name">6　練習總覽（今天做完了）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>今天</h2><button class="pillbtn"><svg class="i"><use href="#i-set"/></svg>設定</button></div>
+        <div class="done">
+          <div class="done__mark"><svg class="i"><use href="#i-check"/></svg></div>
+          <h3>今天做完了</h3>
+          <p>到期的卡片都複習過了，今天的新卡也用完了。明天再來。</p>
+        </div>
+        <section class="box">
+          <div class="box__h">今天複習了 20 張</div>
+          <ul class="chips">
+            <li class="s-review">答對<b>16</b></li>
+            <li class="s-relearn">答錯<b>4</b></li>
+            <li style="--c:var(--pink-strong);--cb:var(--blush-2)">畢業<b>3</b></li>
+          </ul>
+          <div class="tmr"><svg class="i"><use href="#i-cal"/></svg>明天到期<b>9</b>張</div>
+        </section>
+        <section class="box box--line">
+          <div class="box__h">所有字卡<span>316 張</span></div>
+          <div class="dist" role="img" aria-label="新卡 248、學習中 31、重新學習 7、間隔複習 30">
+            <i style="--c:var(--g-new);flex:248"></i><i style="--c:var(--g-learn);flex:31"></i><i style="--c:var(--g-due);flex:7"></i><i style="--c:var(--g-review);flex:30"></i>
+          </div>
+          <ul class="legend">
+            <li style="--c:var(--g-new)">新卡<b>248</b></li>
+            <li style="--c:var(--g-learn)">學習中<b>31</b></li>
+            <li style="--c:var(--g-due)">重新學習<b>7</b></li>
+            <li style="--c:var(--g-review)">間隔複習<b>30</b></li>
+          </ul>
+        </section>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-lib"/></svg></span>書庫</a>
+        <a class="tab"><span class="tab__ic"><svg class="i"><use href="#i-cards"/></svg></span>字卡</a>
+        <a class="tab is-on" aria-current="page"><span class="tab__ic"><svg class="i"><use href="#i-prac"/></svg></span>練習</a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 7 練習中 -->
+  <section class="shot">
+    <h2 class="shot__name">7　練習中（填空題）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="sess">
+          <button class="round round--blush" aria-label="結束練習"><svg class="i"><use href="#i-x"/></svg></button>
+          <div class="bar"><i style="width:15%"></i></div>
+          <span class="sess__n">3 / 20</span>
+        </div>
+        <div class="qcard">
+          <p class="q__k">填入空格裡的字</p>
+          <p class="q__s" lang="vi">Cô ấy từ chối một cách <span class="blank"></span>.</p>
+          <div class="hint"><p class="hint__k">中文提示</p><p class="hint__v">果斷、堅決、毫不猶豫</p></div>
+        </div>
+        <div class="field" lang="vi">dứt kh<span class="caret"></span></div>
+      </div>
+      <div class="dock"><button class="btn">送出</button></div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
