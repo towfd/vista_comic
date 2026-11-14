@@ -8,6 +8,9 @@ Folder format (from docs/backend-architecture.md):
     library / comic / chapter / page-image
 
 - Comic title  = comic directory name.
+- Display title = first non-blank line of an optional ``title.txt`` at the
+  comic root (UTF-8, trimmed), else None. A plain file, so it is never a
+  chapter, a page, or a cover, and it does not feed into any id.
 - Chapter name = ``^\\s*(\\d+)\\s*(?:[-_.–]\\s*(.*))?$`` -> leading int is
   ``number``; remainder (if any) is ``title``; else ``"Chapter <number>"``.
 - Pages        = image files with accepted extensions, natural-sorted.
@@ -41,6 +44,15 @@ PAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 _CHAPTER_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(?:[-–_.]\s*(.*))?$")
 
 _NUM_SPLIT_RE = re.compile(r"(\d+)")
+
+# Optional per-comic file holding the human-readable title (e.g. with Vietnamese
+# diacritics) for a folder named ``lam_nong_dan_...``. The folder name stays the
+# comic's ``title`` because OCR data and the reader's name table are keyed by it.
+DISPLAY_TITLE_FILE = "title.txt"
+
+# A title is one line; anything bigger than this is not a title file, and
+# reading it whole would only cost memory at scan time.
+_DISPLAY_TITLE_MAX_BYTES = 64 * 1024
 
 
 def _natural_key(name: str) -> List[object]:
@@ -248,7 +260,47 @@ def _scan_comic(
         return None
 
     cover_path = _resolve_cover(comic_dir, root, root_real, chapters)
-    return ComicEntry(id=comic_id, title=comic_dir.name, cover_path=cover_path, chapters=chapters)
+    return ComicEntry(
+        id=comic_id,
+        title=comic_dir.name,
+        cover_path=cover_path,
+        chapters=chapters,
+        display_title=_read_display_title(comic_dir, root_real),
+    )
+
+
+def _read_display_title(comic_dir: Path, root_real: Path) -> Optional[str]:
+    """First non-blank line of ``<comic>/title.txt``, stripped, or None.
+
+    Missing, a directory, a symlink out of the library, unreadable, too large,
+    not valid UTF-8, or blank throughout -> None, and the client falls back to
+    the folder name. Never raises: a bad title file must not cost the comic its
+    place in the catalog. Read-only, like everything else here.
+    """
+    path = comic_dir / DISPLAY_TITLE_FILE
+    try:
+        if not path.is_file() or _real_within(path, root_real) is None:
+            return None
+        with path.open("rb") as fh:
+            raw = fh.read(_DISPLAY_TITLE_MAX_BYTES + 1)
+    except OSError:
+        logger.warning("Could not read %s", path)
+        return None
+    if len(raw) > _DISPLAY_TITLE_MAX_BYTES:
+        logger.warning("Ignoring oversized %s", path)
+        return None
+    try:
+        # utf-8-sig: still strict UTF-8, but drops the BOM some editors write,
+        # which str.strip() would otherwise leave glued to the title.
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        logger.warning("Ignoring %s: not valid UTF-8", path)
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
 
 
 def _resolve_chapter_cover(

@@ -15,6 +15,7 @@ vi.mock('../api/client', async (importOriginal) => {
 const comic = (readState: string, continueChapterId?: string): ComicDetail => ({
   id: 'a',
   title: 'One',
+  displayTitle: null,
   coverUrl: '/media/a/cover',
   ...(continueChapterId ? { continueChapterId } : {}),
   chapters: [
