@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>方向 C：夜讀玉色</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/*
+  方向 C：夜讀玉色
+  照 iOS 原生 App 的骨架：大標題、分組列表、半透明分頁列。
+  色彩冷調：深藍綠底、玉色當主色；狀態色各自有固定意思。
+  字體：Be Vietnam Pro（越南設計師做的字，聲調位置準）＋ Noto Sans TC。
+*/
+:root{
+  --bg:#0F1518;
+  --surface:#182125;
+  --surface-2:#212C31;
+  --line:#2A363D;
+  --text:#EAF2F2;
+  --text-2:#A3B3B6;
+  --text-3:#7D8F93;
+  --jade:#4FD1B0;
+  --on-jade:#04201A;
+  --st-new:#7DB7FF;
+  --st-learn:#F2C14E;
+  --st-relearn:#FF8B7B;
+  --st-review:#4FD1B0;
+  --font:"Be Vietnam Pro","Noto Sans TC","PingFang TC","Heiti TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:#0A0F11;color:var(--text);font-family:var(--font);line-height:1.6}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--jade);outline-offset:2px}
+
+/* ---------- 展示框架 ---------- */
+.intro{max-width:1260px;margin:0 auto;padding:36px 20px 8px}
+.intro h1{font-size:24px;font-weight:700}
+.intro p{color:var(--text-2);font-size:15px;margin-top:6px;max-width:40em;line-height:1.7}
+.stage{display:flex;flex-wrap:wrap;justify-content:center;gap:48px 36px;padding:28px 20px 96px;max-width:1300px;margin:0 auto}
+.shot{width:390px}
+.shot__name{font-size:14px;color:var(--text-2);margin-bottom:12px}
+.phone{position:relative;width:390px;height:844px;overflow:hidden;border-radius:46px;background:var(--bg);box-shadow:0 0 0 1px var(--line),0 30px 60px -30px #000}
+@media (max-width:480px){
+  .intro{padding:28px 20px 4px}
+  .stage{padding:20px 0 64px;gap:36px}
+  .shot{width:100%}
+  .shot__name{padding:0 20px}
+  .phone{width:100%;border-radius:0;box-shadow:none;border-top:1px solid var(--line)}
+}
+.sb{position:absolute;inset:0 0 auto;height:47px;z-index:20;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 7px 36px;font:600 16px/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--text)}
+.sb__bat{width:25px;height:12px;border:1.5px solid currentColor;border-radius:4px;padding:1.5px;opacity:.9}
+.sb__bat::before{content:"";display:block;width:70%;height:100%;background:currentColor;border-radius:1.5px}
+.home{position:absolute;bottom:8px;left:50%;width:134px;height:5px;border-radius:3px;background:var(--text);transform:translateX(-50%);z-index:30;opacity:.9}
+.page{position:absolute;inset:47px 0 0;overflow:hidden}
+
+/* ---------- 封面佔位：2:3、10px 圓角 ---------- */
+.cv{position:relative;aspect-ratio:2/3;border-radius:10px;overflow:hidden;background:linear-gradient(200deg,var(--c1),var(--c2))}
+.cv::before{content:"";position:absolute;left:-20%;right:-20%;bottom:-10%;height:55%;background:var(--c2);transform:rotate(-12deg);opacity:.7}
+.cv::after{content:attr(data-abbr);position:absolute;left:10px;bottom:8px;font:700 24px/1 "Be Vietnam Pro",sans-serif;color:rgba(255,255,255,.88)}
+.c1{--c1:#7DB36F;--c2:#24483F}
+.c2{--c1:#8B7DC4;--c2:#2B2140}
+.c3{--c1:#E0AE4B;--c2:#6B3E1E}
+.c4{--c1:#D24B44;--c2:#3A0F12}
+.c5{--c1:#A8CDE0;--c2:#3E5F7A}
+.c6{--c1:#EA7536;--c2:#2A1610}
+.c7{--c1:#F4A9BB;--c2:#7A3E58}
+.c8{--c1:#4C7BC4;--c2:#10203F}
+
+/* ---------- 共用：iOS 骨架 ---------- */
+.nav{display:flex;justify-content:flex-end;align-items:center;height:44px;padding:0 16px;color:var(--jade);font-size:17px}
+.large{display:flex;align-items:baseline;justify-content:space-between;padding:0 20px 10px}
+.large h2{font-size:34px;font-weight:700;line-height:1.2;letter-spacing:-.01em}
+.large span{font-size:15px;color:var(--text-2)}
+.gh{display:flex;justify-content:space-between;padding:22px 36px 7px;font-size:13px;color:var(--text-2)}
+.group{list-style:none;margin:0 16px;border-radius:12px;background:var(--surface);overflow:hidden}
+.row{position:relative;display:flex;align-items:center;gap:12px;min-height:46px;padding:10px 16px;font-size:17px}
+.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;background:var(--line)}
+.row__v{margin-left:auto;color:var(--text-2);font-variant-numeric:tabular-nums}
+.chev{width:16px;height:16px;color:var(--text-3);stroke-width:2.4}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:52px;border-radius:26px;background:var(--jade);color:var(--on-jade);font-size:17px;font-weight:600}
+.btn__sub{font-weight:500;opacity:.75}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--c);white-space:nowrap}
+.st::before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid currentColor}
+.st.is-fill::before{background:currentColor}
+.s-new{--c:var(--st-new)}.s-learn{--c:var(--st-learn)}.s-relearn{--c:var(--st-relearn)}.s-review{--c:var(--st-review)}
+
+/* 半透明分頁列（iOS 原生樣式） */
+.tabs{position:absolute;inset:auto 0 0;height:83px;padding-bottom:34px;background:rgba(15,21,24,.86);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);box-shadow:0 -1px 0 var(--line);display:grid;grid-template-columns:repeat(3,1fr);z-index:15}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:var(--text-3);font-size:11.5px;font-weight:500}
+.tab svg{width:26px;height:26px}
+.tab.is-on{color:var(--jade)}
+.tab__badge{position:absolute;top:3px;left:calc(50% + 7px);min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--st-relearn);color:#1A0A08;font:600 12px/19px "Be Vietnam Pro",sans-serif;text-align:center}
+
+/* ---------- 1 書庫 ---------- */
+.banner{position:relative;margin:4px 16px 0;height:208px;border-radius:16px;overflow:hidden;background:linear-gradient(200deg,#7DB36F,#24483F)}
+.banner::before{content:"LN";position:absolute;right:-10px;top:-34px;font:700 170px/1 "Be Vietnam Pro",sans-serif;color:rgba(255,255,255,.14);letter-spacing:-.04em}
+.banner::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(15,21,24,0) 20%,rgba(15,21,24,.92) 82%)}
+.banner__in{position:absolute;left:16px;right:16px;bottom:16px;z-index:1;display:flex;align-items:flex-end;gap:14px}
+.banner__txt{flex:1;min-width:0}
+.banner__k{font-size:13px;color:var(--jade);font-weight:600}
+.banner__t{font-size:18px;font-weight:600;line-height:1.3;margin-top:2px}
+.banner__c{font-size:14px;color:var(--text-2);margin-top:3px}
+.ring{--p:36;position:relative;width:58px;height:58px;border-radius:50%;flex:none;background:conic-gradient(var(--jade) calc(var(--p)*1%),rgba(234,242,242,.18) 0);display:grid;place-items:center}
+.ring::before{content:"";position:absolute;inset:5px;border-radius:50%;background:#14201F}
+.ring span{position:relative;font-size:11px;line-height:1.15;text-align:center;color:var(--text)}
+.ring b{display:block;font-size:14px;font-weight:600}
+.shelf{display:grid;grid-template-columns:1fr 1fr;gap:22px 16px;padding:0 16px}
+.book__title{font-size:15px;font-weight:500;line-height:1.35;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.book__meta{font-size:13px;color:var(--text-2);margin-top:2px}
+.book__meta.is-on{color:var(--jade)}
+
+/* ---------- 2 章節列表 ---------- */
+.page--full{inset:0}
+.poster{position:relative;height:372px;overflow:hidden;background:linear-gradient(200deg,#7DB36F,#24483F)}
+.poster::before{content:"LN";position:absolute;right:-20px;top:30px;font:700 240px/1 "Be Vietnam Pro",sans-serif;color:rgba(255,255,255,.13);letter-spacing:-.05em}
+.poster::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(15,21,24,.15) 0%,rgba(15,21,24,0) 30%,rgba(15,21,24,.7) 70%,var(--bg))}
+.poster__back{position:absolute;left:12px;top:51px;z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(15,21,24,.5);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);display:grid;place-items:center}
+.poster__in{position:absolute;left:20px;right:20px;bottom:16px;z-index:1}
+.poster__t{font-size:25px;font-weight:700;line-height:1.25}
+.poster__m{font-size:15px;color:var(--text-2);margin-top:6px}
+.cta{padding:6px 16px 0}
+.ch{font-size:16px}
+.ch.is-read{color:var(--text-3)}
+.ch.is-read .row__v{color:var(--text-3)}
+.ch.is-now{color:var(--jade);font-weight:600;background:rgba(79,209,176,.1)}
+.ch.is-now .row__v{color:var(--jade);font-weight:500}
+.ch__mark{width:6px;height:6px;border-radius:50%;background:var(--jade);margin-left:-11px;margin-right:-1px}
+
+/* ---------- 3 閱讀器 ---------- */
+.rbar{position:absolute;inset:0 0 auto;padding-top:47px;background:rgba(15,21,24,.84);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);z-index:10;box-shadow:0 1px 0 var(--line)}
+.rbar__in{display:flex;align-items:center;gap:8px;height:54px;padding:0 12px 0 4px}
+.rbar__back{width:36px;height:40px;display:grid;place-items:center;flex:none;color:var(--jade)}
+.rbar__back svg{width:26px;height:26px}
+.rbar__t{flex:1;min-width:0}
+.rbar__name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbar__ch{font-size:12px;color:var(--text-2)}
+.tog{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);flex:none}
+.tog__sw{width:46px;height:28px;border-radius:14px;background:var(--jade);position:relative}
+.tog__sw::after{content:"";position:absolute;right:2px;top:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.25)}
+.collect{height:32px;padding:0 12px;border-radius:16px;background:rgba(79,209,176,.18);color:var(--jade);font-size:14px;font-weight:600;flex:none}
+.mpage{position:absolute;inset:0;background:#F4F2F3}
+.bub{position:absolute;background:#fff;border:2.5px solid #161616;border-radius:50%;display:grid;place-items:center}
+.hl{font:700 15px/1.15 "Be Vietnam Pro",sans-serif;color:#161616;padding:3px 6px;border-radius:5px;background:rgba(79,209,176,.22);box-shadow:0 0 0 1.5px #22A889;text-align:center}
+.panel{position:absolute;left:0;right:0;top:290px;height:470px;background:linear-gradient(170deg,#5D6E86 0%,#3F4C61 45%,#2C3443 100%);border-top:3px solid #161616;border-bottom:3px solid #161616;overflow:hidden}
+.panel::before{content:"";position:absolute;left:40px;top:110px;width:250px;height:420px;border-radius:120px 120px 0 0;background:#E9E6E2}
+.panel::after{content:"";position:absolute;left:10px;top:40px;width:200px;height:90px;border-radius:50%;background:#7A6A58}
+
+/* ---------- 4 字卡庫 ---------- */
+.search{display:flex;align-items:center;gap:8px;margin:2px 16px 0;height:38px;padding:0 10px;border-radius:10px;background:var(--surface-2);color:var(--text-3);font-size:17px}
+.search svg{width:18px;height:18px}
+.word{align-items:flex-start;padding:11px 16px 12px}
+.word__l{flex:1;min-width:0}
+.word__vi{font-size:17px;font-weight:600;line-height:1.35}
+.word__zh{font-size:15px;color:var(--text-2);margin-top:1px}
+.word__r{display:flex;flex-direction:column;align-items:flex-end;gap:3px;padding-top:2px}
+.due{font-size:12px;color:var(--text-3)}
+.due.is-due{color:var(--st-relearn)}
+
+/* ---------- 5 練習總覽 ---------- */
+.lead{padding:4px 20px 0;font-size:17px;color:var(--text-2)}
+.lead b{color:var(--text);font-weight:600}
+.split{display:flex;height:8px;gap:2px;margin:14px 20px 0;border-radius:4px;overflow:hidden}
+.split i{background:var(--c)}
+.cta--b{padding:24px 16px 0}
+
+/* ---------- 6 今天做完了 ---------- */
+.fin{display:flex;align-items:center;gap:16px;padding:4px 20px 0}
+.fin__ring{width:64px;height:64px;border-radius:50%;border:6px solid var(--jade);display:grid;place-items:center;color:var(--jade);flex:none}
+.fin__ring svg{width:28px;height:28px;stroke-width:2.6}
+.fin h3{font-size:22px;font-weight:700;line-height:1.3}
+.fin p{font-size:14px;color:var(--text-2);line-height:1.6;margin-top:2px}
+.distrow{display:block;padding:14px 16px}
+.dist{display:flex;height:10px;gap:2px;border-radius:5px;overflow:hidden}
+.dist i{background:var(--c)}
+.legend{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-top:12px;font-size:14px;color:var(--text-2)}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend li::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--c)}
+.legend b{margin-left:auto;font-weight:500;color:var(--text)}
+
+/* ---------- 7 練習中 ---------- */
+.snav{position:relative;display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 16px;font-size:17px}
+.snav button{color:var(--jade)}
+.snav__n{position:absolute;left:50%;transform:translateX(-50%);font-weight:600;font-variant-numeric:tabular-nums}
+.sbar{height:3px;margin:0 16px;border-radius:2px;background:var(--surface-2)}
+.sbar i{display:block;height:100%;width:15%;border-radius:2px;background:var(--jade)}
+.qcard{margin:24px 16px 0;padding:20px 18px;border-radius:16px;background:var(--surface)}
+.q__k{font-size:15px;color:var(--text-2)}
+.q__s{font-size:25px;line-height:1.55;font-weight:500;margin-top:10px}
+.blank{display:inline-block;width:124px;height:1.05em;vertical-align:-.13em;border-radius:6px;background:rgba(79,209,176,.16);box-shadow:inset 0 -2.5px 0 var(--jade)}
+.q__hint{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.q__hk{font-size:13px;color:var(--text-3)}
+.q__hv{font-size:17px;margin-top:1px}
+.field{margin:16px 16px 0;height:52px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 2px var(--jade);display:flex;align-items:center;padding:0 16px;font-size:19px;font-weight:500}
+.caret{width:2px;height:24px;background:var(--jade);margin-left:1px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.caret{animation:none}}
+.sess__send{position:absolute;width:auto;left:16px;right:16px;bottom:44px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-lib" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5z"/><path d="M12 6.5v13"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><rect x="3.5" y="6.5" width="13" height="14" rx="2.5"/><path d="M7.5 3.5h10.5a2.5 2.5 0 0 1 2.5 2.5v11"/></symbol>
+  <symbol id="i-prac" viewBox="0 0 24 24"><path d="M20 11.5A8 8 0 1 1 15.5 4.3"/><path d="M8.5 11.5l3 3 8.5-9"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
+</svg>
+
+<header class="intro">
+  <h1>方向 C：夜讀玉色</h1>
+  <p>照 iPhone 原生 App 的骨架來做：大標題、分組列表、半透明分頁列。深藍綠的夜色底配玉色，顏色只用來表示狀態，讓注意力留在越南文上。</p>
+</header>
+
+<main class="stage">
+
+  <!-- 1 書庫 -->
+  <section class="shot">
+    <h2 class="shot__name">1　書庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="nav"><button aria-label="重新整理"><svg class="i"><use href="#i-refresh"/></svg></button></div>
+        <div class="large"><h2>書庫</h2></div>
+        <article class="banner">
+          <div class="banner__in">
+            <div class="banner__txt">
+              <p class="banner__k">繼續看</p>
+              <p class="banner__t" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+              <p class="banner__c">看到第 54 / 149 話</p>
+            </div>
+            <div class="ring" style="--p:36" role="img" aria-label="進度 36%"><span><b>54</b>/149</span></div>
+          </div>
+        </article>
+        <div class="gh"><span>全部漫畫</span><span>8 部</span></div>
+        <div class="shelf">
+          <div class="book"><div class="cv c1" data-abbr="LN"></div><p class="book__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="book__meta is-on">看到第 54 / 149 話</p></div>
+          <div class="book"><div class="cv c2" data-abbr="CĐ"></div><p class="book__title" lang="vi">Cô Đi Mà Kết Hôn Với Chồng Tôi Đi</p><p class="book__meta">76 話</p></div>
+          <div class="book"><div class="cv c3" data-abbr="HT"></div><p class="book__title" lang="vi">Hoàng Tử Bán Thuốc</p><p class="book__meta">129 話</p></div>
+          <div class="book"><div class="cv c4" data-abbr="SP"></div><p class="book__title" lang="vi">Sát Thủ Peter</p><p class="book__meta">201 話</p></div>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab is-on"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 2 章節列表 -->
+  <section class="shot">
+    <h2 class="shot__name">2　章節列表</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <button class="poster__back" aria-label="回書庫"><svg class="i"><use href="#i-back"/></svg></button>
+      <div class="page page--full">
+        <div class="poster">
+          <div class="poster__in">
+            <p class="poster__t" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+            <p class="poster__m">149 話</p>
+          </div>
+        </div>
+        <div class="cta"><button class="btn"><svg class="i" style="width:16px;height:16px;fill:currentColor;stroke:none"><use href="#i-play"/></svg>繼續閱讀<span class="btn__sub">第 54 話</span></button></div>
+        <div class="gh"><span>章節</span><span>149 話</span></div>
+        <ol class="group">
+          <li class="row ch is-read">第 50 話<span class="row__v">158 頁</span></li>
+          <li class="row ch is-read">第 51 話<span class="row__v">171 頁</span></li>
+          <li class="row ch is-read">第 52 話<span class="row__v">144 頁</span></li>
+          <li class="row ch is-read">第 53 話<span class="row__v">166 頁</span></li>
+          <li class="row ch is-now"><span class="ch__mark"></span>第 54 話<span class="row__v">正在看</span></li>
+          <li class="row ch">第 55 話<span class="row__v">152 頁</span></li>
+          <li class="row ch">第 56 話<span class="row__v">149 頁</span></li>
+        </ol>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 3 閱讀器頂端列 -->
+  <section class="shot">
+    <h2 class="shot__name">3　閱讀器（頂端列出現時）</h2>
+    <div class="phone">
+      <div class="mpage">
+        <div class="bub" style="left:150px;top:118px;width:200px;height:132px"><span class="hl">THƯA NGÀI</span></div>
+        <div class="panel"></div>
+        <div class="bub" style="left:20px;top:640px;width:190px;height:150px"><span class="hl" style="font-size:26px">AH...<br>AHHH.</span></div>
+      </div>
+      <div class="rbar">
+        <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+        <div class="rbar__in">
+          <button class="rbar__back" aria-label="回章節列表"><svg class="i"><use href="#i-back"/></svg></button>
+          <div class="rbar__t"><p class="rbar__name" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="rbar__ch">第 54 話</p></div>
+          <span class="tog">標示<span class="tog__sw" role="switch" aria-checked="true"></span></span>
+          <button class="collect">＋收卡</button>
+        </div>
+      </div>
+      <div class="home" style="background:#161616"></div>
+    </div>
+  </section>
+
+  <!-- 4 字卡庫 -->
+  <section class="shot">
+    <h2 class="shot__name">4　字卡庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="nav"></div>
+        <div class="large"><h2>字卡庫</h2><span>共 316 張</span></div>
+        <div class="search"><svg class="i"><use href="#i-search"/></svg>搜尋原文或譯文</div>
+        <div class="gh"><span>單字</span><span>171</span></div>
+        <ul class="group">
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">THỨ HAI KHÔNG AI THỨ NHẤT</p><p class="word__zh">天下無敵</p></div><div class="word__r"><span class="st s-new">新卡</span></div></li>
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">chấm dứt hết</p><p class="word__zh">徹底結束、一刀兩斷</p></div><div class="word__r"><span class="st s-learn">學習中 1/2</span><span class="due">3 小時後</span></div></li>
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">SỈ NHỤC</p><p class="word__zh">羞辱</p></div><div class="word__r"><span class="st s-relearn">重新學習 1/2</span><span class="due is-due">已到期</span></div></li>
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">dứt khoát</p><p class="word__zh">果斷、堅決、毫不猶豫</p></div><div class="word__r"><span class="st s-review is-fill">間隔 7 天</span><span class="due">2 天後</span></div></li>
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">đảm đang</p><p class="word__zh">賢慧、能幹、善於持家</p></div><div class="word__r"><span class="st s-new">新卡</span></div></li>
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">GIẢN DỊ</p><p class="word__zh">樸素、簡樸、不浮誇</p></div><div class="word__r"><span class="st s-review is-fill">間隔 7 天</span><span class="due">2 天後</span></div></li>
+          <li class="row word"><div class="word__l"><p class="word__vi" lang="vi">VỢ SẮP CƯỚI</p><p class="word__zh">未婚妻</p></div><div class="word__r"><span class="st s-learn">學習中 1/2</span><span class="due is-due">已到期</span></div></li>
+        </ul>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 5 練習總覽 -->
+  <section class="shot">
+    <h2 class="shot__name">5　練習總覽（有卡片要複習）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="nav"><button>設定</button></div>
+        <div class="large"><h2>今天</h2></div>
+        <p class="lead">有 <b>20</b> 張要複習</p>
+        <div class="split" role="img" aria-label="到期 12、新卡 5、學習中 3"><i style="--c:var(--st-relearn);flex:12"></i><i style="--c:var(--st-new);flex:5"></i><i style="--c:var(--st-learn);flex:3"></i></div>
+        <div class="gh"><span>今天的卡片</span></div>
+        <ul class="group">
+          <li class="row" style="--c:var(--st-relearn)"><span class="dot"></span>到期<span class="row__v">12</span></li>
+          <li class="row" style="--c:var(--st-new)"><span class="dot"></span>新卡<span class="row__v">5</span></li>
+          <li class="row" style="--c:var(--st-learn)"><span class="dot"></span>學習中<span class="row__v">3</span></li>
+        </ul>
+        <div class="cta--b"><button class="btn">開始複習</button></div>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 6 今天做完了 -->
+  <section class="shot">
+    <h2 class="shot__name">6　練習總覽（今天做完了）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="nav"><button>設定</button></div>
+        <div class="large"><h2>今天</h2></div>
+        <div class="fin">
+          <div class="fin__ring"><svg class="i"><use href="#i-check"/></svg></div>
+          <div><h3>今天做完了</h3><p>到期的卡片都複習過了，今天的新卡也用完了。明天再來。</p></div>
+        </div>
+        <div class="gh"><span>今天複習了 20 張</span></div>
+        <ul class="group">
+          <li class="row" style="--c:var(--st-review)"><span class="dot"></span>答對<span class="row__v">16</span></li>
+          <li class="row" style="--c:var(--st-relearn)"><span class="dot"></span>答錯<span class="row__v">4</span></li>
+          <li class="row" style="--c:var(--st-new)"><span class="dot"></span>畢業<span class="row__v">3</span></li>
+          <li class="row"><span style="width:10px"></span>明天到期<span class="row__v">9 張</span></li>
+        </ul>
+        <div class="gh"><span>所有字卡</span><span>316 張</span></div>
+        <div class="group distrow">
+          <div class="dist" role="img" aria-label="新卡 248、學習中 31、重新學習 7、間隔複習 30"><i style="--c:var(--st-new);flex:248"></i><i style="--c:var(--st-learn);flex:31"></i><i style="--c:var(--st-relearn);flex:7"></i><i style="--c:var(--st-review);flex:30"></i></div>
+          <ul class="legend">
+            <li style="--c:var(--st-new)">新卡<b>248</b></li>
+            <li style="--c:var(--st-learn)">學習中<b>31</b></li>
+            <li style="--c:var(--st-relearn)">重新學習<b>7</b></li>
+            <li style="--c:var(--st-review)">間隔複習<b>30</b></li>
+          </ul>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-prac"/></svg>練習</a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 7 練習中 -->
+  <section class="shot">
+    <h2 class="shot__name">7　練習中（填空題）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="snav"><button>結束</button><span class="snav__n">3 / 20</span><span></span></div>
+        <div class="sbar"><i></i></div>
+        <div class="qcard">
+          <p class="q__k">填入空格裡的字</p>
+          <p class="q__s" lang="vi">Cô ấy từ chối một cách <span class="blank"></span>.</p>
+          <div class="q__hint"><p class="q__hk">中文提示</p><p class="q__hv">果斷、堅決、毫不猶豫</p></div>
+        </div>
+        <div class="field" lang="vi">dứt kh<span class="caret"></span></div>
+        <button class="btn sess__send">送出</button>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

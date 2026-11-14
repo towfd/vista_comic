@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>方向 B：墨與琥珀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600;7..72,700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/*
+  方向 B：墨與琥珀
+  漫畫印刷的語彙：墨色底、網點、對話框形狀的標籤、分鏡框。
+  字體規則：越南文與數字用襯線 Literata（像印出來的原文），中文介面用 Noto Sans TC。
+*/
+:root{
+  --bg:#17140F;
+  --surface:#221D17;
+  --surface-2:#2C261E;
+  --line:#3B342A;
+  --paper:#EFE6D3;
+  --text:#EFE6D3;
+  --text-2:#B8AC95;
+  --text-3:#93876F;
+  --amber:#F5B041;
+  --on-amber:#1E1406;
+  --st-new:#9CC3F0;
+  --st-learn:#F5B041;
+  --st-relearn:#FF8A66;
+  --st-review:#A8C98A;
+  --serif:"Literata","Noto Serif TC","Songti TC",Georgia,serif;
+  --sans:"Literata","Noto Sans TC","PingFang TC","Heiti TC","Microsoft JhengHei",system-ui,sans-serif;
+  --tone:radial-gradient(rgba(239,230,211,.16) 1px,transparent 1.5px) 0 0/6px 6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:#100E0A;color:var(--text);font-family:var(--sans);line-height:1.6}
+[lang="vi"]{font-family:var(--serif)}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+/* ---------- 展示框架 ---------- */
+.intro{max-width:1260px;margin:0 auto;padding:36px 20px 8px}
+.intro h1{font-size:24px;font-weight:900}
+.intro p{color:var(--text-2);font-size:15px;margin-top:6px;max-width:40em;line-height:1.7}
+.stage{display:flex;flex-wrap:wrap;justify-content:center;gap:48px 36px;padding:28px 20px 96px;max-width:1300px;margin:0 auto}
+.shot{width:390px}
+.shot__name{font-size:14px;font-weight:500;color:var(--text-2);margin-bottom:12px}
+.phone{position:relative;width:390px;height:844px;overflow:hidden;border-radius:46px;background:var(--bg);box-shadow:0 0 0 1px var(--line),0 30px 60px -30px #000}
+@media (max-width:480px){
+  .intro{padding:28px 20px 4px}
+  .stage{padding:20px 0 64px;gap:36px}
+  .shot{width:100%}
+  .shot__name{padding:0 20px}
+  .phone{width:100%;border-radius:0;box-shadow:none;border-top:1px solid var(--line)}
+}
+.sb{position:absolute;inset:0 0 auto;height:47px;z-index:20;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 7px 36px;font:600 16px/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--text)}
+.sb__bat{width:25px;height:12px;border:1.5px solid currentColor;border-radius:4px;padding:1.5px;opacity:.9}
+.sb__bat::before{content:"";display:block;width:70%;height:100%;background:currentColor;border-radius:1.5px}
+.home{position:absolute;bottom:8px;left:50%;width:134px;height:5px;border-radius:3px;background:var(--text);transform:translateX(-50%);z-index:30;opacity:.9}
+.page{position:absolute;inset:47px 0 0;overflow:hidden}
+
+/* ---------- 封面佔位：方角、細框、底部網點 ---------- */
+.cv{position:relative;aspect-ratio:3/4;border-radius:3px;overflow:hidden;background:linear-gradient(165deg,var(--c1),var(--c2));box-shadow:0 0 0 1.5px #000,0 0 0 2.5px rgba(239,230,211,.2)}
+.cv::before{content:"";position:absolute;inset:45% 0 0;background:radial-gradient(rgba(0,0,0,.55) 1.1px,transparent 1.6px) 0 0/5px 5px;-webkit-mask:linear-gradient(transparent,#000);mask:linear-gradient(transparent,#000)}
+.cv::after{content:attr(data-abbr);position:absolute;left:8px;top:6px;font:700 22px/1 "Literata",serif;color:rgba(255,255,255,.85)}
+.c1{--c1:#7DB36F;--c2:#24483F}
+.c2{--c1:#8B7DC4;--c2:#2B2140}
+.c3{--c1:#E0AE4B;--c2:#6B3E1E}
+.c4{--c1:#D24B44;--c2:#3A0F12}
+.c5{--c1:#A8CDE0;--c2:#3E5F7A}
+.c6{--c1:#EA7536;--c2:#2A1610}
+.c7{--c1:#F4A9BB;--c2:#7A3E58}
+.c8{--c1:#4C7BC4;--c2:#10203F}
+
+/* ---------- 共用 ---------- */
+.head{display:flex;align-items:flex-end;justify-content:space-between;padding:14px 20px 16px}
+.head h2{font-size:32px;font-weight:900;line-height:1.15;letter-spacing:.02em}
+.head__meta{font-size:14px;color:var(--text-2)}
+.textbtn{display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text-2);height:36px}
+.btn{display:flex;align-items:center;justify-content:space-between;width:100%;height:54px;padding:0 20px;border-radius:6px;background:var(--amber);color:var(--on-amber);font-size:17px;font-weight:700;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.btn--c{justify-content:center}
+.btn__sub{font-weight:500}
+/* 對話框形狀的標籤 */
+.tag{position:relative;display:inline-block;padding:1px 9px;border-radius:9px;background:var(--c);color:var(--on-amber);font-size:12px;font-weight:700;line-height:20px;white-space:nowrap}
+.tag::after{content:"";position:absolute;left:9px;bottom:-5px;border:5px solid transparent;border-top-color:var(--c);border-bottom:0;border-left-width:2px}
+.s-new{--c:var(--st-new)}.s-learn{--c:var(--st-learn)}.s-relearn{--c:var(--st-relearn)}.s-review{--c:var(--st-review)}
+
+/* 底部分頁列：貼底，選中的分頁從上緣垂下一條書籤 */
+.tabs{position:absolute;inset:auto 0 0;height:90px;padding-bottom:34px;background:var(--bg);box-shadow:0 -1px 0 var(--line);display:grid;grid-template-columns:repeat(3,1fr);z-index:15}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text-3);font-size:12px;font-weight:500}
+.tab.is-on{color:var(--amber)}
+.tab.is-on::before{content:"";position:absolute;top:0;left:50%;width:18px;height:8px;margin-left:-9px;background:var(--amber);clip-path:polygon(0 0,100% 0,100% 100%,50% 60%,0 100%)}
+.tab__badge{position:absolute;top:6px;left:calc(50% + 8px);padding:0 6px;min-width:20px;height:18px;border-radius:9px;background:var(--amber);color:var(--on-amber);font:700 12px/18px "Literata",serif;text-align:center}
+.tab__badge::after{content:"";position:absolute;left:4px;bottom:-4px;border:4px solid transparent;border-top-color:var(--amber);border-bottom:0;border-left-width:1px}
+
+/* ---------- 1 書庫 ---------- */
+.cont{position:relative;margin:0 16px;height:184px;border-radius:4px;background:var(--surface);box-shadow:0 0 0 2px var(--paper);overflow:hidden;display:flex}
+.cont__art{position:relative;width:132px;flex:none;background:linear-gradient(165deg,#7DB36F,#24483F);clip-path:polygon(0 0,100% 0,78% 100%,0 100%)}
+.cont__art::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(0,0,0,.5) 1.1px,transparent 1.6px) 0 0/5px 5px;-webkit-mask:linear-gradient(100deg,transparent 30%,#000);mask:linear-gradient(100deg,transparent 30%,#000)}
+.cont__art::after{content:"LN";position:absolute;left:12px;top:10px;font:700 26px/1 "Literata",serif;color:rgba(255,255,255,.85)}
+.cont__body{flex:1;min-width:0;padding:16px 16px 14px 0;display:flex;flex-direction:column}
+.cont__title{font-size:17px;font-weight:600;line-height:1.35;margin-top:12px}
+.cont__ch{font-size:14px;color:var(--text-2);margin-top:4px}
+.prog{margin-top:auto}
+.prog__bar{height:9px;border-radius:2px;box-shadow:inset 0 0 0 1.5px var(--paper);overflow:hidden}
+.prog__bar i{display:block;height:100%;background:var(--amber)}
+.prog__n{display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-top:5px}
+.sec{display:flex;align-items:baseline;gap:10px;padding:28px 20px 14px}
+.sec h3{font-size:17px;font-weight:700}
+.sec span{font-size:13px;color:var(--text-3)}
+.sec::after{content:"";flex:1;height:1px;background:var(--line);align-self:center}
+.shelf{display:grid;grid-template-columns:repeat(3,1fr);gap:20px 14px;padding:0 18px}
+.book__title{font-size:13.5px;font-weight:600;line-height:1.35;margin-top:9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.book__meta{font-size:12px;color:var(--text-2);margin-top:2px;white-space:nowrap}
+.book__meta.is-on{color:var(--amber)}
+
+/* ---------- 2 章節列表 ---------- */
+.page--full{inset:0}
+.hero{position:relative;padding:47px 20px 20px;overflow:hidden}
+.hero__bg{position:absolute;inset:-50px;background:linear-gradient(165deg,#7DB36F,#24483F);filter:blur(36px);opacity:.6}
+.hero__tone{position:absolute;inset:0;background:var(--tone),linear-gradient(to bottom,rgba(23,20,15,.25),var(--bg) 92%)}
+.hero__in{position:relative}
+.hero__row{display:grid;grid-template-columns:108px 1fr;gap:16px;align-items:end;margin-top:12px}
+.hero .cv{box-shadow:0 0 0 1.5px #000,0 0 0 3px var(--paper)}
+.hero__title{font-size:21px;font-weight:600;line-height:1.3}
+.hero__meta{font-size:14px;color:var(--text-2);margin-top:6px}
+.hero .btn{margin-top:20px}
+.chs{list-style:none;padding:0 20px}
+.ch{display:flex;align-items:baseline;gap:4px;height:56px;padding-top:12px;border-bottom:1px dashed var(--line);font-size:13px;color:var(--text-2);position:relative}
+.ch__n{font:600 22px/1 "Literata",serif;color:var(--text);min-width:38px;text-align:right}
+.ch__p{margin-left:auto;font-family:"Literata",serif;font-size:13px;color:var(--text-3)}
+.ch.is-read,.ch.is-read .ch__n{color:var(--text-3)}
+.ch.is-now .ch__n{color:var(--amber)}
+.ch.is-now{color:var(--amber)}
+.ch.is-now::before{content:"";position:absolute;left:-20px;top:10px;bottom:10px;width:4px;background:var(--amber)}
+.ch .tag{margin-left:10px;align-self:center;margin-top:-6px}
+
+/* ---------- 3 閱讀器 ---------- */
+.rbar{position:absolute;inset:0 0 auto;padding-top:47px;background:var(--bg);z-index:10;box-shadow:0 1px 0 rgba(245,176,65,.45)}
+.rbar__in{display:flex;align-items:center;gap:8px;height:56px;padding:0 12px 0 6px}
+.rbar__back{width:36px;height:40px;display:grid;place-items:center;flex:none}
+.rbar__t{flex:1;min-width:0}
+.rbar__name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbar__ch{font-size:12px;color:var(--text-2)}
+.tog{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);flex:none}
+.tog__sw{width:40px;height:24px;border-radius:6px;background:var(--amber);position:relative}
+.tog__sw::after{content:"";position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:4px;background:var(--on-amber)}
+.collect{height:34px;padding:0 12px;border-radius:6px;background:var(--amber);color:var(--on-amber);font-size:14px;font-weight:700;flex:none}
+.mpage{position:absolute;inset:0;background:#F4F2F3}
+.bub{position:absolute;background:#fff;border:2.5px solid #161616;border-radius:50%;display:grid;place-items:center}
+.hl{font:700 15px/1.15 "Literata",serif;color:#161616;padding:3px 6px;border-radius:2px;background:rgba(245,176,65,.25);box-shadow:0 0 0 1.5px #D8901C;text-align:center}
+.panel{position:absolute;left:0;right:0;top:290px;height:470px;background:linear-gradient(170deg,#5D6E86 0%,#3F4C61 45%,#2C3443 100%);border-top:3px solid #161616;border-bottom:3px solid #161616;overflow:hidden}
+.panel::before{content:"";position:absolute;left:40px;top:110px;width:250px;height:420px;border-radius:120px 120px 0 0;background:#E9E6E2}
+.panel::after{content:"";position:absolute;left:10px;top:40px;width:200px;height:90px;border-radius:50%;background:#7A6A58}
+
+/* ---------- 4 字卡庫 ---------- */
+.search{display:flex;align-items:center;gap:10px;margin:0 20px;height:46px;border-bottom:1.5px solid var(--text-3);color:var(--text-3);font-size:15px}
+.grp{display:flex;align-items:baseline;gap:8px;padding:24px 20px 4px}
+.grp h3{font-size:15px;font-weight:700}
+.grp span{font:600 15px "Literata",serif;color:var(--amber)}
+.grp::after{content:"";flex:1;height:1px;background:var(--line);align-self:center}
+.words{list-style:none;padding:0 20px}
+.word{display:grid;grid-template-columns:1fr auto;gap:2px 14px;padding:14px 0 13px;border-bottom:1px dashed var(--line)}
+.word__vi{font-size:21px;font-weight:600;line-height:1.3}
+.word__zh{font-size:14px;color:var(--text-2);grid-column:1}
+.word__st{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:9px;padding-top:4px}
+.due{font-size:12px;color:var(--text-3)}
+.due.is-due{color:var(--st-relearn);font-weight:500}
+
+/* ---------- 5 練習總覽 ---------- */
+.sheet{position:relative;margin:4px 16px 0;padding:20px 20px 22px;border-radius:4px;background:var(--surface);box-shadow:0 0 0 2px var(--paper);overflow:hidden}
+.sheet::before{content:"";position:absolute;right:0;top:0;width:150px;height:110px;background:radial-gradient(rgba(245,176,65,.35) 1.2px,transparent 1.7px) 0 0/6px 6px;-webkit-mask:radial-gradient(circle at 100% 0,#000,transparent 70%);mask:radial-gradient(circle at 100% 0,#000,transparent 70%)}
+.sheet__h{position:relative;font-size:22px;font-weight:900;line-height:1.35}
+.ledger{position:relative;list-style:none;margin:16px 0 22px}
+.ledger li{display:flex;align-items:baseline;gap:8px;padding:9px 0;font-size:16px}
+.ledger li::after{content:"";order:2;flex:1;border-bottom:2px dotted var(--line);transform:translateY(-4px)}
+.ledger b{order:3;font:600 22px/1 "Literata",serif;color:var(--text)}
+.ledger em{order:4;font-style:normal;font-size:13px;color:var(--text-2);width:14px}
+.ledger .sum{border-top:1.5px solid var(--text-3);margin-top:6px;padding-top:12px}
+.ledger .sum b{color:var(--amber)}
+
+/* ---------- 6 今天做完了 ---------- */
+.fin{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;padding:4px 20px 0}
+.stamp{width:88px;height:88px;border-radius:50%;border:3px solid var(--amber);color:var(--amber);display:grid;place-items:center;font-size:40px;font-weight:900;transform:rotate(-10deg);box-shadow:inset 0 0 0 4px var(--bg),inset 0 0 0 5.5px var(--amber)}
+.fin h3{font-size:24px;font-weight:900;line-height:1.3}
+.fin p{font-size:14px;color:var(--text-2);line-height:1.7;margin-top:4px}
+.sheet--flat{box-shadow:0 0 0 1px var(--line);margin-top:20px;padding:14px 20px 16px}
+.sheet--flat::before{display:none}
+.sheet__k{font-size:15px;font-weight:700}
+.ledger--s{margin:6px 0 0}
+.ledger--s li{padding:6px 0;font-size:15px}
+.ledger--s b{font-size:19px}
+.dist{display:flex;height:16px;border-radius:2px;box-shadow:0 0 0 1.5px var(--paper);overflow:hidden;margin-top:12px}
+.dist i{background:var(--c);box-shadow:-1.5px 0 0 var(--bg)}
+.dist .p-stripe{background:repeating-linear-gradient(-45deg,var(--c) 0 3px,rgba(0,0,0,.35) 3px 5px)}
+.dist .p-dot{background:radial-gradient(rgba(0,0,0,.45) 1px,transparent 1.4px) 0 0/4px 4px,var(--c)}
+.legend{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-top:12px;font-size:13px;color:var(--text-2)}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend li::before{content:"";width:12px;height:12px;border-radius:2px;background:var(--c)}
+.legend b{margin-left:auto;font:600 14px "Literata",serif;color:var(--text)}
+
+/* ---------- 7 練習中 ---------- */
+.sess{display:flex;align-items:center;gap:12px;padding:6px 20px 0}
+.ticks{flex:1;display:grid;grid-template-columns:repeat(20,1fr);gap:2px}
+.ticks i{height:6px;background:var(--line)}
+.ticks i.f{background:var(--amber)}
+.ticks i.c{background:var(--paper)}
+.sess__n{font:600 14px "Literata",serif;color:var(--text-2)}
+.q{padding:48px 22px 0}
+.q__k{font-size:15px;color:var(--text-2);font-weight:500}
+.q__s{font-size:28px;line-height:1.5;font-weight:500;margin-top:12px}
+.blank{display:inline-block;width:128px;height:1.05em;vertical-align:-.15em;border-bottom:3px solid var(--amber);background:rgba(245,176,65,.12)}
+.say{position:relative;margin-top:26px;padding:12px 16px;border-radius:18px;background:var(--surface);box-shadow:0 0 0 1.5px var(--line)}
+.say::before{content:"";position:absolute;left:26px;top:-9px;width:16px;height:16px;background:var(--surface);border-left:1.5px solid var(--line);border-top:1.5px solid var(--line);transform:rotate(45deg)}
+.say__k{position:relative;font-size:12px;color:var(--text-3)}
+.say__v{position:relative;font-size:17px;line-height:1.6}
+.field{margin:30px 22px 0;height:56px;display:flex;align-items:center;border-bottom:2.5px solid var(--amber);font:500 24px "Literata",serif}
+.caret{width:2px;height:26px;background:var(--amber);margin-left:1px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.caret{animation:none}}
+.sess__send{position:absolute;width:auto;left:22px;right:22px;bottom:44px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-lib" viewBox="0 0 24 24"><path d="M4 4.5h5v15H4zM9 4.5h5v15H9z"/><path d="M15.2 5.6l3.9-1 3.6 14-3.9 1z"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><path d="M7 3.5h13v15H7z"/><path d="M4 7v13.5h12"/><path d="M10.5 9h6M10.5 12.5h4"/></symbol>
+  <symbol id="i-prac" viewBox="0 0 24 24"><path d="M5 4.5h14v15H5z"/><path d="M8.5 9.5l2 2 4-4"/><path d="M8.5 15.5h7"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></symbol>
+</svg>
+
+<header class="intro">
+  <h1>方向 B：墨與琥珀</h1>
+  <p>把漫畫印刷的手感搬進介面：墨色紙底、琥珀色的頁籤、網點陰影、對話框形狀的標籤。越南文用襯線字，像在讀印出來的原文。</p>
+</header>
+
+<main class="stage">
+
+  <!-- 1 書庫 -->
+  <section class="shot">
+    <h2 class="shot__name">1　書庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>書庫</h2><button class="textbtn"><svg class="i" style="width:18px;height:18px"><use href="#i-refresh"/></svg>重新整理</button></div>
+        <article class="cont">
+          <div class="cont__art"></div>
+          <div class="cont__body">
+            <span><span class="tag s-learn">繼續看</span></span>
+            <p class="cont__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+            <p class="cont__ch">第 54 話</p>
+            <div class="prog">
+              <div class="prog__bar"><i style="width:36%"></i></div>
+              <div class="prog__n"><span>看到第 54 / 149 話</span><span>36%</span></div>
+            </div>
+          </div>
+        </article>
+        <div class="sec"><h3>全部漫畫</h3><span>8 部</span></div>
+        <div class="shelf">
+          <div class="book"><div class="cv c1" data-abbr="LN"></div><p class="book__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="book__meta is-on">看到第 54 / 149 話</p></div>
+          <div class="book"><div class="cv c2" data-abbr="CĐ"></div><p class="book__title" lang="vi">Cô Đi Mà Kết Hôn Với Chồng Tôi Đi</p><p class="book__meta">76 話</p></div>
+          <div class="book"><div class="cv c3" data-abbr="HT"></div><p class="book__title" lang="vi">Hoàng Tử Bán Thuốc</p><p class="book__meta">129 話</p></div>
+          <div class="book"><div class="cv c4" data-abbr="SP"></div><p class="book__title" lang="vi">Sát Thủ Peter</p><p class="book__meta">201 話</p></div>
+          <div class="book"><div class="cv c5" data-abbr="SF"></div><p class="book__title" lang="vi">Sousou no Frieren</p><p class="book__meta">150 話</p></div>
+          <div class="book"><div class="cv c6" data-abbr="GD"></div><p class="book__title" lang="vi">Giáo Dục Chân Chính</p><p class="book__meta">274 話</p></div>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab is-on"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 2 章節列表 -->
+  <section class="shot">
+    <h2 class="shot__name">2　章節列表</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page page--full">
+        <div class="hero">
+          <div class="hero__bg"></div><div class="hero__tone"></div>
+          <div class="hero__in">
+            <button class="textbtn" style="color:var(--text)"><svg class="i" style="width:18px;height:18px"><use href="#i-back"/></svg>書庫</button>
+            <div class="hero__row">
+              <div class="cv c1" data-abbr="LN"></div>
+              <div><p class="hero__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="hero__meta">149 話</p></div>
+            </div>
+            <button class="btn">繼續閱讀<span class="btn__sub">第 54 話</span></button>
+          </div>
+        </div>
+        <ol class="chs">
+          <li class="ch is-read">第<span class="ch__n">50</span>話<span class="ch__p">158 頁</span></li>
+          <li class="ch is-read">第<span class="ch__n">51</span>話<span class="ch__p">171 頁</span></li>
+          <li class="ch is-read">第<span class="ch__n">52</span>話<span class="ch__p">144 頁</span></li>
+          <li class="ch is-read">第<span class="ch__n">53</span>話<span class="ch__p">166 頁</span></li>
+          <li class="ch is-now">第<span class="ch__n">54</span>話<span class="tag s-learn">正在看</span><span class="ch__p">180 頁</span></li>
+          <li class="ch">第<span class="ch__n">55</span>話<span class="ch__p">152 頁</span></li>
+          <li class="ch">第<span class="ch__n">56</span>話<span class="ch__p">149 頁</span></li>
+          <li class="ch">第<span class="ch__n">57</span>話<span class="ch__p">163 頁</span></li>
+        </ol>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 3 閱讀器頂端列 -->
+  <section class="shot">
+    <h2 class="shot__name">3　閱讀器（頂端列出現時）</h2>
+    <div class="phone">
+      <div class="mpage">
+        <div class="bub" style="left:150px;top:118px;width:200px;height:132px"><span class="hl">THƯA NGÀI</span></div>
+        <div class="panel"></div>
+        <div class="bub" style="left:20px;top:640px;width:190px;height:150px"><span class="hl" style="font-size:26px">AH...<br>AHHH.</span></div>
+      </div>
+      <div class="rbar">
+        <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+        <div class="rbar__in">
+          <button class="rbar__back" aria-label="回章節列表"><svg class="i"><use href="#i-back"/></svg></button>
+          <div class="rbar__t"><p class="rbar__name" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="rbar__ch">第 54 話</p></div>
+          <span class="tog">標示<span class="tog__sw" role="switch" aria-checked="true"></span></span>
+          <button class="collect">＋收卡</button>
+        </div>
+      </div>
+      <div class="home" style="background:#161616"></div>
+    </div>
+  </section>
+
+  <!-- 4 字卡庫 -->
+  <section class="shot">
+    <h2 class="shot__name">4　字卡庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>字卡庫</h2><span class="head__meta">共 316 張</span></div>
+        <div class="search"><svg class="i"><use href="#i-search"/></svg>搜尋原文或譯文</div>
+        <div class="grp"><h3>單字</h3><span>171</span></div>
+        <ul class="words">
+          <li class="word"><p class="word__vi" lang="vi">THỨ HAI KHÔNG AI THỨ NHẤT</p><p class="word__zh">天下無敵</p><div class="word__st"><span class="tag s-new">新卡</span></div></li>
+          <li class="word"><p class="word__vi" lang="vi">chấm dứt hết</p><p class="word__zh">徹底結束、一刀兩斷</p><div class="word__st"><span class="tag s-learn">學習中 1/2</span><span class="due">3 小時後</span></div></li>
+          <li class="word"><p class="word__vi" lang="vi">SỈ NHỤC</p><p class="word__zh">羞辱</p><div class="word__st"><span class="tag s-relearn">重新學習 1/2</span><span class="due is-due">已到期</span></div></li>
+          <li class="word"><p class="word__vi" lang="vi">dứt khoát</p><p class="word__zh">果斷、堅決、毫不猶豫</p><div class="word__st"><span class="tag s-review">間隔 7 天</span><span class="due">2 天後</span></div></li>
+          <li class="word"><p class="word__vi" lang="vi">đảm đang</p><p class="word__zh">賢慧、能幹、善於持家</p><div class="word__st"><span class="tag s-new">新卡</span></div></li>
+          <li class="word"><p class="word__vi" lang="vi">GIẢN DỊ</p><p class="word__zh">樸素、簡樸、不浮誇</p><div class="word__st"><span class="tag s-review">間隔 7 天</span><span class="due">2 天後</span></div></li>
+          <li class="word"><p class="word__vi" lang="vi">VỢ SẮP CƯỚI</p><p class="word__zh">未婚妻</p><div class="word__st"><span class="tag s-learn">學習中 1/2</span><span class="due is-due">已到期</span></div></li>
+        </ul>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 5 練習總覽 -->
+  <section class="shot">
+    <h2 class="shot__name">5　練習總覽（有卡片要複習）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>今天</h2><button class="textbtn"><svg class="i" style="width:18px;height:18px"><use href="#i-set"/></svg>設定</button></div>
+        <section class="sheet">
+          <p class="sheet__h">今天有 20 張要複習</p>
+          <ul class="ledger">
+            <li>到期<b>12</b><em>張</em></li>
+            <li>新卡<b>5</b><em>張</em></li>
+            <li>學習中<b>3</b><em>張</em></li>
+            <li class="sum">合計<b>20</b><em>張</em></li>
+          </ul>
+          <button class="btn btn--c">開始複習</button>
+        </section>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 6 今天做完了 -->
+  <section class="shot">
+    <h2 class="shot__name">6　練習總覽（今天做完了）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="head"><h2>今天</h2><button class="textbtn"><svg class="i" style="width:18px;height:18px"><use href="#i-set"/></svg>設定</button></div>
+        <div class="fin">
+          <div class="stamp" aria-hidden="true">完</div>
+          <div><h3>今天做完了</h3><p>到期的卡片都複習過了，今天的新卡也用完了。明天再來。</p></div>
+        </div>
+        <section class="sheet sheet--flat">
+          <p class="sheet__k">今天複習了 20 張</p>
+          <ul class="ledger ledger--s">
+            <li>答對<b>16</b><em>張</em></li>
+            <li>答錯<b>4</b><em>張</em></li>
+            <li>畢業<b>3</b><em>張</em></li>
+            <li class="sum">明天到期<b>9</b><em>張</em></li>
+          </ul>
+        </section>
+        <section class="sheet sheet--flat" style="margin-top:14px">
+          <p class="sheet__k">所有字卡 316 張</p>
+          <div class="dist" role="img" aria-label="新卡 248、學習中 31、重新學習 7、間隔複習 30">
+            <i style="--c:var(--st-new);flex:248"></i><i class="p-stripe" style="--c:var(--st-learn);flex:31"></i><i class="p-dot" style="--c:var(--st-relearn);flex:7"></i><i style="--c:var(--st-review);flex:30"></i>
+          </div>
+          <ul class="legend">
+            <li style="--c:var(--st-new)">新卡<b>248</b></li>
+            <li style="--c:var(--st-learn)">學習中<b>31</b></li>
+            <li style="--c:var(--st-relearn)">重新學習<b>7</b></li>
+            <li style="--c:var(--st-review)">間隔複習<b>30</b></li>
+          </ul>
+        </section>
+      </div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-prac"/></svg>練習</a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 7 練習中 -->
+  <section class="shot">
+    <h2 class="shot__name">7　練習中（填空題）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__bat"></span></div>
+      <div class="page">
+        <div class="sess">
+          <button class="textbtn">結束</button>
+          <div class="ticks" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="c"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <span class="sess__n">3 / 20</span>
+        </div>
+        <div class="q">
+          <p class="q__k">填入空格裡的字</p>
+          <p class="q__s" lang="vi">Cô ấy từ chối một cách <span class="blank"></span>.</p>
+          <div class="say"><p class="say__k">中文提示</p><p class="say__v">果斷、堅決、毫不猶豫</p></div>
+        </div>
+        <div class="field" lang="vi">dứt kh<span class="caret"></span></div>
+        <button class="btn btn--c sess__send">送出</button>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

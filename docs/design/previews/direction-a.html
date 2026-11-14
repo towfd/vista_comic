@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>方向 A：粉髮墨鏡</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Huninn&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/*
+  方向 A：粉髮墨鏡
+  色票取自 App 圖示：粉色頭髮、墨鏡的黑、背景磚牆的暖色只出現在封面光暈裡。
+  字體：Lexend（越南文、數字）＋ 粉圓 Huninn（中文，只有一個字重，層級只靠字級與顏色）。
+*/
+:root{
+  --bg:#15111A;
+  --surface:#221B27;
+  --surface-2:#2E2534;
+  --line:#3A3040;
+  --text:#F7EEF3;
+  --text-2:#BFAFBD;
+  --text-3:#988998;
+  --pink:#FF8FB1;
+  --on-pink:#2A0E19;
+  --st-new:#8EC5FF;
+  --st-learn:#FFC266;
+  --st-relearn:#FF8A7A;
+  --st-review:#7FDDB0;
+  --font:"Lexend","Huninn","PingFang TC","Heiti TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:#0E0B11;color:var(--text);font-family:var(--font);font-synthesis-weight:none;line-height:1.6}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+
+/* ---------- 展示框架 ---------- */
+.intro{max-width:1260px;margin:0 auto;padding:36px 20px 8px}
+.intro h1{font-size:24px;font-weight:400}
+.intro p{color:var(--text-2);font-size:15px;margin-top:6px;max-width:40em;line-height:1.7}
+.stage{display:flex;flex-wrap:wrap;justify-content:center;gap:48px 36px;padding:28px 20px 96px;max-width:1300px;margin:0 auto}
+.shot{width:390px}
+.shot__name{font-size:14px;color:var(--text-2);margin-bottom:12px}
+.phone{position:relative;width:390px;height:844px;overflow:hidden;border-radius:46px;background:var(--bg);box-shadow:0 0 0 1px var(--line),0 30px 60px -30px #000}
+@media (max-width:480px){
+  .intro{padding:28px 20px 4px}
+  .stage{padding:20px 0 64px;gap:36px}
+  .shot{width:100%}
+  .shot__name{padding:0 20px}
+  .phone{width:100%;border-radius:0;box-shadow:none;border-top:1px solid var(--line)}
+}
+
+/* iOS 狀態列與 Home 條（示意） */
+.sb{position:absolute;inset:0 0 auto;height:47px;z-index:20;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 7px 36px;font:600 16px/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--text)}
+.sb__r{display:flex;gap:6px;align-items:center}
+.sb__bat{width:25px;height:12px;border:1.5px solid currentColor;border-radius:4px;padding:1.5px;opacity:.9}
+.sb__bat::before{content:"";display:block;width:70%;height:100%;background:currentColor;border-radius:1.5px}
+.home{position:absolute;bottom:8px;left:50%;width:134px;height:5px;border-radius:3px;background:var(--text);transform:translateX(-50%);z-index:30;opacity:.9}
+.page{position:absolute;inset:47px 0 0;overflow:hidden}
+
+/* ---------- 封面佔位：每部不同色調＋書名縮寫 ---------- */
+.cv{position:relative;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:linear-gradient(155deg,var(--c1),var(--c2));isolation:isolate}
+.cv::before{content:"";position:absolute;width:120%;aspect-ratio:1;left:30%;top:-45%;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.28),rgba(255,255,255,0) 65%);z-index:-1}
+.cv::after{content:attr(data-abbr);position:absolute;left:12px;bottom:8px;font:700 30px/1 "Lexend",sans-serif;color:rgba(255,255,255,.82);letter-spacing:-.02em}
+.c1{--c1:#7DB36F;--c2:#24483F}
+.c2{--c1:#8B7DC4;--c2:#2B2140}
+.c3{--c1:#E0AE4B;--c2:#6B3E1E}
+.c4{--c1:#D24B44;--c2:#3A0F12}
+.c5{--c1:#A8CDE0;--c2:#3E5F7A}
+.c6{--c1:#EA7536;--c2:#2A1610}
+.c7{--c1:#F4A9BB;--c2:#7A3E58}
+.c8{--c1:#4C7BC4;--c2:#10203F}
+
+/* ---------- 共用元件 ---------- */
+.head{display:flex;align-items:center;justify-content:space-between;padding:10px 20px 14px}
+.head h2{font-size:30px;font-weight:400;line-height:1.2}
+.head__meta{font-size:14px;color:var(--text-2)}
+.iconbtn{width:42px;height:42px;border-radius:50%;background:var(--surface);display:grid;place-items:center;color:var(--text-2)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--pink);border-radius:3px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:56px;border-radius:28px;background:var(--pink);color:var(--on-pink);font-size:17px}
+.btn__sub{opacity:.72;font-size:15px}
+[lang="vi"]{font-family:"Lexend",var(--font)}
+
+/* 底部分頁列：浮起的膠囊 */
+.tabs{position:absolute;left:16px;right:16px;bottom:28px;height:64px;border-radius:32px;background:rgba(46,37,52,.94);box-shadow:0 0 0 1px var(--line),0 12px 30px -8px rgba(0,0,0,.7);display:grid;grid-template-columns:repeat(3,1fr);padding:6px;z-index:15}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:26px;color:var(--text-2);font-size:12px}
+.tab.is-on{background:rgba(255,143,177,.16);color:var(--pink)}
+.tab__badge{position:absolute;top:4px;left:calc(50% + 6px);min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--pink);color:var(--on-pink);font:600 12px/20px "Lexend",sans-serif;text-align:center;box-shadow:0 0 0 2px var(--surface-2)}
+.tabs-fade{position:absolute;inset:auto 0 0;height:130px;background:linear-gradient(to top,var(--bg) 40%,rgba(21,17,26,0));z-index:14;pointer-events:none}
+
+/* ---------- 1 書庫 ---------- */
+.cont{margin:0 16px;padding:16px;border-radius:26px;background:radial-gradient(120% 90% at 0% 0%,rgba(125,179,111,.32),rgba(125,179,111,0) 60%),var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.cont__top{display:grid;grid-template-columns:92px 1fr;gap:16px;align-items:start}
+.cont .cv{border-radius:14px;box-shadow:0 10px 24px -10px rgba(0,0,0,.8)}
+.cont .cv::after{font-size:22px;left:9px;bottom:6px}
+.cont__label{font-size:14px;color:var(--pink)}
+.cont__title{font-size:17px;font-weight:600;line-height:1.35;margin-top:4px}
+.cont__ch{font-size:14px;color:var(--text-2);margin-top:6px}
+.cont__row{display:flex;align-items:center;gap:14px;margin-top:16px}
+.cont__prog{flex:1}
+.cont__nums{display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-top:6px}
+.play{width:52px;height:52px;border-radius:50%;background:var(--pink);color:var(--on-pink);display:grid;place-items:center;flex:none}
+.play svg{fill:currentColor;stroke:none;width:20px;height:20px;margin-left:3px}
+.sec{display:flex;align-items:baseline;gap:8px;padding:26px 20px 12px}
+.sec h3{font-size:19px;font-weight:400}
+.sec span{font-size:13px;color:var(--text-3)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px 14px;padding:0 16px}
+.book__title{font-size:14px;font-weight:500;line-height:1.4;margin-top:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.book__meta{font-size:12.5px;color:var(--text-2);margin-top:3px}
+.book .bar{position:absolute;left:10px;right:10px;bottom:10px;height:4px;background:rgba(0,0,0,.45)}
+.book .cv.has-bar::after{bottom:20px}
+
+/* ---------- 2 章節列表 ---------- */
+.page--full{inset:0}
+.hero{position:relative;height:420px;padding-top:47px;text-align:center;overflow:hidden}
+.hero__bg{position:absolute;inset:-60px;background:linear-gradient(155deg,#7DB36F,#24483F);filter:blur(40px);opacity:.75}
+.hero__veil{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(21,17,26,.2),rgba(21,17,26,.55) 55%,var(--bg))}
+.hero__in{position:relative;padding:4px 24px 0}
+.hero__back{position:absolute;left:16px;top:4px;width:40px;height:40px;border-radius:50%;background:rgba(21,17,26,.55);display:grid;place-items:center}
+.hero .cv{width:124px;margin:22px auto 0;box-shadow:0 18px 36px -14px rgba(0,0,0,.85)}
+.hero .cv::after{font-size:26px}
+.hero__title{font-size:20px;font-weight:600;line-height:1.35;margin-top:16px}
+.hero__meta{font-size:13px;color:var(--text-2);margin-top:4px}
+.hero .btn{margin-top:18px}
+.chs{padding:4px 12px 0;list-style:none}
+.ch{display:flex;align-items:center;gap:12px;height:54px;padding:0 14px;border-radius:16px;font-size:16px}
+.ch__p{margin-left:auto;font-size:13px;color:var(--text-3)}
+.ch.is-read{color:var(--text-3)}
+.ch.is-now{background:rgba(255,143,177,.14);color:var(--pink)}
+.ch.is-now .ch__p{color:var(--pink)}
+.ch__now{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--pink);color:var(--on-pink)}
+
+/* ---------- 3 閱讀器 ---------- */
+.rbar{position:absolute;inset:0 0 auto;padding-top:47px;background:rgba(21,17,26,.94);z-index:10;box-shadow:0 1px 0 var(--line)}
+.rbar__in{display:flex;align-items:center;gap:8px;height:56px;padding:0 12px 0 8px}
+.rbar__back{width:36px;height:40px;display:grid;place-items:center;flex:none}
+.rbar__t{flex:1;min-width:0}
+.rbar__name{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbar__ch{font-size:12px;color:var(--text-2)}
+.tog{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);flex:none}
+.tog__sw{width:40px;height:24px;border-radius:12px;background:var(--pink);position:relative}
+.tog__sw::after{content:"";position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff}
+.collect{height:34px;padding:0 13px;border-radius:17px;box-shadow:inset 0 0 0 1.5px var(--pink);color:var(--pink);font-size:14px;flex:none}
+.mpage{position:absolute;inset:0;background:#F4F2F3;padding-top:103px}
+.bub{position:absolute;background:#fff;border:2.5px solid #161616;border-radius:50%;display:grid;place-items:center}
+.hl{font:700 15px/1.15 "Lexend",sans-serif;color:#161616;padding:3px 6px;border-radius:4px;background:rgba(255,143,177,.22);box-shadow:0 0 0 1.5px var(--pink);text-align:center}
+.panel{position:absolute;left:0;right:0;top:290px;height:470px;background:linear-gradient(170deg,#5D6E86 0%,#3F4C61 45%,#2C3443 100%);border-top:3px solid #161616;border-bottom:3px solid #161616;overflow:hidden}
+.panel::before{content:"";position:absolute;left:40px;top:110px;width:250px;height:420px;border-radius:120px 120px 0 0;background:#E9E6E2}
+.panel::after{content:"";position:absolute;left:10px;top:40px;width:200px;height:90px;border-radius:50%;background:#7A6A58}
+
+/* ---------- 4 字卡庫 ---------- */
+.search{display:flex;align-items:center;gap:10px;margin:0 16px;height:48px;padding:0 16px;border-radius:24px;background:var(--surface);color:var(--text-3);font-size:15px}
+.grp{display:flex;align-items:center;gap:6px;padding:22px 20px 10px;font-size:16px}
+.grp svg{width:18px;height:18px;color:var(--text-3)}
+.grp span{color:var(--text-3);font-family:"Lexend",sans-serif;font-size:14px}
+.cards{list-style:none;display:flex;flex-direction:column;gap:8px;padding:0 16px}
+.card{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:14px 16px;border-radius:20px;background:var(--surface)}
+.card__vi{font-size:19px;font-weight:600;line-height:1.3}
+.card__zh{font-size:14px;color:var(--text-2);line-height:1.6;grid-column:1}
+.card__st{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;font-size:12px;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent)}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.due{font-size:12px;color:var(--text-3)}
+.due.is-due{color:var(--st-relearn)}
+.s-new{--c:var(--st-new)}.s-learn{--c:var(--st-learn)}.s-relearn{--c:var(--st-relearn)}.s-review{--c:var(--st-review)}
+
+/* ---------- 5 練習總覽 ---------- */
+.today{margin:4px 16px 0;padding:22px 20px 20px;border-radius:30px;background:linear-gradient(165deg,rgba(255,143,177,.24),rgba(255,143,177,.04) 60%),var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.today__h{font-size:24px;line-height:1.35}
+.today__h b{font-weight:600;font-family:"Lexend",sans-serif;color:var(--pink)}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);margin:20px 0 22px;padding:14px 0;border-radius:20px;background:rgba(21,17,26,.55)}
+.trio>div{text-align:center;padding:0 6px}
+.trio>div+div{box-shadow:-1px 0 0 var(--line)}
+.trio dt{font-size:13px;color:var(--text-2);display:flex;align-items:center;justify-content:center;gap:6px}
+.trio dt::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c)}
+.trio dd{font:600 24px/1.3 "Lexend",sans-serif;margin-top:2px}
+.peek{margin:18px 16px 0;padding:16px 18px;border-radius:22px;background:var(--surface);font-size:14px;color:var(--text-2);line-height:1.7}
+.peek strong{display:block;color:var(--text);font-weight:400;font-size:16px;margin-bottom:6px}
+.peek ul{list-style:none;display:flex;flex-wrap:wrap;gap:8px}
+.peek li{padding:4px 12px;border-radius:14px;background:var(--surface-2);color:var(--text);font-size:14px}
+
+/* ---------- 6 今天做完了 ---------- */
+.done{text-align:center;padding:0 32px 4px}
+.done__mark{width:64px;height:64px;margin:0 auto;border-radius:50%;background:rgba(255,143,177,.16);color:var(--pink);display:grid;place-items:center}
+.done__mark svg{width:34px;height:34px;stroke-width:2.4}
+.done h3{font-size:26px;font-weight:400;margin-top:14px}
+.done p{font-size:14px;color:var(--text-2);line-height:1.7;margin-top:6px}
+.box{margin:16px 16px 0;padding:16px 18px;border-radius:22px;background:var(--surface)}
+.box__h{display:flex;justify-content:space-between;align-items:baseline;font-size:16px}
+.box__h span{font-size:13px;color:var(--text-3)}
+.res{display:flex;gap:8px;margin-top:12px}
+.res li{list-style:none;flex:1;padding:8px 0;border-radius:14px;background:var(--surface-2);text-align:center;font-size:13px;color:var(--text-2)}
+.res b{display:block;font:600 19px/1.3 "Lexend",sans-serif;color:var(--c)}
+.tmr{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;box-shadow:0 -1px 0 var(--line);font-size:15px;color:var(--text-2)}
+.tmr__n{font:600 20px/1 "Lexend",sans-serif;color:var(--text)}
+.dist{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin-top:14px}
+.dist i{background:var(--c)}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:14px;list-style:none;font-size:13px;color:var(--text-2)}
+.legend li{display:flex;align-items:center;gap:8px}
+.legend li::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--c)}
+.legend b{margin-left:auto;font:500 14px "Lexend",sans-serif;color:var(--text)}
+
+/* ---------- 7 練習中 ---------- */
+.sess{display:flex;align-items:center;gap:12px;padding:8px 20px 0}
+.sess .bar{flex:1;height:8px;border-radius:4px}
+.sess__n{font:500 14px "Lexend",sans-serif;color:var(--text-2)}
+.q{padding:46px 24px 0}
+.q__k{font-size:15px;color:var(--text-2)}
+.q__s{font-size:27px;line-height:1.55;font-weight:500;margin-top:14px}
+.blank{display:inline-block;width:132px;height:1.05em;vertical-align:-0.12em;border-bottom:3px solid var(--pink);background:rgba(255,143,177,.12);border-radius:8px 8px 2px 2px}
+.hint{margin-top:22px;padding:14px 16px;border-radius:18px;background:var(--surface)}
+.hint__k{font-size:12px;color:var(--text-3)}
+.hint__v{font-size:17px;margin-top:2px;line-height:1.6}
+.field{margin:28px 24px 0;height:58px;border-radius:20px;background:var(--surface);box-shadow:inset 0 0 0 2px var(--pink);display:flex;align-items:center;padding:0 18px;font:500 19px "Lexend",sans-serif}
+.caret{width:2px;height:24px;background:var(--pink);margin-left:1px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.caret{animation:none}}
+.sess__send{position:absolute;width:auto;left:24px;right:24px;bottom:44px}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-lib" viewBox="0 0 24 24"><rect x="3.5" y="4" width="4.5" height="16" rx="1.2"/><rect x="10" y="4" width="4.5" height="16" rx="1.2"/><path d="M16.7 5.3l3.3-.9 3 14.9-3.3.9z"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><rect x="7.5" y="3.5" width="13" height="15" rx="2.5"/><path d="M4 7.5v10.5a2.5 2.5 0 0 0 2.5 2.5H15"/></symbol>
+  <symbol id="i-prac" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+</svg>
+
+<header class="intro">
+  <h1>方向 A：粉髮墨鏡</h1>
+  <p>從 App 圖示的粉色頭髮和墨鏡取色：墨黑偏紫的底、粉色當唯一主色，配上圓潤的粉圓體與大圓角，像在滑一個輕鬆的漫畫 App。</p>
+</header>
+
+<main class="stage">
+
+  <!-- 1 書庫 -->
+  <section class="shot">
+    <h2 class="shot__name">1　書庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+      <div class="page">
+        <div class="head"><h2>書庫</h2><button class="iconbtn" aria-label="重新整理"><svg class="i"><use href="#i-refresh"/></svg></button></div>
+        <article class="cont">
+          <div class="cont__top">
+            <div class="cv c1" data-abbr="LN"></div>
+            <div>
+              <p class="cont__label">繼續看</p>
+              <p class="cont__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+              <p class="cont__ch">第 54 話</p>
+            </div>
+          </div>
+          <div class="cont__row">
+            <div class="cont__prog">
+              <div class="bar"><i style="width:36%"></i></div>
+              <div class="cont__nums"><span>看到第 54 / 149 話</span><span>36%</span></div>
+            </div>
+            <button class="play" aria-label="繼續閱讀"><svg class="i"><use href="#i-play"/></svg></button>
+          </div>
+        </article>
+        <div class="sec"><h3>全部漫畫</h3><span>8 部</span></div>
+        <div class="grid">
+          <div class="book"><div class="cv c1 has-bar" data-abbr="LN"><div class="bar"><i style="width:36%"></i></div></div><p class="book__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="book__meta">看到第 54 / 149 話</p></div>
+          <div class="book"><div class="cv c2" data-abbr="CĐ"></div><p class="book__title" lang="vi">Cô Đi Mà Kết Hôn Với Chồng Tôi Đi</p><p class="book__meta">76 話</p></div>
+          <div class="book"><div class="cv c3" data-abbr="HT"></div><p class="book__title" lang="vi">Hoàng Tử Bán Thuốc</p><p class="book__meta">129 話</p></div>
+          <div class="book"><div class="cv c4" data-abbr="SP"></div><p class="book__title" lang="vi">Sát Thủ Peter</p><p class="book__meta">201 話</p></div>
+        </div>
+      </div>
+      <div class="tabs-fade"></div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab is-on"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 2 章節列表 -->
+  <section class="shot">
+    <h2 class="shot__name">2　章節列表</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+      <div class="page page--full">
+        <div class="hero">
+          <div class="hero__bg"></div><div class="hero__veil"></div>
+          <div class="hero__in">
+            <button class="hero__back" aria-label="回書庫"><svg class="i"><use href="#i-back"/></svg></button>
+            <div class="cv c1" data-abbr="LN"></div>
+            <p class="hero__title" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p>
+            <p class="hero__meta">149 話</p>
+            <button class="btn">繼續閱讀<span class="btn__sub">第 54 話</span></button>
+          </div>
+        </div>
+        <ol class="chs">
+          <li class="ch is-read">第 50 話<span class="ch__p">158 頁</span></li>
+          <li class="ch is-read">第 51 話<span class="ch__p">171 頁</span></li>
+          <li class="ch is-read">第 52 話<span class="ch__p">144 頁</span></li>
+          <li class="ch is-read">第 53 話<span class="ch__p">166 頁</span></li>
+          <li class="ch is-now">第 54 話<span class="ch__now">正在看</span><span class="ch__p">180 頁</span></li>
+          <li class="ch">第 55 話<span class="ch__p">152 頁</span></li>
+          <li class="ch">第 56 話<span class="ch__p">149 頁</span></li>
+          <li class="ch">第 57 話<span class="ch__p">163 頁</span></li>
+        </ol>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 3 閱讀器頂端列 -->
+  <section class="shot">
+    <h2 class="shot__name">3　閱讀器（頂端列出現時）</h2>
+    <div class="phone">
+      <div class="mpage">
+        <div class="bub" style="left:150px;top:118px;width:200px;height:132px"><span class="hl">THƯA NGÀI</span></div>
+        <div class="panel"></div>
+        <div class="bub" style="left:20px;top:640px;width:190px;height:150px"><span class="hl" style="font-size:26px">AH...<br>AHHH.</span></div>
+      </div>
+      <div class="rbar">
+        <div class="sb" style="position:absolute"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+        <div class="rbar__in">
+          <button class="rbar__back" aria-label="回章節列表"><svg class="i"><use href="#i-back"/></svg></button>
+          <div class="rbar__t"><p class="rbar__name" lang="vi">Làm Nông Dân Trong Tòa Tháp Thử Thách</p><p class="rbar__ch">第 54 話</p></div>
+          <span class="tog">標示<span class="tog__sw" role="switch" aria-checked="true"></span></span>
+          <button class="collect">＋收卡</button>
+        </div>
+      </div>
+      <div class="home" style="background:#161616"></div>
+    </div>
+  </section>
+
+  <!-- 4 字卡庫 -->
+  <section class="shot">
+    <h2 class="shot__name">4　字卡庫</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+      <div class="page">
+        <div class="head"><h2>字卡庫</h2><span class="head__meta">共 316 張</span></div>
+        <div class="search"><svg class="i"><use href="#i-search"/></svg>搜尋原文或譯文</div>
+        <div class="grp"><svg class="i"><use href="#i-down"/></svg>單字<span>171</span></div>
+        <ul class="cards">
+          <li class="card"><p class="card__vi" lang="vi">THỨ HAI KHÔNG AI THỨ NHẤT</p><p class="card__zh">天下無敵</p><div class="card__st"><span class="pill s-new">新卡</span></div></li>
+          <li class="card"><p class="card__vi" lang="vi">chấm dứt hết</p><p class="card__zh">徹底結束、一刀兩斷</p><div class="card__st"><span class="pill s-learn">學習中 1/2</span><span class="due">3 小時後</span></div></li>
+          <li class="card"><p class="card__vi" lang="vi">SỈ NHỤC</p><p class="card__zh">羞辱</p><div class="card__st"><span class="pill s-relearn">重新學習 1/2</span><span class="due is-due">已到期</span></div></li>
+          <li class="card"><p class="card__vi" lang="vi">dứt khoát</p><p class="card__zh">果斷、堅決、毫不猶豫</p><div class="card__st"><span class="pill s-review">間隔 7 天</span><span class="due">2 天後</span></div></li>
+          <li class="card"><p class="card__vi" lang="vi">đảm đang</p><p class="card__zh">賢慧、能幹、善於持家</p><div class="card__st"><span class="pill s-new">新卡</span></div></li>
+          <li class="card"><p class="card__vi" lang="vi">GIẢN DỊ</p><p class="card__zh">樸素、簡樸、不浮誇</p><div class="card__st"><span class="pill s-review">間隔 7 天</span><span class="due">2 天後</span></div></li>
+          <li class="card"><p class="card__vi" lang="vi">VỢ SẮP CƯỚI</p><p class="card__zh">未婚妻</p><div class="card__st"><span class="pill s-learn">學習中 1/2</span><span class="due is-due">已到期</span></div></li>
+        </ul>
+      </div>
+      <div class="tabs-fade"></div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 5 練習總覽 -->
+  <section class="shot">
+    <h2 class="shot__name">5　練習總覽（有卡片要複習）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+      <div class="page">
+        <div class="head"><h2>今天</h2><button class="iconbtn" aria-label="設定"><svg class="i"><use href="#i-set"/></svg></button></div>
+        <section class="today">
+          <p class="today__h">今天有 <b>20</b> 張要複習</p>
+          <dl class="trio">
+            <div style="--c:var(--st-relearn)"><dt>到期</dt><dd>12</dd></div>
+            <div style="--c:var(--st-new)"><dt>新卡</dt><dd>5</dd></div>
+            <div style="--c:var(--st-learn)"><dt>學習中</dt><dd>3</dd></div>
+          </dl>
+          <button class="btn">開始複習</button>
+        </section>
+      </div>
+      <div class="tabs-fade"></div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-prac"/></svg>練習<span class="tab__badge">20</span></a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 6 今天做完了 -->
+  <section class="shot">
+    <h2 class="shot__name">6　練習總覽（今天做完了）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+      <div class="page">
+        <div class="head"><h2>今天</h2><button class="iconbtn" aria-label="設定"><svg class="i"><use href="#i-set"/></svg></button></div>
+        <div class="done">
+          <div class="done__mark"><svg class="i"><use href="#i-check"/></svg></div>
+          <h3>今天做完了</h3>
+          <p>到期的卡片都複習過了，今天的新卡也用完了。明天再來。</p>
+        </div>
+        <section class="box">
+          <div class="box__h">今天複習了 20 張</div>
+          <ul class="res">
+            <li style="--c:var(--st-review)"><b>16</b>答對</li>
+            <li style="--c:var(--st-relearn)"><b>4</b>答錯</li>
+            <li style="--c:var(--pink)"><b>3</b>畢業</li>
+          </ul>
+          <div class="tmr">
+            <svg class="i" style="color:var(--text-3)"><use href="#i-cal"/></svg>
+            <span>明天到期</span>
+            <span style="margin-left:auto"><span class="tmr__n">9</span> 張</span>
+          </div>
+        </section>
+        <section class="box">
+          <div class="box__h">所有字卡<span>316 張</span></div>
+          <div class="dist" role="img" aria-label="新卡 248、學習中 31、重新學習 7、間隔複習 30">
+            <i style="--c:var(--st-new);flex:248"></i><i style="--c:var(--st-learn);flex:31"></i><i style="--c:var(--st-relearn);flex:7"></i><i style="--c:var(--st-review);flex:30"></i>
+          </div>
+          <ul class="legend">
+            <li style="--c:var(--st-new)">新卡<b>248</b></li>
+            <li style="--c:var(--st-learn)">學習中<b>31</b></li>
+            <li style="--c:var(--st-relearn)">重新學習<b>7</b></li>
+            <li style="--c:var(--st-review)">間隔複習<b>30</b></li>
+          </ul>
+        </section>
+      </div>
+      <div class="tabs-fade"></div>
+      <nav class="tabs" aria-label="主要分頁">
+        <a class="tab"><svg class="i"><use href="#i-lib"/></svg>書庫</a>
+        <a class="tab"><svg class="i"><use href="#i-cards"/></svg>字卡</a>
+        <a class="tab is-on"><svg class="i"><use href="#i-prac"/></svg>練習</a>
+      </nav>
+      <div class="home"></div>
+    </div>
+  </section>
+
+  <!-- 7 練習中 -->
+  <section class="shot">
+    <h2 class="shot__name">7　練習中（填空題）</h2>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="sb__r"><span class="sb__bat"></span></span></div>
+      <div class="page">
+        <div class="sess">
+          <button class="iconbtn" aria-label="結束練習"><svg class="i"><use href="#i-x"/></svg></button>
+          <div class="bar"><i style="width:15%"></i></div>
+          <span class="sess__n">3 / 20</span>
+        </div>
+        <div class="q">
+          <p class="q__k">填入空格裡的字</p>
+          <p class="q__s" lang="vi">Cô ấy từ chối một cách <span class="blank"></span>.</p>
+          <div class="hint"><p class="hint__k">中文提示</p><p class="hint__v">果斷、堅決、毫不猶豫</p></div>
+        </div>
+        <div class="field" lang="vi">dứt kh<span class="caret"></span></div>
+        <button class="btn sess__send">送出</button>
+      </div>
+      <div class="home"></div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
