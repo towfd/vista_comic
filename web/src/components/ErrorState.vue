@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ApiErrorKind } from '../api/client'
 import AppIcon, { type IconName } from './AppIcon.vue'
+import { primaryMd as primaryButton, secondaryMd as secondaryButton } from './buttons'
 
 const props = defineProps<{
   kind: ApiErrorKind
@@ -41,12 +42,6 @@ const messages: Record<ApiErrorKind, { title: string; hint: string; icon: IconNa
 }
 
 const title = () => (props.kind === 'notFound' && props.notFoundTitle) || messages[props.kind].title
-
-// Medium buttons (44px): the primary one sinks onto its edge when pressed.
-const primaryButton =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand px-5 text-body font-extrabold text-white shadow-edge-sm transition-[translate,box-shadow,background-color] duration-120 ease-standard hover:bg-brand-hover active:translate-y-0.75 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0'
-const secondaryButton =
-  'inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-paper px-5 text-body font-extrabold text-ink inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush'
 </script>
 
 <template>
