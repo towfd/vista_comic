@@ -1,15 +1,17 @@
 # 對比驗算報告
 
-- 日期：2026-11-14
+- 日期：亮色 2026-11-14；暗色 2026-11-16（第 6 節）
 - 依據：專案根目錄 `DESIGN.md` 第 3 節、`docs/design/design-tokens.json`
 - 工具：`python3 ~/.claude/skills/website-studio/scripts/contrast.py`（不加 `--large` 為一般文字門檻 4.5；加 `--large` 為大字／圖示／UI 元件門檻 3.0）
 - 標準：一般文字 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1
 
 ## 結論
 
-- **使用中的組合全部通過。**
-- 驗算時沒過或太勉強的 9 項都已處理（改色、改用法，或列為禁止組合），其中 3 項是 page-design-spec 原本的寫法，已在 DESIGN.md 15.6 換成通過的 token。見第 5 節。
-- 停用狀態在 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（blush-strong 上 ink-faint 4.73）。
+- **亮色、暗色兩套，使用中的組合全部通過。**
+- 亮色：驗算時沒過或太勉強的 9 項都已處理（改色、改用法，或列為禁止組合），其中 3 項是 page-design-spec 原本的寫法，已在 DESIGN.md 15.6 換成通過的 token。見第 5 節。
+- 暗色（B 星空藍）：使用中的 89 組全部通過（文字 50、圖形與控制項 25、提示框疊在漫畫上的 14 種底色），B 的預覽色值不用調。沒過或太勉強的 8 項：5 項是現在寫死的白字、白鈕、黃底上的 `text-ink` 不換 token 會壞，2 項是沒有元件用到的組合，1 項是閱讀器提示框只靠框不夠、改靠框和底兩層。全部已處理，見 6.5。
+- 兩套共用同一組 class，所以亮色禁止的組合，暗色就算過了也照樣禁止（6.5）。
+- 停用狀態在 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（blush-strong 上 ink-faint：亮 4.73、暗 4.92）。
 
 ## 1. 文字與背景
 
@@ -148,7 +150,289 @@
 | 8 | 鮮粉不定進度條滑塊／淡粉 2 軌道（page-design-spec 原寫法） | 2.54 | 滑塊改 brand（4.54） |
 | 9 | 學習中圖形色 `#C98400` 用在字卡分布（page-design-spec 原寫法） | 淡粉 2.81 | 換成 `#B87A00` |
 
-## 原始輸出
+## 6. 暗色（B 星空藍）
+
+- 日期：2026-11-16
+- 色值：`DESIGN.md` 第 3 節「暗色」欄。paper `#1E1F45`、blush `#2C2560`、blush-strong `#3D3080`、mist `#262852`、line `#36386A`、line-strong `#8A8CC4`、ink `#F6F3FF`、ink-soft `#CCC8F0`、ink-faint `#AEA9DC`、brand `#FF80B5`、brand-hover `#FF6BA8`、brand-pressed `#F2559A`、on-fill `#24102A`。sun `#FFD23F`、on-sun `#2B1F27`、brand-vivid `#FF4F8B` 兩套相同。
+- 下表的 paper、blush 等名稱都指暗色的值。原始輸出在第 6.6 節。
+
+### 6.1 文字與背景（門檻 4.5）
+
+| 前景 | 背景 | 用在哪 | 對比 | 結果 |
+|---|---|---|---|---|
+| ink `#F6F3FF` | paper `#1E1F45` | 主要文字 | 14.35 | 通過 |
+| ink | blush `#2C2560` | 淡粉頂區、練習卡裡的字 | 12.45 | 通過 |
+| ink | blush-strong `#3D3080` | | 9.92 | 通過 |
+| ink | mist `#262852` | | 12.72 | 通過 |
+| ink-soft `#CCC8F0` | paper | 次要說明、中文翻譯、圖示鈕 | 9.79 | 通過 |
+| ink-soft | blush | 淡粉卡裡的說明、唯讀輸入框 | 8.49 | 通過 |
+| ink-soft | blush-strong | 次要按鈕按下 | 6.77 | 通過 |
+| ink-soft | mist | 漫畫頁載入失敗 | 8.68 | 通過 |
+| ink-faint `#AEA9DC` | paper | 到期時間、未選分頁、placeholder | 7.11 | 通過 |
+| ink-faint | blush | 搜尋框提示字 | 6.17 | 通過 |
+| ink-faint | blush-strong | 主要按鈕停用、停用開關的標籤 | 4.92 | 通過 |
+| ink-faint | mist | 看過的數字格、柔和按鈕停用、停用輸入框 | 6.31 | 通過 |
+| brand `#FF80B5` | paper | 粉色文字、選中分頁文字 | 6.74 | 通過 |
+| brand | blush | 數量標籤、柔和按鈕 | 5.85 | 通過 |
+| brand | blush-strong | 「畢業」標籤、柔和按鈕按下 | 4.66 | 通過 |
+| brand-hover `#FF6BA8` | paper | 粉色字 hover | 5.92 | 通過 |
+| brand-hover | blush | | 5.14 | 通過 |
+| on-fill `#24102A` | brand | 主要按鈕、正在看的數字格、＋收卡、分段選擇選中 | 7.62 | 通過 |
+| on-fill | brand-hover | 主要按鈕 hover | 6.70 | 通過 |
+| on-fill | brand-pressed `#F2559A` | 主要按鈕按下 | 5.53 | 通過 |
+| on-fill 90%（`#3A1B38`） | brand | 兩段文字按鈕的第二段 | 6.46 | 通過 |
+| on-fill 90%（`#3A1B3A`） | brand-hover | 同上 hover | 5.67 | 通過 |
+| on-fill 90%（`#391735`） | brand-pressed | 同上按下 | 4.85 | 通過 |
+| on-sun `#2B1F27` | sun `#FFD23F` | 徽章、「繼續看」「本話完」、完成與空狀態貼紙 | 10.95 | 通過 |
+| on-fill | danger `#FF948A` | 危險按鈕 | 8.33 | 通過 |
+| on-fill | danger-hover `#F47B70` | 危險按鈕 hover／按下 | 6.69 | 通過 |
+| on-fill | warning `#FFC94D` | 「確定重設？」確認按鈕 | 11.60 | 通過 |
+| danger | paper | 錯誤文字、「已到期」、次要按鈕當危險動作 | 7.37 | 通過 |
+| danger | blush | 次要危險按鈕 hover | 6.40 | 通過 |
+| danger | danger-tint `#4B2E4D` | 錯誤訊息框 | 5.48 | 通過 |
+| success `#6EDCA2` | paper | 「已儲存」「已加入」 | 9.29 | 通過 |
+| success | blush | | 8.06 | 通過 |
+| success | success-tint `#244050` | 成功訊息框、「已加入」膠囊 | 6.46 | 通過 |
+| warning | paper | 「已經收過了」 | 10.26 | 通過 |
+| warning | blush | | 8.90 | 通過 |
+| warning | warning-tint `#483C41` | 提醒訊息框 | 6.86 | 通過 |
+| ink-soft | warning-tint | 提醒框裡的「到字卡庫修改」連結 | 6.55 | 通過 |
+| ink-faint | warning-tint | 提醒框裡的「單字／句子」 | 4.76 | 通過 |
+| ink-soft | line `#36386A` | （備用） | 6.78 | 通過 |
+| ink-faint | line | （不使用） | 4.92 | 通過，不採用 |
+| ink | warning-tint | （備用） | 9.60 | 通過 |
+| ink-faint | danger-tint／success-tint | （備用） | 5.29／4.94 | 通過 |
+
+亮色補驗（提醒框裡的次要字，原本沒列）：ink-soft `#6A5560`／warning-tint `#FFF3D6` 6.18、ink-faint `#765F6B`／warning-tint 5.26，通過。
+
+### 6.2 字卡狀態文字色（paper、自己的淡底、blush）
+
+| 狀態 | 文字色 | paper | 淡底 | blush |
+|---|---|---|---|---|
+| 新卡 | `#9DC0FF` | 8.54 | `#2D396A` 5.99 | 7.41 |
+| 學習中 | `#FFC94D` | 10.26 | `#483C41` 6.86 | 8.90 |
+| 重新學習（含「已到期」「答錯」） | `#FF948A` | 7.37 | `#4B2E4D` 5.48 | 6.40 |
+| 間隔複習（含「答對」） | `#6EDCA2` | 9.29 | `#244050` 6.46 | 8.06 |
+
+全部 ≥ 4.5，通過。淡底是圖形色以 20% 疊在 `#1E1F45` 上的實色（新卡 `#6AA2FF` → `#2D396A`，四個都驗算過混色結果和預覽一致）。
+
+### 6.3 圖形、圖示與 UI 元件（門檻 3.0）
+
+| 前景 | 背景 | 用在哪 | 對比 | 結果 |
+|---|---|---|---|---|
+| brand-vivid `#FF4F8B` | paper | 進度條填色、桌機 hover 外框、載入圓點、被挖空那個字的底線 | 5.04 | 通過 |
+| brand | paper | focus 外框、開關開、輸入框聚焦框 | 6.74 | 通過 |
+| brand | blush | focus 外框在淡粉上、填空格外框 | 5.85 | 通過 |
+| brand | blush-strong | 選中分頁的圖示、解析中滑塊、錯誤貼紙圖示 | 4.66 | 通過 |
+| brand | mist | focus 外框在看過的格子旁 | 5.97 | 通過 |
+| ink-soft | paper | 圓形圖示鈕（含主題切換鈕）的圖示 | 9.79 | 通過 |
+| ink-faint | paper | 未選分頁圖示 | 7.11 | 通過 |
+| ink-faint | blush | 搜尋框放大鏡 | 6.17 | 通過 |
+| ink-faint | blush-strong | | 4.92 | 通過 |
+| ink-faint | mist | 封面載入失敗的書本圖示 | 6.31 | 通過 |
+| line-strong `#8A8CC4` | paper | 輸入框預設外框、開關關的軌道 | 4.96 | 通過 |
+| line-strong | blush | 輸入框與開關在淡粉卡上 | 4.30 | 通過 |
+| line-strong | line | （不使用） | 3.43 | 通過，不出現 |
+| on-fill（圓鈕） | line-strong | 開關關時的圓鈕 | 5.61 | 通過 |
+| on-fill（圓鈕） | brand | 開關開時的圓鈕 | 7.62 | 通過 |
+| on-fill（圓鈕） | brand-vivid | 停用但開著的開關圓鈕 | 5.70 | 通過 |
+| danger | paper | 無效輸入框外框 | 7.37 | 通過 |
+| sun | paper | 徽章、正在看小黃點 | 10.88 | 通過 |
+
+#### 字卡狀態圖形色（比例條、圖例圓點、作答欄對錯外框）
+
+| 狀態 | 圖形色 | paper | blush |
+|---|---|---|---|
+| 新卡 | `#6AA2FF` | 6.15 | 5.34 |
+| 學習中 | `#F0B030` | 8.20 | 7.11 |
+| 重新學習（答錯外框） | `#FF6B6B` | 5.66 | 4.91 |
+| 間隔複習（答對外框） | `#3CC47E` | 7.02 | 6.09 |
+
+### 6.4 閱讀器：暗色的提示框疊在漫畫上
+
+暗色時泡泡框三層框、浮動控制項的白＋墨外圈、`brand-wash` 都和亮色一樣，第 4 節的驗算直接適用。
+
+會變的是提示框：暗色是靛藍底 `#1E1F45` 配淺色框 `#F6F3FF`（`border-ink` 的暗色值）。用第 4 節同一組漫畫代表色測，框和底兩層至少一層 ≥ 3：
+
+| 底色 | 淺色框 `#F6F3FF` | 靛藍底 `#1E1F45` | 最好的一層 |
+|---|---|---|---|
+| 白 `#FFFFFF` | 1.09 | 15.71 | 底 15.71 |
+| 黑 `#000000` | 19.18 | 1.34 | 框 19.18 |
+| 墨 `#2B1F27` | 14.44 | 1.01 | 框 14.44 |
+| 中灰 `#808080` | 3.61 | 3.98 | 底 3.98 |
+| 膚色 `#F6D7BE` | 1.25 | 11.50 | 底 11.50 |
+| 天空藍 `#BFE6FF` | 1.20 | 11.95 | 底 11.95 |
+| 黃 `#FFE07A` | 1.18 | 12.11 | 底 12.11 |
+| 粉紅 `#FF8DB5` | 1.97 | 7.28 | 底 7.28 |
+| 紅 `#E2382B` | 3.97 | 3.62 | 框 3.97 |
+| 綠 `#47C26E` | 2.08 | 6.89 | 底 6.89 |
+| 藍綠 `#1BA59A` | 2.78 | 5.16 | 底 5.16 |
+| 紫 `#9B7BEA` | 2.99 | 4.80 | 底 4.80 |
+| 深紫 `#5B3A8E` | 7.86 | 1.83 | 框 7.86 |
+| 深藍 `#13306E` | 11.45 | 1.25 | 框 11.45 |
+
+全部底色都至少有一層 ≥ 3:1，通過。提示框裡的字是 ink／ink-soft／ink-faint 在 paper 上（14.35／9.79／7.11）。
+
+### 6.5 沒過的組合與處理
+
+| # | 組合 | 暗色對比 | 處理 |
+|---|---|---|---|
+| 1 | 白字在 brand／brand-hover／brand-pressed 上（現在寫死的 `text-white`） | 2.33／2.65／3.21 | 換 `text-on-fill`（7.62／6.70／5.53） |
+| 2 | 白字在 danger 上 | 2.13 | 換 `text-on-fill`（8.33） |
+| 3 | 白字在 warning 上 | 1.53 | 換 `text-on-fill`（11.60） |
+| 4 | `text-ink` 在 sun 上（ink 在暗色是 `#F6F3FF`） | 1.32 | 換 `text-on-sun`（10.95） |
+| 5 | 白圓鈕在 line-strong 上（現在寫死的 `bg-white`） | 3.17（剛過 3，太勉強；而且和開著時的圓鈕不同色） | 換 `bg-on-fill`（5.61） |
+| 6 | brand-hover 當字放在 blush-strong 上 | 4.10 | 禁止；目前沒有元件這樣用，粉色字的 hover 只出現在 paper、blush 上 |
+| 7 | 白字在 ink 上（亮色第 1 節的提示訊息組合） | 1.09 | 禁止；目前沒有元件這樣用 |
+| 8 | 提示框只靠淺色框疊在淺色漫畫上 | 白 1.09、黃 1.18、天空藍 1.20 | 不靠單層：框＋靛藍底兩層，每種底色至少一層 ≥ 3（6.4） |
+| 9 | brand-vivid 在 blush／blush-strong 上 | 4.38／3.49（暗色過了） | 亮色 2.82／2.54 沒過，class 共用，**仍禁止** |
+| 10 | danger 文字在 blush-strong 上 | 5.10（暗色過了） | 亮色 4.34 沒過，**仍禁止** |
+
+B 的預覽色值沒有任何一個需要調。唯一和預覽不同的是 on-sun：預覽暗色用 `#24102A`（12.30），改成和亮色一樣的 `#2B1F27`（10.95），兩個都過，用同一個值比較單純。
+
+### 6.6 原始輸出
+
+```
+$ contrast.py "#F6F3FF" "#1E1F45" "#F6F3FF" "#2C2560" "#F6F3FF" "#3D3080" "#F6F3FF" "#262852" "#CCC8F0" "#1E1F45" "#CCC8F0" "#2C2560" "#CCC8F0" "#3D3080" "#CCC8F0" "#262852" "#AEA9DC" "#1E1F45" "#AEA9DC" "#2C2560" "#AEA9DC" "#3D3080" "#AEA9DC" "#262852" "#AEA9DC" "#36386A" "#CCC8F0" "#36386A" "#FF80B5" "#1E1F45" "#FF80B5" "#2C2560" "#FF80B5" "#3D3080" "#FF80B5" "#262852" "#24102A" "#FF80B5" "#2B1F27" "#FFD23F" "#24102A" "#FFD23F"
+#F6F3FF on #1E1F45: 14.35:1  AA PASS  AAA PASS
+#F6F3FF on #2C2560: 12.45:1  AA PASS  AAA PASS
+#F6F3FF on #3D3080: 9.92:1  AA PASS  AAA PASS
+#F6F3FF on #262852: 12.72:1  AA PASS  AAA PASS
+#CCC8F0 on #1E1F45: 9.79:1  AA PASS  AAA PASS
+#CCC8F0 on #2C2560: 8.49:1  AA PASS  AAA PASS
+#CCC8F0 on #3D3080: 6.77:1  AA PASS  AAA FAIL
+#CCC8F0 on #262852: 8.68:1  AA PASS  AAA PASS
+#AEA9DC on #1E1F45: 7.11:1  AA PASS  AAA PASS
+#AEA9DC on #2C2560: 6.17:1  AA PASS  AAA FAIL
+#AEA9DC on #3D3080: 4.92:1  AA PASS  AAA FAIL
+#AEA9DC on #262852: 6.31:1  AA PASS  AAA FAIL
+#AEA9DC on #36386A: 4.92:1  AA PASS  AAA FAIL
+#CCC8F0 on #36386A: 6.78:1  AA PASS  AAA FAIL
+#FF80B5 on #1E1F45: 6.74:1  AA PASS  AAA FAIL
+#FF80B5 on #2C2560: 5.85:1  AA PASS  AAA FAIL
+#FF80B5 on #3D3080: 4.66:1  AA PASS  AAA FAIL
+#FF80B5 on #262852: 5.97:1  AA PASS  AAA FAIL
+#24102A on #FF80B5: 7.62:1  AA PASS  AAA PASS
+#2B1F27 on #FFD23F: 10.95:1  AA PASS  AAA PASS
+#24102A on #FFD23F: 12.30:1  AA PASS  AAA PASS
+
+$ contrast.py "#24102A" "#FF6BA8" "#24102A" "#F7609E" "#24102A" "#F2559A" "#24102A" "#E8488F" "#FF6BA8" "#1E1F45" "#FF6BA8" "#2C2560" "#24102A" "#FF948A" "#24102A" "#F47B70" "#24102A" "#FF7B70" "#24102A" "#FFC94D" "#24102A" "#F0B030" "#FF948A" "#1E1F45" "#FF948A" "#2C2560" "#FF948A" "#4B2E4D" "#FF948A" "#3D3080" "#6EDCA2" "#1E1F45" "#6EDCA2" "#2C2560" "#6EDCA2" "#244050" "#FFC94D" "#1E1F45" "#FFC94D" "#2C2560" "#FFC94D" "#483C41" "#9DC0FF" "#1E1F45" "#9DC0FF" "#2C2560" "#9DC0FF" "#2D396A"
+#24102A on #FF6BA8: 6.70:1  AA PASS  AAA FAIL
+#24102A on #F7609E: 6.02:1  AA PASS  AAA FAIL
+#24102A on #F2559A: 5.53:1  AA PASS  AAA FAIL
+#24102A on #E8488F: 4.87:1  AA PASS  AAA FAIL
+#FF6BA8 on #1E1F45: 5.92:1  AA PASS  AAA FAIL
+#FF6BA8 on #2C2560: 5.14:1  AA PASS  AAA FAIL
+#24102A on #FF948A: 8.33:1  AA PASS  AAA PASS
+#24102A on #F47B70: 6.69:1  AA PASS  AAA FAIL
+#24102A on #FF7B70: 7.03:1  AA PASS  AAA PASS
+#24102A on #FFC94D: 11.60:1  AA PASS  AAA PASS
+#24102A on #F0B030: 9.27:1  AA PASS  AAA PASS
+#FF948A on #1E1F45: 7.37:1  AA PASS  AAA PASS
+#FF948A on #2C2560: 6.40:1  AA PASS  AAA FAIL
+#FF948A on #4B2E4D: 5.48:1  AA PASS  AAA FAIL
+#FF948A on #3D3080: 5.10:1  AA PASS  AAA FAIL
+#6EDCA2 on #1E1F45: 9.29:1  AA PASS  AAA PASS
+#6EDCA2 on #2C2560: 8.06:1  AA PASS  AAA PASS
+#6EDCA2 on #244050: 6.46:1  AA PASS  AAA FAIL
+#FFC94D on #1E1F45: 10.26:1  AA PASS  AAA PASS
+#FFC94D on #2C2560: 8.90:1  AA PASS  AAA PASS
+#FFC94D on #483C41: 6.86:1  AA PASS  AAA FAIL
+#9DC0FF on #1E1F45: 8.54:1  AA PASS  AAA PASS
+#9DC0FF on #2C2560: 7.41:1  AA PASS  AAA PASS
+#9DC0FF on #2D396A: 5.99:1  AA PASS  AAA FAIL
+（hover／按下的候選比較：brand-hover 選 #FF6BA8、brand-pressed 選 #F2559A、danger-hover 選 #F47B70，都是「往深一階、配 on-fill 仍 ≥ 5」的候選裡最接近原色的）
+
+$ contrast.py --large "#6AA2FF" "#1E1F45" "#6AA2FF" "#2C2560" "#F0B030" "#1E1F45" "#F0B030" "#2C2560" "#FF6B6B" "#1E1F45" "#FF6B6B" "#2C2560" "#3CC47E" "#1E1F45" "#3CC47E" "#2C2560" "#FF4F8B" "#1E1F45" "#FF4F8B" "#2C2560" "#FF4F8B" "#3D3080" "#FF4F8B" "#262852" "#8A8CC4" "#1E1F45" "#8A8CC4" "#2C2560" "#8A8CC4" "#36386A" "#24102A" "#8A8CC4" "#24102A" "#FF80B5" "#24102A" "#FF4F8B" "#FF80B5" "#1E1F45" "#FF80B5" "#3D3080" "#FFD23F" "#1E1F45" "#AEA9DC" "#3D3080" "#FF948A" "#1E1F45"
+#6AA2FF on #1E1F45: 6.15:1  AA PASS  AAA PASS  (large text)
+#6AA2FF on #2C2560: 5.34:1  AA PASS  AAA PASS  (large text)
+#F0B030 on #1E1F45: 8.20:1  AA PASS  AAA PASS  (large text)
+#F0B030 on #2C2560: 7.11:1  AA PASS  AAA PASS  (large text)
+#FF6B6B on #1E1F45: 5.66:1  AA PASS  AAA PASS  (large text)
+#FF6B6B on #2C2560: 4.91:1  AA PASS  AAA PASS  (large text)
+#3CC47E on #1E1F45: 7.02:1  AA PASS  AAA PASS  (large text)
+#3CC47E on #2C2560: 6.09:1  AA PASS  AAA PASS  (large text)
+#FF4F8B on #1E1F45: 5.04:1  AA PASS  AAA PASS  (large text)
+#FF4F8B on #2C2560: 4.38:1  AA PASS  AAA FAIL  (large text)
+#FF4F8B on #3D3080: 3.49:1  AA PASS  AAA FAIL  (large text)
+#FF4F8B on #262852: 4.47:1  AA PASS  AAA FAIL  (large text)
+#8A8CC4 on #1E1F45: 4.96:1  AA PASS  AAA PASS  (large text)
+#8A8CC4 on #2C2560: 4.30:1  AA PASS  AAA FAIL  (large text)
+#8A8CC4 on #36386A: 3.43:1  AA PASS  AAA FAIL  (large text)
+#24102A on #8A8CC4: 5.61:1  AA PASS  AAA PASS  (large text)
+#24102A on #FF80B5: 7.62:1  AA PASS  AAA PASS  (large text)
+#24102A on #FF4F8B: 5.70:1  AA PASS  AAA PASS  (large text)
+#FF80B5 on #1E1F45: 6.74:1  AA PASS  AAA PASS  (large text)
+#FF80B5 on #3D3080: 4.66:1  AA PASS  AAA PASS  (large text)
+#FFD23F on #1E1F45: 10.88:1  AA PASS  AAA PASS  (large text)
+#AEA9DC on #3D3080: 4.92:1  AA PASS  AAA PASS  (large text)
+#FF948A on #1E1F45: 7.37:1  AA PASS  AAA PASS  (large text)
+
+$ contrast.py --large "#F6F3FF" "#FFFFFF" "#F6F3FF" "#000000" "#F6F3FF" "#2B1F27" "#F6F3FF" "#808080" "#F6F3FF" "#F6D7BE" "#F6F3FF" "#BFE6FF" "#F6F3FF" "#FFE07A" "#F6F3FF" "#FF8DB5" "#F6F3FF" "#E2382B" "#F6F3FF" "#47C26E" "#F6F3FF" "#1BA59A" "#F6F3FF" "#9B7BEA" "#F6F3FF" "#5B3A8E" "#F6F3FF" "#13306E" "#1E1F45" "#FFFFFF" "#1E1F45" "#000000" "#1E1F45" "#2B1F27" "#1E1F45" "#808080" "#1E1F45" "#F6D7BE" "#1E1F45" "#BFE6FF" "#1E1F45" "#FFE07A" "#1E1F45" "#FF8DB5" "#1E1F45" "#E2382B" "#1E1F45" "#47C26E" "#1E1F45" "#1BA59A" "#1E1F45" "#9B7BEA" "#1E1F45" "#5B3A8E" "#1E1F45" "#13306E"
+#F6F3FF on #FFFFFF: 1.09:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #000000: 19.18:1  AA PASS  AAA PASS  (large text)
+#F6F3FF on #2B1F27: 14.44:1  AA PASS  AAA PASS  (large text)
+#F6F3FF on #808080: 3.61:1  AA PASS  AAA FAIL  (large text)
+#F6F3FF on #F6D7BE: 1.25:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #BFE6FF: 1.20:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #FFE07A: 1.18:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #FF8DB5: 1.97:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #E2382B: 3.97:1  AA PASS  AAA FAIL  (large text)
+#F6F3FF on #47C26E: 2.08:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #1BA59A: 2.78:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #9B7BEA: 2.99:1  AA FAIL  AAA FAIL  (large text)
+#F6F3FF on #5B3A8E: 7.86:1  AA PASS  AAA PASS  (large text)
+#F6F3FF on #13306E: 11.45:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #FFFFFF: 15.71:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #000000: 1.34:1  AA FAIL  AAA FAIL  (large text)
+#1E1F45 on #2B1F27: 1.01:1  AA FAIL  AAA FAIL  (large text)
+#1E1F45 on #808080: 3.98:1  AA PASS  AAA FAIL  (large text)
+#1E1F45 on #F6D7BE: 11.50:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #BFE6FF: 11.95:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #FFE07A: 12.11:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #FF8DB5: 7.28:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #E2382B: 3.62:1  AA PASS  AAA FAIL  (large text)
+#1E1F45 on #47C26E: 6.89:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #1BA59A: 5.16:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #9B7BEA: 4.80:1  AA PASS  AAA PASS  (large text)
+#1E1F45 on #5B3A8E: 1.83:1  AA FAIL  AAA FAIL  (large text)
+#1E1F45 on #13306E: 1.25:1  AA FAIL  AAA FAIL  (large text)
+（提示框的框與底分開測；每一種底色看框或底其中一層，見 6.4。單層的 FAIL 是預期的）
+
+$ contrast.py "#AEA9DC" "#483C41" "#CCC8F0" "#483C41" "#F6F3FF" "#483C41" "#765F6B" "#FFF3D6" "#6A5560" "#FFF3D6" "#FF6BA8" "#2C2560" "#FF6BA8" "#3D3080" "#24102A" "#F47B70" "#6EDCA2" "#2C2560" "#AEA9DC" "#4B2E4D" "#AEA9DC" "#244050"
+#AEA9DC on #483C41: 4.76:1  AA PASS  AAA FAIL
+#CCC8F0 on #483C41: 6.55:1  AA PASS  AAA FAIL
+#F6F3FF on #483C41: 9.60:1  AA PASS  AAA PASS
+#765F6B on #FFF3D6: 5.26:1  AA PASS  AAA FAIL
+#6A5560 on #FFF3D6: 6.18:1  AA PASS  AAA FAIL
+#FF6BA8 on #2C2560: 5.14:1  AA PASS  AAA FAIL
+#FF6BA8 on #3D3080: 4.10:1  AA FAIL  AAA FAIL
+#24102A on #F47B70: 6.69:1  AA PASS  AAA FAIL
+#6EDCA2 on #2C2560: 8.06:1  AA PASS  AAA PASS
+#AEA9DC on #4B2E4D: 5.29:1  AA PASS  AAA FAIL
+#AEA9DC on #244050: 4.94:1  AA PASS  AAA FAIL
+
+$ contrast.py "#F6F3FF" "#FFD23F" "#FFFFFF" "#FF80B5" "#FFFFFF" "#FF948A" "#FFFFFF" "#FFC94D" "#FFFFFF" "#F6F3FF" "#FFFFFF" "#8A8CC4" "#FFFFFF" "#FF4F8B" "#FFFFFF" "#FF6BA8" "#FFFFFF" "#F2559A"
+#F6F3FF on #FFD23F: 1.32:1  AA FAIL  AAA FAIL
+#FFFFFF on #FF80B5: 2.33:1  AA FAIL  AAA FAIL
+#FFFFFF on #FF948A: 2.13:1  AA FAIL  AAA FAIL
+#FFFFFF on #FFC94D: 1.53:1  AA FAIL  AAA FAIL
+#FFFFFF on #F6F3FF: 1.09:1  AA FAIL  AAA FAIL
+#FFFFFF on #8A8CC4: 3.17:1  AA FAIL  AAA FAIL
+#FFFFFF on #FF4F8B: 3.11:1  AA FAIL  AAA FAIL
+#FFFFFF on #FF6BA8: 2.65:1  AA FAIL  AAA FAIL
+#FFFFFF on #F2559A: 3.21:1  AA FAIL  AAA FAIL
+（不換 token 會壞的組合：現在寫死的白字、白鈕、黃底上的 text-ink 在暗色的樣子。見 6.5）
+
+$ contrast.py "#3A1B38" "#FF80B5" "#391735" "#F2559A" "#3A1B3A" "#FF6BA8" "#F9E8EF" "#C81A60"
+#3A1B38 on #FF80B5: 6.46:1  AA PASS  AAA FAIL
+#391735 on #F2559A: 4.85:1  AA PASS  AAA FAIL
+#3A1B3A on #FF6BA8: 5.67:1  AA PASS  AAA FAIL
+#F9E8EF on #C81A60: 4.72:1  AA PASS  AAA FAIL
+（兩段文字按鈕第二段的 opacity-90：on-fill 90% 疊在主粉上的實色。最後一行是亮色補驗，白 90% 在深粉上）
+```
+
+## 原始輸出（亮色，2026-11-14）
 
 ```
 $ contrast.py "#2B1F27" "#FFFFFF" "#2B1F27" "#FFF0F5" "#2B1F27" "#FFE0EC" "#6A5560" "#FFFFFF" "#6A5560" "#FFF0F5" "#6A5560" "#FFE0EC" "#765F6B" "#FFFFFF" "#765F6B" "#FFF0F5" "#765F6B" "#F5EEF1" "#FFFFFF" "#C81A60" "#C81A60" "#FFFFFF" "#C81A60" "#FFF0F5" "#C81A60" "#FFE0EC" "#2B1F27" "#FFD23F"

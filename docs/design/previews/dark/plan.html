@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>暗色模式：實作前確認</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Huninn&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#FFFFFF;--blush:#FFF0F5;--line:#F3DDE6;--text:#2B1F27;--text-2:#6A5560;--brand:#C81A60;--on-fill:#FFFFFF;--sun:#FFD23F;--on-sun:#2B1F27;
+  --font:"Nunito","Huninn","PingFang TC","Heiti TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){color-scheme:dark;--bg:#1E1F45;--blush:#2C2560;--line:#36386A;--text:#F6F3FF;--text-2:#CCC8F0;--brand:#FF80B5;--on-fill:#24102A}
+}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#1E1F45;--blush:#2C2560;--line:#36386A;--text:#F6F3FF;--text-2:#CCC8F0;--brand:#FF80B5;--on-fill:#24102A}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-weight:600;font-synthesis-weight:none;line-height:1.7}
+main{max-width:880px;margin:0 auto;padding:40px 16px 96px}
+h1{font-family:"Huninn",var(--font);font-weight:400;font-size:30px;line-height:1.3}
+h2{font-family:"Huninn",var(--font);font-weight:400;font-size:22px;margin:40px 0 12px}
+p,li{font-size:16px}
+.lead{color:var(--text-2);margin-top:8px}
+.ask{margin-top:24px;padding:20px;border-radius:24px;background:var(--blush)}
+.ask h2{margin-top:0}
+.ask ol{padding-left:1.4em;display:grid;gap:8px}
+.wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px;border-radius:16px;box-shadow:inset 0 0 0 2px var(--line)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:2px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font-weight:800;color:var(--text-2);white-space:nowrap}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
+a{color:var(--brand);font-weight:800}
+.sw{display:inline-block;width:18px;height:18px;border-radius:6px;vertical-align:-3px;margin-right:6px;box-shadow:inset 0 0 0 1.5px rgba(128,128,128,.45)}
+ul.plain{padding-left:1.2em;display:grid;gap:6px;margin-top:8px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.btn{display:inline-flex;align-items:center;height:44px;padding:0 18px;border-radius:22px;background:var(--brand);color:var(--on-fill);text-decoration:none}
+.btn--line{background:var(--bg);color:var(--text);box-shadow:inset 0 0 0 2px var(--line)}
+.theme{position:fixed;top:12px;right:12px;height:40px;padding:0 14px;border-radius:20px;border:0;background:var(--bg);color:var(--text);box-shadow:inset 0 0 0 2px var(--line);font:inherit;font-size:14px;cursor:pointer}
+@media (max-width:480px){main{padding-top:64px}h1{font-size:26px}}
+</style>
+</head>
+<body>
+<button type="button" class="theme" id="theme">換成暗色</button>
+<main>
+  <h1>暗色模式：實作前確認</h1>
+  <p class="lead">照你的回答定案了：暗色用 B 星空藍；第一次跟著手機，按過就記住；切換鈕放在書庫右上角。下面是寫好的設計規則和實作計畫，你同意後才開始改程式。</p>
+
+  <section class="ask">
+    <h2>要你回覆的事</h2>
+    <ol>
+      <li>設計規則和實作計畫可以照這樣做嗎？</li>
+      <li>什麼時候部署、在 iPhone 上看：建議等三段都做完，你說一聲再一起部署。每段做完我會先把截圖做成網頁給你看。</li>
+    </ol>
+    <div class="btns">
+      <a class="btn" href="./">再看一次暗色預覽</a>
+    </div>
+  </section>
+
+  <h2>1　暗色的顏色（已寫進 DESIGN.md）</h2>
+  <p>就是預覽裡的 B 星空藍，只有黃色上的字改成跟亮色同色。主要的幾個：</p>
+  <div class="wrap"><table>
+    <thead><tr><th>用在哪</th><th>亮色</th><th>暗色</th></tr></thead>
+    <tbody>
+      <tr><td>頁面底、卡片、分頁列</td><td><span class="sw" style="background:#FFFFFF"></span><code>#FFFFFF</code></td><td><span class="sw" style="background:#1E1F45"></span><code>#1E1F45</code></td></tr>
+      <tr><td>頁首色帶、練習大卡、搜尋框</td><td><span class="sw" style="background:#FFF0F5"></span><code>#FFF0F5</code></td><td><span class="sw" style="background:#2C2560"></span><code>#2C2560</code></td></tr>
+      <tr><td>主要文字</td><td><span class="sw" style="background:#2B1F27"></span><code>#2B1F27</code></td><td><span class="sw" style="background:#F6F3FF"></span><code>#F6F3FF</code></td></tr>
+      <tr><td>粉色字、主要按鈕底</td><td><span class="sw" style="background:#C81A60"></span><code>#C81A60</code></td><td><span class="sw" style="background:#FF80B5"></span><code>#FF80B5</code></td></tr>
+      <tr><td>按鈕上的字</td><td><span class="sw" style="background:#FFFFFF"></span>白</td><td><span class="sw" style="background:#24102A"></span><code>#24102A</code>（深色字）</td></tr>
+      <tr><td>黃色徽章、標籤</td><td colspan="2"><span class="sw" style="background:#FFD23F"></span><code>#FFD23F</code>，上面的字 <code>#2B1F27</code>，兩套一樣</td></tr>
+      <tr><td>貼紙封面的白邊</td><td colspan="2">兩套都是白色</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="plain">
+    <li>暗色用到的顏色組合都驗算過，89 組全部達到無障礙標準（字的對比至少 4.5 倍，圖示和框線至少 3 倍）。</li>
+    <li>預覽裡沒畫到、這次補上的：按鈕按下去和滑鼠移上去的顏色、錯誤訊息的紅色、面板後面的遮罩。</li>
+  </ul>
+
+  <h2>2　你還沒在預覽裡看過的地方</h2>
+  <ul class="plain">
+    <li><strong>閱讀器的提示框</strong>（點泡泡框跳出來的那個）：亮色是白底黑框，暗色改成靛藍底配淺色框。用 14 種漫畫底色測過，都看得清楚。實作後請你在 iPhone 上看一眼。</li>
+    <li><strong>漫畫頁本身不會變暗</strong>；泡泡框外圍的三層框疊在漫畫上，所以也不變。</li>
+  </ul>
+
+  <h2>3　實作分三段</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>段</th><th>做什麼</th><th>改哪些檔</th><th>怎麼驗</th><th>要先等</th></tr></thead>
+    <tbody>
+      <tr><td>1 地基</td><td>加上暗色的顏色；打開時照手機設定決定亮暗，第一個畫面就是對的顏色，不會先閃白；按鈕上的白字、貼紙白邊這些寫死的顏色換掉</td><td><code>style.css</code>、<code>index.html</code>、按鈕和幾個頁面（十幾個檔，清單在 DESIGN.md 15.5）</td><td>建置和既有測試全過；亮色算出來的顏色跟現在一模一樣；模擬手機設成暗色時，一打開就是暗色、不閃白</td><td>無</td></tr>
+      <tr><td>2 切換鈕</td><td>書庫右上角的月亮／太陽鈕；按了整站立刻換色，並記住；還沒按過時跟著手機即時換</td><td>新增主題的小程式和它的測試、<code>AppIcon.vue</code>、<code>LibraryView.vue</code></td><td>新的單元測試通過；按了切換鈕再重新載入網頁，還是同一個主題；按過以後改手機設定，App 不跟著變</td><td>第 1 段</td></tr>
+      <tr><td>3 檢查</td><td>每一頁在手機寬和電腦寬、亮色和暗色都截圖檢查，有問題修一輪；整理要你在 iPhone 和 Mac 上確認的清單</td><td>看檢查結果，有問題才改</td><td>沒有會影響使用或看錯的問題、沒有左右捲動、瀏覽器沒有報錯；截圖做成網頁給你看</td><td>第 1、2 段</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lead">實作計畫的檔案在 <code>.scratch/web-dark-mode/</code>（spec 和 01–03）。每段一個 PR，你在 GitHub 上看。</p>
+
+  <h2>4　要在 iPhone 上確認的事</h2>
+  <ul class="plain">
+    <li><strong>頂端的狀態列（時鐘那一條）</strong>：查到的資料說法不一，有的 iOS 版本跟著手機的深淺設定，有的跟著 App 指定的顏色。我會讓 App 指定的顏色跟著主題換；手機和 App 設定不同時（例如手機亮、App 暗）長什麼樣，要你在 iPhone 上看。狀態列的樣式設定不會動，所以不用把主畫面的 vista 刪掉重加。</li>
+    <li>手機是暗色時第一次打開，不會先閃白。</li>
+    <li>按切換鈕、把 App 完全關掉再打開，還是你選的那個。</li>
+    <li>暗色下打字時，鍵盤也是暗的。</li>
+  </ul>
+
+  <h2>5　我自己決定的事</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>決定</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td>切換鈕一直顯示，書庫還在載入或出錯時也在；重新整理鈕的位置先留好，載入完出現時切換鈕不會往旁邊跳</td><td>隨時都按得到；按鈕不會突然移位，也不會按錯</td></tr>
+      <tr><td>切換時整頁瞬間換色，不做淡入淡出</td><td>有些地方本身有換色動畫，會比別處慢一拍，看起來像在閃</td></tr>
+      <tr><td>開發伺服器維持只讓這台電腦連</td><td>它帶著連線到書庫的金鑰，開放到區網的話，區網裡誰都能透過它讀書庫。所以每段做完用截圖網頁給你看，iPhone 實機要等部署</td></tr>
+      <tr><td>紀錄寫在 <code>docs/design/dark-mode.md</code>，送 PR 時併進 STATUS.md</td><td>STATUS.md 的最新版還在另一個分支上，先不碰，免得蓋掉</td></tr>
+    </tbody>
+  </table></div>
+</main>
+<script>
+(function(){
+  var root=document.documentElement,btn=document.getElementById('theme');
+  function isDark(){var t=root.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
+  function label(){btn.textContent=isDark()?'換成亮色':'換成暗色'}
+  btn.addEventListener('click',function(){root.setAttribute('data-theme',isDark()?'light':'dark');label()});
+  label();
+})();
+</script>
+</body>
+</html>
