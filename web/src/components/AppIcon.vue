@@ -39,6 +39,13 @@ const paths = {
   external: ['M14 4.5h5.5V10', 'M19.5 4.5L11 13', 'M18 14v3.5a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2H10'],
   trash: ['M4.5 7h15', 'M9.5 7V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v2', 'M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7'],
   sparkle: ['M12 4l1.8 4.7L18.5 10.5l-4.7 1.8L12 17l-1.8-4.7L5.5 10.5l4.7-1.8z'],
+  // The theme toggle's two (DESIGN.md 7.18): each draws the theme a press
+  // switches to. The sun's disc is the preview's r=4 circle, written as a path.
+  moon: ['M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'],
+  sun: [
+    'M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z',
+    'M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
+  ],
 } satisfies Record<string, string[]>
 
 export type IconName = keyof typeof paths
