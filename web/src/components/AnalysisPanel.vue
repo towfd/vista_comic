@@ -100,7 +100,7 @@ const problems: Record<RequestProblem, string> = {
           type="button"
           role="radio"
           :aria-checked="analysis.model === m.id"
-          class="h-9 rounded-full px-3 text-meta text-ink-soft transition-colors duration-120 ease-standard hover:text-ink aria-checked:bg-brand aria-checked:text-white"
+          class="h-9 rounded-full px-3 text-meta text-ink-soft transition-colors duration-120 ease-standard hover:text-ink aria-checked:bg-brand aria-checked:text-on-fill"
           @click="analysis.setModel(m.id)"
         >
           {{ m.label }}

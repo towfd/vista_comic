@@ -91,7 +91,7 @@ const covers = reactive<Record<string, 'loaded' | 'failed'>>({})
             aria-hidden="true"
           >
             <div
-              class="relative grid aspect-3/4 -rotate-4 place-items-center overflow-hidden rounded-tile border-4 border-paper bg-blush-strong shadow-raised backface-hidden"
+              class="relative grid aspect-3/4 -rotate-4 place-items-center overflow-hidden rounded-tile border-4 border-sticker bg-blush-strong shadow-raised backface-hidden"
               :class="covers[continueComic.coverUrl] === 'failed' && 'bg-mist text-ink-faint'"
             >
               <AppIcon v-if="covers[continueComic.coverUrl] === 'failed'" name="book" class="size-8" />
@@ -108,7 +108,7 @@ const covers = reactive<Record<string, 'loaded' | 'failed'>>({})
             </div>
           </RouterLink>
           <div class="min-w-0">
-            <span class="inline-block rounded-full bg-sun px-2.5 text-caption text-ink">繼續看</span>
+            <span class="inline-block rounded-full bg-sun px-2.5 text-caption text-on-sun">繼續看</span>
             <RouterLink
               :to="{ name: 'comic', params: { comicId: continueComic.id } }"
               class="mt-1.5 line-clamp-3 rounded-tile text-body leading-title font-extrabold wrap-anywhere text-ink"
@@ -140,7 +140,7 @@ const covers = reactive<Record<string, 'loaded' | 'failed'>>({})
             <RouterLink
               :to="{ name: 'reader', params: { comicId: continueComic.id, chapterId: continueTo.chapterId } }"
               :aria-label="continueTo.progress ? `繼續閱讀第 ${continueTo.progress.number} 話` : '繼續閱讀'"
-              class="ml-auto grid size-13 shrink-0 place-items-center rounded-full bg-brand text-white shadow-edge-sm transition-[translate,box-shadow,background-color] duration-120 ease-standard hover:bg-brand-hover active:translate-y-0.5 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0"
+              class="ml-auto grid size-13 shrink-0 place-items-center rounded-full bg-brand text-on-fill shadow-edge-sm transition-[translate,box-shadow,background-color] duration-120 ease-standard hover:bg-brand-hover active:translate-y-0.5 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0"
             >
               <!-- Filled, unlike the line icons: the preview's play button. -->
               <svg viewBox="0 0 24 24" class="ml-0.75 size-5" fill="currentColor" aria-hidden="true">

@@ -92,7 +92,7 @@ const kindClass = (selected: boolean) =>
         ? 'bg-blush-strong text-ink-faint'
         : 'text-ink-faint'
       : selected
-        ? 'bg-brand text-white'
+        ? 'bg-brand text-on-fill'
         : 'text-ink-soft hover:bg-blush-strong active:bg-blush-strong'
   }`
 

@@ -14,7 +14,7 @@ defineSlots<{ actions?: () => unknown }>()
 <template>
   <div class="flex flex-col items-center px-4 pt-16 text-center">
     <div
-      class="grid size-18 -rotate-8 place-items-center rounded-full bg-sun text-ink ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
+      class="grid size-18 -rotate-8 place-items-center rounded-full bg-sun text-on-sun ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
     >
       <AppIcon :name="icon" class="size-8" />
     </div>

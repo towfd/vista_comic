@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 01 Dark foundation: tokens, pre-paint theme, class replacements
 
@@ -19,3 +19,12 @@ Spec: ../spec.md
 Blocked by: none
 
 ## Comments
+
+2026-11-16 (frontend-builder, checked by the main session): done on `feature/web-dark-mode-01-foundation`.
+
+- 14 files: `style.css` (§15.1: `--shade-*`, dark block, `on-fill`／`on-sun`／`sticker`, `--color-white` removed), `index.html` (§15.2 pre-paint script, `color-scheme: light dark`), and the §15.5 replacements, plus `PracticeSessionView.vue:251` (the correct-answer stamp is `bg-sun` with text; missing from §15.5, fixed by the same rule).
+- `npm run typecheck`, `npm run build` pass; `npm test` 24 files／481 tests pass (re-run by the main session).
+- Built CSS, light: 530 rules compared with `var()` resolved — all values identical to `main`. `--color-brand-edge` is emitted, so the `@theme static` fallback in §15.1 was not needed.
+- Searches in `web/src`: `text-white`／`bg-white`／`border-white`／`ring-white`／`border-paper`／`dark:` all 0; the 7 elements with text on `bg-sun` use `text-on-sun`.
+- Browser, 390 and 1440, seven pages, emulated dark: `data-theme` and `theme-color #1E1F45` are set before `<body>` (no white flash); pink buttons with dark text, edge `#C23A78`, black shadows, white sticker borders; reader frames unchanged, hint box indigo. Light re-checked. No horizontal scroll. Screenshots `docs/design/screenshots/dark/impl-01/` (not in git).
+- Not seen on screen: the practice finished stickers (13 cards due; no answers were submitted to real data). The dev server does not get OCR data from its env; the reader was checked by routing `/ocr-data/*` to the local copy in Playwright.

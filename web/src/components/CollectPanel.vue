@@ -81,7 +81,7 @@ const secondarySm =
     -->
     <button
       type="button"
-      class="relative inline-flex h-9 shrink-0 items-center rounded-full bg-brand px-3.5 text-meta font-extrabold text-white shadow-float transition-colors duration-120 ease-standard before:absolute before:-inset-1 before:content-[''] hover:bg-brand-hover active:bg-brand-pressed"
+      class="relative inline-flex h-9 shrink-0 items-center rounded-full bg-brand px-3.5 text-meta font-extrabold text-on-fill shadow-float transition-colors duration-120 ease-standard before:absolute before:-inset-1 before:content-[''] hover:bg-brand-hover active:bg-brand-pressed"
       @click="collect.openPanel()"
     >
       ＋收卡
