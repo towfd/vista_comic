@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 03 Dark QA: both themes, every page, device checklist
 
@@ -23,3 +23,9 @@ Spec: ../spec.md
 Blocked by: 01, 02
 
 ## Comments
+
+2026-11-16 (visual-qa, checked by the main session): round 1 done — P0 0, P1 0, P2 3. Report `docs/design/dark-qa-report.md`; screenshots `docs/design/screenshots/dark/r1/` (45, not in git).
+
+- Passed: eight pages at 390 and 1440 with no horizontal scroll; dark contrast scan of library, deck, card, practice, settings and chapters with no failures, no white surfaces, no pink-purple shadows; white sticker borders, dark text on yellow, manga pages undimmed, the three-layer frames unchanged, indigo hint box; toggle (colour, `theme-color`, kept on reload, Enter); follows the phone until pressed. Light library at 390 compared element by element with the deployed site: no style difference.
+- P2, left for later (not dark-specific or not blocking): QA-D01 the 「看過」 legend swatch on the chapter page is about 1.1:1 against the dark page (the label beside it carries the meaning); QA-D02 「刪除卡片」 uses `text-ink`, not `text-danger` as DESIGN §7.1 says (same in light, pre-existing); QA-D03 the 「已加入」 pill's white ring touches the left edge at 390 in dark (light not captured).
+- Not checked: Lighthouse (no DevTools MCP); 768 width; practice loading, empty library and API-failure message boxes; light at 1440 and on some pages beyond token checks (the built-CSS comparison in 01 already showed every light value unchanged). States were faked by replacing `fetch`; no real data was written. The dev server was started by the main session (localhost only) because the QA agent's shell is restricted.
