@@ -5,8 +5,26 @@
     <!-- viewport-fit=cover: the page runs under the notch and home bar, and style.css keeps content clear of them. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#FFFFFF" />
-    <!-- Light only, with the phone in dark mode too. -->
-    <meta name="color-scheme" content="light" />
+    <!-- Light and dark; which one shows is <html data-theme>, set just below. -->
+    <meta name="color-scheme" content="light dark" />
+    <!--
+      Picks the theme before anything is drawn: a choice remembered in this
+      browser wins, otherwise the phone's or computer's light/dark setting.
+      Here in <head>, ahead of every stylesheet, so a dark first frame never
+      flashes white. theme-color follows the page colour of the theme (dark
+      #1E1F45). The key and values must match the theme toggle's.
+    -->
+    <script>
+      ;(function () {
+        var saved = null
+        try {
+          saved = localStorage.getItem('vista-theme')
+        } catch (e) {}
+        var dark = saved === 'dark' || (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.setAttribute('data-theme', 'dark')
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#1E1F45' : '#FFFFFF')
+      })()
+    </script>
     <title>vista_comic</title>
 
     <!--

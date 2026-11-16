@@ -399,7 +399,7 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
                 :class="showHints ? 'bg-brand' : 'bg-line-strong'"
               >
                 <span
-                  class="absolute top-0.75 left-0.75 size-5.5 rounded-full bg-white transition-[translate] duration-120 ease-standard"
+                  class="absolute top-0.75 left-0.75 size-5.5 rounded-full bg-on-fill transition-[translate] duration-120 ease-standard"
                   :class="showHints ? 'translate-x-4' : ''"
                 />
               </span>
@@ -408,7 +408,7 @@ const backTo = computed(() => ({ name: 'comic', params: { comicId: props.comicId
         </CollectPanel>
 
         <div ref="endEl" class="mt-12 flex flex-col items-center px-4 text-center">
-          <p class="inline-block -rotate-3 rounded-full bg-sun px-3 py-0.5 text-caption text-ink">本話完</p>
+          <p class="inline-block -rotate-3 rounded-full bg-sun px-3 py-0.5 text-caption text-on-sun">本話完</p>
           <button v-if="next" type="button" :class="[primaryLg, 'mt-6 max-w-90']" @click="openNext">
             下一話
             <span class="text-meta font-bold opacity-90">第 {{ next.number }} 話</span>

@@ -2,7 +2,7 @@
 
 > 本檔是 `web/` 唯一的設計依據，由 design-system-architect 維護。其他 agent 要改 token 請提出變更請求（token、現值、建議值、理由、影響範圍），由總控轉交；接受的變更寫進最後的 Changelog。
 > 機器可讀版本：`docs/design/design-tokens.json`　對比驗算：`docs/design/contrast-report.md`
-> 視覺依據：`docs/design/visual-decision.md`（第 2 輪方向 C 粉紅貼紙）、`docs/design/previews/round2/direction-c.html`
+> 視覺依據：`docs/design/visual-decision.md`（第 2 輪方向 C 粉紅貼紙）、`docs/design/previews/round2/direction-c.html`；暗色：`docs/design/previews/dark/index.html` 的 B 星空藍、紀錄在 `docs/design/dark-mode.md`
 > 分工：各頁的版面、內容、狀態由 `docs/design/page-design-spec.md` 負責；本檔定 token、元件、規則。兩份不一致時，**顏色、字級、圓角、陰影、時長以本檔為準**（對照見第 15.6 節），版面與文字以 page-design-spec 為準。
 
 ---
@@ -13,17 +13,20 @@
 - **個性關鍵字**：輕快、圓潤、封面優先、可愛但不幼稚、像自己的東西
 - **語氣**：像自己的 App 在旁邊提醒你：短句、口語、具體，不說教、不撒嬌。
 - **不是什麼**：
-  - 不是暗色的閱讀器（只做亮色，手機開深色模式也一樣）。
+  - 不是一片黑的閱讀器。暗色是同一本貼紙本換成靛藍底，不是近黑底配灰字；亮色和暗色由你自己切換。
   - 不是學習平台的儀表板（不做大數字統計卡、不做成就牆）。
   - 不是童書（不用表情符號、不到處歪斜、不用彩虹漸層）。
   - 不是 Webtoon 或 LINE 漫畫（借骨架，不借它們的綠色、商標與圖示）。
 
 ## 2. Design Principles
 
-1. **封面是畫面上唯一的大面積彩色。** 介面只用白、淡粉和一個深粉，彩度留給封面。
+1. **封面是畫面上唯一的大面積彩色。** 介面只用頁面底、和底差一階的面，再加一個主粉，彩度留給封面。亮色是白、淡粉、深粉；暗色是靛藍、靛紫、亮粉。
    例：書庫格子裡的封面不加白邊、不加陰影；介面元件不用漸層。
-2. **鮮粉是顏料，深粉是墨水。** `#FF4F8B` 只畫圖形（進度條、載入圓點、整句裡被挖空那個字的底線），而且只放白底；所有粉色的字、按鈕、外框都用 `#C81A60`。
-   例：「繼續看」卡片的進度條用鮮粉；同一張卡片上的播放鈕用深粉。
+2. **鮮粉是顏料，主粉是墨水。** 鮮粉 `brand-vivid` 只畫圖形（進度條、載入圓點、整句裡被挖空那個字的底線），而且只放 `paper` 底；所有粉色的字、按鈕、外框都用主粉 `brand`。兩套主題裡誰是顏料、誰是墨水都一樣，只是墨水的深淺反過來：
+   - 亮色：墨水是深粉 `#C81A60`，比鮮粉深。按鈕是深粉底配白字。
+   - 暗色：墨水是亮粉 `#FF80B5`，比鮮粉淺。亮粉同時當粉色的字和按鈕底，所以按鈕上的字改成深色（`on-fill` `#24102A`）。顏料還是鮮粉 `#FF4F8B`，不換。
+   例：「繼續看」卡片的進度條用鮮粉；同一張卡片上的播放鈕用主粉。
+   本檔其他地方寫「深粉」時，指的是 `brand` 這個 token；暗色時就是亮粉。
 3. **一個畫面只有一張貼紙。** 歪斜、白邊、黃色點綴都是「這裡最重要」的記號，一個畫面只用在一個焦點。
    例：書庫只有「繼續看」那張封面往左歪 4°；下面的兩欄封面全部擺正。
 4. **粉圓沒有粗體，層級靠字級、顏色和越南文的粗細。** 中文永遠是 Huninn 的單一字重；要強調就放大、換深粉，或交給 Nunito 的數字和越南文去粗。
@@ -33,9 +36,14 @@
 
 ## 3. Color Palette
 
-只有亮色。`:root { color-scheme: light; }`，不寫 `prefers-color-scheme: dark` 和 `[data-theme="dark"]`。
+兩套主題：**亮色**（粉紅貼紙）和**暗色**（B 星空藍：靛藍底，粉和黃最跳）。
 
-### 原始色票（元件不可直接用）
+- 怎麼切換：`<html data-theme="dark">` 時用暗色，沒有這個屬性就是亮色。暗色只覆寫 `@theme` 的變數值，元件的 class 兩套共用，不寫 `dark:`（寫法見 15.1）。
+- 誰決定用哪一套：第一次打開跟著手機或電腦的深淺設定；按過主題切換鈕（7.18）就記住你的選擇。
+- **兩套共用同一組 class，所以每個組合都要在兩套裡通過。** 一個組合只要在其中一套沒過，就列為禁止（下面「不可用的組合」）。
+- 兩套都不變的：封面、漫畫頁、疊在漫畫上的框（`shadow-ring-*`、`shadow-float`、`brand-wash`）、鮮粉、黃色和黃色上的字、貼紙白邊。
+
+### 原始色票：亮色（元件不可直接用）
 
 | token | HEX | 備註 |
 |---|---|---|
@@ -59,43 +67,82 @@
 | palette.red.50 / 500 / 600 / 700 | `#FDECEA` / `#E5484D` / `#C8322A` / `#A82820` | 重新學習、錯誤 |
 | palette.green.50 / 500 / 700 | `#E6F5EC` / `#2B9A5E` / `#17734A` | 間隔複習、成功 |
 
+### 原始色票：暗色（元件不可直接用）
+
+取自 `previews/dark/index.html` 的 `[data-theme="b"]`。預覽裡沒有的（hover、按下、危險、遮罩）是這次補的。
+
+| token | HEX | 備註 |
+|---|---|---|
+| palette-dark.indigo.900 | `#1E1F45` | 頁面底（預覽的 `--bg`） |
+| palette-dark.indigo.850 | `#262852` | 看過、封面失敗、漫畫頁佔位（`--mist`） |
+| palette-dark.indigo.800 | `#2C2560` | 淡一階的面（`--blush`） |
+| palette-dark.indigo.750 | `#36386A` | 卡片框、分隔線（`--line`） |
+| palette-dark.indigo.700 | `#3D3080` | 選中底、停用按鈕（`--blush-2`） |
+| palette-dark.indigo.400 | `#8A8CC4` | 控制項外框（`--line-strong`） |
+| palette-dark.lavender.50 | `#F6F3FF` | 主要文字（`--text`） |
+| palette-dark.lavender.200 | `#CCC8F0` | 次要文字（`--text-2`） |
+| palette-dark.lavender.300 | `#AEA9DC` | 退後的文字（`--text-3`） |
+| palette-dark.pink.300 | `#FF80B5` | 亮粉，暗色的主粉（`--pink-strong`） |
+| palette-dark.pink.350 | `#FF6BA8` | hover（新加） |
+| palette-dark.pink.450 | `#F2559A` | 按下（新加） |
+| palette-dark.pink.650 | `#C23A78` | 按鈕厚邊（預覽的 `--edge`） |
+| palette-dark.plum.950 | `#24102A` | 實心底上的字（`--on-fill`） |
+| palette-dark.blue.night / 300 / 400 | `#2D396A` / `#9DC0FF` / `#6AA2FF` | 新卡：淡底／文字／圖形 |
+| palette-dark.amber.night / 300 / 400 | `#483C41` / `#FFC94D` / `#F0B030` | 學習中 |
+| palette-dark.red.night / 300 / 350 / 400 | `#4B2E4D` / `#FF948A` / `#F47B70` / `#FF6B6B` | 重新學習、錯誤（350 是危險按鈕 hover，新加） |
+| palette-dark.green.night / 300 / 400 | `#244050` / `#6EDCA2` / `#3CC47E` | 間隔複習、成功 |
+
+- `*.night` 是淡底：圖形色（400）以 20% 疊在頁面底 `#1E1F45` 上的結果，算成實色。
+- 鮮粉 `#FF4F8B`、黃色 `#FFD23F`、白 `#FFFFFF`、墨 `#2B1F27` 兩套共用，不另列。
+
 ### 語意 token
 
 「Tailwind」欄是 `web/src/style.css` `@theme` 的變數名（第 15 節），utility 就是去掉 `--color-` 的名字（`bg-paper`、`text-ink-soft`）。對比值全部出自 `contrast.py`。
 
-| token | 值 | Tailwind | 用途 | 搭配文字 | 對比 |
-|---|---|---|---|---|---|
-| color.bg.canvas | `#FFFFFF` | `--color-paper` | 頁面底 | text.primary | 15.81 |
-| color.bg.surface | `#FFFFFF` | `--color-paper` | 卡片、分頁列、頂端列、面板、提示框 | text.primary | 15.81 |
-| color.bg.tint | `#FFF0F5` | `--color-blush` | 淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側 | primary / secondary / muted / brand | 14.33 / 6.18 / 5.26 / 5.05 |
-| color.bg.tint-strong | `#FFE0EC` | `--color-blush-strong` | 選中分頁的圖示底、按下、停用按鈕、「畢業」標籤、封面載入中 | primary / secondary / muted / brand | 12.90 / 5.56 / 4.73 / 4.54 |
-| color.bg.muted | `#F5EEF1` | `--color-mist` | 看過的數字格、封面載入失敗、漫畫頁佔位 | primary / secondary / muted | 13.84 / 5.97 / 5.08 |
-| color.bg.scrim | `#2B1F27` 45% | `--color-scrim` | 強制回應的面板後的遮罩（目前沒有頁面用到） | — | — |
-| color.text.primary | `#2B1F27` | `--color-ink` | 主要文字、標題 | — | 白 15.81 |
-| color.text.secondary | `#6A5560` | `--color-ink-soft` | 次要說明、中文翻譯、話數、文字按鈕 | — | 白 6.82 |
-| color.text.muted | `#765F6B` | `--color-ink-faint` | 看過的數字、到期時間、未選分頁、提示字、停用文字 | — | 白 5.80 |
-| color.text.brand | `#C81A60` | `--color-brand` | 粉色文字（數量、正在看的話數、強調數字） | — | 白 5.57 |
-| color.text.inverse | `#FFFFFF` | `--color-white` | 實心底上的字 | — | — |
-| color.brand.primary | `#C81A60` | `--color-brand` | 主要按鈕、選中、正在看的數字格、開關開、分段選擇的選中 | brand.on-primary | 5.57 |
-| color.brand.primary-hover | `#B01652` | `--color-brand-hover` | 主要按鈕 hover（只在有滑鼠的裝置） | on-primary | 6.81 |
-| color.brand.primary-pressed | `#9E1449` | `--color-brand-pressed` | 主要按鈕按下 | on-primary | 7.92 |
-| color.brand.edge | `#8F1244` | `--color-brand-edge` | 按鈕下緣的厚邊 | — | 裝飾 |
-| color.brand.on-primary | `#FFFFFF` | `--color-white` | 深粉上的字與圖示 | — | 5.57 |
-| color.brand.vivid | `#FF4F8B` | `--color-brand-vivid` | 進度條填色、載入圓點、桌機 hover 外框、被挖空那個字的底線、停用但開著的開關軌道；**只放白底、不放字** | — | 白 3.11（圖形） |
-| color.brand.wash | `#FF4F8B` 16% | `--color-brand-wash` | 閱讀器選中泡泡框的填色 | — | 疊在漫畫上，靠外框辨識 |
-| color.accent.sun | `#FFD23F` | `--color-sun` | 徽章、「繼續看」「本話完」標籤、完成貼紙、正在看小圓點、載入圓點 | accent.on-sun | 10.95 |
-| color.accent.on-sun | `#2B1F27` | `--color-ink` | 黃色上的字與圖示 | — | 10.95 |
-| color.border.subtle | `#F3DDE6` | `--color-line` | 卡片框、數字格框、分隔線（裝飾，不負責辨識） | — | — |
-| color.border.control | `#A07C8C` | `--color-line-strong` | 輸入框預設外框、開關關的軌道 | — | 白 3.65、淡粉 3.31 |
-| color.border.ink | `#2B1F27` | `--color-ink` | 閱讀器提示框外框、浮在漫畫上的外圈 | — | — |
-| color.focus.ring | `#C81A60` | `--color-brand` | focus-visible 外框 3px | — | 白 5.57、淡粉 5.05、淡粉 2 4.54、mist 4.87 |
-| color.feedback.danger | `#C8322A` | `--color-danger` | 錯誤文字、無效輸入框外框、確認刪除按鈕底 | 白字 5.32 | 白 5.32、淡粉 4.82 |
-| color.feedback.danger-hover | `#A82820` | `--color-danger-hover` | 危險按鈕 hover／按下 | 白字 7.02 | |
-| color.feedback.danger-bg | `#FDECEA` | `--color-danger-tint` | 錯誤訊息框底 | danger 4.65 | |
-| color.feedback.success | `#17734A` | `--color-success` | 「已儲存」「已加入」「正確」 | — | 白 5.85、淡粉 5.31 |
-| color.feedback.success-bg | `#E6F5EC` | `--color-success-tint` | 成功訊息框、「已加入」膠囊 | success 5.19 | |
-| color.feedback.warning | `#9A5B00` | `--color-warning` | 「已經收過了」等提醒、確認重設按鈕底 | 白字 5.43 | 白 5.43、淡粉 4.92 |
-| color.feedback.warning-bg | `#FFF3D6` | `--color-warning-tint` | 提醒訊息框底 | warning 4.92 | |
+「暗色」欄寫「同左」的，兩套是同一個值，暗色不覆寫。暗色對比裡的 paper、blush、blush-strong、mist 指的是暗色的值（`#1E1F45`、`#2C2560`、`#3D3080`、`#262852`）。
+
+| token | 亮色 | 暗色 | Tailwind | 用途 | 搭配文字 | 亮色對比 | 暗色對比 |
+|---|---|---|---|---|---|---|---|
+| color.bg.canvas | `#FFFFFF` | `#1E1F45` | `--color-paper` | 頁面底 | text.primary | 15.81 | 14.35 |
+| color.bg.surface | `#FFFFFF` | `#1E1F45` | `--color-paper` | 卡片、分頁列、頂端列、面板、提示框 | text.primary | 15.81 | 14.35 |
+| color.bg.tint | `#FFF0F5` | `#2C2560` | `--color-blush` | 淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側 | primary / secondary / muted / brand | 14.33 / 6.18 / 5.26 / 5.05 | 12.45 / 8.49 / 6.17 / 5.85 |
+| color.bg.tint-strong | `#FFE0EC` | `#3D3080` | `--color-blush-strong` | 選中分頁的圖示底、按下、停用按鈕、「畢業」標籤、封面載入中 | primary / secondary / muted / brand | 12.90 / 5.56 / 4.73 / 4.54 | 9.92 / 6.77 / 4.92 / 4.66 |
+| color.bg.muted | `#F5EEF1` | `#262852` | `--color-mist` | 看過的數字格、封面載入失敗、漫畫頁佔位 | primary / secondary / muted | 13.84 / 5.97 / 5.08 | 12.72 / 8.68 / 6.31 |
+| color.bg.scrim | `#2B1F27` 45% | `#0C0C24` 60% | `--color-scrim` | 強制回應的面板後的遮罩（目前沒有頁面用到） | — | — | — |
+| color.text.primary | `#2B1F27` | `#F6F3FF` | `--color-ink` | 主要文字、標題 | — | 白 15.81 | paper 14.35 |
+| color.text.secondary | `#6A5560` | `#CCC8F0` | `--color-ink-soft` | 次要說明、中文翻譯、話數、文字按鈕 | — | 白 6.82 | paper 9.79 |
+| color.text.muted | `#765F6B` | `#AEA9DC` | `--color-ink-faint` | 看過的數字、到期時間、未選分頁、提示字、停用文字 | — | 白 5.80 | paper 7.11 |
+| color.text.brand | `#C81A60` | `#FF80B5` | `--color-brand` | 粉色文字（數量、正在看的話數、強調數字） | — | 白 5.57 | paper 6.74 |
+| color.text.on-fill（新） | `#FFFFFF` | `#24102A` | `--color-on-fill` | brand／danger／warning 實心底上的字與圖示、開關的圓鈕 | — | 深粉 5.57 | 亮粉 7.62 |
+| color.brand.primary | `#C81A60` | `#FF80B5` | `--color-brand` | 主要按鈕、選中、正在看的數字格、開關開、分段選擇的選中 | on-fill | 5.57 | 7.62 |
+| color.brand.primary-hover | `#B01652` | `#FF6BA8` | `--color-brand-hover` | 主要按鈕 hover（只在有滑鼠的裝置） | on-fill | 6.81 | 6.70 |
+| color.brand.primary-pressed | `#9E1449` | `#F2559A` | `--color-brand-pressed` | 主要按鈕按下 | on-fill | 7.92 | 5.53 |
+| color.brand.edge | `#8F1244` | `#C23A78` | `--color-brand-edge` | 按鈕下緣的厚邊 | — | 裝飾 | 裝飾 |
+| color.brand.on-primary | `#FFFFFF` | `#24102A` | `--color-on-fill` | 主粉上的字與圖示（和 text.on-fill 同一個變數） | — | 5.57 | 7.62 |
+| color.brand.vivid | `#FF4F8B` | 同左 | `--color-brand-vivid` | 進度條填色、載入圓點、桌機 hover 外框、被挖空那個字的底線、停用但開著的開關軌道；**只放 paper 底、不放字** | — | 白 3.11（圖形） | paper 5.04（圖形） |
+| color.brand.wash | `#FF4F8B` 16% | 同左 | `--color-brand-wash` | 閱讀器選中泡泡框的填色 | — | 疊在漫畫上，靠外框辨識 | 同左 |
+| color.accent.sun | `#FFD23F` | 同左 | `--color-sun` | 徽章、「繼續看」「本話完」標籤、完成貼紙、正在看小圓點、載入圓點 | accent.on-sun | 10.95 | 10.95 |
+| color.accent.on-sun（換變數） | `#2B1F27` | 同左 | `--color-on-sun`（原本用 `--color-ink`） | 黃色上的字與圖示 | — | 10.95 | 10.95 |
+| color.border.subtle | `#F3DDE6` | `#36386A` | `--color-line` | 卡片框、數字格框、分隔線（裝飾，不負責辨識） | — | — | — |
+| color.border.control | `#A07C8C` | `#8A8CC4` | `--color-line-strong` | 輸入框預設外框、開關關的軌道 | — | 白 3.65、淡粉 3.31 | paper 4.96、blush 4.30 |
+| color.border.ink | `#2B1F27` | `#F6F3FF` | `--color-ink` | 閱讀器提示框外框 | — | — | 疊在漫畫上，見 7.17 |
+| color.border.sticker（新） | `#FFFFFF` | 同左 | `--color-sticker` | 貼紙封面的白邊 | — | 裝飾 | 裝飾 |
+| color.focus.ring | `#C81A60` | `#FF80B5` | `--color-brand` | focus-visible 外框 3px | — | 白 5.57、淡粉 5.05、淡粉 2 4.54、mist 4.87 | paper 6.74、blush 5.85、blush-strong 4.66、mist 5.97 |
+| color.feedback.danger | `#C8322A` | `#FF948A` | `--color-danger` | 錯誤文字、無效輸入框外框、確認刪除按鈕底 | on-fill 5.32／8.33 | 白 5.32、淡粉 4.82 | paper 7.37、blush 6.40 |
+| color.feedback.danger-hover | `#A82820` | `#F47B70` | `--color-danger-hover` | 危險按鈕 hover／按下 | on-fill 7.02／6.69 | | |
+| color.feedback.danger-bg | `#FDECEA` | `#4B2E4D` | `--color-danger-tint` | 錯誤訊息框底 | danger 4.65／5.48 | | |
+| color.feedback.success | `#17734A` | `#6EDCA2` | `--color-success` | 「已儲存」「已加入」「正確」 | — | 白 5.85、淡粉 5.31 | paper 9.29、blush 8.06 |
+| color.feedback.success-bg | `#E6F5EC` | `#244050` | `--color-success-tint` | 成功訊息框、「已加入」膠囊 | success 5.19／6.46 | | |
+| color.feedback.warning | `#9A5B00` | `#FFC94D` | `--color-warning` | 「已經收過了」等提醒、確認重設按鈕底 | on-fill 5.43／11.60 | 白 5.43、淡粉 4.92 | paper 10.26、blush 8.90 |
+| color.feedback.warning-bg | `#FFF3D6` | `#483C41` | `--color-warning-tint` | 提醒訊息框底 | warning 4.92／6.86 | | |
+
+- 「搭配文字」欄有兩個數字的，前面是亮色、後面是暗色。
+- **新增的三個 token**：
+  - `on-fill`：實心底（brand、danger、warning）上的字與圖示，還有開關的圓鈕。亮色白、暗色深紫。取代原本寫死的 `text-white`／`bg-white`。
+  - `on-sun`：黃色上的字與圖示。兩套都是墨色 `#2B1F27`。原本用 `text-ink`，但 `ink` 在暗色會變成淺色，黃底配淺字只有 1.32，所以拆出來。
+  - `sticker`：貼紙封面的白邊。兩套都是白。原本用 `border-paper`，暗色會變成靛藍，貼紙感就沒了。
+- 原本的 `color.text.inverse`（`--color-white`）拿掉：它的兩個用途分給 `on-fill` 和 `sticker`。元件裡不再出現 `white`。
+- 暗色的 `danger`／`warning`／`success` 和狀態色的文字色、淡底是同一組（success = review、danger = relearning、warning = learning），規則和亮色一樣。
 
 ### 字卡狀態色
 
@@ -108,22 +155,39 @@
 | 重新學習 relearning | `#C8322A` `--color-st-relearn` | `#FDECEA` `--color-st-relearn-tint` | `#E5484D` `--color-st-relearn-graphic` | 5.32 | 4.65 | 4.82 | 3.91 | 3.55 |
 | 間隔複習 review | `#17734A` `--color-st-review` | `#E6F5EC` `--color-st-review-tint` | `#2B9A5E` `--color-st-review-graphic` | 5.85 | 5.19 | 5.31 | 3.57 | 3.23 |
 
-- **文字色**：狀態標籤的字、泡泡的數字與外框、「已到期」（用 relearning）。白底、自己的淡底、淡粉底都 ≥ 4.5。
-- **圖形色**：比例條每一段、圖例圓點、作答欄的對錯外框（答對 review、答錯 relearning）。白底與淡粉底都 ≥ 3。
-- 「答對」用 review、「答錯」用 relearning、「畢業」用 brand 字＋tint-strong 底（4.54）。
+**暗色**（文字色調亮；淡底是圖形色以 20% 疊在 `#1E1F45` 上算成的實色）：
+
+| 狀態 | 文字色 | 淡底 | 圖形色 | 文字／paper | 文字／淡底 | 文字／blush | 圖形／paper | 圖形／blush |
+|---|---|---|---|---|---|---|---|---|
+| 新卡 new | `#9DC0FF` | `#2D396A` | `#6AA2FF` | 8.54 | 5.99 | 7.41 | 6.15 | 5.34 |
+| 學習中 learning | `#FFC94D` | `#483C41` | `#F0B030` | 10.26 | 6.86 | 8.90 | 8.20 | 7.11 |
+| 重新學習 relearning | `#FF948A` | `#4B2E4D` | `#FF6B6B` | 7.37 | 5.48 | 6.40 | 5.66 | 4.91 |
+| 間隔複習 review | `#6EDCA2` | `#244050` | `#3CC47E` | 9.29 | 6.46 | 8.06 | 7.02 | 6.09 |
+
+- **文字色**：狀態標籤的字、泡泡的數字與外框、「已到期」（用 relearning）。兩套的 paper、自己的淡底、blush 都 ≥ 4.5。
+- **圖形色**：比例條每一段、圖例圓點、作答欄的對錯外框（答對 review、答錯 relearning）。兩套的 paper 與 blush 都 ≥ 3。
+- 「答對」用 review、「答錯」用 relearning、「畢業」用 brand 字＋tint-strong 底（亮 4.54、暗 4.66）。
 - 成功／錯誤／提醒訊息框和狀態色是同一組顏色（success = review、danger = relearning、warning = learning），所以語意 token 分開取名、色碼共用。
 - 重新學習的紅 `#C8322A` 和深粉 `#C81A60` 色相接近；所以重新學習永遠帶文字，深粉永遠不拿來表示狀態。
 
 ### 不可用的組合（驗算沒過，禁止使用）
 
+兩套共用 class，所以只要有一套沒過就禁止。下表的「對比」寫的是沒過的那一套。
+
 | 組合 | 對比 | 改用 |
 |---|---|---|
-| brand.vivid `#FF4F8B` 放在 tint `#FFF0F5` 上 | 2.82 | 淡粉底上的圖形改用 brand.primary（5.05） |
-| brand.vivid 放在 tint-strong `#FFE0EC` 上（預覽的進度條、解析中進度條） | 2.54 | 進度條軌道改白底＋淡框（7.12）；不定進度條的滑塊改 brand（4.54） |
-| 學習中原圖形色 `#C98400` 放在淡粉上 | 2.81 | 改為 `#B87A00`（3.27） |
-| danger `#C8322A` 文字放在 tint-strong 上 | 4.34 | 不出現；錯誤一律用 danger-bg |
+| brand.vivid `#FF4F8B` 放在 tint 上 | 亮 2.82（暗 4.38 雖然過了，仍禁止） | 淡粉底上的圖形改用 brand.primary（亮 5.05、暗 5.85） |
+| brand.vivid 放在 tint-strong 上（預覽的進度條、解析中進度條） | 亮 2.54（暗 3.49 仍禁止） | 進度條軌道改白底＋淡框（7.12），暗色時跟著換成 paper 底（鮮粉 5.04）；不定進度條的滑塊改 brand（亮 4.54、暗 4.66） |
+| 學習中原圖形色 `#C98400` 放在淡粉上 | 亮 2.81 | 改為 `#B87A00`（3.27） |
+| danger 文字放在 tint-strong 上 | 亮 4.34（暗 5.10 仍禁止） | 不出現；錯誤一律用 danger-bg |
 | 單一顏色的泡泡框外框疊在漫畫上 | 最低 1.28 | 三層框（7.17） |
-| 輸入框用 `line` 當唯一外框 | 約 1.3 | 改 `line-strong`（3.65） |
+| 輸入框用 `line` 當唯一外框 | 約 1.3 | 改 `line-strong`（亮 3.65、暗 4.96） |
+| `text-white`／`bg-white` 放在 brand、danger、warning 實心底上 | 暗 2.33／2.13／1.53 | 改 `text-on-fill`／`bg-on-fill`（暗 7.62／8.33／11.60） |
+| `text-ink` 放在 sun 上 | 暗 1.32 | 改 `text-on-sun`（兩套 10.95） |
+| 白圓鈕放在開關關的軌道 line-strong 上 | 暗 3.17（勉強，而且和開著的圓鈕顏色不一致） | 圓鈕一律 `bg-on-fill`（暗 5.61） |
+| `border-paper` 當貼紙白邊 | 暗色變成靛藍，貼紙感消失 | 改 `border-sticker` |
+| brand-hover 當文字放在 tint-strong 上 | 暗 4.10 | 不出現；粉色字的 hover 只出現在 paper、blush 上（暗 5.92、5.14） |
+| 白字放在 ink 上（亮色報告裡的提示訊息組合） | 暗 1.09 | 目前沒有元件這樣用；之後要做提示訊息，用 `bg-paper text-ink`＋`shadow-overlay` |
 
 ## 4. Typography
 
@@ -256,25 +320,30 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 ### Elevation（三層）
 
-| token | Tailwind | 值 | 用途 |
-|---|---|---|---|
-| shadow.raised（第 1 層） | `shadow-raised` | `0 10px 22px -10px rgb(120 30 70 / .55)` | 貼紙封面 |
-| shadow.chrome（第 2 層） | `shadow-chrome-up`／`shadow-chrome-down` | 1px `line` 框線＋往外 20–24px 淡粉陰影 | 分頁列與手機面板（往上）、閱讀器頂端列與章節頁小頂列（往下） |
-| shadow.overlay（第 3 層） | `shadow-overlay` | `0 18px 40px -12px rgb(120 30 70 / .45)` | 閱讀器提示框、寬螢幕的側邊面板 |
+| token | Tailwind | 亮色 | 暗色 | 用途 |
+|---|---|---|---|---|
+| shadow.raised（第 1 層） | `shadow-raised` | `0 10px 22px -10px rgb(120 30 70 / .55)` | 同樣的形狀，顏色 `rgb(0 0 0 / .7)` | 貼紙封面 |
+| shadow.chrome（第 2 層） | `shadow-chrome-up`／`shadow-chrome-down` | 1px `line` 框線＋往外 20–24px 淡粉陰影（up `rgb(200 26 96 / .25)`、down `rgb(120 30 70 / .4)`） | 1px `line`（暗色 `#36386A`）＋`rgb(0 0 0 / .6)` | 分頁列與手機面板（往上）、閱讀器頂端列與章節頁小頂列（往下） |
+| shadow.overlay（第 3 層） | `shadow-overlay` | `0 18px 40px -12px rgb(120 30 70 / .45)` | 同樣的形狀，顏色 `rgb(0 0 0 / .6)` | 閱讀器提示框、寬螢幕的側邊面板 |
+
+- 暗色的陰影改成黑色：粉紫色的陰影在靛藍底上看起來像髒污，黑色才有「浮起來」的感覺。形狀（位移、模糊、擴散）兩套一樣。
+- 陰影的顏色寫成變數（`--shade-*`、`--color-line`、`--color-brand-edge`），暗色只換變數，寫法見 15.1。
 
 不是高度層級、但也用 box-shadow 實作的：
-- `shadow-edge`／`shadow-edge-sm`／`shadow-edge-pressed`：主要按鈕、播放鈕、正在看的數字格下緣的深粉厚邊（像可以按下去的實體按鈕）。
-- `shadow-float`：浮在漫畫上的控制項的白邊＋墨線＋貼紙陰影。
-- `shadow-ring-selected`／`shadow-ring-hint`／`shadow-ring-hint-plain`：閱讀器泡泡框（7.17）。
-- 卡片一律不加陰影；白卡靠 `inset-ring-2 inset-ring-line`，淡粉卡靠底色。
+- `shadow-edge`／`shadow-edge-sm`／`shadow-edge-pressed`：主要按鈕、播放鈕、正在看的數字格下緣的厚邊（像可以按下去的實體按鈕）。顏色是 `brand-edge`：亮色 `#8F1244`、暗色 `#C23A78`。
+- `shadow-float`：浮在漫畫上的控制項的白邊＋墨線＋貼紙陰影。**兩套一樣**（疊在漫畫上，漫畫不變暗）。
+- `shadow-ring-selected`／`shadow-ring-hint`／`shadow-ring-hint-plain`：閱讀器泡泡框（7.17）。**兩套一樣**。
+- 卡片一律不加陰影；白卡靠 `inset-ring-2 inset-ring-line`，淡粉卡靠底色。暗色也一樣（「白卡」在暗色是 paper 底的靛藍卡）。
 
 ## 7. Component Guidelines
 
+**暗色怎麼套到元件上**：元件的 class 兩套共用，暗色只靠 token 換值，不寫 `dark:`。下面每個元件只在暗色有不同的地方加「暗色：」說明；沒寫的就是照 token 自動換，對比見第 3 節。
+
 通用狀態規則：
 - **hover** 只在有滑鼠的裝置出現（Tailwind v4 的 `hover:` 本來就包在 `@media (hover: hover)` 裡），不能只靠 hover 傳達資訊。
-- **focus-visible**：全站統一 `outline: 3px solid var(--color-brand); outline-offset: 2px`（寫在 base，元件不用各自寫；圓角跟著元件）。疊在漫畫上的元件改用 `shadow-ring-selected` 的三層框。
+- **focus-visible**：全站統一 `outline: 3px solid var(--color-brand); outline-offset: 2px`（寫在 base，元件不用各自寫；圓角跟著元件）。疊在漫畫上的元件改用 `shadow-ring-selected` 的三層框。暗色時外框是亮粉（paper 6.74、blush 5.85、blush-strong 4.66）。
 - **active（按下）**：iOS Safari 預設不觸發 `:active`，要在 `main.ts` 加一行 `document.addEventListener('touchstart', () => {}, { passive: true })`。
-- **disabled**：不用整顆 `opacity`（半透明的粉看起來像壞掉），改用停用色：`bg-blush-strong text-ink-faint`（4.73），移除厚邊與按下效果，`cursor-not-allowed`。
+- **disabled**：不用整顆 `opacity`（半透明的粉看起來像壞掉），改用停用色：`bg-blush-strong text-ink-faint`（亮 4.73、暗 4.92），移除厚邊與按下效果，`cursor-not-allowed`。
 - **loading（處理中）**：按鈕寬度不變，文字換成同一個動詞的進行式（「儲存中…」），`aria-busy="true"`，不接受第二次按下；底色維持（不是停用），不加轉圈。
 - **error**：外框或文字變 danger，旁邊一定有文字說明怎麼修。
 
@@ -282,21 +351,22 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 | 變體 | 尺寸 | default | hover | focus-visible | active（按下） | disabled | loading |
 |---|---|---|---|---|---|---|---|
-| primary | lg 56／md 44／sm 36 | `bg-brand text-white`＋lg `shadow-edge`、md/sm `shadow-edge-sm` | `bg-brand-hover` | 3px brand 外框 | 下沉 `translate-y-0.75`（sm `translate-y-0.5`）＋`shadow-edge-pressed`＋`bg-brand-pressed` | `bg-blush-strong text-ink-faint shadow-none` | 「…中…」，底色不變 |
+| primary | lg 56／md 44／sm 36 | `bg-brand text-on-fill`＋lg `shadow-edge`、md/sm `shadow-edge-sm` | `bg-brand-hover` | 3px brand 外框 | 下沉 `translate-y-0.75`（sm `translate-y-0.5`）＋`shadow-edge-pressed`＋`bg-brand-pressed` | `bg-blush-strong text-ink-faint shadow-none` | 「…中…」，底色不變 |
 | secondary | 跟著旁邊的主要按鈕（56／44／36） | `bg-paper text-ink inset-ring-2 inset-ring-line` | `bg-blush` | 同上 | `bg-blush` | `text-ink-faint` | 同上 |
 | soft | 36（觸控區補到 44） | `bg-blush text-brand` | `bg-blush-strong` | 同上 | `bg-blush-strong` | `bg-mist text-ink-faint` | 同上 |
 | text | 高 44、左右 8 | `text-ink-soft` 無底 | `bg-blush` | 同上 | `bg-blush` | `text-ink-faint` | — |
-| danger | md 44 | `bg-danger text-white` | `bg-danger-hover` | 同上 | `bg-danger-hover` | 停用色 | 同上 |
-| warning | md 44 | `bg-warning text-white`（5.43） | 底不變 | 同上 | `active:scale-98`（減少動態時不縮） | 停用色 | 同上 |
+| danger | md 44 | `bg-danger text-on-fill` | `bg-danger-hover` | 同上 | `bg-danger-hover` | 停用色 | 同上 |
+| warning | md 44 | `bg-warning text-on-fill`（亮 5.43、暗 11.60） | 底不變 | 同上 | `active:scale-98`（減少動態時不縮） | 停用色 | 同上 |
 
 - 文字：lg 用 `text-label`（18）、md 用 `text-body font-extrabold`、sm 用 `text-meta font-extrabold`。中文字在 Huninn 不會變粗，越南文與數字會。
 - 全部 `rounded-full`。lg 在手機上 `w-full`（最寬 360 的地方由 page-design-spec 指定）。
 - 一個畫面只有一顆 primary lg（「繼續閱讀」「開始複習」「送出」「下一題」「儲存」「回到總覽」）。
-- 兩段文字的按鈕（「繼續閱讀」＋「第 54 話」、「下一話」＋「第 55 話」）：第二段 `font-bold text-meta opacity-90`（白字在深粉上 90% 仍 ≥ 4.5），間距 10，不用中點。
+- 兩段文字的按鈕（「繼續閱讀」＋「第 54 話」、「下一話」＋「第 55 話」）：第二段 `font-bold text-meta opacity-90`（on-fill 90% 疊在主粉上：亮 4.72、暗 6.46，暗色按下 4.85），間距 10，不用中點。
+- **暗色**：主要按鈕是亮粉底配深色字（7.62）。hover、按下往深一階走（`#FF6BA8`、`#F2559A`），和亮色一樣是「越按越深」；厚邊 `#C23A78`。危險按鈕是淺紅底深色字（8.33），提醒按鈕是黃橘底深色字（11.60）。次要、柔和、文字按鈕照 token 換。
 - **次要按鈕當危險動作**（「刪除卡片」）：secondary 的字改 `text-danger`；確認中換成 danger 實心。「重設為新卡」確認中換成 warning 實心。
 - **有改動才亮的儲存鈕**（單張字卡）：沒改動 secondary＋disabled；有改動換成 primary md。
 - 圓形圖示鈕（返回、重新整理、結束）：`size-11 rounded-full grid place-items-center`；白底版 `bg-paper text-ink-soft inset-ring-2 inset-ring-line`、淡粉版 `bg-blush text-ink-soft`。必須有 `aria-label`。**一律 44**，閱讀器頂端列與章節頁小頂列也是（預覽的 40 改 44）。
-- 播放鈕：`size-13 rounded-full bg-brand text-white shadow-edge-sm grid place-items-center`。
+- 播放鈕：`size-13 rounded-full bg-brand text-on-fill shadow-edge-sm grid place-items-center`。
 - `prefers-reduced-motion`：按下不位移、不縮放，只換成 pressed 底色（`motion-reduce:active:translate-y-0 motion-reduce:active:scale-100`）。
 - 觸控區不足 44 的（sm 36、soft 36）：`relative before:absolute before:-inset-1 before:content-['']` 補到 44。
 
@@ -315,17 +385,21 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - 選中：整格 `text-brand`、圖示底 `bg-blush-strong`、`aria-current="page"`。選中有圖示底塊＋顏色兩種差異，不只靠顏色。
 - 按下：圖示底先出現 `bg-blush`，`active:scale-92`（`duration-120`）。
 - 切換分頁不做動畫。
+- 暗色：列是靛藍底，上緣 1px `#36386A` 線＋黑色陰影；未選 `text-ink-faint`（7.11），選中亮粉字在 `#3D3080` 圖示底上（4.66）。
 
 ### 7.4 Badge
 
 | 變體 | 樣式 | 用途 |
 |---|---|---|
-| 計數徽章 | `absolute -top-1 left-[calc(50%+10px)] h-5 min-w-5.5 rounded-full bg-sun px-1.5 text-caption font-black leading-5 text-ink tabular-nums ring-2 ring-paper` | 練習分頁的 `standing.remaining`；0 或抓不到時不顯示 |
+| 計數徽章 | `absolute -top-1 left-[calc(50%+10px)] h-5 min-w-5.5 rounded-full bg-sun px-1.5 text-caption font-black leading-5 text-on-sun tabular-nums ring-2 ring-paper` | 練習分頁的 `standing.remaining`；0 或抓不到時不顯示 |
 | 數量標籤 | `rounded-full bg-blush px-2.5 text-meta text-brand tabular-nums` | 「8 部」「共 316 張」「171」 |
-| 點綴標籤 | `rounded-full bg-sun px-2.5 text-caption text-ink` | 「繼續看」；「本話完」加 `-rotate-3` |
+| 點綴標籤 | `rounded-full bg-sun px-2.5 text-caption text-on-sun` | 「繼續看」；「本話完」加 `-rotate-3` |
 | 小標籤 | `rounded-full bg-blush px-2 text-caption text-ink-soft` | 深入查詢裡的詞性 |
 
 數字變化時 `animate-bump`（第 9 節）。徽章的數字要在分頁的 `aria-label` 裡讀出來（「N 張等待複習」，現有）。
+
+- **黃色上的字一律 `text-on-sun`**，不用 `text-ink`：`ink` 在暗色是淺色，黃底配淺字只有 1.32。
+- 暗色：徽章和點綴標籤的黃底、墨色字都不變（10.95）；徽章外圈 `ring-paper` 跟著變靛藍，和分頁列底色接在一起。數量標籤亮粉在 `#2C2560` 上 5.85。
 
 ### 7.5 Card
 
@@ -335,10 +409,12 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 淡粉大卡 | `rounded-panel bg-blush px-5 pt-5.5 pb-6` | 練習總覽「今天」、題目卡、玩法、「這一輪做完了」結果 |
 | 繼續看卡 | `rounded-card bg-paper p-4 grid grid-cols-[6rem_1fr] gap-4` | 書庫頂區裡唯一的一張 |
 | 書架封面 | `relative aspect-3/4 overflow-hidden rounded-card bg-blush-strong`＋`<img class="size-full object-cover object-top">`＋`after:absolute after:inset-0 after:rounded-card after:inset-ring-1 after:inset-ring-ink/8` | 書庫兩欄封面；不歪、不加白邊、不加陰影 |
-| 貼紙封面 | `aspect-3/4 overflow-hidden rounded-tile border-4 border-paper bg-blush-strong shadow-raised -rotate-4 backface-hidden`（章節頁 `rotate-3`） | 只用在「繼續看」與章節頁頂區 |
+| 貼紙封面 | `aspect-3/4 overflow-hidden rounded-tile border-4 border-sticker bg-blush-strong shadow-raised -rotate-4 backface-hidden`（章節頁 `rotate-3`） | 只用在「繼續看」與章節頁頂區 |
 
-- 能點的卡片整張是一個連結。字卡按下 `active:bg-blush`；封面按下 `active:scale-97`。不做 hover 浮起；桌機 hover 時封面外框 `hover:outline-2 hover:outline-brand-vivid`（白底 3.11）。
-- 封面載入中底色 `bg-blush-strong`，載入完淡入（`duration-200`）；失敗時 `bg-mist`＋中間 32px 書本線條圖示 `text-ink-faint`（5.08）。
+- 能點的卡片整張是一個連結。字卡按下 `active:bg-blush`；封面按下 `active:scale-97`。不做 hover 浮起；桌機 hover 時封面外框 `hover:outline-2 hover:outline-brand-vivid`（亮 3.11、暗 5.04）。
+- 封面載入中底色 `bg-blush-strong`，載入完淡入（`duration-200`）；失敗時 `bg-mist`＋中間 32px 書本線條圖示 `text-ink-faint`（亮 5.08、暗 6.31）。
+- **貼紙白邊兩套都是白**（`border-sticker`）。白邊是「這是一張貼紙」的記號，暗色裡反而更跳。陰影在暗色換成黑色（第 6 節）。
+- 暗色：封面圖片原色，不加濾鏡、不調暗。書架封面的 `after:inset-ring-ink/8` 在暗色會變成 8% 的淡色細框，讓深色封面和靛藍底分得開，不用另外改。白卡變成靛藍卡配 `#36386A` 框，淡粉大卡變成 `#2C2560`。
 - 卡片標題（越南文）`text-heading`；中文翻譯 `text-meta text-ink-soft`；截斷用 `line-clamp-2`／`line-clamp-3`。
 
 ### 7.6 清單列（List row）
@@ -355,14 +431,16 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - 容器：`<ol class="grid grid-cols-5 gap-2.5">`（≥ 640 改 auto-fill，見第 6 節）。
 - 格子（連結）：`relative grid h-13 place-items-center rounded-tile text-label font-extrabold tabular-nums transition-transform duration-120 ease-standard`（52 高、390 寬時約 63 寬）。
 
-| 狀態 | 樣式 | 對比 |
-|---|---|---|
-| 還沒看（含看到一半但不是正在看） | `bg-paper text-ink inset-ring-2 inset-ring-line` | 15.81 |
-| 看過 | `bg-mist text-ink-faint font-bold` | 5.08 |
-| 正在看 | `bg-brand text-white shadow-edge-sm`＋右上黃點 `after:absolute after:-top-1 after:-right-1 after:size-3.5 after:rounded-full after:bg-sun after:ring-2 after:ring-paper` | 5.57 |
-| 按下 | `active:scale-94`；減少動態時改 `active:bg-blush` | — |
-| hover（桌機） | `hover:outline-2 hover:outline-brand-vivid` | 3.11 |
-| focus-visible | 全站外框 | 5.57 |
+| 狀態 | 樣式 | 亮色對比 | 暗色對比 |
+|---|---|---|---|
+| 還沒看（含看到一半但不是正在看） | `bg-paper text-ink inset-ring-2 inset-ring-line` | 15.81 | 14.35 |
+| 看過 | `bg-mist text-ink-faint font-bold` | 5.08 | 6.31 |
+| 正在看 | `bg-brand text-on-fill shadow-edge-sm`＋右上黃點 `after:absolute after:-top-1 after:-right-1 after:size-3.5 after:rounded-full after:bg-sun after:ring-2 after:ring-paper` | 5.57 | 7.62 |
+| 按下 | `active:scale-94`；減少動態時改 `active:bg-blush` | — | — |
+| hover（桌機） | `hover:outline-2 hover:outline-brand-vivid` | 3.11 | 5.04 |
+| focus-visible | 全站外框 | 5.57 | 6.74 |
+
+- 暗色：正在看是亮粉格配深色數字，看過是 `#262852` 格配 `#AEA9DC` 數字。看過和還沒看的底色在暗色更接近（和亮色一樣靠「實心底 vs 外框」與字重分），不另外加差異。
 
 - 「看過」與「還沒看」除了顏色還差在「實心底 vs 外框」與字重；每格 `aria-label` 寫狀態（page-design-spec 2.2）。
 - 圖例的小方塊：`size-3 rounded-[4px]`，三種狀態同上。
@@ -372,8 +450,8 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 | 狀態 | 文字輸入框、textarea |
 |---|---|
-| default | `rounded-card bg-paper px-4 py-3 text-body text-ink inset-ring-2 inset-ring-line-strong`（3.65） |
-| placeholder | `placeholder:text-ink-faint`（5.80）；placeholder 不能取代 label |
+| default | `rounded-card bg-paper px-4 py-3 text-body text-ink inset-ring-2 inset-ring-line-strong`（亮 3.65、暗 4.96） |
+| placeholder | `placeholder:text-ink-faint`（亮 5.80、暗 7.11）；placeholder 不能取代 label |
 | hover | 不變 |
 | focus | `focus:inset-ring-3 focus:inset-ring-brand focus-visible:outline-none`（變色＋變粗兩種差異） |
 | read-only | `read-only:bg-blush read-only:text-ink-soft read-only:inset-ring-line` |
@@ -385,14 +463,15 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - label 在輸入框上方：`text-label text-ink`（表單）或 `text-caption text-ink-soft`（收卡面板）；說明文字 `text-caption text-ink-soft`，在 label 下、框上。
 - 字數計數：`text-caption text-ink-faint text-right`。
 - **搜尋框**：`flex h-12 items-center gap-2 rounded-full bg-blush px-4 text-body`，放大鏡 `size-5 text-ink-faint`；`focus-within:inset-ring-3 focus-within:inset-ring-brand`。不畫 ≥ 3:1 的外框，見第 12 節。
+- 暗色：輸入框是靛藍底配 `#8A8CC4` 外框；作答欄的對錯外框在 `#2C2560` 上答對 6.09、答錯 4.91。`color-scheme: dark` 會讓 iPhone 的鍵盤、游標、捲軸也變成暗的。
 
 ### 7.9 Switch（開關）
 
 - 整列是 `<button role="switch" :aria-checked>`，標籤在左、軌道在右，整列 `min-h-13`（或膠囊版 `h-9`，觸控區補到 44）。
-- 軌道：`relative h-7 w-11 rounded-full transition-colors duration-120`；關 `bg-line-strong`（白鈕 3.65、對白 3.65、對淡粉 3.31）、開 `bg-brand`（5.57）。
-- 圓鈕：`absolute top-0.75 left-0.75 size-5.5 rounded-full bg-white transition-[translate] duration-120 ease-standard`；開時 `translate-x-4`。
-- disabled（玩法只剩一個開著時，那一個不能關）：開著的軌道改 `bg-brand-vivid`（白鈕 3.11，仍看得出是開），標籤 `text-ink-faint`，`cursor-not-allowed`；旁邊說明為什麼不能關（現有字）。
-- 閱讀器「標示」膠囊：`inline-flex h-9 items-center gap-2 rounded-full bg-paper px-3 text-meta text-ink-soft shadow-float`，裡面同一個開關。
+- 軌道：`relative h-7 w-11 rounded-full transition-colors duration-120`；關 `bg-line-strong`（亮色：白鈕 3.65、對白 3.65、對淡粉 3.31；暗色：圓鈕 5.61、對 paper 4.96、對 blush 4.30）、開 `bg-brand`（亮 5.57、暗 7.62）。
+- 圓鈕：`absolute top-0.75 left-0.75 size-5.5 rounded-full bg-on-fill transition-[translate] duration-120 ease-standard`；開時 `translate-x-4`。亮色是白鈕，暗色是深紫鈕。
+- disabled（玩法只剩一個開著時，那一個不能關）：開著的軌道改 `bg-brand-vivid`（亮色白鈕 3.11、暗色圓鈕 5.70，仍看得出是開），標籤 `text-ink-faint`，`cursor-not-allowed`；旁邊說明為什麼不能關（現有字）。暗色時鮮粉比亮粉深一點，所以停用的軌道看起來比開著的深；分辨停用靠標籤變淡和旁邊的說明，不靠軌道深淺。
+- 閱讀器「標示」膠囊：`inline-flex h-9 items-center gap-2 rounded-full bg-paper px-3 text-meta text-ink-soft shadow-float`，裡面同一個開關。暗色時膠囊是靛藍底，外圈的白 2px＋墨 1px 不變。
 
 ### 7.10 狀態標籤（Chip）
 
@@ -404,17 +483,17 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 ### 7.11 分段選擇（Segmented control）
 
 - 軌道：`inline-flex rounded-full bg-blush p-1`。
-- 選項：`h-9 rounded-full px-4 text-meta text-ink-soft`（深入查詢的模型選擇可用 `px-3`）；選中 `bg-brand text-white`。整個軌道 44 高。
+- 選項：`h-9 rounded-full px-4 text-meta text-ink-soft`（深入查詢的模型選擇可用 `px-3`）；選中 `bg-brand text-on-fill`（亮 5.57、暗 7.62）。整個軌道 44 高。
 - 語意：互斥選擇用 `role="radiogroup"`／`role="radio"`＋`aria-checked`；切換型用 `aria-pressed`（沿用現有）。
 - 處理中整組 `disabled`，文字 `text-ink-faint`。
 
 ### 7.12 Progress（進度條）
 
-- **確定進度**：軌道 `h-2.5 overflow-hidden rounded-full bg-paper inset-ring-2 inset-ring-line`（練習中 `h-3`）；填色 `h-full rounded-full bg-brand-vivid transition-[width] duration-200 ease-standard`（對白色軌道 3.11）。
+- **確定進度**：軌道 `h-2.5 overflow-hidden rounded-full bg-paper inset-ring-2 inset-ring-line`（練習中 `h-3`）；填色 `h-full rounded-full bg-brand-vivid transition-[width] duration-200 ease-standard`（對 paper 軌道：亮 3.11、暗 5.04）。
   - 放在淡粉底上時填色改 `bg-brand`（鮮粉在淡粉上 2.82）。
   - 一定搭配文字數字（「54 / 149」「還剩 12 張」）；`role="progressbar"`＋`aria-valuenow`／`aria-valuemax`／`aria-label`。
-- **不定進度**（深入查詢解析中）：軌道 `h-1 overflow-hidden rounded-full bg-blush-strong`；滑塊 30% 寬 `bg-brand`（4.54）來回滑 1.4s；減少動態時靜止。旁邊一定有「解析中… N 秒」。
-- **比例條**（字卡分布）：`flex h-4 gap-0.75`，每段 `min-w-2 rounded-full bg-st-*-graphic`，`role="img"`＋完整數字的 `aria-label`。
+- **不定進度**（深入查詢解析中）：軌道 `h-1 overflow-hidden rounded-full bg-blush-strong`；滑塊 30% 寬 `bg-brand`（亮 4.54、暗 4.66）來回滑 1.4s；減少動態時靜止。旁邊一定有「解析中… N 秒」。
+- **比例條**（字卡分布）：`flex h-4 gap-0.75`，每段 `min-w-2 rounded-full bg-st-*-graphic`，`role="img"`＋完整數字的 `aria-label`。暗色的圖形色見第 3 節（paper 上 5.66–8.20）。
 
 ### 7.13 Panel／面板
 
@@ -427,6 +506,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - 標題列：左 `text-heading`、右「收合」／「關閉」secondary sm；下一行 `text-caption text-ink-soft`（第 12 頁）。
 - 開啟：從下往上 `duration-280 ease-standard`；收起 `duration-200`。不畫拖曳把手（沒有拖曳功能）。
 - 開啟後焦點移到第一個輸入框（沿用）；Esc 收合。
+- 暗色：面板是靛藍底，上緣 1px `#36386A` 線＋黑色陰影；遮罩 `scrim` 換成 `#0C0C24` 60%（比亮色深，才蓋得住靛藍底）。
 
 ### 7.14 訊息框（成功／錯誤／提醒）
 
@@ -438,6 +518,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 - 框裡要再放另一張卡的內容：`mt-2 rounded-tile bg-paper p-3`，原文 `text-body font-bold text-ink lang="vi"`、譯文 `text-meta text-ink-soft`。
 - 成功的短訊（「已儲存」）可用膠囊：`inline-flex h-9 items-center gap-1.5 rounded-full bg-success-tint px-3.5 text-meta text-success`，前面打勾圖示。
+- 暗色：三種框都是深色淡底配亮色字（成功 6.46、錯誤 5.48、提醒 6.86）。框裡的白色小框跟著變靛藍。提醒框裡直接放的次要字（`text-ink-soft`、`text-ink-faint`，例如收卡面板的「單字」「到字卡庫修改」）在 `#483C41` 上是 6.55、4.76（亮色 6.18、5.26）。
 
 ### 7.15 Empty state／Error state
 
@@ -445,7 +526,8 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 - 置中欄，上方留 64：貼紙 → 標題 `text-heading text-ink`（`mt-4`）→ 說明 `text-meta text-ink-soft max-w-[22em]`（`mt-1.5`）→ 按鈕列 `mt-6 flex gap-3`（primary md＋secondary md）。
 - **錯誤貼紙**：`grid size-18 place-items-center rounded-full bg-blush-strong text-brand -rotate-6 ring-5 ring-paper outline-2 outline-blush-strong`，圖示 32、2px 線條。
-- **空狀態貼紙**：同上，改 `bg-sun text-ink -rotate-8`。
+- **空狀態貼紙**：同上，改 `bg-sun text-on-sun -rotate-8`。
+- 暗色：錯誤貼紙是 `#3D3080` 底配亮粉圖示（4.66），空狀態貼紙黃底墨色圖示不變；外圈 `ring-paper` 跟著變靛藍，像貼在頁面上。
 - 錯誤的標題說發生什麼、說明說怎麼修；空狀態說下一步。一個畫面一定有一顆 primary（只剩次要動作時把它升成 primary）。
 - 漫畫頁載入失敗：保留頁面比例的 `bg-mist` 方塊，中間 `text-meta text-ink-soft`「第 n 頁載入失敗」＋secondary md「重試」。
 
@@ -464,8 +546,17 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - `sticky top-[env(safe-area-inset-top)] z-10 rounded-b-panel bg-paper shadow-chrome-down transition-transform duration-200 ease-standard`；藏起時 `-translate-y-[calc(100%+1rem)]`（連陰影一起移出畫面）。
 - 底色**不透明**。
 - 內容：淡粉圓鈕返回（44）→ 書名 `text-body font-extrabold truncate leading-title`＋話數 `text-caption text-ink-soft` → 右側留白給浮動控制項。
+- 暗色：頂端列跟著主題變靛藍，下緣 1px `#36386A` 線＋黑色陰影；返回鈕 `#2C2560` 底。章節頁的小頂列一樣。
 
-**浮在漫畫上的控制項**（固定在右上角的「標示」與「＋收卡」，頂端列藏起時也留著）：一律加 `shadow-float`（白 2px＋墨 1px＋貼紙陰影），不管底下是什麼顏色都有一圈看得見。「＋收卡」是 primary sm，但浮動時用 `shadow-float` 取代 `shadow-edge-sm`（白邊會蓋住厚邊），按下只換 `bg-brand-pressed`、不位移。
+**暗色時閱讀器哪些變、哪些不變**：
+
+| 變（跟著主題） | 不變（兩套一樣） |
+|---|---|
+| 頂端列、章節頁小頂列、收卡與深入查詢面板、提示框、閱讀欄底色（窄頁兩側看得到）、漫畫頁載入中與失敗的佔位、寬螢幕兩側 | 漫畫頁本身（不調暗、不反轉、不加濾鏡）、泡泡框三層框（`shadow-ring-*`）、選中與 hover 的填色 `brand-wash`、浮動控制項的外圈 `shadow-float` |
+
+不變的理由：它們疊在漫畫圖上，不是疊在介面底上。漫畫在兩套裡都一樣，框和外圈的驗算（contrast-report 第 4 節）也就兩套通用。
+
+**浮在漫畫上的控制項**（固定在右上角的「標示」與「＋收卡」，頂端列藏起時也留著）：一律加 `shadow-float`（白 2px＋墨 1px＋貼紙陰影），不管底下是什麼顏色都有一圈看得見。「＋收卡」是 primary sm，但浮動時用 `shadow-float` 取代 `shadow-edge-sm`（白邊會蓋住厚邊），按下只換 `bg-brand-pressed`、不位移。暗色時「＋收卡」是亮粉底深色字、「標示」是靛藍膠囊，外圈照舊白＋墨。
 
 **泡泡框**（`ReaderPage.vue` 的 OCR 框）：
 
@@ -480,25 +571,52 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 驗算見 contrast-report 第 4 節：深粉在中灰只有 1.41、白在粉紅只有 2.16，單色框做不到「任何漫畫上都看得清楚」，所以一定三層一起用。
 
-**提示框**（點泡泡後的翻譯框）：白底墨框，像漫畫的對話框。
+**提示框**（點泡泡後的翻譯框）：亮色是白底墨框，像漫畫的對話框；暗色見本段最後一點。
 - `absolute z-10 my-3 w-72 max-w-[90%] rounded-card border-2 border-ink bg-paper p-3.5 shadow-overlay`；定位沿用 `popoverStyle`。
 - 譯文 `text-body text-ink`；分隔 `my-2 border-t border-line`；原文 `text-meta font-bold text-ink-soft lang="vi"`。
 - 沒有翻譯時「（這句還沒有翻譯）」`text-ink-faint`。
 - 動作列 `mt-3 flex justify-end gap-2`：secondary sm「深入查詢」、primary sm「加入句子」。
 - 出現：`opacity 0→1`＋`scale .96→1`，`duration-120 ease-standard`。
+- **暗色**：提示框跟著主題，變成靛藍底配淺色框（`border-ink` 在暗色是 `#F6F3FF`），像反白的對話框。不保留白底：在暗色裡突然跳出一塊白會很刺眼。疊在漫畫上仍然每種底色都看得見：淺色框和靛藍底兩層，至少一層 ≥ 3:1（白漫畫靠底 15.71、黑網點靠框 19.18、中灰 3.98／3.61、紅 3.97／3.62，見 contrast-report 6.4）。陰影換成黑色。
 
 **「已加入」膠囊**（收卡成功後 4 秒）：成功膠囊（7.14）加 `max-w-64 truncate shadow-float`，原文 `lang="vi"`；`role="status"`。
 
-**寬螢幕**：≥ 1024 閱讀欄兩側 `bg-blush`。
+**寬螢幕**：≥ 1024 閱讀欄兩側 `bg-blush`（暗色 `#2C2560`）。
 
-**章末**：「本話完」點綴標籤 `-rotate-3`；「下一話」primary lg（最寬 360）；「回到章節列表」text 按鈕。
+**章末**：「本話完」點綴標籤 `-rotate-3`（`text-on-sun`）；「下一話」primary lg（最寬 360）；「回到章節列表」text 按鈕。
+
+### 7.18 主題切換鈕（新）
+
+在亮色和暗色之間切換的圓形圖示鈕。
+
+- **位置**：只放在書庫頁首的右上角，重新整理鈕的**左邊**，兩顆並排（`flex items-center gap-2.5`）。閱讀器、字卡庫、練習都不放。
+- **一直顯示**：書庫載入中、出錯、沒有漫畫時也在。重新整理鈕照舊載入完才出現，出現時接在切換鈕右邊。
+- **樣子**：沿用 `iconButton`（`grid size-11 shrink-0 place-items-center rounded-full bg-paper text-ink-soft inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush`），圖示 24、2px 圓頭線條。圖示對比：亮 6.82、暗 9.79。
+
+| 現在的主題 | 顯示的圖示 | `aria-label` | 按下去 |
+|---|---|---|---|
+| 亮色 | 月亮 | 換成暗色 | 換成暗色 |
+| 暗色 | 太陽 | 換成亮色 | 換成亮色 |
+
+- 圖示畫的是「按下去會變成什麼」，名稱寫的是按下去的動作。不加 `aria-pressed`，名稱已經說清楚了，再加會讓報讀說兩次。
+- 圖示路徑（24×24，`fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`，取自預覽）：
+  - 月亮：`<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>`
+  - 太陽：`<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>`
+- **狀態**：default、hover、active 照 `iconButton`；focus-visible 全站外框；沒有 disabled、loading（切換是瞬間的，不會失敗）。
+- **按下去**：`<html>` 加上或拿掉 `data-theme="dark"`，`theme-color` 換成新主題的頁面底（15.2），記住這次的選擇。整頁瞬間換色，不做淡入淡出；焦點留在這顆按鈕上，圖示和名稱同時換。
+- **預設行為**：
+  - 第一次打開跟著手機或電腦的深淺設定（`prefers-color-scheme`）。還沒按過時，手機切換深淺，App 也跟著換。
+  - 按過一次，就把選擇記在這台裝置的瀏覽器裡（`localStorage`），之後不再跟著手機變。iPhone 和 Mac 各記各的。
+  - 只有亮色、暗色兩種，不做「跟著手機」第三個選項。
+  - 瀏覽器不讓存（例如私密瀏覽）時，就跟著手機；按了只在這次打開有效。
 
 ## 8. Responsive Guidelines
 
-- **色彩模式**：只有亮色。`:root { color-scheme: light; }`＋`<meta name="color-scheme" content="light">`；不寫任何暗色樣式。手機開深色模式時，表單控制項、捲軸也維持亮色。
+- **色彩模式**：亮色和暗色兩套，由 `<html>` 的 `data-theme` 決定（第 3 節開頭、7.18）。亮色 `color-scheme: light`、暗色 `color-scheme: dark`，所以表單控制項、捲軸、iPhone 鍵盤會跟著 App 的主題，不是跟著手機。`<meta name="color-scheme" content="light dark">`。
 - **iPhone 主畫面 PWA**（主要情境）：
-  - `index.html`：`theme-color` 改 `#FFFFFF`；`apple-mobile-web-app-status-bar-style` 從 `black-translucent` 改成 **`default`**（black-translucent 的時鐘永遠是白字，在白底上看不到）。改了之後如果狀態列還是白字，要把主畫面圖示刪掉重新加入。
-  - `manifest.webmanifest`：`background_color` 與 `theme_color` 都改 `#FFFFFF`。
+  - `index.html`：`theme-color` 跟著主題（亮 `#FFFFFF`、暗 `#1E1F45`），由開頁前的小腳本和切換鈕一起改（15.2）。`apple-mobile-web-app-status-bar-style` 從 `black-translucent` 改成 **`default`**（black-translucent 的時鐘永遠是白字，在白底上看不到）。改了之後如果狀態列還是白字，要把主畫面圖示刪掉重新加入。做暗色時也**維持 `default`**，不再改：這個值在加入主畫面時就固定，每改一次都要刪掉圖示重加。
+  - **要實機確認**：手機是亮色、App 選暗色時，時鐘那一條可能還是白底黑字（`default` 有的 iOS 版本跟著手機、有的跟著 `theme-color`）。結果要在 iPhone 上看；不行再決定要不要接受（紀錄在 `docs/design/dark-mode.md`）。
+  - `manifest.webmanifest`：`background_color` 與 `theme_color` 維持 `#FFFFFF`。manifest 不能跟著主題換，它只影響開啟 App 那一瞬間。
   - safe-area 的處理全部保留：`viewport-fit=cover`、`body` 的四邊 `env(safe-area-inset-*)`、狀態列下的固定色條（色條改 `--color-paper`）。改成 `default` 後直式的上方 inset 會是 0，色條自然沒有高度；橫式與一般瀏覽器分頁仍照舊。
   - 既有的 `overscroll-behavior: none`、`-webkit-tap-highlight-color: transparent`、`text-size-adjust`、圖片長按、按鈕不可選取，全部保留。
 - **字重**：≥ 768px 時 Nunito 內文 600 → 700；Huninn 不變。
@@ -531,16 +649,17 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 8. 進度條寬度變化（base）；封面載入完淡入（base）。
 9. 循環動畫只有三種：載入圓點、重新整理圖示旋轉、不定進度條。
 
-**不動的地方**：分頁切換、元素逐一進場、捲動進場、卡片 hover 浮起、答錯、封面歪斜（是靜態的）、章節頁捲到正在看（瞬間定位）。
+**不動的地方**：分頁切換、元素逐一進場、捲動進場、卡片 hover 浮起、答錯、封面歪斜（是靜態的）、章節頁捲到正在看（瞬間定位）、**切換亮色／暗色**（整頁瞬間換色，不做淡入淡出；有 `transition-colors` 的元件會各自慢一拍，看起來像閃爍，所以切換時不靠過渡）。
 
 **`prefers-reduced-motion: reduce`**：所有 transition 與 animation 縮成 0.01ms（base 層一次處理）；循環動畫改 `motion-safe:` 才加；按下不位移、不縮放，改成按下的底色；閱讀器頂端列直接出現／消失（藏與出的行為照舊）。
 
 ## 10. Accessibility
 
-- **對比**：內文 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1。全部組合見 `docs/design/contrast-report.md`；第 3 節列出的組合全部通過。停用狀態 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（淡粉 2 上 ink-faint 4.73）。
-- **focus**：全站 `:focus-visible` 3px 深粉外框、offset 2px。輸入框聚焦用 3px 深粉內框（變粗＋變色）。疊在漫畫上的元件用三層框。
-- **不只靠顏色**：狀態標籤一定有字；數字格的看過／還沒看差在實心 vs 外框；選中分頁有圖示底塊；泡泡框有翻譯／沒翻譯差在有沒有粉色那圈；錯誤一定有文字；開關有圓鈕位置。
-- **鍵盤**：Tab 順序照視覺順序；Esc 關提示框與面板；開關 `role="switch"`；分段選擇 `role="radio"` 或 `aria-pressed`；數字格是 `<ol>` 裡的連結；分組收合用原生 `<details>`；圓形圖示鈕都有 `aria-label`。
+- **對比**：內文 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1。全部組合見 `docs/design/contrast-report.md`；第 3 節列出的組合全部通過。停用狀態 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（淡粉 2 上 ink-faint：亮 4.73、暗 4.92）。
+- **兩套主題都要達 AA**：亮色和暗色分開驗算，每一個使用中的組合在兩套裡都要過門檻。class 兩套共用，所以只要一套沒過，那個組合就禁止（第 3 節「不可用的組合」）。新增元件或新組合時，兩套都要跑 `contrast.py`，結果補進 contrast-report。暗色各項的最低值：文字 4.66（亮粉在 `#3D3080` 上）、停用文字 4.92、控制項外框 4.30、圖形 4.66（解析中的滑塊）。
+- **focus**：全站 `:focus-visible` 3px 主粉外框、offset 2px（亮色深粉、暗色亮粉）。輸入框聚焦用 3px 主粉內框（變粗＋變色）。疊在漫畫上的元件用三層框（兩套一樣）。
+- **不只靠顏色**：狀態標籤一定有字；數字格的看過／還沒看差在實心 vs 外框；選中分頁有圖示底塊；泡泡框有翻譯／沒翻譯差在有沒有粉色那圈；錯誤一定有文字；開關有圓鈕位置。這些差異兩套都在，暗色不另外加。
+- **鍵盤**：Tab 順序照視覺順序；Esc 關提示框與面板；開關 `role="switch"`；分段選擇 `role="radio"` 或 `aria-pressed`；數字格是 `<ol>` 裡的連結；分組收合用原生 `<details>`；圓形圖示鈕都有 `aria-label`。主題切換鈕的名稱跟著狀態換（「換成暗色」／「換成亮色」，7.18）。
 - **語言**：越南文內容一律 `lang="vi"`（書名、字卡原文、填空句、提示框原文、作答欄、「已加入」的原文）。
 - **alt 文字**：封面 `alt` 用顯示用書名；漫畫頁沿用 `alt="第 n 頁"`；裝飾圖示 `aria-hidden="true"`；泡泡圖、比例條用 `role="img"`＋完整數字的 `aria-label`。
 - **表單錯誤**：`aria-invalid="true"`＋`aria-describedby` 指向錯誤文字；錯誤文字說怎麼修（沿用現有寫法）；失敗 `role="alert"`，成功 `role="status"`。
@@ -559,13 +678,18 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - 表情符號當圖示（「⚙」也算，改用 SVG）。
 
 這個品牌專屬：
-- **鮮粉 `#FF4F8B` 放字，或放在淡粉／淡粉 2 上。**
-- **黃色 `#FFD23F` 當文字色，或黃底配白字。** 黃色只當底，上面只放墨色。
+- **鮮粉 `#FF4F8B` 放字，或放在淡粉／淡粉 2 上。**（暗色雖然過了，class 共用，一樣禁止。）
+- **黃色 `#FFD23F` 當文字色，或黃底配 `on-sun` 以外的字。** 黃色只當底，上面只放 `text-on-sun`（墨色）。不用 `text-ink`：暗色時它是淺色。
 - **一個畫面超過一張歪斜的貼紙**；書架封面加白邊或歪斜。
 - **中文加粗、中文斜體**（Huninn 沒有粗體，假粗體會糊）。
 - **到處都是深粉**：深粉只給一顆主要按鈕、選中狀態、正在看、少量粉色數字。一整列重複的動作用 soft 按鈕。
 - 介面用漸層（漸層只存在於預覽的封面佔位）。
-- 任何暗色樣式、`prefers-color-scheme: dark`、深色卡片或深色提示訊息。
+- **元件自己判斷主題**：寫 `dark:` 變體、在元件裡讀 `prefers-color-scheme` 或 `data-theme` 換 class。暗色只靠第 15.1 節的變數覆寫；`prefers-color-scheme` 只在第一次打開時用來選預設（7.18）。
+- **第三套主題**，或「跟著手機」的第三個選項。
+- **近黑底、灰色低彩度的暗色**（`#0B0B0B`、`#111`、`neutral-900`）：暗色的底是靛藍 `#1E1F45`。
+- **`text-white`、`bg-white`、`border-white`、`ring-white`**：實心底上的字和圓鈕用 `on-fill`，貼紙白邊用 `sticker`。
+- **把漫畫頁或封面調暗、反轉、加濾鏡**；暗色時把疊在漫畫上的框（`shadow-ring-*`、`shadow-float`）改色。
+- 暗色裡突然出現一大塊白底（提示框、面板、卡片）。白只留給貼紙白邊和浮動控制項的外圈。
 - 寫死色碼、`bg-neutral-*`、`text-sky-*` 等 Tailwind 內建色票；`text-sm` 這類內建字級。
 - 用整顆 `opacity` 做停用或次要文字。
 - 紅色（重新學習、錯誤）和深粉用在同一個元件裡互相緊鄰。
@@ -575,8 +699,11 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 | 頁面／區塊 | 例外 | 理由 |
 |---|---|---|
-| 閱讀器：漫畫頁 | 漫畫圖本身不做任何處理（不加圓角、不加框、不調色）；頁面之間不留縫 | 漫畫頁不被設計（原則 5） |
+| 閱讀器：漫畫頁 | 漫畫圖本身不做任何處理（不加圓角、不加框、不調色）；頁面之間不留縫。**暗色也不調暗** | 漫畫頁不被設計（原則 5） |
 | 閱讀器：泡泡框、提示框、浮動控制項、「已加入」 | 唯一使用墨色外圈（`shadow-ring-*`、`border-ink`、`shadow-float`）的地方 | 疊在任意圖上要都看得見；單一顏色做不到 |
+| 閱讀器：泡泡框、浮動控制項的外圈、`brand-wash` | 暗色時**不跟著主題換**，維持寫死的粉／白／墨 | 疊在漫畫上，漫畫兩套一樣 |
+| 閱讀器：提示框 | 暗色時跟著主題變靛藍底淺框，`border-ink` 在這裡變成淺色框 | 白底在暗色太刺眼；底和框兩層至少一層 ≥ 3:1（7.17） |
+| 貼紙封面 | 白邊在暗色也是白（`border-sticker`） | 白邊是貼紙的記號 |
 | 閱讀器：泡泡框 | 用 `rounded-tile`，小框會自動變成膠囊形 | 跟對話框的形狀一致 |
 | 書庫「繼續看」卡 | 封面貼紙 −4°、白邊 4px、`shadow-raised`；黃色「繼續看」標籤 | 一個畫面一張貼紙（原則 3） |
 | 章節頁頂區 | 封面貼紙 +3° 置中；手機上頂區內容置中 | 同上；頂區是這頁唯一的焦點 |
@@ -585,7 +712,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 練習總覽泡泡 | 圓的大小照張數比例，最小直徑 64；數字依大小用 `text-display`／`text-headline`／`text-heading` | 大小本身就是資訊 |
 | 今天做完了、這一輪做完了 | 黃色貼紙 −8°、`animate-pop` | 完成時刻 |
 | 錯誤與空狀態貼紙 | −6°／−8° | 同一家族；這個畫面沒有其他貼紙 |
-| 搜尋框 | 不畫 ≥ 3:1 的外框，靠放大鏡圖示（5.26）與提示字（5.26）辨識；聚焦時出現深粉框 | 淡粉膠囊搜尋框是方向 C 的造型；圖示與提示字已足以辨識它是輸入框 |
+| 搜尋框 | 不畫 ≥ 3:1 的外框，靠放大鏡圖示與提示字辨識（亮 5.26、暗 6.17）；聚焦時出現主粉框 | 淡粉膠囊搜尋框是方向 C 的造型；圖示與提示字已足以辨識它是輸入框 |
 | 練習中的填空格 | 白底膠囊 `inset-ring-2 inset-ring-brand`（在淡粉題目卡裡，不用鮮粉） | 鮮粉在淡粉上只有 2.82 |
 | 練習中的「送出」「下一題」 | 放在作答欄下方的一般流排，不做預覽的貼底容器 | iPhone 鍵盤彈出時貼底元素會被蓋住（page-design-spec 2.7） |
 
@@ -614,7 +741,9 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 看過、正在看、還沒看、看到一半 | 已讀、未讀、閱讀中 |
 | 標示（泡泡框開關） | 提示、高亮 |
 | 深入查詢 | 分析、AI 解說 |
+| 亮色、暗色（兩種主題）；切換鈕「換成暗色」「換成亮色」 | 深色、淺色、深色模式、夜間模式、黑色主題、dark mode、切換主題 |
 
+- 主題切換鈕的名稱寫按下去會怎樣（「換成暗色」），不寫現在的狀態（「暗色：關」）。
 - 不在介面上出現內部用語（`standing.remaining`、`.env`、`npm run dev`）。現有 `ErrorState` 的「無法通過 Cloudflare 驗證」說明提到 `web/.env` 與 `npm run dev`，是給開發者看的；page-design-spec 決定沿用現有字，這裡只標記，之後要改由使用者決定。
 - 新加的字列在 page-design-spec 第 8 節；本節只定規則。
 
@@ -635,6 +764,15 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 2026-11-14 | `duration.slow` 360 → 280 | 配合頁面規格「所有動態 ≤ 300ms」 | design-system-architect |
 | 2026-11-14 | 停用開關（開著）改鮮粉軌道，不用整顆半透明 | 停用規則一致；白鈕對鮮粉 3.11 | design-system-architect |
 | 2026-11-14 | `apple-mobile-web-app-status-bar-style` 改 `default`、`theme-color` 與 manifest 顏色改 `#FFFFFF`（與 page-design-spec 1.1 一致） | 亮色底配 black-translucent 時鐘會看不到 | design-system-architect |
+| 2026-11-16 | **推翻 2026-11-14「只做亮色」**：加上暗色，可以自己切換。改寫第 1 節「不是什麼」、第 2 節原則 1、2、第 3 節開頭、第 8 節色彩模式、第 11 節的暗色禁令 | 使用者要「有時候用暗的、有時候用亮的」，自己切換 | 使用者 |
+| 2026-11-16 | 暗色採用 B 星空藍（預覽 `previews/dark/index.html`）。B 的色值全部沿用，只補預覽沒有的：brand-hover `#FF6BA8`、brand-pressed `#F2559A`、danger `#FF948A`／hover `#F47B70`／tint `#4B2E4D`、success `#6EDCA2`／`#244050`、warning `#FFC94D`／`#483C41`、scrim `#0C0C24` 60% | 使用者在 A、B、C 三個裡選 B；B 的組合驗算全部通過，不用調。hover／按下往深一階走，和亮色方向一致；回饋色和狀態色共用 | 使用者（選 B）、design-system-architect（補值） |
+| 2026-11-16 | 黃色上的字：預覽的暗色是 `#24102A`，改成兩套都用 `#2B1F27` | 總控定案「黃色和黃色上的字不變」；兩個值對黃底都過（12.30、10.95），用同一個值比較單純 | design-system-architect |
+| 2026-11-16 | 新增 `on-fill`（亮 `#FFFFFF`、暗 `#24102A`）、`on-sun`（兩套 `#2B1F27`）、`sticker`（兩套 `#FFFFFF`）；拿掉 `text.inverse`（`--color-white`） | 暗色的主粉是亮粉，白字只有 2.33；`text-ink` 在暗色是淺色，放黃底上 1.32；`border-paper` 在暗色變靛藍，貼紙白邊會不見 | 總控（on-fill、白邊）、design-system-architect（on-sun：盤點時發現 `bg-sun text-ink` 也會壞） |
+| 2026-11-16 | 陰影的顏色改成變數：`--shade-*`、`--color-line`、`--color-brand-edge`。暗色陰影改黑色、厚邊 `#C23A78`；`shadow-float`、`shadow-ring-*`、`brand-wash` 兩套一樣 | 陰影原本寫死色碼，暗色換不到；疊在漫畫上的框不受主題影響。亮色算出來的值完全不變 | 總控、design-system-architect（寫法） |
+| 2026-11-16 | 閱讀器提示框在暗色跟著主題（靛藍底、淺色框），不保留白底 | 暗色裡突然一塊白太刺眼；驗算底和框兩層，每種漫畫底色至少一層 ≥ 3:1 | design-system-architect |
+| 2026-11-16 | 新增 7.18 主題切換鈕：沿用 `iconButton`，亮色月亮「換成暗色」、暗色太陽「換成亮色」；只放書庫頁首、重新整理鈕左邊；第一次跟著手機，按過就記住，只有兩種 | 使用者決定位置與預設行為 | 使用者 |
+| 2026-11-16 | 主題切換鈕在還沒按過時，手機切換深淺也跟著換；切換時整頁瞬間換色、不做過渡；書庫載入中、出錯時也顯示 | 「跟著手機」直到按過為止才一致；有過渡的元件會慢一拍像閃爍；切換是全站設定，隨時要按得到 | design-system-architect |
+| 2026-11-16 | 第 13 節用詞加「亮色／暗色」，不用「深色、夜間模式」 | 使用者自己的說法 | 使用者 |
 
 ---
 
@@ -644,8 +782,18 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 ### 15.1 `web/src/style.css`
 
+下面是加上暗色之後的完整寫法。和現在的 `style.css` 比，只有標了「暗色：」的地方要改，其他照舊：
+
+1. `@import` 下面加 `@custom-variant dark`（讓 `dark:` 也跟著 `data-theme`，萬一有人寫了也不會跟著手機跑；元件仍然不准用，見第 11 節）。
+2. `@theme` 裡：刪掉 `--color-white`；加 `--color-on-fill`、`--color-on-sun`、`--color-sticker`；陰影裡寫死的顏色換成變數（`shadow-float`、`shadow-ring-*` 不換）。**亮色算出來的值完全不變。**
+3. `@layer base` 的 `:root` 加四個陰影顏色 `--shade-*`；再加一整塊 `:root[data-theme='dark']`，覆寫暗色的值。
+4. `@theme` 保持現在的寫法，**不要改成 `@theme inline`**：`inline` 會把顏色直接寫進 utility，暗色就換不到了。
+
 ```css
 @import 'tailwindcss';
+
+/* 暗色：新增。dark: 跟著 <html data-theme="dark">，不跟著手機。元件不用它，這行只是保險。 */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @theme {
   /* 全部頁面都換成新 token 之後，打開這三行，讓內建色票、字級、圓角再也用不到。 */
@@ -666,10 +814,13 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
   --color-ink: #2b1f27;
   --color-ink-soft: #6a5560;
   --color-ink-faint: #765f6b;
-  --color-white: #ffffff;
+  /* 暗色：刪除 --color-white，改成下面兩個 */
+  --color-on-fill: #ffffff; /* brand／danger／warning 實心底上的字與圖示、開關圓鈕。暗色會覆寫 */
+  --color-on-sun: #2b1f27; /* 黃色上的字與圖示。兩套一樣，不覆寫 */
   /* ---- 顏色：線 ---- */
   --color-line: #f3dde6;
   --color-line-strong: #a07c8c;
+  --color-sticker: #ffffff; /* 暗色：新增。貼紙封面的白邊，兩套都是白，不覆寫 */
   /* ---- 顏色：主色與點綴 ---- */
   --color-brand: #c81a60;
   --color-brand-hover: #b01652;
@@ -728,13 +879,15 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
   --radius-panel: 1.75rem;
 
   /* ---- 陰影與框 ---- */
-  --shadow-raised: 0 10px 22px -10px rgb(120 30 70 / 0.55);
-  --shadow-chrome-up: 0 -1px 0 #f3dde6, 0 -8px 24px -12px rgb(200 26 96 / 0.25);
-  --shadow-chrome-down: 0 1px 0 #f3dde6, 0 8px 20px -14px rgb(120 30 70 / 0.4);
-  --shadow-overlay: 0 18px 40px -12px rgb(120 30 70 / 0.45);
-  --shadow-edge: 0 5px 0 -1px #8f1244;
-  --shadow-edge-sm: 0 4px 0 -1px #8f1244;
-  --shadow-edge-pressed: 0 2px 0 -1px #8f1244;
+  /* 暗色：改。介面上的陰影，顏色改用變數（值在 @layer base 的 :root 與暗色區塊） */
+  --shadow-raised: 0 10px 22px -10px var(--shade-raised);
+  --shadow-chrome-up: 0 -1px 0 var(--color-line), 0 -8px 24px -12px var(--shade-chrome-up);
+  --shadow-chrome-down: 0 1px 0 var(--color-line), 0 8px 20px -14px var(--shade-chrome-down);
+  --shadow-overlay: 0 18px 40px -12px var(--shade-overlay);
+  --shadow-edge: 0 5px 0 -1px var(--color-brand-edge);
+  --shadow-edge-sm: 0 4px 0 -1px var(--color-brand-edge);
+  --shadow-edge-pressed: 0 2px 0 -1px var(--color-brand-edge);
+  /* 疊在漫畫上的：兩套一樣，維持寫死，不改 */
   --shadow-float: 0 0 0 2px #ffffff, 0 0 0 3px #2b1f27, 0 10px 22px -10px rgb(120 30 70 / 0.55);
   --shadow-ring-selected: 0 0 0 3px #c81a60, 0 0 0 5px #ffffff, 0 0 0 6px #2b1f27;
   --shadow-ring-hint: 0 0 0 1.5px #c81a60, 0 0 0 2.5px #ffffff, 0 0 0 3.5px #2b1f27;
@@ -765,9 +918,66 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 }
 
 @layer base {
-  /* 只有亮色：瀏覽器自己的控制項、捲軸也是亮的。手機開深色模式也不變。 */
+  /* 亮色（預設）：瀏覽器自己的控制項、捲軸、鍵盤也是亮的。
+     主題由 <html data-theme> 決定，不由手機決定（7.18）。 */
   :root {
     color-scheme: light;
+    /* 暗色：新增。介面陰影的顏色（亮色的值和原本寫死的一樣） */
+    --shade-raised: rgb(120 30 70 / 0.55);
+    --shade-chrome-up: rgb(200 26 96 / 0.25);
+    --shade-chrome-down: rgb(120 30 70 / 0.4);
+    --shade-overlay: rgb(120 30 70 / 0.45);
+  }
+
+  /* 暗色：新增整塊。B 星空藍。只覆寫會變的；沒列的（brand-vivid、brand-wash、sun、
+     on-sun、sticker、shadow-float、shadow-ring-*）兩套一樣。 */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    /* 底 */
+    --color-paper: #1e1f45;
+    --color-blush: #2c2560;
+    --color-blush-strong: #3d3080;
+    --color-mist: #262852;
+    --color-scrim: rgb(12 12 36 / 0.6);
+    /* 字 */
+    --color-ink: #f6f3ff;
+    --color-ink-soft: #ccc8f0;
+    --color-ink-faint: #aea9dc;
+    --color-on-fill: #24102a;
+    /* 線 */
+    --color-line: #36386a;
+    --color-line-strong: #8a8cc4;
+    /* 主粉：暗色是亮粉，同時當粉色字和按鈕底 */
+    --color-brand: #ff80b5;
+    --color-brand-hover: #ff6ba8;
+    --color-brand-pressed: #f2559a;
+    --color-brand-edge: #c23a78;
+    /* 回饋（和狀態色共用：danger = relearn、success = review、warning = learn） */
+    --color-danger: #ff948a;
+    --color-danger-hover: #f47b70;
+    --color-danger-tint: #4b2e4d;
+    --color-success: #6edca2;
+    --color-success-tint: #244050;
+    --color-warning: #ffc94d;
+    --color-warning-tint: #483c41;
+    /* 字卡狀態（文字／淡底／圖形）。淡底 = 圖形色 20% 疊在 #1e1f45 上 */
+    --color-st-new: #9dc0ff;
+    --color-st-new-tint: #2d396a;
+    --color-st-new-graphic: #6aa2ff;
+    --color-st-learn: #ffc94d;
+    --color-st-learn-tint: #483c41;
+    --color-st-learn-graphic: #f0b030;
+    --color-st-relearn: #ff948a;
+    --color-st-relearn-tint: #4b2e4d;
+    --color-st-relearn-graphic: #ff6b6b;
+    --color-st-review: #6edca2;
+    --color-st-review-tint: #244050;
+    --color-st-review-graphic: #3cc47e;
+    /* 介面陰影：黑色 */
+    --shade-raised: rgb(0 0 0 / 0.7);
+    --shade-chrome-up: rgb(0 0 0 / 0.6);
+    --shade-chrome-down: rgb(0 0 0 / 0.6);
+    --shade-overlay: rgb(0 0 0 / 0.6);
   }
 
   html {
@@ -826,22 +1036,52 @@ body::before {
 ```
 
 注意：
-- `body` 的 `padding` 與 `body::before` 沿用現狀不包 layer（會贏過 utility），不要搬進 `@layer base`。
-- `--shadow-*` 裡的色碼寫死，是因為陰影要能在任何元素上獨立使用；改顏色時這裡要一起改（design-tokens.json 有對照）。
+- `body` 的 `padding` 與 `body::before` 沿用現狀不包 layer（會贏過 utility），不要搬進 `@layer base`。`body` 底色與 `body::before` 的色條讀 `--color-paper`，暗色自動變靛藍，不用另外改。
+- **為什麼陰影要改成變數**：Tailwind v4 產生 `shadow-*` utility 時，會把 `--shadow-*` 的值直接抄進 class（為了支援陰影換色），不是寫 `var(--shadow-edge)`。所以在暗色覆寫 `--shadow-edge` 沒有用；要讓陰影值裡面引用變數（`var(--color-brand-edge)`、`var(--shade-raised)`），暗色才換得到。`shadow-float`、`shadow-ring-*` 疊在漫畫上，兩套一樣，維持寫死。
+- 為什麼 `--shade-*` 放在 `@layer base` 不放 `@theme`：它們只給陰影用，放 `@theme` 會多出 `shadow-*` 或 `bg-*` 的 utility，也可能因為沒有 class 用到而被 Tailwind 省略。
+- 暗色區塊放在 `@layer base`：Tailwind 的 `@theme` 輸出在 `theme` layer，`base` 排在它後面，加上 `:root[data-theme='dark']` 比 `:root` 更具體，兩個條件都讓暗色值蓋過亮色值。
 - `rotate-*`、`scale-*` 在 v4 用的是獨立的 `rotate`／`scale` 屬性，所以貼紙的 `-rotate-8` 和 `animate-pop` 的縮放可以同時存在，不會互相蓋掉。
+- **改完要驗**（`npm run build` 後在瀏覽器 DevTools 看）：
+  1. 亮色：主要按鈕的厚邊是 `#8F1244`、分頁列上緣有 `#F3DDE6` 線、貼紙封面有粉紫陰影。和改之前一模一樣。
+  2. 在 `<html>` 手動加 `data-theme="dark"`：頁面底 `#1E1F45`、主要按鈕亮粉底深色字、厚邊 `#C23A78`、分頁列上緣 `#36386A`、貼紙封面白邊還是白、陰影變黑。
+  3. 閱讀器：暗色時泡泡框的粉／白／墨三層、「標示」與「＋收卡」的白＋墨外圈，和亮色一樣。
+  4. 如果第 1 點的厚邊或分頁列的線不見了，代表 Tailwind 沒有輸出 `--color-brand-edge` 或 `--color-line`（沒有 class 直接用到）：把 `@theme {` 改成 `@theme static {`，讓 `@theme` 裡的變數全部輸出。
 
 ### 15.2 `web/index.html`
 
+`<head>` 裡改三件事：`color-scheme` 改成兩套、`theme-color` 由小腳本決定、在樣式表之前決定主題（避免暗色的人打開時先閃一下白）。
+
 ```html
 <meta name="theme-color" content="#FFFFFF" />
-<meta name="color-scheme" content="light" />
+<meta name="color-scheme" content="light dark" />
+<!--
+  開頁前決定主題：有記住的選擇就照它，沒有就跟著手機或電腦的深淺設定。
+  放在 <head> 裡、樣式表之前，第一次畫面就是對的顏色，不會先閃白。
+  鍵名與值要和主題切換鈕（7.18）用的一樣。
+-->
+<script>
+  ;(function () {
+    var saved = null
+    try {
+      saved = localStorage.getItem('vista-theme')
+    } catch (e) {}
+    var dark = saved === 'dark' || (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark')
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#1E1F45' : '#FFFFFF')
+  })()
+</script>
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&family=Nunito:wght@600;700;800;900&display=swap" />
 ```
 
-`viewport-fit=cover`、manifest（`crossorigin="use-credentials"`）、apple-touch-icon 等其他標籤不動。
+- `theme-color`：亮色 `#FFFFFF`、暗色 `#1E1F45`（暗色的頁面底）。只用一個 meta、由腳本改，不用兩個帶 `media` 的 meta：`media` 只會跟著手機，App 自己選的主題和手機不同時就錯了。
+- `apple-mobile-web-app-status-bar-style` 維持 `default`，不改（第 8 節）。
+- 記住選擇的鍵名 `vista-theme`、值 `light`／`dark`，是建議值；實作可以換名字，但開頁腳本和切換鈕要用同一個。
+- 主題切換鈕按下時做的事（7.18）：設定或移除 `data-theme="dark"`、把 `theme-color` 改成新主題的頁面底、`localStorage` 寫入 `light` 或 `dark`。還沒按過時，用 `matchMedia('(prefers-color-scheme: dark)')` 的 `change` 事件跟著手機換；按過就不再聽。
+- 舊註解「Light only, with the phone in dark mode too.」（`index.html:8`）刪掉或改寫。
+- `viewport-fit=cover`、manifest（`crossorigin="use-credentials"`）、apple-touch-icon 等其他標籤不動。
 
 ### 15.3 `web/public/manifest.webmanifest`
 
@@ -850,17 +1090,20 @@ body::before {
 "theme_color": "#FFFFFF"
 ```
 
+暗色不改：manifest 不能跟著 App 的主題換。它只影響主畫面 App 剛打開的那一瞬間，之後就由 `index.html` 的腳本接手。
+
 ### 15.4 元件 utility 速查
 
 | 元件 | class |
 |---|---|
-| 主要按鈕 lg | `inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-full bg-brand px-6 text-label font-extrabold text-white shadow-edge transition-[translate,box-shadow,background-color] duration-120 ease-standard hover:bg-brand-hover active:translate-y-0.75 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0 disabled:translate-y-0 disabled:bg-blush-strong disabled:text-ink-faint disabled:shadow-none disabled:cursor-not-allowed` |
-| 主要按鈕 sm（＋收卡、加入句子） | `relative inline-flex h-9 items-center rounded-full bg-brand px-3.5 text-meta font-extrabold text-white shadow-edge-sm before:absolute before:-inset-1 before:content-[''] hover:bg-brand-hover active:translate-y-0.5 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0` |
+| 主要按鈕 lg | `inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-full bg-brand px-6 text-label font-extrabold text-on-fill shadow-edge transition-[translate,box-shadow,background-color] duration-120 ease-standard hover:bg-brand-hover active:translate-y-0.75 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0 disabled:translate-y-0 disabled:bg-blush-strong disabled:text-ink-faint disabled:shadow-none disabled:cursor-not-allowed` |
+| 主要按鈕 sm（＋收卡、加入句子） | `relative inline-flex h-9 items-center rounded-full bg-brand px-3.5 text-meta font-extrabold text-on-fill shadow-edge-sm before:absolute before:-inset-1 before:content-[''] hover:bg-brand-hover active:translate-y-0.5 active:bg-brand-pressed active:shadow-edge-pressed motion-reduce:active:translate-y-0` |
 | 次要按鈕 md | `inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-paper px-4 text-body font-extrabold text-ink inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush disabled:text-ink-faint` |
 | 柔和按鈕 | `relative inline-flex h-9 items-center rounded-full bg-blush px-3.5 text-meta font-extrabold text-brand before:absolute before:-inset-1 before:content-[''] hover:bg-blush-strong active:bg-blush-strong` |
 | 文字按鈕 | `inline-flex h-11 items-center rounded-full px-2 text-body text-ink-soft hover:bg-blush active:bg-blush` |
-| 危險按鈕（確認中） | `inline-flex h-11 items-center justify-center rounded-full bg-danger px-4 text-body font-extrabold text-white hover:bg-danger-hover active:bg-danger-hover` |
+| 危險按鈕（確認中） | `inline-flex h-11 items-center justify-center rounded-full bg-danger px-4 text-body font-extrabold text-on-fill hover:bg-danger-hover active:bg-danger-hover` |
 | 圓形圖示鈕 | `grid size-11 place-items-center rounded-full bg-paper text-ink-soft inset-ring-2 inset-ring-line`（淡粉版 `bg-blush` 無框） |
+| 主題切換鈕 | 圓形圖示鈕（`iconButton`）＋月亮或太陽圖示，`aria-label` 「換成暗色」或「換成亮色」（7.18） |
 | 設定膠囊鈕 | `inline-flex h-10 items-center gap-1.5 rounded-full bg-paper pr-3.5 pl-3 text-meta text-ink-soft inset-ring-2 inset-ring-line` |
 | 頁名 | `text-page` |
 | 區塊標題 | `text-heading` |
@@ -880,12 +1123,12 @@ body::before {
 | 輸入框 | `w-full rounded-card bg-paper px-4 py-3 text-body text-ink inset-ring-2 inset-ring-line-strong placeholder:text-ink-faint focus:inset-ring-3 focus:inset-ring-brand focus-visible:outline-none aria-[invalid=true]:inset-ring-3 aria-[invalid=true]:inset-ring-danger read-only:bg-blush read-only:text-ink-soft read-only:inset-ring-line` |
 | 搜尋框 | `flex h-12 items-center gap-2 rounded-full bg-blush px-4 text-body focus-within:inset-ring-3 focus-within:inset-ring-brand` |
 | 開關 | 見 7.9 |
-| 分段選擇 | 軌道 `inline-flex rounded-full bg-blush p-1`；選項 `h-9 rounded-full px-4 text-meta text-ink-soft aria-checked:bg-brand aria-checked:text-white`（`aria-pressed:` 同理） |
+| 分段選擇 | 軌道 `inline-flex rounded-full bg-blush p-1`；選項 `h-9 rounded-full px-4 text-meta text-ink-soft aria-checked:bg-brand aria-checked:text-on-fill`（`aria-pressed:` 同理） |
 | 訊息框 | 見 7.14 |
 | 面板 | 見 7.13 |
 | 閱讀器泡泡框 | 見 7.17 |
 | 提示框 | `absolute z-10 my-3 w-72 max-w-[90%] rounded-card border-2 border-ink bg-paper p-3.5 shadow-overlay` |
-| 完成貼紙 | `grid size-21 place-items-center rounded-full bg-sun text-ink -rotate-8 ring-5 ring-paper outline-2 outline-blush-strong motion-safe:animate-pop` |
+| 完成貼紙 | `grid size-21 place-items-center rounded-full bg-sun text-on-sun -rotate-8 ring-5 ring-paper outline-2 outline-blush-strong motion-safe:animate-pop` |
 | 錯誤／空狀態貼紙 | 見 7.15 |
 | 載入圓點 | `size-2 rounded-full bg-brand-vivid`（第二顆 `bg-sun`、第三顆 `bg-brand`），`motion-safe:` 才加跳動動畫 |
 
@@ -914,6 +1157,37 @@ body::before {
 | `max-w-[800px]` | `max-w-reader` |
 | `max-w-xl`、`max-w-md` | `max-w-narrow`／`max-w-page` |
 
+**加暗色時要換的 class**（2026-11-16；行號是 main 上 `bd364db` 的位置）：
+
+| 檔案:行 | 元件 | 現在 | 換成 |
+|---|---|---|---|
+| `web/src/components/buttons.ts:9` | 主要按鈕（`primaryBase`） | `text-white` | `text-on-fill` |
+| `web/src/components/buttons.ts:31` | 危險按鈕（`dangerMd`） | `text-white` | `text-on-fill` |
+| `web/src/components/buttons.ts:35` | 提醒按鈕（`warningMd`） | `text-white` | `text-on-fill` |
+| `web/src/views/LibraryView.vue:143` | 播放鈕 | `text-white` | `text-on-fill` |
+| `web/src/views/ComicView.vue:38` | 正在看的數字格 | `text-white` | `text-on-fill` |
+| `web/src/views/DeckCardView.vue:95` | 分段選擇的選中 | `text-white` | `text-on-fill` |
+| `web/src/components/CollectPanel.vue:84` | ＋收卡 | `text-white` | `text-on-fill` |
+| `web/src/components/AnalysisPanel.vue:103` | 模型選擇的選中 | `aria-checked:text-white` | `aria-checked:text-on-fill` |
+| `web/src/views/PracticeSettingsView.vue:129` | 玩法開關的圓鈕 | `bg-white` | `bg-on-fill` |
+| `web/src/views/ReaderView.vue:402` | 「標示」開關的圓鈕 | `bg-white` | `bg-on-fill` |
+| `web/src/views/LibraryView.vue:94` | 繼續看的貼紙封面 | `border-paper` | `border-sticker` |
+| `web/src/views/ComicView.vue:137` | 章節頁的貼紙封面 | `border-paper` | `border-sticker` |
+| `web/src/components/TabBar.vue:74` | 計數徽章 | `text-ink` | `text-on-sun` |
+| `web/src/components/EmptyState.vue:17` | 空狀態貼紙 | `text-ink` | `text-on-sun` |
+| `web/src/views/LibraryView.vue:111` | 「繼續看」標籤 | `text-ink` | `text-on-sun` |
+| `web/src/views/ReaderView.vue:411` | 「本話完」標籤 | `text-ink` | `text-on-sun` |
+| 練習的完成貼紙（「今天做完了」「這一輪做完了」，15.4） | 完成貼紙 | `text-ink` | `text-on-sun` |
+| `web/src/style.css:96-110`、`144-149` | 陰影與 `:root` | 寫死色碼、`color-scheme: light` | 照 15.1 |
+| `web/index.html:7-9` | `theme-color`、`color-scheme` | 只有亮色 | 照 15.2 |
+| `web/src/views/LibraryView.vue:60-73` | 書庫頁首右上角 | 只有重新整理鈕 | 重新整理鈕左邊加主題切換鈕（7.18） |
+
+換完要確認（在 `web/src` 裡搜尋）：
+- `text-white`、`bg-white`、`border-white`、`ring-white`：0 筆。
+- 每個有 `bg-sun` 的元素，同一個元素上的字色都是 `text-on-sun`（`after:bg-sun` 的小黃點沒有字，不用管）。
+- `border-paper`：0 筆（`ring-paper` 是「和頁面底接在一起的外圈」，跟著主題換是對的，保留）。
+- `dark:`：0 筆。
+
 ### 15.6 page-design-spec 的數值 → token
 
 page-design-spec 用預覽的變數與 px 寫；實作時換成這裡的 token。
@@ -924,6 +1198,12 @@ page-design-spec 用預覽的變數與 px 寫；實作時換成這裡的 token�
 | `--text` / `--text-2` / `--text-3` | `ink` / `ink-soft` / `ink-faint` |
 | `--pink` / `--pink-strong` / `--sun` | `brand-vivid` / `brand` / `sun` |
 | `--st-*`、`--st-*-bg`、圖形色 | `st-*`、`st-*-tint`、`st-*-graphic`（學習中圖形色 `#C98400` 一律換 `st-learn-graphic` `#B87A00`） |
+| 暗色預覽 `previews/dark/index.html` 的 `--mist` / `--line-strong` | `mist` / `line-strong` |
+| 暗色預覽的 `--on-fill` / `--on-sun` | `on-fill` / `on-sun`（暗色預覽的 `--on-sun` `#24102A` 不採用，兩套都用 `#2B1F27`） |
+| 暗色預覽的 `--edge`、`--edge-sm` | `shadow-edge`、`shadow-edge-sm`（顏色是 `brand-edge`；位移照第 6 節的 5px／4px，不用預覽的 6px） |
+| 暗色預覽的 `--sh-raised` / `--sh-up` / `--sh-down` | `shadow-raised` / `shadow-chrome-up` / `shadow-chrome-down`（顏色是 `--shade-*`） |
+| 暗色預覽的 `--g-due` / `--g-new` / `--g-learn` / `--g-review` | `st-relearn-graphic` / `st-new-graphic` / `st-learn-graphic` / `st-review-graphic` |
+| 暗色預覽 `.sticker` 的 `border: 4px solid #fff` | `border-4 border-sticker` |
 | `#A9154F`（按下深一階） | `brand-pressed` |
 | `#9C8592`（開關關閉軌道） | `line-strong` |
 | `#F5EEF1` | `mist` |

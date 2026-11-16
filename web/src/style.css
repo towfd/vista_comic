@@ -4,7 +4,19 @@
  * The design tokens of DESIGN.md (section 15.1). Components use the semantic
  * names -- bg-paper, text-ink-soft, rounded-card, shadow-edge -- never a hex
  * code or a built-in palette colour.
+ *
+ * Two themes share every class: light by default, dark when <html> carries
+ * data-theme="dark" (set by index.html before the first paint). The dark theme
+ * only overrides the variables below, in the `:root[data-theme='dark']` block
+ * of @layer base. Keep this a plain @theme, not `@theme inline`: inline writes
+ * the colours straight into the utilities and the dark values never reach them.
  */
+
+/* Ties the `dark` variant to data-theme rather than the phone's setting.
+   Components never use it (DESIGN.md section 11); this only stops a stray one
+   from following the phone. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @theme {
   /* Once every page uses the tokens below, uncomment these so the built-in
      palette, type sizes and radii can no longer be reached for by mistake. */
@@ -29,10 +41,17 @@
   --color-ink: #2b1f27;
   --color-ink-soft: #6a5560;
   --color-ink-faint: #765f6b;
-  --color-white: #ffffff;
+  /* Text and icons on a solid brand, danger or warning fill, and the switch
+     knob. White here; dark text in the dark theme, where the fills turn light. */
+  --color-on-fill: #ffffff;
+  /* Text and icons on sun yellow: ink in both themes (ink itself turns pale in
+     the dark theme, 1.32:1 on yellow). */
+  --color-on-sun: #2b1f27;
   /* ---- Colour: lines ---- */
   --color-line: #f3dde6;
   --color-line-strong: #a07c8c;
+  /* The white rim of a sticker cover: white in both themes, unlike paper. */
+  --color-sticker: #ffffff;
   /* ---- Colour: brand and accent. brand-vivid is for shapes on white only,
      never text: it is 3.11:1 on white and under 3 on the pinks. ---- */
   --color-brand: #c81a60;
@@ -93,15 +112,19 @@
   --radius-card: 1.25rem;
   --radius-panel: 1.75rem;
 
-  /* ---- Shadows. The colours are written out so each shadow stands alone on
-     any element; change them alongside the colours above. ---- */
-  --shadow-raised: 0 10px 22px -10px rgb(120 30 70 / 0.55);
-  --shadow-chrome-up: 0 -1px 0 #f3dde6, 0 -8px 24px -12px rgb(200 26 96 / 0.25);
-  --shadow-chrome-down: 0 1px 0 #f3dde6, 0 8px 20px -14px rgb(120 30 70 / 0.4);
-  --shadow-overlay: 0 18px 40px -12px rgb(120 30 70 / 0.45);
-  --shadow-edge: 0 5px 0 -1px #8f1244;
-  --shadow-edge-sm: 0 4px 0 -1px #8f1244;
-  --shadow-edge-pressed: 0 2px 0 -1px #8f1244;
+  /* ---- Shadows. Tailwind copies a --shadow-* value into each shadow-*
+     utility instead of pointing at the variable, so overriding --shadow-edge
+     for the dark theme would change nothing. The interface shadows therefore
+     name their colours by variable -- the --shade-* in @layer base, the line
+     and the brand edge -- and those are what the dark theme overrides. ---- */
+  --shadow-raised: 0 10px 22px -10px var(--shade-raised);
+  --shadow-chrome-up: 0 -1px 0 var(--color-line), 0 -8px 24px -12px var(--shade-chrome-up);
+  --shadow-chrome-down: 0 1px 0 var(--color-line), 0 8px 20px -14px var(--shade-chrome-down);
+  --shadow-overlay: 0 18px 40px -12px var(--shade-overlay);
+  --shadow-edge: 0 5px 0 -1px var(--color-brand-edge);
+  --shadow-edge-sm: 0 4px 0 -1px var(--color-brand-edge);
+  --shadow-edge-pressed: 0 2px 0 -1px var(--color-brand-edge);
+  /* Drawn over the manga, so the same in both themes and written out. */
   --shadow-float: 0 0 0 2px #ffffff, 0 0 0 3px #2b1f27, 0 10px 22px -10px rgb(120 30 70 / 0.55);
   /* Pink, white and ink together: on any manga page at least one of the three
      rings stands out. */
@@ -142,10 +165,73 @@
 }
 
 @layer base {
-  /* Light throughout, so the browser's own controls and scrollbars are too --
-     even with the phone in dark mode. */
+  /* Light by default, browser controls and scrollbars included. Which theme
+     shows is decided by <html data-theme>, not by the phone (index.html). */
   :root {
     color-scheme: light;
+    /* The interface shadows' colours. Kept out of @theme: they would grow
+       utilities of their own there, or be dropped as unused. */
+    --shade-raised: rgb(120 30 70 / 0.55);
+    --shade-chrome-up: rgb(200 26 96 / 0.25);
+    --shade-chrome-down: rgb(120 30 70 / 0.4);
+    --shade-overlay: rgb(120 30 70 / 0.45);
+  }
+
+  /*
+   * The dark theme, "starry indigo". Only what changes is listed; brand-vivid,
+   * brand-wash, sun, on-sun, sticker, shadow-float and shadow-ring-* are the
+   * same in both themes. This sits in @layer base, after @theme's `theme`
+   * layer, and `:root[data-theme]` outranks `:root`, so it wins both ways.
+   */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    /* Surfaces */
+    --color-paper: #1e1f45;
+    --color-blush: #2c2560;
+    --color-blush-strong: #3d3080;
+    --color-mist: #262852;
+    --color-scrim: rgb(12 12 36 / 0.6);
+    /* Text */
+    --color-ink: #f6f3ff;
+    --color-ink-soft: #ccc8f0;
+    --color-ink-faint: #aea9dc;
+    --color-on-fill: #24102a;
+    /* Lines */
+    --color-line: #36386a;
+    --color-line-strong: #8a8cc4;
+    /* The light pink serves as both pink text and the button fill. */
+    --color-brand: #ff80b5;
+    --color-brand-hover: #ff6ba8;
+    --color-brand-pressed: #f2559a;
+    --color-brand-edge: #c23a78;
+    /* Feedback (shared with the card states: danger = relearn, success =
+       review, warning = learn) */
+    --color-danger: #ff948a;
+    --color-danger-hover: #f47b70;
+    --color-danger-tint: #4b2e4d;
+    --color-success: #6edca2;
+    --color-success-tint: #244050;
+    --color-warning: #ffc94d;
+    --color-warning-tint: #483c41;
+    /* Card states (text / tint / graphic). Each tint is its graphic colour at
+       20% over #1e1f45, worked out as a solid colour. */
+    --color-st-new: #9dc0ff;
+    --color-st-new-tint: #2d396a;
+    --color-st-new-graphic: #6aa2ff;
+    --color-st-learn: #ffc94d;
+    --color-st-learn-tint: #483c41;
+    --color-st-learn-graphic: #f0b030;
+    --color-st-relearn: #ff948a;
+    --color-st-relearn-tint: #4b2e4d;
+    --color-st-relearn-graphic: #ff6b6b;
+    --color-st-review: #6edca2;
+    --color-st-review-tint: #244050;
+    --color-st-review-graphic: #3cc47e;
+    /* Interface shadows: black */
+    --shade-raised: rgb(0 0 0 / 0.7);
+    --shade-chrome-up: rgb(0 0 0 / 0.6);
+    --shade-chrome-down: rgb(0 0 0 / 0.6);
+    --shade-overlay: rgb(0 0 0 / 0.6);
   }
 
   html {

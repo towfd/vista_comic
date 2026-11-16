@@ -1,11 +1,11 @@
 {
-  "$description": "vista_comic 設計 token（方向 C 粉紅貼紙，只有亮色）。與專案根目錄 DESIGN.md 一致；$extensions.tailwind 是 web/src/style.css @theme 裡對應的 CSS 變數。",
+  "$description": "vista_comic 設計 token（方向 C 粉紅貼紙），兩套主題：亮色（預設）與暗色（B 星空藍，<html data-theme=\"dark\">）。與專案根目錄 DESIGN.md 一致；$extensions.tailwind 是 web/src/style.css @theme 裡對應的 CSS 變數。顏色與陰影的 $value 是亮色；$extensions.mode 同時列出 light 與 dark，兩個值相同的表示暗色不覆寫。palette 是亮色原始色，palette-dark 是暗色原始色。",
   "palette": {
     "white": { "$type": "color", "$value": "#FFFFFF" },
     "pink": {
       "50": { "$type": "color", "$value": "#FFF0F5", "$description": "blush" },
       "100": { "$type": "color", "$value": "#FFE0EC", "$description": "blush-2" },
-      "400": { "$type": "color", "$value": "#FF4F8B", "$description": "鮮粉，只畫圖形、只放白底" },
+      "400": { "$type": "color", "$value": "#FF4F8B", "$description": "鮮粉，只畫圖形、只放 paper 底；兩套共用" },
       "600": { "$type": "color", "$value": "#C81A60", "$description": "深粉，按鈕與粉色文字" },
       "700": { "$type": "color", "$value": "#B01652" },
       "800": { "$type": "color", "$value": "#9E1449" },
@@ -17,9 +17,9 @@
       "400": { "$type": "color", "$value": "#A07C8C" },
       "600": { "$type": "color", "$value": "#765F6B" },
       "700": { "$type": "color", "$value": "#6A5560" },
-      "950": { "$type": "color", "$value": "#2B1F27" }
+      "950": { "$type": "color", "$value": "#2B1F27", "$description": "墨色；也是兩套共用的黃色上的字" }
     },
-    "sun": { "400": { "$type": "color", "$value": "#FFD23F" } },
+    "sun": { "400": { "$type": "color", "$value": "#FFD23F", "$description": "兩套共用" } },
     "blue": {
       "50": { "$type": "color", "$value": "#E8F0FD" },
       "500": { "$type": "color", "$value": "#2E6FE0" },
@@ -42,72 +42,119 @@
       "700": { "$type": "color", "$value": "#17734A" }
     }
   },
+  "palette-dark": {
+    "$description": "暗色 B 星空藍的原始色，取自 docs/design/previews/dark/index.html 的 [data-theme=\"b\"]；pink.350、pink.450、red.350 與 scrim 是預覽沒有、這次補的。*.night 是圖形色 20% 疊在 indigo.900 上的實色。",
+    "indigo": {
+      "900": { "$type": "color", "$value": "#1E1F45", "$description": "頁面底（預覽 --bg）" },
+      "850": { "$type": "color", "$value": "#262852", "$description": "預覽 --mist" },
+      "800": { "$type": "color", "$value": "#2C2560", "$description": "預覽 --blush" },
+      "750": { "$type": "color", "$value": "#36386A", "$description": "預覽 --line" },
+      "700": { "$type": "color", "$value": "#3D3080", "$description": "預覽 --blush-2" },
+      "400": { "$type": "color", "$value": "#8A8CC4", "$description": "預覽 --line-strong" }
+    },
+    "lavender": {
+      "50": { "$type": "color", "$value": "#F6F3FF", "$description": "預覽 --text" },
+      "200": { "$type": "color", "$value": "#CCC8F0", "$description": "預覽 --text-2" },
+      "300": { "$type": "color", "$value": "#AEA9DC", "$description": "預覽 --text-3" }
+    },
+    "pink": {
+      "300": { "$type": "color", "$value": "#FF80B5", "$description": "亮粉，暗色的主粉（預覽 --pink-strong）" },
+      "350": { "$type": "color", "$value": "#FF6BA8", "$description": "hover（新加）" },
+      "450": { "$type": "color", "$value": "#F2559A", "$description": "按下（新加）" },
+      "650": { "$type": "color", "$value": "#C23A78", "$description": "按鈕厚邊（預覽 --edge）" }
+    },
+    "plum": {
+      "950": { "$type": "color", "$value": "#24102A", "$description": "實心底上的字（預覽 --on-fill）" }
+    },
+    "blue": {
+      "night": { "$type": "color", "$value": "#2D396A" },
+      "300": { "$type": "color", "$value": "#9DC0FF" },
+      "400": { "$type": "color", "$value": "#6AA2FF" }
+    },
+    "amber": {
+      "night": { "$type": "color", "$value": "#483C41" },
+      "300": { "$type": "color", "$value": "#FFC94D" },
+      "400": { "$type": "color", "$value": "#F0B030" }
+    },
+    "red": {
+      "night": { "$type": "color", "$value": "#4B2E4D" },
+      "300": { "$type": "color", "$value": "#FF948A" },
+      "350": { "$type": "color", "$value": "#F47B70", "$description": "危險按鈕 hover（新加）" },
+      "400": { "$type": "color", "$value": "#FF6B6B" }
+    },
+    "green": {
+      "night": { "$type": "color", "$value": "#244050" },
+      "300": { "$type": "color", "$value": "#6EDCA2" },
+      "400": { "$type": "color", "$value": "#3CC47E" }
+    }
+  },
   "color": {
     "bg": {
-      "canvas": { "$type": "color", "$value": "{palette.white}", "$description": "頁面底", "$extensions": { "tailwind": "--color-paper" } },
-      "surface": { "$type": "color", "$value": "{palette.white}", "$description": "卡片、分頁列、閱讀器頂端列、抽屜、提示框", "$extensions": { "tailwind": "--color-paper" } },
-      "tint": { "$type": "color", "$value": "{palette.pink.50}", "$description": "淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側", "$extensions": { "tailwind": "--color-blush" } },
-      "tint-strong": { "$type": "color", "$value": "{palette.pink.100}", "$description": "選中分頁的圖示底、按下、停用按鈕、畢業標籤、封面載入中", "$extensions": { "tailwind": "--color-blush-strong" } },
-      "muted": { "$type": "color", "$value": "{palette.mauve.50}", "$description": "看過的數字格、封面載入失敗、漫畫頁佔位", "$extensions": { "tailwind": "--color-mist" } },
-      "scrim": { "$type": "color", "$value": "#2B1F2773", "$description": "強制回應的面板後面的遮罩（45%，目前沒有頁面用到）", "$extensions": { "tailwind": "--color-scrim" } }
+      "canvas": { "$type": "color", "$value": "{palette.white}", "$description": "頁面底", "$extensions": { "tailwind": "--color-paper", "mode": { "light": "{palette.white}", "dark": "{palette-dark.indigo.900}" } } },
+      "surface": { "$type": "color", "$value": "{palette.white}", "$description": "卡片、分頁列、閱讀器頂端列、面板、提示框", "$extensions": { "tailwind": "--color-paper", "mode": { "light": "{palette.white}", "dark": "{palette-dark.indigo.900}" } } },
+      "tint": { "$type": "color", "$value": "{palette.pink.50}", "$description": "淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側", "$extensions": { "tailwind": "--color-blush", "mode": { "light": "{palette.pink.50}", "dark": "{palette-dark.indigo.800}" } } },
+      "tint-strong": { "$type": "color", "$value": "{palette.pink.100}", "$description": "選中分頁的圖示底、按下、停用按鈕、畢業標籤、封面載入中", "$extensions": { "tailwind": "--color-blush-strong", "mode": { "light": "{palette.pink.100}", "dark": "{palette-dark.indigo.700}" } } },
+      "muted": { "$type": "color", "$value": "{palette.mauve.50}", "$description": "看過的數字格、封面載入失敗、漫畫頁佔位", "$extensions": { "tailwind": "--color-mist", "mode": { "light": "{palette.mauve.50}", "dark": "{palette-dark.indigo.850}" } } },
+      "scrim": { "$type": "color", "$value": "#2B1F2773", "$description": "強制回應的面板後面的遮罩（亮 45%、暗 60%；目前沒有頁面用到）", "$extensions": { "tailwind": "--color-scrim", "mode": { "light": "#2B1F2773", "dark": "#0C0C2499" } } }
     },
     "text": {
-      "primary": { "$type": "color", "$value": "{palette.mauve.950}", "$extensions": { "tailwind": "--color-ink" } },
-      "secondary": { "$type": "color", "$value": "{palette.mauve.700}", "$extensions": { "tailwind": "--color-ink-soft" } },
-      "muted": { "$type": "color", "$value": "{palette.mauve.600}", "$description": "看過的數字、到期時間、未選分頁、提示字", "$extensions": { "tailwind": "--color-ink-faint" } },
-      "brand": { "$type": "color", "$value": "{palette.pink.600}", "$extensions": { "tailwind": "--color-brand" } },
-      "inverse": { "$type": "color", "$value": "{palette.white}", "$extensions": { "tailwind": "--color-white" } }
+      "primary": { "$type": "color", "$value": "{palette.mauve.950}", "$extensions": { "tailwind": "--color-ink", "mode": { "light": "{palette.mauve.950}", "dark": "{palette-dark.lavender.50}" } } },
+      "secondary": { "$type": "color", "$value": "{palette.mauve.700}", "$extensions": { "tailwind": "--color-ink-soft", "mode": { "light": "{palette.mauve.700}", "dark": "{palette-dark.lavender.200}" } } },
+      "muted": { "$type": "color", "$value": "{palette.mauve.600}", "$description": "看過的數字、到期時間、未選分頁、提示字", "$extensions": { "tailwind": "--color-ink-faint", "mode": { "light": "{palette.mauve.600}", "dark": "{palette-dark.lavender.300}" } } },
+      "brand": { "$type": "color", "$value": "{palette.pink.600}", "$extensions": { "tailwind": "--color-brand", "mode": { "light": "{palette.pink.600}", "dark": "{palette-dark.pink.300}" } } },
+      "on-fill": { "$type": "color", "$value": "{palette.white}", "$description": "新加：brand／danger／warning 實心底上的字與圖示、開關的圓鈕（取代 text.inverse／--color-white）", "$extensions": { "tailwind": "--color-on-fill", "mode": { "light": "{palette.white}", "dark": "{palette-dark.plum.950}" } } }
     },
     "brand": {
-      "primary": { "$type": "color", "$value": "{palette.pink.600}", "$description": "主要按鈕底、選中、正在看", "$extensions": { "tailwind": "--color-brand" } },
-      "primary-hover": { "$type": "color", "$value": "{palette.pink.700}", "$extensions": { "tailwind": "--color-brand-hover" } },
-      "primary-pressed": { "$type": "color", "$value": "{palette.pink.800}", "$extensions": { "tailwind": "--color-brand-pressed" } },
-      "edge": { "$type": "color", "$value": "{palette.pink.900}", "$description": "按鈕下緣厚邊", "$extensions": { "tailwind": "--color-brand-edge" } },
-      "on-primary": { "$type": "color", "$value": "{palette.white}", "$extensions": { "tailwind": "--color-white" } },
-      "vivid": { "$type": "color", "$value": "{palette.pink.400}", "$description": "進度條、載入圓點、桌機 hover 外框、停用但開著的開關軌道；只能放白底，不放字", "$extensions": { "tailwind": "--color-brand-vivid" } },
-      "wash": { "$type": "color", "$value": "#FF4F8B29", "$description": "閱讀器選中泡泡框的填色（16%）", "$extensions": { "tailwind": "--color-brand-wash" } }
+      "primary": { "$type": "color", "$value": "{palette.pink.600}", "$description": "主要按鈕底、選中、正在看", "$extensions": { "tailwind": "--color-brand", "mode": { "light": "{palette.pink.600}", "dark": "{palette-dark.pink.300}" } } },
+      "primary-hover": { "$type": "color", "$value": "{palette.pink.700}", "$extensions": { "tailwind": "--color-brand-hover", "mode": { "light": "{palette.pink.700}", "dark": "{palette-dark.pink.350}" } } },
+      "primary-pressed": { "$type": "color", "$value": "{palette.pink.800}", "$extensions": { "tailwind": "--color-brand-pressed", "mode": { "light": "{palette.pink.800}", "dark": "{palette-dark.pink.450}" } } },
+      "edge": { "$type": "color", "$value": "{palette.pink.900}", "$description": "按鈕下緣厚邊", "$extensions": { "tailwind": "--color-brand-edge", "mode": { "light": "{palette.pink.900}", "dark": "{palette-dark.pink.650}" } } },
+      "on-primary": { "$type": "color", "$value": "{palette.white}", "$description": "主粉上的字與圖示（和 text.on-fill 同一個變數）", "$extensions": { "tailwind": "--color-on-fill", "mode": { "light": "{palette.white}", "dark": "{palette-dark.plum.950}" } } },
+      "vivid": { "$type": "color", "$value": "{palette.pink.400}", "$description": "進度條、載入圓點、桌機 hover 外框、停用但開著的開關軌道；只放 paper 底，不放字；兩套一樣", "$extensions": { "tailwind": "--color-brand-vivid", "mode": { "light": "{palette.pink.400}", "dark": "{palette.pink.400}" } } },
+      "wash": { "$type": "color", "$value": "#FF4F8B29", "$description": "閱讀器選中泡泡框的填色（16%）；疊在漫畫上，兩套一樣", "$extensions": { "tailwind": "--color-brand-wash", "mode": { "light": "#FF4F8B29", "dark": "#FF4F8B29" } } }
     },
     "accent": {
-      "sun": { "$type": "color", "$value": "{palette.sun.400}", "$description": "徽章、繼續看標籤、完成貼紙、正在看小圓點；上面只放 ink", "$extensions": { "tailwind": "--color-sun" } },
-      "on-sun": { "$type": "color", "$value": "{palette.mauve.950}", "$extensions": { "tailwind": "--color-ink" } }
+      "sun": { "$type": "color", "$value": "{palette.sun.400}", "$description": "徽章、繼續看標籤、完成貼紙、正在看小圓點；上面只放 on-sun；兩套一樣", "$extensions": { "tailwind": "--color-sun", "mode": { "light": "{palette.sun.400}", "dark": "{palette.sun.400}" } } },
+      "on-sun": { "$type": "color", "$value": "{palette.mauve.950}", "$description": "黃色上的字與圖示；兩套一樣（原本借用 --color-ink，暗色時 ink 變淺，所以拆出來）", "$extensions": { "tailwind": "--color-on-sun", "mode": { "light": "{palette.mauve.950}", "dark": "{palette.mauve.950}" } } }
     },
     "border": {
-      "subtle": { "$type": "color", "$value": "{palette.mauve.100}", "$description": "卡片框、數字格框、分隔線（裝飾用）", "$extensions": { "tailwind": "--color-line" } },
-      "control": { "$type": "color", "$value": "{palette.mauve.400}", "$description": "輸入框預設外框、開關關閉的軌道（≥ 3:1）", "$extensions": { "tailwind": "--color-line-strong" } },
-      "ink": { "$type": "color", "$value": "{palette.mauve.950}", "$description": "疊在漫畫上的提示框外框、圖上外圈", "$extensions": { "tailwind": "--color-ink" } }
+      "subtle": { "$type": "color", "$value": "{palette.mauve.100}", "$description": "卡片框、數字格框、分隔線（裝飾用）", "$extensions": { "tailwind": "--color-line", "mode": { "light": "{palette.mauve.100}", "dark": "{palette-dark.indigo.750}" } } },
+      "control": { "$type": "color", "$value": "{palette.mauve.400}", "$description": "輸入框預設外框、開關關閉的軌道（≥ 3:1）", "$extensions": { "tailwind": "--color-line-strong", "mode": { "light": "{palette.mauve.400}", "dark": "{palette-dark.indigo.400}" } } },
+      "ink": { "$type": "color", "$value": "{palette.mauve.950}", "$description": "閱讀器提示框外框；暗色時是淺色框配靛藍底", "$extensions": { "tailwind": "--color-ink", "mode": { "light": "{palette.mauve.950}", "dark": "{palette-dark.lavender.50}" } } },
+      "sticker": { "$type": "color", "$value": "{palette.white}", "$description": "新加：貼紙封面的白邊；兩套都是白", "$extensions": { "tailwind": "--color-sticker", "mode": { "light": "{palette.white}", "dark": "{palette.white}" } } }
     },
     "focus": {
-      "ring": { "$type": "color", "$value": "{palette.pink.600}", "$extensions": { "tailwind": "--color-brand" } }
+      "ring": { "$type": "color", "$value": "{palette.pink.600}", "$extensions": { "tailwind": "--color-brand", "mode": { "light": "{palette.pink.600}", "dark": "{palette-dark.pink.300}" } } }
     },
     "feedback": {
-      "danger": { "$type": "color", "$value": "{palette.red.600}", "$extensions": { "tailwind": "--color-danger" } },
-      "danger-hover": { "$type": "color", "$value": "{palette.red.700}", "$extensions": { "tailwind": "--color-danger-hover" } },
-      "danger-bg": { "$type": "color", "$value": "{palette.red.50}", "$extensions": { "tailwind": "--color-danger-tint" } },
-      "success": { "$type": "color", "$value": "{palette.green.700}", "$extensions": { "tailwind": "--color-success" } },
-      "success-bg": { "$type": "color", "$value": "{palette.green.50}", "$extensions": { "tailwind": "--color-success-tint" } },
-      "warning": { "$type": "color", "$value": "{palette.amber.700}", "$extensions": { "tailwind": "--color-warning" } },
-      "warning-bg": { "$type": "color", "$value": "{palette.amber.50}", "$extensions": { "tailwind": "--color-warning-tint" } }
+      "danger": { "$type": "color", "$value": "{palette.red.600}", "$extensions": { "tailwind": "--color-danger", "mode": { "light": "{palette.red.600}", "dark": "{palette-dark.red.300}" } } },
+      "danger-hover": { "$type": "color", "$value": "{palette.red.700}", "$extensions": { "tailwind": "--color-danger-hover", "mode": { "light": "{palette.red.700}", "dark": "{palette-dark.red.350}" } } },
+      "danger-bg": { "$type": "color", "$value": "{palette.red.50}", "$extensions": { "tailwind": "--color-danger-tint", "mode": { "light": "{palette.red.50}", "dark": "{palette-dark.red.night}" } } },
+      "success": { "$type": "color", "$value": "{palette.green.700}", "$extensions": { "tailwind": "--color-success", "mode": { "light": "{palette.green.700}", "dark": "{palette-dark.green.300}" } } },
+      "success-bg": { "$type": "color", "$value": "{palette.green.50}", "$extensions": { "tailwind": "--color-success-tint", "mode": { "light": "{palette.green.50}", "dark": "{palette-dark.green.night}" } } },
+      "warning": { "$type": "color", "$value": "{palette.amber.700}", "$extensions": { "tailwind": "--color-warning", "mode": { "light": "{palette.amber.700}", "dark": "{palette-dark.amber.300}" } } },
+      "warning-bg": { "$type": "color", "$value": "{palette.amber.50}", "$extensions": { "tailwind": "--color-warning-tint", "mode": { "light": "{palette.amber.50}", "dark": "{palette-dark.amber.night}" } } }
     },
     "status": {
       "new": {
-        "text": { "$type": "color", "$value": "{palette.blue.600}", "$extensions": { "tailwind": "--color-st-new" } },
-        "bg": { "$type": "color", "$value": "{palette.blue.50}", "$extensions": { "tailwind": "--color-st-new-tint" } },
-        "graphic": { "$type": "color", "$value": "{palette.blue.500}", "$extensions": { "tailwind": "--color-st-new-graphic" } }
+        "text": { "$type": "color", "$value": "{palette.blue.600}", "$extensions": { "tailwind": "--color-st-new", "mode": { "light": "{palette.blue.600}", "dark": "{palette-dark.blue.300}" } } },
+        "bg": { "$type": "color", "$value": "{palette.blue.50}", "$extensions": { "tailwind": "--color-st-new-tint", "mode": { "light": "{palette.blue.50}", "dark": "{palette-dark.blue.night}" } } },
+        "graphic": { "$type": "color", "$value": "{palette.blue.500}", "$extensions": { "tailwind": "--color-st-new-graphic", "mode": { "light": "{palette.blue.500}", "dark": "{palette-dark.blue.400}" } } }
       },
       "learning": {
-        "text": { "$type": "color", "$value": "{palette.amber.700}", "$extensions": { "tailwind": "--color-st-learn" } },
-        "bg": { "$type": "color", "$value": "{palette.amber.50}", "$extensions": { "tailwind": "--color-st-learn-tint" } },
-        "graphic": { "$type": "color", "$value": "{palette.amber.600}", "$extensions": { "tailwind": "--color-st-learn-graphic" } }
+        "text": { "$type": "color", "$value": "{palette.amber.700}", "$extensions": { "tailwind": "--color-st-learn", "mode": { "light": "{palette.amber.700}", "dark": "{palette-dark.amber.300}" } } },
+        "bg": { "$type": "color", "$value": "{palette.amber.50}", "$extensions": { "tailwind": "--color-st-learn-tint", "mode": { "light": "{palette.amber.50}", "dark": "{palette-dark.amber.night}" } } },
+        "graphic": { "$type": "color", "$value": "{palette.amber.600}", "$extensions": { "tailwind": "--color-st-learn-graphic", "mode": { "light": "{palette.amber.600}", "dark": "{palette-dark.amber.400}" } } }
       },
       "relearning": {
-        "text": { "$type": "color", "$value": "{palette.red.600}", "$extensions": { "tailwind": "--color-st-relearn" } },
-        "bg": { "$type": "color", "$value": "{palette.red.50}", "$extensions": { "tailwind": "--color-st-relearn-tint" } },
-        "graphic": { "$type": "color", "$value": "{palette.red.500}", "$extensions": { "tailwind": "--color-st-relearn-graphic" } }
+        "text": { "$type": "color", "$value": "{palette.red.600}", "$extensions": { "tailwind": "--color-st-relearn", "mode": { "light": "{palette.red.600}", "dark": "{palette-dark.red.300}" } } },
+        "bg": { "$type": "color", "$value": "{palette.red.50}", "$extensions": { "tailwind": "--color-st-relearn-tint", "mode": { "light": "{palette.red.50}", "dark": "{palette-dark.red.night}" } } },
+        "graphic": { "$type": "color", "$value": "{palette.red.500}", "$extensions": { "tailwind": "--color-st-relearn-graphic", "mode": { "light": "{palette.red.500}", "dark": "{palette-dark.red.400}" } } }
       },
       "review": {
-        "text": { "$type": "color", "$value": "{palette.green.700}", "$extensions": { "tailwind": "--color-st-review" } },
-        "bg": { "$type": "color", "$value": "{palette.green.50}", "$extensions": { "tailwind": "--color-st-review-tint" } },
-        "graphic": { "$type": "color", "$value": "{palette.green.500}", "$extensions": { "tailwind": "--color-st-review-graphic" } }
+        "text": { "$type": "color", "$value": "{palette.green.700}", "$extensions": { "tailwind": "--color-st-review", "mode": { "light": "{palette.green.700}", "dark": "{palette-dark.green.300}" } } },
+        "bg": { "$type": "color", "$value": "{palette.green.50}", "$extensions": { "tailwind": "--color-st-review-tint", "mode": { "light": "{palette.green.50}", "dark": "{palette-dark.green.night}" } } },
+        "graphic": { "$type": "color", "$value": "{palette.green.500}", "$extensions": { "tailwind": "--color-st-review-graphic", "mode": { "light": "{palette.green.500}", "dark": "{palette-dark.green.400}" } } }
       }
     }
   },
@@ -151,17 +198,25 @@
     "full": { "$type": "dimension", "$value": "9999px", "$description": "按鈕、標籤、徽章、搜尋框、開關、進度條、分段選擇、圓形圖示鈕", "$extensions": { "tailwind": "rounded-full（內建）" } }
   },
   "shadow": {
-    "raised": { "$type": "shadow", "$value": { "color": "#781E468C", "offsetX": "0px", "offsetY": "10px", "blur": "22px", "spread": "-10px" }, "$description": "第 1 層：貼紙封面", "$extensions": { "tailwind": "--shadow-raised" } },
-    "chrome-up": { "$type": "shadow", "$value": [ { "color": "#F3DDE6", "offsetX": "0px", "offsetY": "-1px", "blur": "0px", "spread": "0px" }, { "color": "#C81A6040", "offsetX": "0px", "offsetY": "-8px", "blur": "24px", "spread": "-12px" } ], "$description": "第 2 層（貼底）：分頁列、底部抽屜", "$extensions": { "tailwind": "--shadow-chrome-up" } },
-    "chrome-down": { "$type": "shadow", "$value": [ { "color": "#F3DDE6", "offsetX": "0px", "offsetY": "1px", "blur": "0px", "spread": "0px" }, { "color": "#781E4666", "offsetX": "0px", "offsetY": "8px", "blur": "20px", "spread": "-14px" } ], "$description": "第 2 層（貼頂）：閱讀器頂端列", "$extensions": { "tailwind": "--shadow-chrome-down" } },
-    "overlay": { "$type": "shadow", "$value": { "color": "#781E4673", "offsetX": "0px", "offsetY": "18px", "blur": "40px", "spread": "-12px" }, "$description": "第 3 層：閱讀器提示框、寬螢幕的側邊收卡面板", "$extensions": { "tailwind": "--shadow-overlay" } },
-    "edge": { "$type": "shadow", "$value": { "color": "{color.brand.edge}", "offsetX": "0px", "offsetY": "5px", "blur": "0px", "spread": "-1px" }, "$description": "不是高度層級：主要按鈕與正在看的數字格下緣的厚邊", "$extensions": { "tailwind": "--shadow-edge" } },
-    "edge-sm": { "$type": "shadow", "$value": { "color": "{color.brand.edge}", "offsetX": "0px", "offsetY": "4px", "blur": "0px", "spread": "-1px" }, "$description": "md／sm 主要按鈕、播放鈕、正在看的數字格", "$extensions": { "tailwind": "--shadow-edge-sm" } },
-    "edge-pressed": { "$type": "shadow", "$value": { "color": "{color.brand.edge}", "offsetX": "0px", "offsetY": "2px", "blur": "0px", "spread": "-1px" }, "$extensions": { "tailwind": "--shadow-edge-pressed" } },
-    "float": { "$type": "shadow", "$value": [ { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "2px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "3px" }, { "color": "#781E468C", "offsetX": "0px", "offsetY": "10px", "blur": "22px", "spread": "-10px" } ], "$description": "浮在漫畫上的控制項：白邊＋墨線＋貼紙陰影", "$extensions": { "tailwind": "--shadow-float" } },
-    "ring-selected": { "$type": "shadow", "$value": [ { "color": "#C81A60", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "3px" }, { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "5px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "6px" } ], "$description": "閱讀器選中的泡泡框：粉／白／墨三層", "$extensions": { "tailwind": "--shadow-ring-selected" } },
-    "ring-hint": { "$type": "shadow", "$value": [ { "color": "#C81A60", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "1.5px" }, { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "2.5px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "3.5px" } ], "$description": "標示開啟時，有翻譯的泡泡框", "$extensions": { "tailwind": "--shadow-ring-hint" } },
-    "ring-hint-plain": { "$type": "shadow", "$value": [ { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "1px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "2px" } ], "$description": "標示開啟時，還沒有翻譯的泡泡框（沒有粉色）", "$extensions": { "tailwind": "--shadow-ring-hint-plain" } }
+    "$description": "介面上的陰影在暗色換成黑色、厚邊換成 brand-edge 的暗色值；疊在漫畫上的 float、ring-* 兩套一樣。style.css 裡陰影的顏色寫成變數（--shade-*、--color-line、--color-brand-edge），見 DESIGN.md 15.1。",
+    "raised": { "$type": "shadow", "$value": { "color": "#781E468C", "offsetX": "0px", "offsetY": "10px", "blur": "22px", "spread": "-10px" }, "$description": "第 1 層：貼紙封面", "$extensions": { "tailwind": "--shadow-raised", "cssColorVar": "--shade-raised", "mode": { "light": { "color": "#781E468C" }, "dark": { "color": "#000000B3" } } } },
+    "chrome-up": { "$type": "shadow", "$value": [ { "color": "{color.border.subtle}", "offsetX": "0px", "offsetY": "-1px", "blur": "0px", "spread": "0px" }, { "color": "#C81A6040", "offsetX": "0px", "offsetY": "-8px", "blur": "24px", "spread": "-12px" } ], "$description": "第 2 層（貼底）：分頁列、底部面板", "$extensions": { "tailwind": "--shadow-chrome-up", "cssColorVar": ["--color-line", "--shade-chrome-up"], "mode": { "light": [ { "color": "#F3DDE6" }, { "color": "#C81A6040" } ], "dark": [ { "color": "#36386A" }, { "color": "#00000099" } ] } } },
+    "chrome-down": { "$type": "shadow", "$value": [ { "color": "{color.border.subtle}", "offsetX": "0px", "offsetY": "1px", "blur": "0px", "spread": "0px" }, { "color": "#781E4666", "offsetX": "0px", "offsetY": "8px", "blur": "20px", "spread": "-14px" } ], "$description": "第 2 層（貼頂）：閱讀器頂端列、章節頁小頂列", "$extensions": { "tailwind": "--shadow-chrome-down", "cssColorVar": ["--color-line", "--shade-chrome-down"], "mode": { "light": [ { "color": "#F3DDE6" }, { "color": "#781E4666" } ], "dark": [ { "color": "#36386A" }, { "color": "#00000099" } ] } } },
+    "overlay": { "$type": "shadow", "$value": { "color": "#781E4673", "offsetX": "0px", "offsetY": "18px", "blur": "40px", "spread": "-12px" }, "$description": "第 3 層：閱讀器提示框、寬螢幕的側邊面板", "$extensions": { "tailwind": "--shadow-overlay", "cssColorVar": "--shade-overlay", "mode": { "light": { "color": "#781E4673" }, "dark": { "color": "#00000099" } } } },
+    "edge": { "$type": "shadow", "$value": { "color": "{color.brand.edge}", "offsetX": "0px", "offsetY": "5px", "blur": "0px", "spread": "-1px" }, "$description": "不是高度層級：主要按鈕與正在看的數字格下緣的厚邊（顏色跟著 brand.edge：亮 #8F1244、暗 #C23A78）", "$extensions": { "tailwind": "--shadow-edge", "cssColorVar": "--color-brand-edge" } },
+    "edge-sm": { "$type": "shadow", "$value": { "color": "{color.brand.edge}", "offsetX": "0px", "offsetY": "4px", "blur": "0px", "spread": "-1px" }, "$description": "md／sm 主要按鈕、播放鈕、正在看的數字格", "$extensions": { "tailwind": "--shadow-edge-sm", "cssColorVar": "--color-brand-edge" } },
+    "edge-pressed": { "$type": "shadow", "$value": { "color": "{color.brand.edge}", "offsetX": "0px", "offsetY": "2px", "blur": "0px", "spread": "-1px" }, "$extensions": { "tailwind": "--shadow-edge-pressed", "cssColorVar": "--color-brand-edge" } },
+    "float": { "$type": "shadow", "$value": [ { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "2px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "3px" }, { "color": "#781E468C", "offsetX": "0px", "offsetY": "10px", "blur": "22px", "spread": "-10px" } ], "$description": "浮在漫畫上的控制項：白邊＋墨線＋貼紙陰影；兩套一樣（寫死）", "$extensions": { "tailwind": "--shadow-float", "mode": { "light": "same", "dark": "same" } } },
+    "ring-selected": { "$type": "shadow", "$value": [ { "color": "#C81A60", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "3px" }, { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "5px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "6px" } ], "$description": "閱讀器選中的泡泡框：粉／白／墨三層；兩套一樣（寫死）", "$extensions": { "tailwind": "--shadow-ring-selected", "mode": { "light": "same", "dark": "same" } } },
+    "ring-hint": { "$type": "shadow", "$value": [ { "color": "#C81A60", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "1.5px" }, { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "2.5px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "3.5px" } ], "$description": "標示開啟時，有翻譯的泡泡框；兩套一樣（寫死）", "$extensions": { "tailwind": "--shadow-ring-hint", "mode": { "light": "same", "dark": "same" } } },
+    "ring-hint-plain": { "$type": "shadow", "$value": [ { "color": "#FFFFFF", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "1px" }, { "color": "#2B1F27", "offsetX": "0px", "offsetY": "0px", "blur": "0px", "spread": "2px" } ], "$description": "標示開啟時，還沒有翻譯的泡泡框（沒有粉色）；兩套一樣（寫死）", "$extensions": { "tailwind": "--shadow-ring-hint-plain", "mode": { "light": "same", "dark": "same" } } }
+  },
+  "theme": {
+    "$description": "主題切換（DESIGN.md 7.18、15.2）。",
+    "attribute": { "$type": "string", "$value": "<html data-theme=\"dark\">；沒有這個屬性就是亮色" },
+    "color-scheme": { "$type": "string", "$value": "亮色 light、暗色 dark" },
+    "theme-color": { "$type": "color", "$value": "#FFFFFF", "$description": "<meta name=\"theme-color\">，由開頁腳本與切換鈕改", "$extensions": { "mode": { "light": "#FFFFFF", "dark": "{palette-dark.indigo.900}" } } },
+    "storage-key": { "$type": "string", "$value": "vista-theme", "$description": "localStorage 鍵名（建議值），值 light／dark；沒有值時跟著 prefers-color-scheme" }
   },
   "breakpoint": {
     "sm": { "$type": "dimension", "$value": "640px" },
@@ -186,7 +241,7 @@
   "duration": {
     "fast": { "$type": "duration", "$value": "120ms" },
     "base": { "$type": "duration", "$value": "200ms" },
-    "slow": { "$type": "duration", "$value": "280ms", "$description": "所有動態 ≤ 300ms" },
+    "slow": { "$type": "duration", "$value": "280ms", "$description": "所有動態 ≤ 300ms；切換亮色／暗色不做過渡" },
     "pop": { "$type": "duration", "$value": "300ms" }
   },
   "easing": {

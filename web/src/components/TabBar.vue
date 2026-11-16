@@ -71,7 +71,7 @@ const tabLabel = (section: string, label: string) =>
           <span
             v-if="tab.section === 'practice' && waitingCount"
             aria-hidden="true"
-            class="absolute -top-1 left-[calc(50%+10px)] h-5 min-w-5.5 rounded-full bg-sun px-1.5 text-center text-caption leading-5 font-black text-ink tabular-nums ring-2 ring-paper"
+            class="absolute -top-1 left-[calc(50%+10px)] h-5 min-w-5.5 rounded-full bg-sun px-1.5 text-center text-caption leading-5 font-black text-on-sun tabular-nums ring-2 ring-paper"
             :class="bumping && 'motion-safe:animate-bump'"
             @animationend="bumping = false"
           >

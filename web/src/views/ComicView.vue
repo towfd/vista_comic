@@ -35,7 +35,7 @@ const cellLooks: Record<CellState, string> = {
   unread: 'bg-paper font-extrabold text-ink inset-ring-2 inset-ring-line motion-reduce:active:bg-blush',
   read: 'bg-mist font-bold text-ink-faint motion-reduce:active:bg-blush',
   current:
-    "bg-brand font-extrabold text-white shadow-edge-sm after:absolute after:-top-1 after:-right-1 after:size-3.5 after:rounded-full after:bg-sun after:ring-2 after:ring-paper after:content-[''] motion-reduce:active:bg-brand-pressed",
+    "bg-brand font-extrabold text-on-fill shadow-edge-sm after:absolute after:-top-1 after:-right-1 after:size-3.5 after:rounded-full after:bg-sun after:ring-2 after:ring-paper after:content-[''] motion-reduce:active:bg-brand-pressed",
 }
 
 // ---- Opening at the current chapter ----
@@ -134,7 +134,7 @@ watch(
           </RouterLink>
 
           <div
-            class="mx-auto mt-3.5 aspect-3/4 w-31 rotate-3 overflow-hidden rounded-tile border-4 border-paper shadow-raised backface-hidden lg:mx-0 lg:mt-0 lg:w-40 lg:shrink-0"
+            class="mx-auto mt-3.5 aspect-3/4 w-31 rotate-3 overflow-hidden rounded-tile border-4 border-sticker shadow-raised backface-hidden lg:mx-0 lg:mt-0 lg:w-40 lg:shrink-0"
             :class="coverFailed ? 'bg-mist text-ink-faint' : 'bg-blush-strong'"
             :aria-hidden="!state.data || coverFailed ? 'true' : undefined"
           >

@@ -126,7 +126,7 @@ const fieldClass =
             aria-hidden="true"
           >
             <span
-              class="absolute top-0.75 left-0.75 size-5.5 rounded-full bg-white transition-[translate] duration-120 ease-standard"
+              class="absolute top-0.75 left-0.75 size-5.5 rounded-full bg-on-fill transition-[translate] duration-120 ease-standard"
               :class="item.on && 'translate-x-4'"
             />
           </span>

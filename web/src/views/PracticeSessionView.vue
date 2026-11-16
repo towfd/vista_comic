@@ -141,7 +141,7 @@ function onNextKeydown(event: KeyboardEvent) {
 
     <section v-else-if="phase === 'finished' && answered() > 0" class="pt-8 text-center">
       <div
-        class="mx-auto grid size-21 -rotate-8 place-items-center rounded-full bg-sun text-ink ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
+        class="mx-auto grid size-21 -rotate-8 place-items-center rounded-full bg-sun text-on-sun ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
       >
         <AppIcon name="check" class="size-11 stroke-3" />
       </div>
@@ -248,7 +248,7 @@ function onNextKeydown(event: KeyboardEvent) {
         <div class="flex items-center gap-3">
           <span
             class="grid size-10 -rotate-6 place-items-center rounded-full"
-            :class="verdict.correct ? 'bg-sun text-ink' : 'bg-st-relearn-tint text-st-relearn'"
+            :class="verdict.correct ? 'bg-sun text-on-sun' : 'bg-st-relearn-tint text-st-relearn'"
             aria-hidden="true"
           >
             <AppIcon :name="verdict.correct ? 'check' : 'close'" class="size-6 stroke-3" />

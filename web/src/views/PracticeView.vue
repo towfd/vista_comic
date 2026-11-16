@@ -72,7 +72,7 @@ const settingsButton =
       <template v-else-if="standing.empty === 'dayIsDone'">
         <div class="px-4 pt-2 text-center">
           <div
-            class="mx-auto grid size-21 -rotate-8 place-items-center rounded-full bg-sun text-ink ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
+            class="mx-auto grid size-21 -rotate-8 place-items-center rounded-full bg-sun text-on-sun ring-5 ring-paper outline-2 outline-offset-5 outline-blush-strong"
           >
             <AppIcon name="check" class="size-11 stroke-3" />
           </div>
