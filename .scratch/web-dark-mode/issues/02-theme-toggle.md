@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done
 
 # 02 Theme toggle: library header button, remembered choice
 
@@ -19,3 +19,13 @@ Spec: ../spec.md
 Blocked by: 01
 
 ## Comments
+
+2026-11-16 (frontend-builder, checked by the main session): done on `feature/web-dark-mode-02-toggle`.
+
+- New `web/src/theme.ts` (`createTheme` takes storage, the phone's media query, `<html>` and `theme-color` as parameters, so the tests run without a DOM; `useTheme()` is the site's one instance) and `theme.test.ts` (11 tests: remembered／phone start, live follow before a press, press remembers and stops following, storage throwing on read and write, unknown stored value, no `theme-color` meta).
+- `main.ts` calls `useTheme()` before mounting, so the phone is followed from whichever page opens first (the reader included).
+- `AppIcon.vue`: `moon`, `sun` (DESIGN §7.18; the sun's centre circle written as a path).
+- `LibraryView.vue`: the toggle left of refresh; refresh is rendered `invisible` until the library loads, so the toggle stays put (x = 276 at 390 and 1138 at 1440 while loading, loaded and on error) and the hidden button is out of the tab order and the accessibility tree.
+- A switch briefly holds every transition (`transition:none` for one restyle), because buttons and switches ease colour over 120ms and would otherwise fade a beat behind the page; press transitions are intact afterwards. Browser-verified, not unit-tested.
+- `npm run typecheck`, `npm run build` pass; `npm test` 25 files／492 tests pass (re-run by the main session).
+- Browser, 390 and 1440: Enter／Space／click switch the whole page at once, `theme-color` and `localStorage` follow, focus stays on the button with its name and icon swapped; reload keeps the choice; with nothing stored, flipping emulated `prefers-color-scheme` flips the app live, and after a press it no longer does. Screenshots `docs/design/screenshots/dark/impl-02/` (not in git).

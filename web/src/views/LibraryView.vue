@@ -10,8 +10,10 @@ import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 import LoadingState from '../components/LoadingState.vue'
 import { iconButton, primaryMd } from '../components/buttons'
+import { useTheme } from '../theme'
 
 const store = useLibraryStore()
+const { theme, toggle: toggleTheme } = useTheme()
 const { comics, loading, error, loaded, refreshing, refreshFailed } = storeToRefs(store)
 const comicsStore = useComicsStore()
 
@@ -59,17 +61,30 @@ const covers = reactive<Record<string, 'loaded' | 'failed'>>({})
       <div class="mx-auto max-w-shelf">
         <div class="flex items-center justify-between pt-2 pr-4 pb-3 pl-5 md:pr-6 md:pl-7">
           <h1 class="text-page text-ink">書庫</h1>
-          <button
-            v-if="loaded"
-            type="button"
-            :class="iconButton"
-            :disabled="refreshing"
-            :aria-label="refreshing ? '重新整理中…' : '重新整理'"
-            :aria-busy="refreshing"
-            @click="store.refresh()"
-          >
-            <AppIcon name="refresh" :class="refreshing && 'motion-safe:animate-spin motion-reduce:opacity-50'" />
-          </button>
+          <div class="flex items-center gap-2.5">
+            <!-- One button whose icon and name change, so focus stays on it after a press. -->
+            <button
+              type="button"
+              :class="iconButton"
+              :aria-label="theme === 'dark' ? '換成亮色' : '換成暗色'"
+              @click="toggleTheme"
+            >
+              <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" />
+            </button>
+            <!-- Kept in place, invisible, until the library loads: the toggle beside it
+                 would otherwise jump left when it appears. Invisible is also out of the
+                 tab order and unread. -->
+            <button
+              type="button"
+              :class="[iconButton, !loaded && 'invisible']"
+              :disabled="refreshing"
+              :aria-label="refreshing ? '重新整理中…' : '重新整理'"
+              :aria-busy="refreshing"
+              @click="store.refresh()"
+            >
+              <AppIcon name="refresh" :class="refreshing && 'motion-safe:animate-spin motion-reduce:opacity-50'" />
+            </button>
+          </div>
         </div>
 
         <p

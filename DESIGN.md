@@ -773,6 +773,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 2026-11-16 | 新增 7.18 主題切換鈕：沿用 `iconButton`，亮色月亮「換成暗色」、暗色太陽「換成亮色」；只放書庫頁首、重新整理鈕左邊；第一次跟著手機，按過就記住，只有兩種 | 使用者決定位置與預設行為 | 使用者 |
 | 2026-11-16 | 主題切換鈕在還沒按過時，手機切換深淺也跟著換；切換時整頁瞬間換色、不做過渡；書庫載入中、出錯時也顯示 | 「跟著手機」直到按過為止才一致；有過渡的元件會慢一拍像閃爍；切換是全站設定，隨時要按得到 | design-system-architect |
 | 2026-11-16 | 第 13 節用詞加「亮色／暗色」，不用「深色、夜間模式」 | 使用者自己的說法 | 使用者 |
+| 2026-11-16 | 15.5 替換表補 `PracticeSessionView.vue:251` 答對圓章（`text-ink` → `text-on-sun`）；15.1 的 `@custom-variant` 註解拿掉 `dark:` 字樣；15.1 註明 `@theme static` 退路已驗證不需要 | 第 1 段實作回報：漏列一處黃底字；照抄註解會讓「`dark:` 0 筆」的搜尋過不了；Tailwind 有輸出 `--color-brand-edge` | 實作者（經總控） |
 
 ---
 
@@ -792,7 +793,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 ```css
 @import 'tailwindcss';
 
-/* 暗色：新增。dark: 跟著 <html data-theme="dark">，不跟著手機。元件不用它，這行只是保險。 */
+/* 暗色：新增。讓 Tailwind 的暗色變體跟著 <html data-theme="dark">，不跟著手機。元件不用它，這行只是保險。 */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @theme {
@@ -1045,7 +1046,7 @@ body::before {
   1. 亮色：主要按鈕的厚邊是 `#8F1244`、分頁列上緣有 `#F3DDE6` 線、貼紙封面有粉紫陰影。和改之前一模一樣。
   2. 在 `<html>` 手動加 `data-theme="dark"`：頁面底 `#1E1F45`、主要按鈕亮粉底深色字、厚邊 `#C23A78`、分頁列上緣 `#36386A`、貼紙封面白邊還是白、陰影變黑。
   3. 閱讀器：暗色時泡泡框的粉／白／墨三層、「標示」與「＋收卡」的白＋墨外圈，和亮色一樣。
-  4. 如果第 1 點的厚邊或分頁列的線不見了，代表 Tailwind 沒有輸出 `--color-brand-edge` 或 `--color-line`（沒有 class 直接用到）：把 `@theme {` 改成 `@theme static {`，讓 `@theme` 裡的變數全部輸出。
+  4. 如果第 1 點的厚邊或分頁列的線不見了，代表 Tailwind 沒有輸出 `--color-brand-edge` 或 `--color-line`（沒有 class 直接用到）：把 `@theme {` 改成 `@theme static {`，讓 `@theme` 裡的變數全部輸出。**已驗證不需要**（2026-11-16 第 1 段實作：Tailwind 有輸出 `--color-brand-edge`，維持 `@theme {`）。
 
 ### 15.2 `web/index.html`
 
@@ -1177,6 +1178,7 @@ body::before {
 | `web/src/components/EmptyState.vue:17` | 空狀態貼紙 | `text-ink` | `text-on-sun` |
 | `web/src/views/LibraryView.vue:111` | 「繼續看」標籤 | `text-ink` | `text-on-sun` |
 | `web/src/views/ReaderView.vue:411` | 「本話完」標籤 | `text-ink` | `text-on-sun` |
+| `web/src/views/PracticeSessionView.vue:251` | 答對時的黃色圓章 | `text-ink` | `text-on-sun` |
 | 練習的完成貼紙（「今天做完了」「這一輪做完了」，15.4） | 完成貼紙 | `text-ink` | `text-on-sun` |
 | `web/src/style.css:96-110`、`144-149` | 陰影與 `:root` | 寫死色碼、`color-scheme: light` | 照 15.1 |
 | `web/index.html:7-9` | `theme-color`、`color-scheme` | 只有亮色 | 照 15.2 |
@@ -1186,7 +1188,7 @@ body::before {
 - `text-white`、`bg-white`、`border-white`、`ring-white`：0 筆。
 - 每個有 `bg-sun` 的元素，同一個元素上的字色都是 `text-on-sun`（`after:bg-sun` 的小黃點沒有字，不用管）。
 - `border-paper`：0 筆（`ring-paper` 是「和頁面底接在一起的外圈」，跟著主題換是對的，保留）。
-- `dark:`：0 筆。
+- `dark:`：0 筆（`style.css` 的 `@custom-variant dark` 那行不含這個字樣，整個 `web/src` 搜尋都應該是 0）。
 
 ### 15.6 page-design-spec 的數值 → token
 
