@@ -11,6 +11,8 @@ endpoint's ``pages`` array 1:1.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -222,3 +224,118 @@ def test_media_rejects_symlink_escape(tmp_path, write_page):
     client = TestClient(main.app)
     assert client.get(f"/media/{comic_id}/{chapter_id}/1").status_code == 404
     assert client.get(f"/media/{comic_id}/cover").status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# Caching: every image says ``no-cache`` and carries an ETag built from the
+# file's path, so a browser checks before reusing one and a page whose file was
+# renamed is fetched again (see ``main._image_response``).
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def covered_client(tmp_path, write_page):
+    """One comic with its own cover, one chapter with a page and its own cover."""
+    root = tmp_path / "library"
+    write_page(root / "Covered" / "cover.png", b"comic-cover")
+    write_page(root / "Covered" / "01" / "001.jpg", b"page-one")
+    write_page(root / "Covered" / "01" / "cover.jpg", b"chapter-cover")
+    main.load_catalog(root)
+    return TestClient(main.app)
+
+
+_COVERED_URLS = {
+    "page": f"/media/{stable_id('Covered')}/{stable_id('Covered/01')}/1",
+    "comic cover": f"/media/{stable_id('Covered')}/cover",
+    "chapter cover": f"/media/{stable_id('Covered')}/{stable_id('Covered/01')}/cover",
+}
+_COVERED_BYTES = {
+    "page": b"page-one",
+    "comic cover": b"comic-cover",
+    "chapter cover": b"chapter-cover",
+}
+
+
+@pytest.mark.parametrize("kind", list(_COVERED_URLS))
+def test_image_must_be_checked_before_reuse(covered_client, kind):
+    resp = covered_client.get(_COVERED_URLS[kind])
+    assert resp.status_code == 200
+    assert resp.content == _COVERED_BYTES[kind]
+    assert resp.headers["cache-control"] == "no-cache"
+    etag = resp.headers["etag"]
+    assert etag.startswith('"') and etag.endswith('"') and len(etag) > 2
+
+
+@pytest.mark.parametrize("kind", list(_COVERED_URLS))
+def test_unchanged_image_answers_304_without_body(covered_client, kind):
+    etag = covered_client.get(_COVERED_URLS[kind]).headers["etag"]
+
+    resp = covered_client.get(_COVERED_URLS[kind], headers={"If-None-Match": etag})
+
+    assert resp.status_code == 304
+    assert resp.content == b""
+    # A 304 repeats the validators, so the browser keeps checking next time.
+    assert resp.headers["etag"] == etag
+    assert resp.headers["cache-control"] == "no-cache"
+
+
+def test_other_etag_gets_the_image(covered_client):
+    resp = covered_client.get(_COVERED_URLS["page"], headers={"If-None-Match": '"something-else"'})
+    assert resp.status_code == 200
+    assert resp.content == b"page-one"
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["W/{etag}", '"something-else", {etag}', "*"],
+    ids=["weak", "in a list", "any"],
+)
+def test_etag_match_accepts_weak_and_listed_forms(covered_client, header):
+    """nginx or Cloudflare may hand the tag back weak (``W/``) or in a list."""
+    etag = covered_client.get(_COVERED_URLS["page"]).headers["etag"]
+    resp = covered_client.get(_COVERED_URLS["page"], headers={"If-None-Match": header.format(etag=etag)})
+    assert resp.status_code == 304
+
+
+def test_renamed_page_is_fetched_again(tmp_path, write_page):
+    """The bug this guards: after renaming a chapter's files, the same page URL
+    points at a different file, and the browser kept showing the old image.
+
+    The two files have the same size and modification time -- all that
+    Starlette's own ETag is built from -- so only the path tells them apart.
+    """
+    root = tmp_path / "library"
+    first = write_page(root / "Renamed" / "01" / "001.jpg", b"image-A")
+    second = write_page(root / "Renamed" / "01" / "002.jpg", b"image-B")
+    same_time = 1_700_000_000_000_000_000
+    for path in (first, second):
+        os.utime(path, ns=(same_time, same_time))
+    main.load_catalog(root)
+    client = TestClient(main.app)
+    url = f"/media/{stable_id('Renamed')}/{stable_id('Renamed/01')}/2"
+
+    before = client.get(url)
+    assert before.content == b"image-B"
+
+    # 001 -> 003: page 2 is now image-A (renaming keeps the modification time).
+    first.rename(root / "Renamed" / "01" / "003.jpg")
+    main.load_catalog(root)
+
+    after = client.get(url, headers={"If-None-Match": before.headers["etag"]})
+    assert after.status_code == 200
+    assert after.content == b"image-A"
+    assert after.headers["etag"] != before.headers["etag"]
+
+
+def test_edited_page_is_fetched_again(mixed_library, write_page):
+    """Same file name, new content: the ETag changes with the size and time."""
+    main.load_catalog(mixed_library)
+    client = TestClient(main.app)
+    url = f"/media/{stable_id('Mixed')}/{stable_id('Mixed/01')}/1"
+    etag = client.get(url).headers["etag"]
+
+    write_page(mixed_library / "Mixed" / "01" / "001.jpg", b"jpg-bytes-1, redrawn")
+
+    resp = client.get(url, headers={"If-None-Match": etag})
+    assert resp.status_code == 200
+    assert resp.content == b"jpg-bytes-1, redrawn"
