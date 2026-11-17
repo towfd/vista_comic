@@ -108,6 +108,7 @@
 | color.bg.tint | `#FFF0F5` | `#2C2560` | `--color-blush` | 淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側 | primary / secondary / muted / brand | 14.33 / 6.18 / 5.26 / 5.05 | 12.45 / 8.49 / 6.17 / 5.85 |
 | color.bg.tint-strong | `#FFE0EC` | `#3D3080` | `--color-blush-strong` | 選中分頁的圖示底、按下、停用按鈕、「畢業」標籤、封面載入中 | primary / secondary / muted / brand | 12.90 / 5.56 / 4.73 / 4.54 | 9.92 / 6.77 / 4.92 / 4.66 |
 | color.bg.muted | `#F5EEF1` | `#262852` | `--color-mist` | 看過的數字格、封面載入失敗、漫畫頁佔位 | primary / secondary / muted | 13.84 / 5.97 / 5.08 | 12.72 / 8.68 / 6.31 |
+| color.bg.muted-swatch（新） | `#F5EEF1` | `#3D3080` | `--color-mist-swatch` | 只給章節頁圖例「看過」的小方塊；數字格本身仍用 `mist` | — | 白 1.14（例外，旁邊有字） | paper 1.45（例外，旁邊有字） |
 | color.bg.scrim | `#2B1F27` 45% | `#0C0C24` 60% | `--color-scrim` | 強制回應的面板後的遮罩（目前沒有頁面用到） | — | — | — |
 | color.text.primary | `#2B1F27` | `#F6F3FF` | `--color-ink` | 主要文字、標題 | — | 白 15.81 | paper 14.35 |
 | color.text.secondary | `#6A5560` | `#CCC8F0` | `--color-ink-soft` | 次要說明、中文翻譯、話數、文字按鈕 | — | 白 6.82 | paper 9.79 |
@@ -143,6 +144,8 @@
   - `sticker`：貼紙封面的白邊。兩套都是白。原本用 `border-paper`，暗色會變成靛藍，貼紙感就沒了。
 - 原本的 `color.text.inverse`（`--color-white`）拿掉：它的兩個用途分給 `on-fill` 和 `sticker`。元件裡不再出現 `white`。
 - 暗色的 `danger`／`warning`／`success` 和狀態色的文字色、淡底是同一組（success = review、danger = relearning、warning = learning），規則和亮色一樣。
+- **`mist-swatch`（2026-11-17 新增）**：章節頁圖例「看過」的小方塊專用，別的地方不用。亮色和 `mist` 同值，外觀不變；暗色用 `#3D3080`（和 `blush-strong` 同值），因為 `mist` 的 `#262852` 放在頁面底上只有 1.13，12px 的方塊幾乎看不見。不直接用 `blush-strong`：亮色會變成淡粉，和「看過」的數字格對不上；只在暗色換，又要寫 `dark:`（第 11 節禁止）。
+  - 它歸在底色（`color.bg`），**不是圖形色**，不適用下面「圖形色 ≥ 3」的規則。對比只有亮 1.14、暗 1.45，列為例外：方塊旁邊就寫著「看過」，方塊本身 `aria-hidden`，狀態不靠它辨識。紫色實心是使用者在三個選項（不改／加外框／紫色實心）裡選的；沒選加外框，是因為會讓「看過」像「還沒看」（7.7）。
 
 ### 字卡狀態色
 
@@ -443,7 +446,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - 暗色：正在看是亮粉格配深色數字，看過是 `#262852` 格配 `#AEA9DC` 數字。看過和還沒看的底色在暗色更接近（和亮色一樣靠「實心底 vs 外框」與字重分），不另外加差異。
 
 - 「看過」與「還沒看」除了顏色還差在「實心底 vs 外框」與字重；每格 `aria-label` 寫狀態（page-design-spec 2.2）。
-- 圖例的小方塊：`size-3 rounded-[4px]`，三種狀態同上。
+- 圖例的小方塊：`size-3 rounded-[4px]`；「正在看」「還沒看」同上，「看過」用 `bg-mist-swatch`（亮色和 `mist` 一樣，暗色 `#3D3080` 實心），因為 `mist` 的暗色 `#262852` 在 12px 的方塊上幾乎看不見，加外框又會像「還沒看」。
 - 打開時捲到正在看：瞬間定位，不做平滑捲動（規則見 page-design-spec 2.2）。
 
 ### 7.8 Input / Textarea / Search
@@ -655,7 +658,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 ## 10. Accessibility
 
-- **對比**：內文 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1。全部組合見 `docs/design/contrast-report.md`；第 3 節列出的組合全部通過。停用狀態 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（淡粉 2 上 ink-faint：亮 4.73、暗 4.92）。
+- **對比**：內文 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1。全部組合見 `docs/design/contrast-report.md`；第 3 節列出的組合全部通過，只有一個例外：章節頁圖例「看過」的小方塊 `mist-swatch`（亮 1.14、暗 1.45），旁邊有字、方塊 `aria-hidden`，不靠它辨識狀態（理由見第 3 節）。停用狀態 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（淡粉 2 上 ink-faint：亮 4.73、暗 4.92）。
 - **兩套主題都要達 AA**：亮色和暗色分開驗算，每一個使用中的組合在兩套裡都要過門檻。class 兩套共用，所以只要一套沒過，那個組合就禁止（第 3 節「不可用的組合」）。新增元件或新組合時，兩套都要跑 `contrast.py`，結果補進 contrast-report。暗色各項的最低值：文字 4.66（亮粉在 `#3D3080` 上）、停用文字 4.92、控制項外框 4.30、圖形 4.66（解析中的滑塊）。
 - **focus**：全站 `:focus-visible` 3px 主粉外框、offset 2px（亮色深粉、暗色亮粉）。輸入框聚焦用 3px 主粉內框（變粗＋變色）。疊在漫畫上的元件用三層框（兩套一樣）。
 - **不只靠顏色**：狀態標籤一定有字；數字格的看過／還沒看差在實心 vs 外框；選中分頁有圖示底塊；泡泡框有翻譯／沒翻譯差在有沒有粉色那圈；錯誤一定有文字；開關有圓鈕位置。這些差異兩套都在，暗色不另外加。
@@ -774,6 +777,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 2026-11-16 | 主題切換鈕在還沒按過時，手機切換深淺也跟著換；切換時整頁瞬間換色、不做過渡；書庫載入中、出錯時也顯示 | 「跟著手機」直到按過為止才一致；有過渡的元件會慢一拍像閃爍；切換是全站設定，隨時要按得到 | design-system-architect |
 | 2026-11-16 | 第 13 節用詞加「亮色／暗色」，不用「深色、夜間模式」 | 使用者自己的說法 | 使用者 |
 | 2026-11-16 | 15.5 替換表補 `PracticeSessionView.vue:251` 答對圓章（`text-ink` → `text-on-sun`）；15.1 的 `@custom-variant` 註解拿掉 `dark:` 字樣；15.1 註明 `@theme static` 退路已驗證不需要 | 第 1 段實作回報：漏列一處黃底字；照抄註解會讓「`dark:` 0 筆」的搜尋過不了；Tailwind 有輸出 `--color-brand-edge` | 實作者（經總控） |
+| 2026-11-17 | 新增 `mist-swatch`（`color.bg.muted-swatch`，亮 `#F5EEF1`、暗 `#3D3080`），只給章節頁圖例「看過」的小方塊用，數字格本身仍用 `mist`。第 3 節、7.7、第 10 節、15.1 跟著補 | 暗色 QA 的 QA-D01：`mist` 的暗色 `#262852` 放在頁面底上只有 1.13，12px 的方塊幾乎看不見；加外框會讓「看過」像「還沒看」。用 token 覆寫，不寫 `dark:`（第 11 節）。對比亮 1.14、暗 1.45，沒到圖形的 3:1；旁邊有字、不靠它辨識，所以列為例外 | 使用者（在不改／加外框／紫色實心三個選項中選紫色實心）、visual-qa（QA-D01）、design-system-architect（token 命名） |
 
 ---
 
@@ -810,6 +814,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
   --color-blush: #fff0f5;
   --color-blush-strong: #ffe0ec;
   --color-mist: #f5eef1;
+  --color-mist-swatch: #f5eef1; /* 2026-11-17 新增。章節頁圖例「看過」的小方塊；亮色和 mist 一樣，暗色會覆寫 */
   --color-scrim: rgb(43 31 39 / 0.45);
   /* ---- 顏色：字（ink 也是提示框的墨框） ---- */
   --color-ink: #2b1f27;
@@ -939,6 +944,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
     --color-blush: #2c2560;
     --color-blush-strong: #3d3080;
     --color-mist: #262852;
+    --color-mist-swatch: #3d3080; /* 圖例「看過」：mist 在 12px 的方塊上幾乎看不見，改用和 blush-strong 同值 */
     --color-scrim: rgb(12 12 36 / 0.6);
     /* 字 */
     --color-ink: #f6f3ff;

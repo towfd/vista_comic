@@ -95,6 +95,7 @@
       "tint": { "$type": "color", "$value": "{palette.pink.50}", "$description": "淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側", "$extensions": { "tailwind": "--color-blush", "mode": { "light": "{palette.pink.50}", "dark": "{palette-dark.indigo.800}" } } },
       "tint-strong": { "$type": "color", "$value": "{palette.pink.100}", "$description": "選中分頁的圖示底、按下、停用按鈕、畢業標籤、封面載入中", "$extensions": { "tailwind": "--color-blush-strong", "mode": { "light": "{palette.pink.100}", "dark": "{palette-dark.indigo.700}" } } },
       "muted": { "$type": "color", "$value": "{palette.mauve.50}", "$description": "看過的數字格、封面載入失敗、漫畫頁佔位", "$extensions": { "tailwind": "--color-mist", "mode": { "light": "{palette.mauve.50}", "dark": "{palette-dark.indigo.850}" } } },
+      "muted-swatch": { "$type": "color", "$value": "{palette.mauve.50}", "$description": "2026-11-17 新增：只給章節頁圖例「看過」的小方塊，數字格本身仍用 muted。亮色和 muted 同值；暗色用 indigo.700（和 tint-strong 同值），因為 indigo.850 在 12px 的方塊上幾乎看不見。不是圖形色：對比亮 1.14、暗 1.45，旁邊有字、方塊 aria-hidden，列為例外（DESIGN.md 第 3 節、第 10 節）", "$extensions": { "tailwind": "--color-mist-swatch", "mode": { "light": "{palette.mauve.50}", "dark": "{palette-dark.indigo.700}" } } },
       "scrim": { "$type": "color", "$value": "#2B1F2773", "$description": "強制回應的面板後面的遮罩（亮 45%、暗 60%；目前沒有頁面用到）", "$extensions": { "tailwind": "--color-scrim", "mode": { "light": "#2B1F2773", "dark": "#0C0C2499" } } }
     },
     "text": {
