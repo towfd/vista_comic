@@ -26,10 +26,14 @@ Also provides:
 
 Media is served read-only: every request re-resolves the joined filesystem path
 and requires it to stay under the library root before streaming (see _safe_file).
+Images go out with ``Cache-Control: no-cache`` and an ETag that covers the file's
+path, so a browser checks before reusing one and a renamed page is fetched
+again (see _image_response).
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from contextlib import asynccontextmanager, contextmanager
 from datetime import date, datetime, timezone
@@ -242,6 +246,48 @@ def _safe_file(catalog: Catalog, rel_path: str) -> Path:
     if not candidate.is_file():
         raise HTTPException(status_code=404, detail="Not found")
     return candidate
+
+
+def _image_response(request: Request, file_path: Path, rel_path: str) -> Response:
+    """Send a page or cover image that the browser must check before reusing.
+
+    The media URLs name a page by its position in the chapter, not by its file.
+    Renaming a chapter's files therefore puts different images under the same
+    URLs, and with no caching directive a browser guesses how long its copy
+    stays fresh and keeps showing the old image until then. ``no-cache`` still
+    lets it keep the copy, but it has to ask first.
+
+    Asking costs a round trip, not the image: a matching ``If-None-Match`` gets
+    a 304 with no body. The ETag hashes the file's library path together with
+    its modification time and size, so a rename changes it even when the new
+    file has the same time and size as the old one; Starlette's own ETag uses
+    only those two.
+    """
+    stat_result = file_path.stat()
+    basis = f"{rel_path}\0{stat_result.st_mtime_ns}\0{stat_result.st_size}"
+    etag = f'"{hashlib.sha1(basis.encode()).hexdigest()}"'
+    headers = {"Cache-Control": "no-cache", "ETag": etag}
+    if _etag_matches(request.headers.get("if-none-match"), etag):
+        return Response(status_code=304, headers=headers)
+    return FileResponse(
+        file_path,
+        media_type=_content_type_for(rel_path),
+        headers=headers,
+        stat_result=stat_result,
+    )
+
+
+def _etag_matches(if_none_match: Optional[str], etag: str) -> bool:
+    """Whether an ``If-None-Match`` header names ``etag``.
+
+    Weak comparison, which is what RFC 9110 asks of this header: a proxy on the
+    way (nginx, Cloudflare) may hand our tag back as ``W/"..."``.
+    """
+    if not if_none_match:
+        return False
+    if if_none_match.strip() == "*":
+        return True
+    return etag in (tag.strip().removeprefix("W/") for tag in if_none_match.split(","))
 
 
 def page_file_path(comic_id: str, chapter_id: str, page_number: int) -> Optional[Path]:
@@ -903,7 +949,7 @@ def get_line_analysis(analysis_id: int) -> LineAnalysisResponse:
 
 
 @app.get("/media/{comic_id}/{chapter_id}/cover")
-def get_chapter_cover_image(comic_id: str, chapter_id: str) -> FileResponse:
+def get_chapter_cover_image(comic_id: str, chapter_id: str, request: Request) -> Response:
     """Stream a chapter's own ``cover.*``.
 
     Declared before the page route below, which would otherwise match ``cover``
@@ -919,11 +965,11 @@ def get_chapter_cover_image(comic_id: str, chapter_id: str) -> FileResponse:
     if chapter is None or chapter.cover_path is None:
         raise HTTPException(status_code=404, detail="Not found")
     file_path = _safe_file(catalog, chapter.cover_path)
-    return FileResponse(file_path, media_type=_content_type_for(chapter.cover_path))
+    return _image_response(request, file_path, chapter.cover_path)
 
 
 @app.get("/media/{comic_id}/{chapter_id}/{page}")
-def get_page_image(comic_id: str, chapter_id: str, page: str) -> FileResponse:
+def get_page_image(comic_id: str, chapter_id: str, page: str, request: Request) -> Response:
     """Stream one page image by 1-based index.
 
     ``page`` is a 1-based index into the chapter's ordered ``page_paths`` (the
@@ -948,11 +994,11 @@ def get_page_image(comic_id: str, chapter_id: str, page: str) -> FileResponse:
 
     rel_path = chapter.page_paths[index_1based - 1]
     file_path = _safe_file(catalog, rel_path)
-    return FileResponse(file_path, media_type=_content_type_for(rel_path))
+    return _image_response(request, file_path, rel_path)
 
 
 @app.get("/media/{comic_id}/cover")
-def get_cover_image(comic_id: str) -> FileResponse:
+def get_cover_image(comic_id: str, request: Request) -> Response:
     """Stream a comic's resolved cover (explicit ``cover.*`` or fallback page).
 
     ``cover_path`` was resolved at scan time to either an explicit ``cover.*``
@@ -964,7 +1010,7 @@ def get_cover_image(comic_id: str) -> FileResponse:
     if comic is None or comic.cover_path is None:
         raise HTTPException(status_code=404, detail="Not found")
     file_path = _safe_file(catalog, comic.cover_path)
-    return FileResponse(file_path, media_type=_content_type_for(comic.cover_path))
+    return _image_response(request, file_path, comic.cover_path)
 
 
 @app.post("/rescan")
