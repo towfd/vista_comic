@@ -36,6 +36,8 @@
   --color-blush: #fff0f5;
   --color-blush-strong: #ffe0ec;
   --color-mist: #f5eef1;
+  /* The chapter page's 看過 legend swatch only; the same as mist in light. */
+  --color-mist-swatch: #f5eef1;
   --color-scrim: rgb(43 31 39 / 0.45);
   /* ---- Colour: text (ink is also the reader popover's outline) ---- */
   --color-ink: #2b1f27;
@@ -190,6 +192,8 @@
     --color-blush: #2c2560;
     --color-blush-strong: #3d3080;
     --color-mist: #262852;
+    /* mist is about 1.1:1 on the page, invisible at 12px; a ring would read as 還沒看. */
+    --color-mist-swatch: #3d3080;
     --color-scrim: rgb(12 12 36 / 0.6);
     /* Text */
     --color-ink: #f6f3ff;

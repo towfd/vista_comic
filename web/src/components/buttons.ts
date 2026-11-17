@@ -15,16 +15,20 @@ export const primaryMd = `${primaryBase} h-11 px-5 text-body font-extrabold shad
 /** 36px; pad the touch area to 44 where it stands alone (DESIGN 7.1). */
 export const primarySm = `${primaryBase} h-9 px-4 text-meta font-extrabold shadow-edge-sm active:translate-y-0.5`
 
+// The text colour is left out of the base and added by each variant: two
+// text-* classes on one element are settled by their order in the stylesheet,
+// not in the class string, and text-ink comes after text-danger there.
 const secondaryBase =
-  'inline-flex items-center justify-center gap-1.5 rounded-full bg-paper text-ink inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush disabled:text-ink-faint disabled:hover:bg-paper'
+  'inline-flex items-center justify-center gap-1.5 rounded-full bg-paper inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush disabled:text-ink-faint disabled:hover:bg-paper'
+const secondaryMdShape = `${secondaryBase} h-11 px-5 text-body font-extrabold`
 
 /** Beside a primary lg. */
-export const secondaryLg = `${secondaryBase} h-14 px-6 text-label`
+export const secondaryLg = `${secondaryBase} h-14 px-6 text-label text-ink`
 /** Beside a primary md, or alone. */
-export const secondaryMd = `${secondaryBase} h-11 px-5 text-body font-extrabold`
+export const secondaryMd = `${secondaryMdShape} text-ink`
 
 /** A secondary button for a destructive action (刪除卡片) before it is confirmed. */
-export const secondaryDangerMd = `${secondaryMd} text-danger`
+export const secondaryDangerMd = `${secondaryMdShape} text-danger`
 
 /** Solid red: the confirming press of a destructive action. */
 export const dangerMd =

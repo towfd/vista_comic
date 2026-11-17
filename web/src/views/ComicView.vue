@@ -183,7 +183,7 @@ watch(
           <h2 id="chapters-heading" class="text-heading text-ink">章節</h2>
           <ul class="flex gap-3 text-caption text-ink-soft">
             <li class="flex items-center gap-1.25">
-              <span class="size-3 rounded-[4px] bg-mist" aria-hidden="true" />看過
+              <span class="size-3 rounded-[4px] bg-mist-swatch" aria-hidden="true" />看過
             </li>
             <li class="flex items-center gap-1.25">
               <span class="size-3 rounded-[4px] bg-brand" aria-hidden="true" />正在看
