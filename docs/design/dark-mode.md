@@ -1,7 +1,7 @@
 # 暗色模式（2026-11-16 開始）
 
 > 這次工作的紀錄：畫面、核心清單、待決定、決定紀錄、切段。新對話從這份接著做。
-> 改版的總紀錄在 `STATUS.md`（以遠端分支 `origin/docs/web-redesign-delivery` 的版本為準，main 上的還寫「實作未開始」）。這次的決定在送 PR 時併進那份的決定紀錄。
+> 改版的總紀錄在 `STATUS.md`。這次的決定摘要已在 2026-11-17 併進那份的決定紀錄。
 > 需求由管理用 session agent-2b 轉達，問題一次一題傳給它，它轉給使用者。
 
 ## 畫面（使用者原話）
@@ -120,6 +120,7 @@
 | 2026-11-16 | STATUS.md 的決定紀錄還沒併：最新版在 `origin/docs/web-redesign-delivery`，等那個分支併進 main 後，把這份的決定摘要寫進去 | 避免蓋掉另一個分支上的版本 | agent |
 | 2026-11-16 | 分支疊著開：01 從 main（先放設計文件 commit）、02 接 01、03 接 02 | 每段要用到前一段的程式；沒有 gh 開不了 PR，合併方式等使用者回答 | agent |
 | 2026-11-16 | `PracticeSessionView.vue:251` 答對的黃色圓章也換 `text-on-sun`（DESIGN 15.5 漏列，已請設計系統補） | 同一條規則 | frontend-builder |
+| 2026-11-17 | STATUS.md 的決定紀錄併好了：`origin/docs/web-redesign-delivery`（#153）和 `origin/docs/web-dark-mode-deployed`（#158）先併進來，再把這份的決定摘要寫進 STATUS.md。接上面 2026-11-16「還沒併」那列 | 原本兩份紀錄的最新版分在不同分支上，STATUS 一直停在 11-14 | agent |
 
 ## 切段（定稿見 `.scratch/web-dark-mode/`；確認頁 `previews/dark/plan.html`）
 
