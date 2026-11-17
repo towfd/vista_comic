@@ -63,14 +63,15 @@ const secondarySm =
   -->
   <div
     v-if="!collect.open"
-    class="fixed top-[calc(0.6875rem+env(safe-area-inset-top))] right-[calc(0.75rem+env(safe-area-inset-right))] z-20 flex items-center gap-3"
+    class="fixed top-[calc(0.6875rem+env(safe-area-inset-top))] right-[calc(0.75rem+env(safe-area-inset-right))] z-20 flex max-w-[calc(100vw_-_1.5rem_-_env(safe-area-inset-left)_-_env(safe-area-inset-right))] items-center gap-3"
   >
+    <!-- On a phone the row can be wider than the screen; then this shrinks and the word ends in …. -->
     <p
       v-if="collect.added"
-      class="inline-flex h-9 max-w-64 items-center gap-1.5 rounded-full bg-success-tint px-3.5 text-meta text-success shadow-float motion-safe:animate-[added-in_200ms_var(--ease-standard)]"
+      class="inline-flex h-9 max-w-64 min-w-0 items-center gap-1.5 rounded-full bg-success-tint px-3.5 text-meta text-success shadow-float motion-safe:animate-[added-in_200ms_var(--ease-standard)]"
       role="status"
     >
-      <AppIcon name="check" class="size-4" />
+      <AppIcon name="check" class="size-4 shrink-0" />
       <span class="truncate">已加入：<span lang="vi">{{ collect.added }}</span></span>
     </p>
     <!-- The reader's own controls, kept beside this button as the page scrolls. -->
