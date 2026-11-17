@@ -35,8 +35,8 @@
 | ⛔ 實作前確認 | 亮色：查不到使用者確認開工的紀錄。暗色：完成，使用者 2026-11-16 同意 | 亮色：`.scratch/web-redesign/spec.md`。暗色：`.scratch/web-dark-mode/spec.md`、previews/dark/plan.html | 亮色 spec 的決定表寫「Made with the owner on 2026-11-14」 |
 | 4 Implementation | 完成 | 亮色：`.scratch/web-redesign/issues/01`～`07`，全部 done（2026-11-14）；PR #146–#152。暗色：`.scratch/web-dark-mode/issues/01`、`02`，done；PR #154、#156 | 亮色 7 張票：01 地基（token、字型、狀態列、底部分頁列）、02 後端顯示用書名、03 書庫、04 章節頁、05 閱讀器、06 字卡庫、07 練習。整合後網頁 24 檔 481 個測試、後端 410 個測試全過（DELIVERY.md）。暗色：01 地基 #154、02 切換鈕 #156（#155 被 GitHub 自動關掉後改開）；網頁 25 檔 492 個測試全過（dark-mode.md 進度表、「交付」） |
 | 5 Visual QA | 完成：亮色第 1 輪、暗色第 1 輪 | 亮色：DELIVERY.md「QA 結果」，截圖 screenshots/r1/。暗色：dark-qa-report.md，截圖 screenshots/dark/r1/（不進版控）；PR #157 | 亮色第 1 輪（390／1440，真實資料）：P0 0、P1 2、P2 1。P1 是沒有空格的長書名溢出卡片、從別頁回書庫不會重抓（繼續看過期）；P2 是缺 favicon。390／1440 都沒有水平捲動。暗色第 1 輪：P0 0、P1 0、P2 3（QA-D01～D03） |
-| 6 Refinement | 完成：亮色 1 輪、暗色 1 輪 | 亮色：DELIVERY.md「QA 結果」；`issues/03-library.md` 的 visual QA 留言。暗色：`.scratch/web-dark-mode/issues/03-dark-qa.md` 2026-11-17 留言；DESIGN.md Changelog 2026-11-17 | 亮色：QA 的 3 項都修好，併入 #148（03 書庫）。暗色：3 個 P2 修好（PR #159），2026-11-17 還沒部署。QA-D01 圖例小方塊改用 `mist-swatch`；QA-D02「刪除卡片」改危險色；QA-D03「已加入」膠囊不再超出畫面 |
-| 7 Delivery | 完成：亮色 2026-11-14、暗色 2026-11-16。P2 修正 2026-11-17 還沒部署 | 亮色：DELIVERY.md。暗色：dark-mode.md「交付（2026-11-16）」 | 亮色：合併 #146–#152 後部署 `bd364db`，重建 `api`、`web`；15 個 `title.txt` 放進書庫並重新掃描，15／15 有正式書名。暗色：部署 main `20e2517`（#154、#156、#157），只重建 `web`；網站回 200、線上 bundle 有切換鈕、模擬暗色時底色是 `#1E1F45`（dark-mode.md 進度表第 7 列） |
+| 6 Refinement | 完成：亮色 1 輪、暗色 1 輪 | 亮色：DELIVERY.md「QA 結果」；`issues/03-library.md` 的 visual QA 留言。暗色：`.scratch/web-dark-mode/issues/03-dark-qa.md` 2026-11-17 留言；DESIGN.md Changelog 2026-11-17 | 亮色：QA 的 3 項都修好，併入 #148（03 書庫）。暗色：3 個 P2 修好（PR #159），2026-11-17 部署。QA-D01 圖例小方塊改用 `mist-swatch`；QA-D02「刪除卡片」改危險色；QA-D03「已加入」膠囊不再超出畫面 |
+| 7 Delivery | 完成：亮色 2026-11-14、暗色 2026-11-16、P2 修正 2026-11-17 | 亮色：DELIVERY.md。暗色：dark-mode.md「交付（2026-11-16）」 | 亮色：合併 #146–#152 後部署 `bd364db`，重建 `api`、`web`；15 個 `title.txt` 放進書庫並重新掃描，15／15 有正式書名。暗色：部署 main `20e2517`（#154、#156、#157），只重建 `web`；網站回 200、線上 bundle 有切換鈕、模擬暗色時底色是 `#1E1F45`（dark-mode.md 進度表第 7 列）。P2 修正：部署 main `bab4717`（#159，連同後端的 #160），重建 `api`、`web`；線上 CSS 有 `mist-swatch` |
 
 ## 工具狀態
 
@@ -131,7 +131,8 @@
 | 2026-11-16 | 5（暗色） | 合併 #157（03 檢查報告） | 同一句「你可以去合併了」 | 使用者 |
 | 2026-11-16 | 7（暗色） | 部署 main `20e2517`（#154、#156、#157），只重建 `web`（`docker compose up -d --build web`）。主控台用 herdr 在同一個 session 代打的「可以部署」不採用，等使用者本人確認 | 使用者本人在同一個 session 說「部吧」；別的 session 代打的同意不能當成使用者本人的同意 | 使用者 |
 | 2026-11-17 | 6（Refinement） | QA-D01：章節頁圖例「看過」的小方塊在暗色改紫色實心。新增 `mist-swatch`（`color.bg.muted-swatch`，亮 `#F5EEF1`、暗 `#3D3080`），只給這個小方塊用；數字格本身仍用 `mist`。用 token 覆寫，不寫 `dark:`。對比亮 1.14、暗 1.45，沒到 3:1，列為例外。DESIGN.md、design-tokens.json、contrast-report.md（第 7 節）已同步 | `mist` 的暗色 `#262852` 放在頁面底上只有 1.13，12px 的方塊幾乎看不見；加外框會讓「看過」像「還沒看」；寫 `dark:` 違反 DESIGN.md 第 11 節。旁邊有字、方塊 `aria-hidden`，不靠顏色辨識，所以可以例外 | 使用者（在不改／加外框／紫色實心三個選項中選紫色實心）；design-system-architect（token 命名） |
-| 2026-11-17 | 6（Refinement） | QA-D02、QA-D03 也修好：「刪除卡片」的字改危險色（亮 `#C8322A`、暗 `#FF948A`）；閱讀器浮動控制項那一列限制在畫面寬度減左右各 12px，「已加入」膠囊放不下就縮短、字尾變「…」。和 QA-D01 同在 PR #159；2026-11-17 還沒部署。接著上面 2026-11-16「P2 先不修，留給之後」那列 | D02：`secondaryBase` 本身帶著 `text-ink`，建好的 CSS 裡 `.text-ink` 排在 `.text-danger` 後面，加上去的危險色蓋不過。D03 比報告的嚴重：「標示」出現時那一列超出左緣 34px，「＋收卡」右邊被切掉 | 紀錄沒寫（`.scratch/web-dark-mode/issues/03-dark-qa.md` 只記由總控修好） |
+| 2026-11-17 | 6（Refinement） | QA-D02、QA-D03 也修好：「刪除卡片」的字改危險色（亮 `#C8322A`、暗 `#FF948A`）；閱讀器浮動控制項那一列限制在畫面寬度減左右各 12px，「已加入」膠囊放不下就縮短、字尾變「…」。和 QA-D01 同在 PR #159，2026-11-17 部署。接著上面 2026-11-16「P2 先不修，留給之後」那列 | D02：`secondaryBase` 本身帶著 `text-ink`，建好的 CSS 裡 `.text-ink` 排在 `.text-danger` 後面，加上去的危險色蓋不過。D03 比報告的嚴重：「標示」出現時那一列超出左緣 34px，「＋收卡」右邊被切掉 | 紀錄沒寫（`.scratch/web-dark-mode/issues/03-dark-qa.md` 只記由總控修好） |
+| 2026-11-17 | 7 | 以後合併、部署都不用再問使用者。照這句合併 #153、#158、#159、#160，部署 main `bab4717`，重建 `api`、`web`（#160 改了後端） | 使用者原話：「以後你這邊就自己去合併部屬 不用我同意」 | 使用者 |
 
 ## 現況觀察（2026-11-14，r0 截圖：`docs/design/screenshots/r0/390-*.png`，取自部署版 192.168.0.45:8080）
 
@@ -156,7 +157,6 @@
 
 ### 還沒決定
 
-- PR #159（暗色 3 個 P2 修正）什麼時候部署。2026-11-17 還沒部署。
 - iPhone 實機確認，結果都查不到。清單合併自 DELIVERY.md「還沒實際測過」（亮色）、`.scratch/web-dark-mode/issues/03-dark-qa.md` 和 dark-qa-report.md「要在 iPhone 實機確認的」（暗色），重複的併成一條：
   1. 主畫面 App 的狀態列（時鐘那一條）：亮色時是白底黑字；再看四種組合，手機亮／暗 × App 亮／暗。不對的話，刪掉主畫面的 vista 重新加入再看一次。
   2. 手機在暗色時第一次打開，沒有白閃。
@@ -166,7 +166,7 @@
   6. Home 條上方的留白：分頁列、收卡面板、練習的按鈕。
   7. 按下按鈕的手感（觸控的 active 樣式）。
   8. 暗色時亮粉按鈕和黃色徽章的色感。
-  9. P2 修正部署之後：章節頁圖例「看過」的小方塊，暗色時是紫色實心；字卡頁「刪除卡片」是紅色（亮色、暗色都看）；在閱讀器收一句長的，「已加入」膠囊留在畫面裡。
+  9. P2 修正（2026-11-17 部署）：章節頁圖例「看過」的小方塊，暗色時是紫色實心；字卡頁「刪除卡片」是紅色（亮色、暗色都看）；在閱讀器收一句長的，「已加入」膠囊留在畫面裡。
 - 錯誤畫面（`ErrorState`）「無法通過 Cloudflare 驗證」的說明提到 `web/.env` 與 `npm run dev`，是給開發者看的字。要不要改？（DESIGN.md 第 13 節、DELIVERY.md「建議的下一步」）
 
 ### page-design-spec 第 7 節的 4 件
