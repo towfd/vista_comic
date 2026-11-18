@@ -21,8 +21,12 @@ import {
   textButton,
   warningMd,
 } from '../components/buttons'
+import { useAudioShortcut } from '../audio/shortcut'
 
 const props = defineProps<{ cardId: string }>()
+
+// ⌘3 plays this card's recording, whichever field is being typed in.
+useAudioShortcut()
 
 const router = useRouter()
 const store = useDeckStore()
@@ -213,7 +217,7 @@ function remove() {
       <section class="mt-3">
         <div class="flex items-start gap-3">
           <h1 class="min-w-0 flex-1 text-headline font-extrabold leading-title break-words whitespace-pre-wrap text-ink" lang="vi">{{ card.sourceText }}</h1>
-          <CardAudioButton v-if="card.hasAudio" :card-id="card.id" />
+          <CardAudioButton v-if="card.hasAudio" :card-id="card.id" shortcut />
         </div>
         <div class="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span :class="stateChipClass(card.state)">{{ state }}</span>

@@ -11,6 +11,11 @@ import CardAudioButton from '../components/CardAudioButton.vue'
 import ErrorState from '../components/ErrorState.vue'
 import LoadingState from '../components/LoadingState.vue'
 import { iconButtonBlush, primaryLg, secondaryLg, secondaryMd } from '../components/buttons'
+import { useAudioShortcut } from '../audio/shortcut'
+
+// ⌘3 is this page's from start to finish: it plays the card asked once there
+// is an answer, and does nothing (rather than jump to tab 3) before.
+useAudioShortcut()
 
 const router = useRouter()
 const session = useSessionStore()
@@ -277,6 +282,7 @@ function onNextKeydown(event: KeyboardEvent) {
                 v-if="answerCard?.hasAudio"
                 :card-id="answerCard.id"
                 :label="question.cloze ? '播放這個字' : '播放發音'"
+                :shortcut="!question.cloze"
               />
             </dd>
           </div>
@@ -291,8 +297,8 @@ function onNextKeydown(event: KeyboardEvent) {
                 >{{ question.cloze.after }}</template
               ><template v-else>{{ verdict.sentence }}</template>
               </span>
-              <!-- The sentence is the card asked, so its recording is the card's own. -->
-              <CardAudioButton v-if="question.card.hasAudio" :card-id="question.card.id" label="播放整句" />
+              <!-- The sentence is the card asked, so its recording is the card's own, and ⌘3's. -->
+              <CardAudioButton v-if="question.card.hasAudio" :card-id="question.card.id" label="播放整句" shortcut />
             </dd>
           </div>
         </dl>
