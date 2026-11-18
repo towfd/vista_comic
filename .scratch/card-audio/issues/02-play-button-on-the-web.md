@@ -1,4 +1,4 @@
-Status: implemented — awaiting deploy and the owner's phone check (2026-11-18)
+Status: deployed — awaiting the owner's phone check (2026-11-18)
 Blocked by: 01
 
 # 02 — Play button on the web
@@ -37,4 +37,6 @@ Decisions made while implementing:
 - Labels: 「播放發音」 beside 卡片 and on the card page, 「播放這個字」 and 「播放整句」 on a 填空題, 「停止播放」 while loading or playing.
 
 Design docs: the design-system agent added DESIGN.md 7.19 (named 發音鈕 there, because 7.1 already has a 播放鈕 for the library's continue-reading card), 發音 to the §13 word list, two §12 exceptions (the loading spin that can be pressed, and a failed load with no words), and the matching rows in `docs/design/` (page-design-spec 2.7, 3.5, 3.7 and §8; contrast-report §8; STATUS). Every combination passes in both themes with existing tokens. The writing manager proofread it (`docs/writing-log.md`, 2026-11-18 第 5 次). Open for the owner: whether a failed load should say something (STATUS, 待使用者決定); that behaviour was decided here while implementing, not by the owner.
+
+2026-11-18: merged as #163 (`a53645e`) and deployed: only `web` rebuilt (the change touched `web/`, docs and `.scratch/`). The served bundle carries 「播放這個字」「停止播放」 and the no-audio sentence. No card has audio until the Text-To-Speech writer runs, so the owner's phone check waits for that.
 
