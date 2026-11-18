@@ -1,4 +1,4 @@
-Status: in progress (2026-11-19)
+Status: deployed — awaiting the owner's Mac check (2026-11-19)
 Blocked by: 02
 
 # 03 — ⌘3 plays the recording
@@ -54,3 +54,5 @@ Decisions made while implementing:
 - The last button to offer wins, and a button takes back only its own offer, so the next question's button mounting before the last one unmounts cannot leave the key dead.
 - Matched by `code`, not `key`; the keypad 3 (`Numpad3`) does not count.
 - The design docs: DESIGN.md 7.19 and §10 describe ⌘3; §12 and `docs/design/STATUS.md` record the failed-load decision (design-system agent).
+
+2026-11-19: merged as #168 (`9ee6174`) and deployed on this machine, which is the deploy host (`agent-Aspire-TC-1750`; SSH to it failed host key verification, so the deploy ran locally). Only `web` rebuilt (the change touched `web/`, docs and `.scratch/`). `localhost:8080/` answers 200, the served bundle (`index-yKyh657i.js`) carries `Digit3` and `Meta+3`, and `/cards/19/audio` answers 200.
