@@ -38,6 +38,10 @@ const paths = {
   book: ['M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5z', 'M12 6.5v13'],
   external: ['M14 4.5h5.5V10', 'M19.5 4.5L11 13', 'M18 14v3.5a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2H10'],
   trash: ['M4.5 7h15', 'M9.5 7V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v2', 'M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7'],
+  // The play button's two (CardAudioButton): a speaker with its sound, and
+  // the stop it turns into while playing, filled there with fill-current.
+  speaker: ['M4.5 9.5H8l4.5-4v13L8 14.5H4.5z', 'M16 9.2a4 4 0 0 1 0 5.6', 'M18.6 6.6a7.5 7.5 0 0 1 0 10.8'],
+  stop: ['M8.5 7.5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z'],
   sparkle: ['M12 4l1.8 4.7L18.5 10.5l-4.7 1.8L12 17l-1.8-4.7L5.5 10.5l4.7-1.8z'],
   // The theme toggle's two (DESIGN.md 7.18): each draws the theme a press
   // switches to. The sun's disc is the preview's r=4 circle, written as a path.

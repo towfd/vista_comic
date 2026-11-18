@@ -1,6 +1,6 @@
 # 對比驗算報告
 
-- 日期：亮色 2026-11-14；暗色 2026-11-16（第 6 節）；圖例例外 2026-11-17（第 7 節）
+- 日期：亮色 2026-11-14；暗色 2026-11-16（第 6 節）；圖例例外 2026-11-17（第 7 節）；發音鈕 2026-11-18（第 8 節）
 - 依據：專案根目錄 `DESIGN.md` 第 3 節、`docs/design/design-tokens.json`
 - 工具：`python3 ~/.claude/skills/website-studio/scripts/contrast.py`（不加 `--large` 為一般文字門檻 4.5；加 `--large` 為大字／圖示／UI 元件門檻 3.0）
 - 標準：一般文字 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1
@@ -13,6 +13,7 @@
 - 暗色（B 星空藍）：使用中的 89 組全部通過（文字 50、圖形與控制項 25、提示框疊在漫畫上的 14 種底色），B 的預覽色值不用調。沒過或太勉強的 8 項：5 項是現在寫死的白字、白鈕、黃底上的 `text-ink` 不換 token 會壞，2 項是沒有元件用到的組合，1 項是閱讀器提示框只靠框不夠、改靠框和底兩層。全部已處理，見 6.5。
 - 兩套共用同一組 class，所以亮色禁止的組合，暗色就算過了也照樣禁止（6.5）。
 - 停用狀態在 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（blush-strong 上 ink-faint：亮 4.73、暗 4.92）。
+- 發音鈕（2026-11-18）：只用既有 token，亮色、暗色的圖示與實心圓全部 ≥ 3:1，「還沒有發音」那句 ≥ 4.5:1。見第 8 節。
 
 ## 1. 文字與背景
 
@@ -458,6 +459,48 @@ $ contrast.py --large "#262852" "#1E1F45" "#F5EEF1" "#FFFFFF" "#3D3080" "#1E1F45
 #F5EEF1 on #FFFFFF: 1.14:1  AA FAIL  AAA FAIL  (large text)
 #3D3080 on #1E1F45: 1.45:1  AA FAIL  AAA FAIL  (large text)
 ```
+
+## 8. 發音鈕（2026-11-18）
+
+- 元件：DESIGN.md 7.19（`web/src/components/CardAudioButton.vue`）。只用既有 token，沒有新增顏色。
+- 圖示和實心圓用圖形的門檻 3:1；「還沒有發音，下次產生發音時會補上。」是 13px 的字，用一般文字的門檻 4.5:1。
+- 按鈕都放在頁面底 `paper` 上（練習回饋的答案列、單張字卡的原文旁），不放在淡粉卡裡。
+
+| 前景 | 背景 | 主題 | 用在哪 | 對比 | 門檻 | 結果 |
+|---|---|---|---|---|---|---|
+| brand `#C81A60` | paper `#FFFFFF` | 亮色 | 待播放、載入中的圖示 | 5.57 | 3.0 | 通過 |
+| brand `#FF80B5` | paper `#1E1F45` | 暗色 | 待播放、載入中的圖示 | 6.74 | 3.0 | 通過 |
+| brand `#C81A60` | blush `#FFF0F5` | 亮色 | 待播放 hover、按下 | 5.05 | 3.0 | 通過 |
+| brand `#FF80B5` | blush `#2C2560` | 暗色 | 待播放 hover、按下 | 5.85 | 3.0 | 通過 |
+| on-fill `#FFFFFF` | brand `#C81A60` | 亮色 | 播放中的方塊圖示 | 5.57 | 3.0 | 通過 |
+| on-fill `#24102A` | brand `#FF80B5` | 暗色 | 播放中的方塊圖示 | 7.62 | 3.0 | 通過 |
+| brand `#C81A60` | paper `#FFFFFF` | 亮色 | 播放中的實心圓對頁面底 | 5.57 | 3.0 | 通過 |
+| brand `#FF80B5` | paper `#1E1F45` | 暗色 | 播放中的實心圓對頁面底 | 6.74 | 3.0 | 通過 |
+| ink-faint `#765F6B` | paper `#FFFFFF` | 亮色 | 「還沒有發音…」 | 5.80 | 4.5 | 通過 |
+| ink-faint `#AEA9DC` | paper `#1E1F45` | 暗色 | 「還沒有發音…」 | 7.11 | 4.5 | 通過 |
+
+- focus-visible 是全站的主粉外框，對 paper 亮 5.57、暗 6.74（第 3 節、6.3），不另外驗。
+- 待播放的外框 `inset-ring-line` 是裝飾 token（DESIGN.md 第 3 節 `color.border.subtle`），不負責辨識，按鈕靠圖示辨識，和其他圓形圖示鈕一樣。下面原始輸出最後兩行是它的值（亮 1.29、暗 1.44），只是記錄，不算未過；指令的結束碼是 1，就是因為這兩行。
+
+原始輸出：
+
+```
+$ contrast.py --large "#C81A60" "#FFFFFF" "#C81A60" "#FFF0F5" "#FFFFFF" "#C81A60" "#FF80B5" "#1E1F45" "#FF80B5" "#2C2560" "#24102A" "#FF80B5" "#F3DDE6" "#FFFFFF" "#36386A" "#1E1F45"
+#C81A60 on #FFFFFF: 5.57:1  AA PASS  AAA PASS  (large text)
+#C81A60 on #FFF0F5: 5.05:1  AA PASS  AAA PASS  (large text)
+#FFFFFF on #C81A60: 5.57:1  AA PASS  AAA PASS  (large text)
+#FF80B5 on #1E1F45: 6.74:1  AA PASS  AAA PASS  (large text)
+#FF80B5 on #2C2560: 5.85:1  AA PASS  AAA PASS  (large text)
+#24102A on #FF80B5: 7.62:1  AA PASS  AAA PASS  (large text)
+#F3DDE6 on #FFFFFF: 1.29:1  AA FAIL  AAA FAIL  (large text)
+#36386A on #1E1F45: 1.44:1  AA FAIL  AAA FAIL  (large text)
+
+$ contrast.py "#765F6B" "#FFFFFF" "#AEA9DC" "#1E1F45"
+#765F6B on #FFFFFF: 5.80:1  AA PASS  AAA FAIL
+#AEA9DC on #1E1F45: 7.11:1  AA PASS  AAA PASS
+```
+
+實心圓對頁面底和「brand 在 paper 上」是同一組顏色，對比是對稱的，直接引用第一行和第四行。
 
 ## 原始輸出（亮色，2026-11-14）
 

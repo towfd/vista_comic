@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ApiError,
   REQUEST_TIMEOUT_MS,
+  cardAudioPath,
   changeSourceText,
   createCard,
   deleteCard,
@@ -298,6 +299,17 @@ describe('fetchCards', () => {
 
   it('returns an empty deck as empty, not as an error', async () => {
     expect(await fetchCards(respondWith(json([])))).toEqual([])
+  })
+
+  it('reads which cards have a recording, and a backend that predates audio as none', async () => {
+    const cards = await fetchCards(
+      respondWith(json([raw({ hasAudio: true }), raw({ hasAudio: false }), raw(), raw({ hasAudio: 'yes' })])),
+    )
+    expect(cards.map((c) => c.hasAudio)).toEqual([true, false, false, false])
+  })
+
+  it('serves a card\'s recording under the card', () => {
+    expect(cardAudioPath(7)).toBe('/cards/7/audio')
   })
 
   it('reads a state it does not know as new, and a kind it does not know as none', async () => {

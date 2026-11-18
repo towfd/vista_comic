@@ -217,7 +217,14 @@ function decodeCard(card: LearningCard): LearningCard {
     kind: card.kind === 'word' || card.kind === 'sentence' ? card.kind : null,
     // Missing from a backend that predates notes.
     note: typeof card.note === 'string' && card.note !== '' ? card.note : null,
+    // Missing from a backend that predates audio.
+    hasAudio: card.hasAudio === true,
   }
+}
+
+/** Where a card's recording is served; only worth asking when the card says `hasAudio`. */
+export function cardAudioPath(cardId: number): string {
+  return `/cards/${cardId}/audio`
 }
 
 export async function fetchStudySettings(fetcher: Fetcher = fetch): Promise<StudySettings> {

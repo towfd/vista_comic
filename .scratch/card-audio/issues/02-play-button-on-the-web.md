@@ -1,4 +1,4 @@
-Status: blocked
+Status: implemented — awaiting deploy and the owner's phone check (2026-11-18)
 Blocked by: 01
 
 # 02 — Play button on the web
@@ -16,13 +16,25 @@ Blocked by: 01
 - Web tests where the client or types change
 
 **Acceptance criteria:**
-- [ ] No play button while a question is being asked.
-- [ ] After an answer, the buttons above appear only for cards with `hasAudio`.
-- [ ] A press plays; a second press while playing stops; starting another stops the first.
-- [ ] Card page: button when `hasAudio`, the sentence when not.
-- [ ] Light and dark both checked at a compact and a larger phone width.
-- [ ] `npm run typecheck`, `npm run build`, `npm test` pass.
+- [x] No play button while a question is being asked.
+- [x] After an answer, the buttons above appear only for cards with `hasAudio`.
+- [x] A press plays; a second press while playing stops; starting another stops the first.
+- [x] Card page: button when `hasAudio`, the sentence when not.
+- [x] Light and dark both checked at a compact and a larger phone width.
+- [x] `npm run typecheck`, `npm run build`, `npm test` pass.
 
 **Owner check after deploy:** On a phone, answer a 整句題 and press the button beside 卡片: it speaks. Answer a 填空題: the word and the sentence each play. Open a card in 字卡庫 and press the button beside the source text.
 
 ## Comments
+
+2026-11-18: implemented. `npm run typecheck`, `npm run build` and `npm test` pass: 505 tests, 13 new (11 in `src/audio/player.test.ts`, 2 in `client.test.ts`). Checked in a browser against the dev server with every write blocked, `hasAudio` set in the browser and a test tone served for `/cards/{id}/audio` (no card had audio yet): no button while asking (整句題 and 填空題); after an answer, 「播放發音」 on a 整句題, 「播放這個字」 (card 185, the cloze's word card) and 「播放整句」 (card 186) on a 填空題; a press plays (solid brand fill, 「停止播放」), a second press stops, pressing the other button takes over, the end of the recording returns it to idle, and a 404 returns it to idle. Card page: the button beside the source text when `hasAudio`, the sentence when not. 375 and 430 wide, light and dark: no horizontal scroll, the button 16px from the edge, never over the text.
+
+Decisions made while implementing:
+- One shared player (`src/audio/player.ts`) with one audio element, created on the first press. Each button is its own owner (a symbol), not a card id, so two buttons for one card would still be told apart.
+- `play()` is called inside the press itself, because iOS Safari only plays what a touch started.
+- A button that leaves the screen (下一題, leaving the page) or moves to another card stops its own recording.
+- A failed load says nothing on screen; the button goes back to idle and can be pressed again.
+- Labels: 「播放發音」 beside 卡片 and on the card page, 「播放這個字」 and 「播放整句」 on a 填空題, 「停止播放」 while loading or playing.
+
+Design docs: the design-system agent added DESIGN.md 7.19 (named 發音鈕 there, because 7.1 already has a 播放鈕 for the library's continue-reading card), 發音 to the §13 word list, two §12 exceptions (the loading spin that can be pressed, and a failed load with no words), and the matching rows in `docs/design/` (page-design-spec 2.7, 3.5, 3.7 and §8; contrast-report §8; STATUS). Every combination passes in both themes with existing tokens. The writing manager proofread it (`docs/writing-log.md`, 2026-11-18 第 5 次). Open for the owner: whether a failed load should say something (STATUS, 待使用者決定); that behaviour was decided here while implementing, not by the owner.
+

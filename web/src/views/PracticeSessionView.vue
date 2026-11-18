@@ -7,6 +7,7 @@ import { useDeckStore } from '../stores/deck'
 import { scheduleState } from '../practice/library'
 import type { CardState } from '../api/types'
 import AppIcon from '../components/AppIcon.vue'
+import CardAudioButton from '../components/CardAudioButton.vue'
 import ErrorState from '../components/ErrorState.vue'
 import LoadingState from '../components/LoadingState.vue'
 import { iconButtonBlush, primaryLg, secondaryLg, secondaryMd } from '../components/buttons'
@@ -28,6 +29,11 @@ const standing = computed(() =>
 )
 
 const answered = () => outcome.value.correct + outcome.value.wrong
+
+// The card the answer line names: the blank's own word card on a cloze, the
+// card asked otherwise. Its recording plays beside the answer -- only after
+// one, never on the question, because the recording is the answer.
+const answerCard = computed(() => (question.value ? (question.value.cloze?.answer ?? question.value.card) : null))
 
 // How far through the round, as far as is known: a card answered wrong comes
 // back to the queue, so the bar can step back a little. That is the truth.
@@ -265,17 +271,28 @@ function onNextKeydown(event: KeyboardEvent) {
           </div>
           <div>
             <dt class="text-caption text-ink-faint">{{ verdict.sentence ? '空格裡的字' : '卡片' }}</dt>
-            <dd class="mt-0.5 text-headline font-extrabold break-words text-ink" lang="vi">{{ verdict.expected }}</dd>
+            <dd class="mt-0.5 flex items-start gap-3">
+              <span class="min-w-0 flex-1 text-headline font-extrabold break-words text-ink" lang="vi">{{ verdict.expected }}</span>
+              <CardAudioButton
+                v-if="answerCard?.hasAudio"
+                :card-id="answerCard.id"
+                :label="question.cloze ? '播放這個字' : '播放發音'"
+              />
+            </dd>
           </div>
           <div v-if="verdict.sentence">
             <dt class="text-caption text-ink-faint">整句</dt>
             <!-- The word that was blanked is underlined where it stands. -->
-            <dd class="mt-0.5 text-label font-bold break-words whitespace-pre-wrap text-ink-soft" lang="vi">
+            <dd class="mt-0.5 flex items-start gap-3">
+              <span class="min-w-0 flex-1 text-label font-bold break-words whitespace-pre-wrap text-ink-soft" lang="vi">
               <template v-if="question.cloze"
                 >{{ question.cloze.before
                 }}<span class="underline decoration-brand-vivid decoration-3 underline-offset-4">{{ question.cloze.removed }}</span
                 >{{ question.cloze.after }}</template
               ><template v-else>{{ verdict.sentence }}</template>
+              </span>
+              <!-- The sentence is the card asked, so its recording is the card's own. -->
+              <CardAudioButton v-if="question.card.hasAudio" :card-id="question.card.id" label="播放整句" />
             </dd>
           </div>
         </dl>

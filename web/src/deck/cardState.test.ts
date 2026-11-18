@@ -20,6 +20,7 @@ function card(state: CardState, dueAt: string): LearningCard {
     introducedOn: '2026-08-01',
     dueAt,
     createdAt: inMinutes(-1),
+    hasAudio: false,
   }
 }
 

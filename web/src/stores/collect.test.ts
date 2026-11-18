@@ -26,6 +26,7 @@ function card(id: number, sourceText: string, translation = '意思'): LearningC
     introducedOn: null,
     dueAt: '2026-08-31T12:00:00+00:00',
     createdAt: '2026-08-31T12:00:00+00:00',
+    hasAudio: false,
   }
 }
 
