@@ -1,4 +1,4 @@
-Status: implemented — awaiting deploy and the owner's card_tts role (2026-11-18)
+Status: done (2026-11-18)
 Blocked by: —
 
 # 01 — Store and serve a card's audio
@@ -34,4 +34,8 @@ Decisions made while implementing:
 - `has_audio` is an SQL expression, so SQLAlchemy expires it whenever the card is written and reloads it on the next access. `reset_card` now builds its response inside the session for that reason.
 - The ETag hashes `card_id` and `created_at` in UTC, so the tag does not change with the connection's time zone.
 - An archived card's recording is still served if current: the writer skips archived cards, and the web never shows them.
+
+2026-11-18: merged as #162 (`a63085f`) and deployed: `api` and `web` rebuilt on the home server. The api ran `b6e2f0c4a913 -> 7e893400bb25` on start; `card_audio` exists and is empty. Through `localhost:8080`: all 324 cards answer `hasAudio: false`, and `/cards/186/audio` and `/cards/999999/audio` answer 404. Next: the owner creates `card_tts`; then tell the `text-to-speech` session, and start ticket 02.
+
+2026-11-18: `card_tts` created at the owner's request (`CREATE ROLE card_tts LOGIN` and the two `GRANT`s from the spec, run here); the owner set its password with `\password` themselves, so it was never seen in this session. Checked: login, not superuser, `SELECT` on `learning_card(id, source_text, archived_at)` only, `SELECT, INSERT, UPDATE` on `card_audio` (no `DELETE`), no `CREATE` on `public`. Connections from outside the container use scram-sha-256. The `text-to-speech` session was told it can start.
 

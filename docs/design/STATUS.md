@@ -5,7 +5,7 @@
 - 專案：vista_comic web 前端（越南文漫畫閱讀 + 字卡練習，自用）
 - 專案路徑：/home/agent/Documents/vista_comic（網頁在 `web/`，Vue 3 + Tailwind v4 + Vite）
 - 模式：redesign（整體視覺改版，版型骨架也可以改；主要在 iPhone 上以主畫面 PWA 使用）。2026-11-16 起加暗色模式，是另一輪只換顏色、不動版面的 redesign，工作紀錄在 `docs/design/dark-mode.md`。
-- 建立日期：2026-11-14；最後更新：2026-11-17
+- 建立日期：2026-11-14；最後更新：2026-11-18
 - 開發伺服器：由總控在需要時啟動（`cd web && npm run dev`，http://localhost:5173）。刻意只綁 localhost：`web/vite.config.ts` 的 proxy 帶著 Cloudflare Access 金鑰，綁區網等於把書庫開放給整個區網（`vite.config.ts` 第 32–34 行；`dark-mode.md` 決定紀錄 2026-11-16）。給使用者看畫面用截圖網頁，不改綁定。
 - 部署版：區網 http://192.168.0.45:8080/、Tailscale http://100.84.22.60:8080/（`dark-mode.md`「交付（2026-11-16）」）
 
@@ -31,7 +31,7 @@
 | 1 Discovery | 沒有另外做 | 查不到 `brief.md` | 現況寫在本檔「現況觀察」；使用者給的參考（Webtoon／LINE 漫畫）在決定紀錄 2026-11-14 |
 | 2 Visual Exploration | 完成 | 亮色：visual-directions.md、previews/round2/direction-{a,b,c}.html、page-design-spec.md。暗色：previews/dark/index.html | 亮色：第 2 輪 A 柿橘連載、B 鈷藍書架、C 粉紅貼紙，使用者選 C。2b 寫完七個預覽畫面的逐頁規格，加上預覽沒畫的畫面與狀態（收卡、深入查詢、泡泡框、單張字卡、練習設定、回饋、這一輪做完了、載入中／錯誤／空）、動態、封面處理、寬螢幕；第 7 節 4 件待決定的結果寫在「待使用者決定」。第 1 輪（深色）已否決，預覽 previews/direction-{a,b,c}.html 保留。暗色（2026-11-16）：A 莓果夜、B 星空藍、C 暮光粉，使用者選 B |
 | ⛔ 選定方向 | 完成 | visual-decision.md；暗色在 dark-mode.md | 亮色選第 2 輪方向 C 粉紅貼紙（2026-11-14）；暗色選 B 星空藍（2026-11-16） |
-| 3 Design System | 完成：亮色 2026-11-14，暗色 2026-11-16，圖例例外 2026-11-17 | DESIGN.md（專案根目錄）、design-tokens.json、contrast-report.md | **亮色、暗色兩套**，使用者自己切換，推翻 2026-11-14 的「只做亮色」。暗色只覆寫 `@theme` 的變數，元件 class 兩套共用，不寫 `dark:`（DESIGN.md 第 3 節）。2026-11-16 新增 `on-fill`、`on-sun`、`sticker`，拿掉 `--color-white`；2026-11-17 新增 `mist-swatch`。對比：兩套使用中的組合全部通過，暗色驗算 89 組；有一個例外：章節頁圖例「看過」的小方塊 `mist-swatch`，亮 1.14:1、暗 1.45:1，沒到 3:1（contrast-report.md 第 7 節）。2026-11-14 亮色版的 token 數量：色 31 個語意＋狀態 12 個、字級 8 階、圓角 3＋全圓、陰影 3 層＋厚邊與框 7 種、版寬 6、時長 3＋曲線 2；之後沒有重算總數，增減見 DESIGN.md 第 14 節 Changelog。第 15 節是 Tailwind v4 實作對照與 page-design-spec 數值對照 |
+| 3 Design System | 完成：亮色 2026-11-14，暗色 2026-11-16，圖例例外 2026-11-17，發音鈕 2026-11-18 | DESIGN.md（專案根目錄）、design-tokens.json、contrast-report.md | **亮色、暗色兩套**，使用者自己切換，推翻 2026-11-14 的「只做亮色」。暗色只覆寫 `@theme` 的變數，元件 class 兩套共用，不寫 `dark:`（DESIGN.md 第 3 節）。2026-11-16 新增 `on-fill`、`on-sun`、`sticker`，拿掉 `--color-white`；2026-11-17 新增 `mist-swatch`。對比：兩套使用中的組合全部通過，暗色驗算 89 組；有一個例外：章節頁圖例「看過」的小方塊 `mist-swatch`，亮 1.14:1、暗 1.45:1，沒到 3:1（contrast-report.md 第 7 節）。2026-11-14 亮色版的 token 數量：色 31 個語意＋狀態 12 個、字級 8 階、圓角 3＋全圓、陰影 3 層＋厚邊與框 7 種、版寬 6、時長 3＋曲線 2；之後沒有重算總數，增減見 DESIGN.md 第 14 節 Changelog。第 15 節是 Tailwind v4 實作對照與 page-design-spec 數值對照 |
 | ⛔ 實作前確認 | 亮色：查不到使用者確認開工的紀錄。暗色：完成，使用者 2026-11-16 同意 | 亮色：`.scratch/web-redesign/spec.md`。暗色：`.scratch/web-dark-mode/spec.md`、previews/dark/plan.html | 亮色 spec 的決定表寫「Made with the owner on 2026-11-14」 |
 | 4 Implementation | 完成 | 亮色：`.scratch/web-redesign/issues/01`～`07`，全部 done（2026-11-14）；PR #146–#152。暗色：`.scratch/web-dark-mode/issues/01`、`02`，done；PR #154、#156 | 亮色 7 張票：01 地基（token、字型、狀態列、底部分頁列）、02 後端顯示用書名、03 書庫、04 章節頁、05 閱讀器、06 字卡庫、07 練習。整合後網頁 24 檔 481 個測試、後端 410 個測試全過（DELIVERY.md）。暗色：01 地基 #154、02 切換鈕 #156（#155 被 GitHub 自動關掉後改開）；網頁 25 檔 492 個測試全過（dark-mode.md 進度表、「交付」） |
 | 5 Visual QA | 完成：亮色第 1 輪、暗色第 1 輪 | 亮色：DELIVERY.md「QA 結果」，截圖 screenshots/r1/。暗色：dark-qa-report.md，截圖 screenshots/dark/r1/（不進版控）；PR #157 | 亮色第 1 輪（390／1440，真實資料）：P0 0、P1 2、P2 1。P1 是沒有空格的長書名溢出卡片、從別頁回書庫不會重抓（繼續看過期）；P2 是缺 favicon。390／1440 都沒有水平捲動。暗色第 1 輪：P0 0、P1 0、P2 3（QA-D01～D03） |
@@ -133,6 +133,9 @@
 | 2026-11-17 | 6（Refinement） | QA-D01：章節頁圖例「看過」的小方塊在暗色改紫色實心。新增 `mist-swatch`（`color.bg.muted-swatch`，亮 `#F5EEF1`、暗 `#3D3080`），只給這個小方塊用；數字格本身仍用 `mist`。用 token 覆寫，不寫 `dark:`。對比亮 1.14、暗 1.45，沒到 3:1，列為例外。DESIGN.md、design-tokens.json、contrast-report.md（第 7 節）已同步 | `mist` 的暗色 `#262852` 放在頁面底上只有 1.13，12px 的方塊幾乎看不見；加外框會讓「看過」像「還沒看」；寫 `dark:` 違反 DESIGN.md 第 11 節。旁邊有字、方塊 `aria-hidden`，不靠顏色辨識，所以可以例外 | 使用者（在不改／加外框／紫色實心三個選項中選紫色實心）；design-system-architect（token 命名） |
 | 2026-11-17 | 6（Refinement） | QA-D02、QA-D03 也修好：「刪除卡片」的字改危險色（亮 `#C8322A`、暗 `#FF948A`）；閱讀器浮動控制項那一列限制在畫面寬度減左右各 12px，「已加入」膠囊放不下就縮短、字尾變「…」。和 QA-D01 同在 PR #159，2026-11-17 部署。接著上面 2026-11-16「P2 先不修，留給之後」那列 | D02：`secondaryBase` 本身帶著 `text-ink`，建好的 CSS 裡 `.text-ink` 排在 `.text-danger` 後面，加上去的危險色蓋不過。D03 比報告的嚴重：「標示」出現時那一列超出左緣 34px，「＋收卡」右邊被切掉 | 紀錄沒寫（`.scratch/web-dark-mode/issues/03-dark-qa.md` 只記由總控修好） |
 | 2026-11-17 | 7 | 以後合併、部署都不用再問使用者。照這句合併 #153、#158、#159、#160，部署 main `bab4717`，重建 `api`、`web`（#160 改了後端） | 使用者原話：「以後你這邊就自己去合併部屬 不用我同意」 | 使用者 |
+| 2026-11-18 | 3 | DESIGN.md 新增 7.19 發音鈕（播放字卡的越南文發音）：待播放／載入中／播放中三種狀態、`aria-label` 依位置、不自動播放、同一頁同時只播一個、載入失敗回到待播放（這一項由主對話定，使用者還沒決定）；練習中只在送出答案之後出現，單張字卡在原文右邊。第 13 節用詞加「發音」。只用既有 token，對比亮色、暗色都過（contrast-report 第 8 節）。page-design-spec 補 2.7、3.5、3.7 和第 8 節 | 字卡加了發音（`.scratch/card-audio/spec.md`）；元件規格由使用者看過截圖預覽後同意，工作票 `.scratch/card-audio/issues/02-play-button-on-the-web.md` | 使用者（元件規格）；design-system-architect（寫進文件） |
+| 2026-11-18 | 3 | 文件裡叫「發音鈕」，不叫「播放鈕」；7.1 的「播放鈕」註明是書庫繼續看卡那顆 | DESIGN.md 原本就有「播放鈕」（繼續看卡，開閱讀器），兩個都叫播放鈕會混 | design-system-architect |
+| 2026-11-18 | 3 | 發音鈕載入中轉圈且可以按（按了就停）、載入失敗不顯示錯誤字，和 DESIGN.md 第 7 節通用的 loading、error 規則不同，寫進第 12 節例外；第 9 節循環動畫從三種改成四種 | 照設計審查規則，和通用規則不同的地方要寫成例外；載入中轉圈是使用者在預覽看過的；載入失敗回到待播放由主對話定，使用者還沒決定（見待使用者決定） | design-system-architect |
 
 ## 現況觀察（2026-11-14，r0 截圖：`docs/design/screenshots/r0/390-*.png`，取自部署版 192.168.0.45:8080）
 
@@ -168,6 +171,7 @@
   8. 暗色時亮粉按鈕和黃色徽章的色感。
   9. P2 修正（2026-11-17 部署）：章節頁圖例「看過」的小方塊，暗色時是紫色實心；字卡頁「刪除卡片」是紅色（亮色、暗色都看）；在閱讀器收一句長的，「已加入」膠囊留在畫面裡。
 - 錯誤畫面（`ErrorState`）「無法通過 Cloudflare 驗證」的說明提到 `web/.env` 與 `npm run dev`，是給開發者看的字。要不要改？（DESIGN.md 第 13 節、DELIVERY.md「建議的下一步」）
+- 發音鈕載入失敗時只回到待播放，畫面上沒有字說明（DESIGN.md 第 12 節例外）。按了轉一下又變回喇叭、沒有聲音時，使用者不知道是網路還是發音本身的問題。要不要加一句說明，建議實機用一陣子再決定（2026-11-18）。
 
 ### page-design-spec 第 7 節的 4 件
 

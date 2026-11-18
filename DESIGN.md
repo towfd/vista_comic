@@ -113,9 +113,9 @@
 | color.text.primary | `#2B1F27` | `#F6F3FF` | `--color-ink` | 主要文字、標題 | — | 白 15.81 | paper 14.35 |
 | color.text.secondary | `#6A5560` | `#CCC8F0` | `--color-ink-soft` | 次要說明、中文翻譯、話數、文字按鈕 | — | 白 6.82 | paper 9.79 |
 | color.text.muted | `#765F6B` | `#AEA9DC` | `--color-ink-faint` | 看過的數字、到期時間、未選分頁、提示字、停用文字 | — | 白 5.80 | paper 7.11 |
-| color.text.brand | `#C81A60` | `#FF80B5` | `--color-brand` | 粉色文字（數量、正在看的話數、強調數字） | — | 白 5.57 | paper 6.74 |
+| color.text.brand | `#C81A60` | `#FF80B5` | `--color-brand` | 粉色文字（數量、正在看的話數、強調數字）、發音鈕待播放的圖示（7.19） | — | 白 5.57 | paper 6.74 |
 | color.text.on-fill（新） | `#FFFFFF` | `#24102A` | `--color-on-fill` | brand／danger／warning 實心底上的字與圖示、開關的圓鈕 | — | 深粉 5.57 | 亮粉 7.62 |
-| color.brand.primary | `#C81A60` | `#FF80B5` | `--color-brand` | 主要按鈕、選中、正在看的數字格、開關開、分段選擇的選中 | on-fill | 5.57 | 7.62 |
+| color.brand.primary | `#C81A60` | `#FF80B5` | `--color-brand` | 主要按鈕、選中、正在看的數字格、開關開、分段選擇的選中、發音鈕播放中（7.19） | on-fill | 5.57 | 7.62 |
 | color.brand.primary-hover | `#B01652` | `#FF6BA8` | `--color-brand-hover` | 主要按鈕 hover（只在有滑鼠的裝置） | on-fill | 6.81 | 6.70 |
 | color.brand.primary-pressed | `#9E1449` | `#F2559A` | `--color-brand-pressed` | 主要按鈕按下 | on-fill | 7.92 | 5.53 |
 | color.brand.edge | `#8F1244` | `#C23A78` | `--color-brand-edge` | 按鈕下緣的厚邊 | — | 裝飾 | 裝飾 |
@@ -369,7 +369,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - **次要按鈕當危險動作**（「刪除卡片」）：secondary 的字改 `text-danger`；確認中換成 danger 實心。「重設為新卡」確認中換成 warning 實心。
 - **有改動才亮的儲存鈕**（單張字卡）：沒改動 secondary＋disabled；有改動換成 primary md。
 - 圓形圖示鈕（返回、重新整理、結束）：`size-11 rounded-full grid place-items-center`；白底版 `bg-paper text-ink-soft inset-ring-2 inset-ring-line`、淡粉版 `bg-blush text-ink-soft`。必須有 `aria-label`。**一律 44**，閱讀器頂端列與章節頁小頂列也是（預覽的 40 改 44）。
-- 播放鈕：`size-13 rounded-full bg-brand text-on-fill shadow-edge-sm grid place-items-center`。
+- 播放鈕（書庫「繼續看」卡，按了開閱讀器）：`size-13 rounded-full bg-brand text-on-fill shadow-edge-sm grid place-items-center`。播放字卡發音的是另一個元件，見 7.19 發音鈕。
 - `prefers-reduced-motion`：按下不位移、不縮放，只換成 pressed 底色（`motion-reduce:active:translate-y-0 motion-reduce:active:scale-100`）。
 - 觸控區不足 44 的（sm 36、soft 36）：`relative before:absolute before:-inset-1 before:content-['']` 補到 44。
 
@@ -613,6 +613,65 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
   - 只有亮色、暗色兩種，不做「跟著手機」第三個選項。
   - 瀏覽器不讓存（例如私密瀏覽）時，就跟著手機；按了只在這次打開有效。
 
+### 7.19 發音鈕（新）
+
+播放一張字卡越南文發音的圓形圖示鈕。程式在 `web/src/components/CardAudioButton.vue`，工作票叫它 play button（`.scratch/card-audio/issues/02-play-button-on-the-web.md`）。本檔叫「發音鈕」，和 7.1 書庫「繼續看」卡的播放鈕分開。
+
+- **尺寸**：一律 44，和其他圓形圖示鈕一樣。三種狀態共用 `grid size-11 shrink-0 place-items-center rounded-full transition-colors duration-120`。
+- **token**：全部用既有的，沒有新增。
+
+| 狀態 | 樣式 | 圖示 | `aria-label` | 按下去 |
+|---|---|---|---|---|
+| 待播放 | `bg-paper text-brand inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush` | `speaker`（喇叭＋兩道聲波），`size-5.5` | 依位置（下面「位置」表） | 開始載入 |
+| 載入中 | 同待播放 | `refresh` 轉圈，`size-5 animate-spin motion-reduce:animate-none` | 停止播放；加 `aria-busy="true"` | 停止，回到待播放 |
+| 播放中 | `bg-brand text-on-fill`；沒有外框、沒有厚邊，hover 和按下不換底色 | `stop`（圓角方塊），`size-6 fill-current` 填成實心 | 停止播放 | 停止，回到待播放 |
+| focus-visible | 全站外框（第 7 節通用規則） | | | |
+
+- 播完自己回到待播放。
+- 載入失敗也回到待播放，不顯示錯誤字。這和第 7 節通用的 error 規則不同，列在第 12 節例外。
+- 沒有 disabled：卡片沒有發音時不放按鈕（下面「位置」）。
+- 不加 `aria-pressed`：名稱已經跟著狀態換（「播放發音」→「停止播放」），和主題切換鈕（7.18）同一個做法。
+- 待播放的圖示用主粉，不是圓形圖示鈕的 `text-ink-soft`：返回、重新整理是管頁面的操作，發音鈕是卡片內容上的動作。一個畫面最多兩顆，平常是白底粉色圖示；實心粉只出現在正在播的那一顆，不會讓畫面到處都是深粉（第 11 節）。
+
+**行為**：
+
+- **不自動播放**：只有按下才出聲。
+- **同一頁同時只播一個**：按另一顆發音鈕，前一顆停止、回到待播放。
+- 按鈕不在頁面上了（例如按了「下一題」），或同一顆按鈕換成另一張卡片時，它的聲音跟著停。
+
+**位置**：
+
+| 頁面 | 放在哪 | `aria-label` | 播放誰的發音 |
+|---|---|---|---|
+| 練習中，整句題 | 回饋的「卡片」那一列，答案右邊 | 播放發音 | 這一題的卡片 |
+| 練習中，填空題 | 回饋的「空格裡的字」那一列，答案右邊 | 播放這個字 | 空格裡那個字自己的卡片 |
+| 練習中，填空題 | 回饋的「整句」那一列，句子右邊 | 播放整句 | 這一題的卡片（整句） |
+| 單張字卡 `/deck/:cardId` | 原文標題右邊 | 播放發音 | 這張卡片 |
+
+- 練習中**只在送出答案之後**出現，題目上不放：播放的內容就是答案。
+- 練習中的那一列是 `flex items-start gap-3`：答案或句子 `min-w-0 flex-1`，按鈕靠右、上緣和字對齊。字長到折行時按鈕不跟著往下移。
+- 卡片沒有發音（`hasAudio` 是 false）時：
+  - 練習中不放按鈕，那一列只有字。
+  - 單張字卡在狀態標籤那一行下面顯示「還沒有發音，下次產生發音時會補上。」，`text-caption text-ink-faint`。
+
+**對比**（contrast-report 第 8 節）：
+
+| 組合 | 亮色 | 暗色 | 門檻 |
+|---|---|---|---|
+| 待播放、載入中：`text-brand` 圖示在 `bg-paper` 上 | 5.57 | 6.74 | 3.0 |
+| 待播放 hover、按下：`text-brand` 圖示在 `bg-blush` 上 | 5.05 | 5.85 | 3.0 |
+| 播放中：`text-on-fill` 圖示在 `bg-brand` 上 | 5.57 | 7.62 | 3.0 |
+| 播放中：`bg-brand` 實心圓對頁面底 `paper` | 5.57 | 6.74 | 3.0 |
+| 「還沒有發音…」：`text-ink-faint` 在 `bg-paper` 上 | 5.80 | 7.11 | 4.5 |
+
+- 待播放的外框 `inset-ring-line` 是裝飾（第 3 節），按鈕靠圖示辨識，和其他圓形圖示鈕一樣。
+
+**減少動態**：載入中的圖示不轉（`motion-reduce:animate-none`），靠圖示形狀分辨：圓形箭頭（`refresh`）是載入中，喇叭是待播放。不降透明度（重新整理鈕會降），因為載入中還能按，按了就停。換狀態的顏色過渡由 base 層縮成 0.01ms（第 9 節）。
+
+**暗色**：照 token 自動換，不寫 `dark:`。待播放是靛藍底配亮粉喇叭，播放中是亮粉實心圓配深紫方塊。
+
+**圖示**：`speaker`、`stop` 加在 `web/src/components/AppIcon.vue`，和其他圖示同一套（24 格、2px 圓頭線條）。`stop` 在發音鈕裡加 `fill-current`，填成實心方塊。
+
 ## 8. Responsive Guidelines
 
 - **色彩模式**：亮色和暗色兩套，由 `<html>` 的 `data-theme` 決定（第 3 節開頭、7.18）。亮色 `color-scheme: light`、暗色 `color-scheme: dark`，所以表單控制項、捲軸、iPhone 鍵盤會跟著 App 的主題，不是跟著手機。`<meta name="color-scheme" content="light dark">`。
@@ -650,11 +709,11 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 6. 面板開關（slow 開／base 關）、提示框出現（fast）、「已加入」膠囊淡入（base）。
 7. 閱讀器頂端列、章節頁小頂列滑入滑出（base）。
 8. 進度條寬度變化（base）；封面載入完淡入（base）。
-9. 循環動畫只有三種：載入圓點、重新整理圖示旋轉、不定進度條。
+9. 循環動畫只有四種：載入圓點、重新整理圖示旋轉、發音鈕載入中的旋轉（7.19）、不定進度條。
 
 **不動的地方**：分頁切換、元素逐一進場、捲動進場、卡片 hover 浮起、答錯、封面歪斜（是靜態的）、章節頁捲到正在看（瞬間定位）、**切換亮色／暗色**（整頁瞬間換色，不做淡入淡出；有 `transition-colors` 的元件會各自慢一拍，看起來像閃爍，所以切換時不靠過渡）。
 
-**`prefers-reduced-motion: reduce`**：所有 transition 與 animation 縮成 0.01ms（base 層一次處理）；循環動畫改 `motion-safe:` 才加；按下不位移、不縮放，改成按下的底色；閱讀器頂端列直接出現／消失（藏與出的行為照舊）。
+**`prefers-reduced-motion: reduce`**：所有 transition 與 animation 縮成 0.01ms（base 層一次處理）；循環動畫改 `motion-safe:` 才加（發音鈕寫成 `animate-spin motion-reduce:animate-none`，效果一樣）；按下不位移、不縮放，改成按下的底色；閱讀器頂端列直接出現／消失（藏與出的行為照舊）。
 
 ## 10. Accessibility
 
@@ -668,6 +727,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - **表單錯誤**：`aria-invalid="true"`＋`aria-describedby` 指向錯誤文字；錯誤文字說怎麼修（沿用現有寫法）；失敗 `role="alert"`，成功 `role="status"`。
 - **觸控區** ≥ 44×44px（第 8 節）。
 - **動態**：尊重 `prefers-reduced-motion`（第 9 節）。
+- **聲音**：只有按了才播放，不自動播放；同一頁同時只有一個在播。發音鈕載入中和播放中的名稱是「停止播放」，再按一次就停；載入中加 `aria-busy="true"`（7.19）。
 
 ## 11. Design Anti-Patterns
 
@@ -718,6 +778,8 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 搜尋框 | 不畫 ≥ 3:1 的外框，靠放大鏡圖示與提示字辨識（亮 5.26、暗 6.17）；聚焦時出現主粉框 | 淡粉膠囊搜尋框是方向 C 的造型；圖示與提示字已足以辨識它是輸入框 |
 | 練習中的填空格 | 白底膠囊 `inset-ring-2 inset-ring-brand`（在淡粉題目卡裡，不用鮮粉） | 鮮粉在淡粉上只有 2.82 |
 | 練習中的「送出」「下一題」 | 放在作答欄下方的一般流排，不做預覽的貼底容器 | iPhone 鍵盤彈出時貼底元素會被蓋住（page-design-spec 2.7） |
+| 發音鈕：載入中（7.19） | 圖示換成轉圈的 `refresh`，而且載入中按下會停止。第 7 節通用的 loading 規則是「文字換成進行式、不加轉圈、不接受第二次按下」 | 只有圖示、沒有字，沒有進行式可以換，所以沿用重新整理鈕的旋轉（7.16）。載入中按下等於取消，名稱寫「停止播放」 |
+| 發音鈕：載入失敗（7.19） | 回到待播放，不顯示錯誤字。第 7 節通用的 error 規則要有文字說明怎麼修 | 主對話實作時定的（工作票 `.scratch/card-audio/issues/02-play-button-on-the-web.md`：「a failed load returns to idle with no crash」）。使用者還沒決定要不要加說明字，見 `docs/design/STATUS.md`「待使用者決定」。只有 `hasAudio` 是 true 的卡片才放按鈕；再按一次會重新抓 |
 
 ## 13. Voice and Microcopy
 
@@ -745,6 +807,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 標示（泡泡框開關） | 提示、高亮 |
 | 深入查詢 | 分析、AI 解說 |
 | 亮色、暗色（兩種主題）；切換鈕「換成暗色」「換成亮色」 | 深色、淺色、深色模式、夜間模式、黑色主題、dark mode、切換主題 |
+| 發音（字卡越南文的合成發音）；發音鈕「播放發音」「播放這個字」「播放整句」「停止播放」；沒有時「還沒有發音」 | 語音、音檔、朗讀、TTS |
 
 - 主題切換鈕的名稱寫按下去會怎樣（「換成暗色」），不寫現在的狀態（「暗色：關」）。
 - 不在介面上出現內部用語（`standing.remaining`、`.env`、`npm run dev`）。現有 `ErrorState` 的「無法通過 Cloudflare 驗證」說明提到 `web/.env` 與 `npm run dev`，是給開發者看的；page-design-spec 決定沿用現有字，這裡只標記，之後要改由使用者決定。
@@ -778,6 +841,9 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 2026-11-16 | 第 13 節用詞加「亮色／暗色」，不用「深色、夜間模式」 | 使用者自己的說法 | 使用者 |
 | 2026-11-16 | 15.5 替換表補 `PracticeSessionView.vue:251` 答對圓章（`text-ink` → `text-on-sun`）；15.1 的 `@custom-variant` 註解拿掉 `dark:` 字樣；15.1 註明 `@theme static` 退路已驗證不需要 | 第 1 段實作回報：漏列一處黃底字；照抄註解會讓「`dark:` 0 筆」的搜尋過不了；Tailwind 有輸出 `--color-brand-edge` | 實作者（經總控） |
 | 2026-11-17 | 新增 `mist-swatch`（`color.bg.muted-swatch`，亮 `#F5EEF1`、暗 `#3D3080`），只給章節頁圖例「看過」的小方塊用，數字格本身仍用 `mist`。第 3 節、7.7、第 10 節、15.1 跟著補 | 暗色 QA 的 QA-D01：`mist` 的暗色 `#262852` 放在頁面底上只有 1.13，12px 的方塊幾乎看不見；加外框會讓「看過」像「還沒看」。用 token 覆寫，不寫 `dark:`（第 11 節）。對比亮 1.14、暗 1.45，沒到圖形的 3:1；旁邊有字、不靠它辨識，所以列為例外 | 使用者（在不改／加外框／紫色實心三個選項中選紫色實心）、visual-qa（QA-D01）、design-system-architect（token 命名） |
+| 2026-11-18 | 新增 7.19 發音鈕：44 圓鈕，待播放（白底粉色喇叭）、載入中（轉圈，`aria-busy`）、播放中（實心主粉、方塊，再按一次停止）；`aria-label` 依位置寫「播放發音」「播放這個字」「播放整句」，載入中和播放中是「停止播放」；不自動播放、同一頁同時只播一個、載入失敗回到待播放（這一項是主對話實作時定的，使用者還沒決定）。練習中只在送出答案之後出現；單張字卡在原文右邊，沒有發音時顯示「還沒有發音，下次產生發音時會補上。」只用既有 token，沒有新增；對比兩套都過（contrast-report 第 8 節） | 字卡加了越南文發音（`.scratch/card-audio/spec.md`），網頁要能播 | 使用者（在 card-audio 預覽後同意） |
+| 2026-11-18 | 第 13 節用詞加「發音」，不用「語音、音檔、朗讀、TTS」 | 同一件事全站用同一個詞 | 使用者（在 card-audio 預覽後同意） |
+| 2026-11-18 | 跟著 7.19 補的地方：7.1 的「播放鈕」註明是書庫繼續看卡那顆；第 3 節 `text.brand`、`brand.primary` 的用途加發音鈕；第 9 節循環動畫從三種變四種；第 10 節加「聲音」；第 12 節加兩個例外（載入中轉圈且可以按、載入失敗不顯示錯誤字）；15.4 加一列 | 兩個元件都叫播放鈕會混；發音鈕的載入中、失敗和第 7 節通用規則不同，照設計審查規則要寫成例外 | design-system-architect |
 
 ---
 
@@ -1111,6 +1177,7 @@ body::before {
 | 危險按鈕（確認中） | `inline-flex h-11 items-center justify-center rounded-full bg-danger px-4 text-body font-extrabold text-on-fill hover:bg-danger-hover active:bg-danger-hover` |
 | 圓形圖示鈕 | `grid size-11 place-items-center rounded-full bg-paper text-ink-soft inset-ring-2 inset-ring-line`（淡粉版 `bg-blush` 無框） |
 | 主題切換鈕 | 圓形圖示鈕（`iconButton`）＋月亮或太陽圖示，`aria-label` 「換成暗色」或「換成亮色」（7.18） |
+| 發音鈕 | 共用 `grid size-11 shrink-0 place-items-center rounded-full transition-colors duration-120`；待播放 `bg-paper text-brand inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush`、播放中 `bg-brand text-on-fill`；圖示與名稱見 7.19（`CardAudioButton.vue`） |
 | 設定膠囊鈕 | `inline-flex h-10 items-center gap-1.5 rounded-full bg-paper pr-3.5 pl-3 text-meta text-ink-soft inset-ring-2 inset-ring-line` |
 | 頁名 | `text-page` |
 | 區塊標題 | `text-heading` |
