@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: done (2026-11-19) — tickets 01–02 merged in #162 and #163; phone check confirmed by the owner
 
 # Card audio: one Vietnamese recording per card, made outside this repo
 
