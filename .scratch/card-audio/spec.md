@@ -27,7 +27,7 @@ Made with the owner on 2026-11-18 in the Text-To-Speech session.
 | How many per card | Exactly one; `card_id` is the primary key. Slower playback comes from the client's playback rate, not from a second file. |
 | Who creates the table | This repo, as an Alembic migration, so Alembic stays the only owner of the schema. |
 | How the writer connects | As a dedicated role, `card_tts`, which can read three columns of `learning_card` and read, insert and update `card_audio`, and nothing else. |
-| Voices | Google Chirp 3: HD, alternating by card id: even ids get `vi-VN-Chirp3-HD-Achernar` (female), odd ids get `vi-VN-Chirp3-HD-Enceladus` (male). The owner chose both in a listening test. |
+| Voices | Google Chirp 3: HD `vi-VN-Chirp3-HD-Achernar` (female) for every card. Until 2026-11-19 odd ids got `vi-VN-Chirp3-HD-Enceladus` (male); the owner dropped it, and on 2026-11-19 those 163 rows were regenerated in place (same `card_id`, new `audio`, `voice` and `created_at`). Nothing changes on the read side. |
 | Text sent to Google | The source text, lowercased. When it was sent in the comic's capitals, the recordings came out longer, and the owner preferred the lowercase ones. `card_audio.source_text` keeps the card's text exactly as it was, not lowercased, so it can be compared with the card directly. |
 | Format | MP3 (`audio/mpeg`), which both iOS and browsers play. |
 | Archived cards | Skipped by the writer. A card that is unarchived gets its audio on the next run. |
@@ -40,7 +40,7 @@ Create it in a migration after `b6e2f0c4a913` (today's head).
 |---|---|---|---|
 | `card_id` | `Integer` | no | Primary key. Foreign key to `learning_card.id` with `ON DELETE CASCADE`: a deleted card takes its audio with it, as it takes its reviews (`backend/app/db.py:279`). |
 | `source_text` | `String` | no | The card's `source_text` at the moment the audio was made, unchanged. |
-| `voice` | `String` | no | The Google voice name, e.g. `vi-VN-Chirp3-HD-Enceladus`. |
+| `voice` | `String` | no | The Google voice name, e.g. `vi-VN-Chirp3-HD-Achernar`. |
 | `mime_type` | `String` | no | `audio/mpeg` today. Serve it as the `Content-Type` rather than hard-coding one. |
 | `audio` | `LargeBinary` (`bytea`) | no | The recording itself. |
 | `created_at` | `DateTime(timezone=True)` | no | When the writer made it. |
