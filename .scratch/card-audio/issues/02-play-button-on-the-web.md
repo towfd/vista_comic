@@ -1,4 +1,4 @@
-Status: deployed — awaiting the owner's phone check (2026-11-18)
+Status: done (2026-11-19)
 Blocked by: 01
 
 # 02 — Play button on the web
@@ -40,3 +40,4 @@ Design docs: the design-system agent added DESIGN.md 7.19 (named 發音鈕 there
 
 2026-11-18: merged as #163 (`a53645e`) and deployed: only `web` rebuilt (the change touched `web/`, docs and `.scratch/`). The served bundle carries 「播放這個字」「停止播放」 and the no-audio sentence. No card has audio until the Text-To-Speech writer runs, so the owner's phone check waits for that.
 
+2026-11-19: the `text-to-speech` session wrote a recording for every card: 324 / 324 answer `hasAudio: true` through `localhost:8080/cards`, and `/cards/{218,225,228,235}/audio` answer 200 `audio/mpeg`. Card 19's text was corrected (SẮP XẾT LẠI → SẮP XẾP LẠI) through `PUT /cards/19/source-text`, and its recording matches the corrected text. The owner checked on a phone: after an answer the recording plays, the button on the card page plays, and cards with odd and even ids have different voices. Not seen on the production site: the button hidden for a card without a recording, because every card has one now; it was checked in the browser on 2026-11-18.
