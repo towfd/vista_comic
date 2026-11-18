@@ -24,15 +24,19 @@ from sqlalchemy import (
     Engine,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
+    and_,
     create_engine,
+    exists,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
     Session,
+    column_property,
     mapped_column,
     sessionmaker,
 )
@@ -313,6 +317,67 @@ class CardReview(Base):
     reviewed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class CardAudio(Base):
+    """A card's Vietnamese recording, made outside this repo.
+
+    **Written by the Text-To-Speech repo, read here.** Its writer connects as
+    the ``card_tts`` role, which may insert and update these rows and nothing
+    else; this repo owns the table (the migration) and serves it
+    (``GET /cards/{card_id}/audio``). See ``.scratch/card-audio/spec.md``.
+
+    One recording per card, so ``card_id`` is the primary key. Rows go with
+    their card through the foreign key's cascade, as ``card_review`` rows do.
+
+    ``source_text`` is the card's text when the recording was made. A
+    correction leaves the row in place, now **stale**: it is compared on read
+    (``card_audio_is_current``) rather than deleted, and the writer overwrites
+    it on its next run.
+
+    ``audio`` is deferred, so loading a row never drags the bytes along; the
+    audio route is the one place that reads them. No server defaults: the
+    writer sets every column.
+    """
+
+    __tablename__ = "card_audio"
+
+    card_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("learning_card.id", ondelete="CASCADE"), primary_key=True
+    )
+    source_text: Mapped[str] = mapped_column(String, nullable=False)
+    #: The Google voice name, e.g. ``vi-VN-Chirp3-HD-Enceladus``.
+    voice: Mapped[str] = mapped_column(String, nullable=False)
+    #: Served as the ``Content-Type`` rather than assumed (``audio/mpeg`` today).
+    mime_type: Mapped[str] = mapped_column(String, nullable=False)
+    audio: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
+    #: When the writer made it. Changes on every regeneration, which is what the
+    #: audio route's ETag is built from.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+#: A recording belongs to its card's **current** text. One definition, used by
+#: ``LearningCard.has_audio`` and by the audio route, so the flag a client reads
+#: and the 404 it would get cannot disagree.
+card_audio_is_current = and_(
+    CardAudio.card_id == LearningCard.id,
+    CardAudio.source_text == LearningCard.source_text,
+)
+
+#: Whether the card has a current recording -- read-only, computed in SQL with
+#: every card row (an ``EXISTS`` on ``card_audio``'s primary key), so listing
+#: the deck costs no second query.
+#:
+#: Assigned here rather than in ``LearningCard`` because it needs
+#: ``CardAudio``. Being an expression, SQLAlchemy expires it whenever a flush
+#: writes the card, and reloads it on the next access: a corrected source text
+#: reads back ``False`` without anyone having to remember. The cost is that the
+#: next access needs the session -- read it before the session closes.
+LearningCard.has_audio = column_property(
+    exists().where(card_audio_is_current).correlate_except(CardAudio)
+)
 
 
 class ComprehendUsage(Base):

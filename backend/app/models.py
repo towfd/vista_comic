@@ -320,6 +320,11 @@ class LearningCardResponse(BaseModel):
     lookupCount: int
     lastLookedUpAt: Optional[str] = None  # ISO-8601 UTC
     createdAt: str  # ISO-8601 UTC
+    #: True only when the card has a recording made from its **current** source
+    #: text (``GET /cards/{id}/audio`` answers 200); false with none, or with
+    #: one made before a correction. Carried from the first release of audio
+    #: because the app caches this response as its deck snapshot.
+    hasAudio: bool = False
 
 
 class LearningCardUpdate(BaseModel):
