@@ -30,6 +30,7 @@ function card(id: number, state: CardState, dueIn: number, sourceText = `câu ${
     introducedOn: state === 'new' ? null : '2026-08-01',
     dueAt: minutes(dueIn),
     createdAt: minutes(-id),
+    hasAudio: false,
   }
 }
 

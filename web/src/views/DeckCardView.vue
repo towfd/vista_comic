@@ -9,6 +9,7 @@ import type { LearningCard } from '../api/types'
 import { scheduleDue, scheduleState } from '../practice/library'
 import { isOverdue, stateChipClass } from '../deck/cardState'
 import AppIcon from '../components/AppIcon.vue'
+import CardAudioButton from '../components/CardAudioButton.vue'
 import ErrorState from '../components/ErrorState.vue'
 import LoadingState from '../components/LoadingState.vue'
 import {
@@ -210,11 +211,16 @@ function remove() {
 
     <template v-else-if="card">
       <section class="mt-3">
-        <h1 class="text-headline font-extrabold leading-title break-words whitespace-pre-wrap text-ink" lang="vi">{{ card.sourceText }}</h1>
+        <div class="flex items-start gap-3">
+          <h1 class="min-w-0 flex-1 text-headline font-extrabold leading-title break-words whitespace-pre-wrap text-ink" lang="vi">{{ card.sourceText }}</h1>
+          <CardAudioButton v-if="card.hasAudio" :card-id="card.id" />
+        </div>
         <div class="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span :class="stateChipClass(card.state)">{{ state }}</span>
           <span v-if="due" class="text-caption" :class="overdue ? 'text-st-relearn' : 'text-ink-faint'">{{ due }}</span>
         </div>
+        <!-- Also what a corrected card shows until its recording is made again. -->
+        <p v-if="!card.hasAudio" class="mt-2 text-caption text-ink-faint">還沒有發音，下次產生發音時會補上。</p>
       </section>
 
       <p v-if="done" class="mt-4 rounded-tile bg-success-tint px-3.5 py-3 text-body text-success" role="status">{{ done }}</p>

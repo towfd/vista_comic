@@ -19,6 +19,7 @@ function card(sourceText: string, extra: Partial<LearningCard> = {}): LearningCa
     introducedOn: '2026-08-01',
     dueAt: '2026-08-31T12:00:00+00:00',
     createdAt: '2026-08-01T12:00:00+00:00',
+    hasAudio: false,
     ...extra,
   }
 }

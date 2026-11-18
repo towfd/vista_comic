@@ -91,6 +91,12 @@ export interface LearningCard {
   dueAt: string
   /** ISO-8601, UTC. */
   createdAt: string
+  /**
+   * Whether `cardAudioPath(id)` holds a recording of the card's current source
+   * text. A recording made before a correction does not count. `false` from a
+   * backend that predates audio.
+   */
+  hasAudio: boolean
 }
 
 /** `GET` / `PUT /study/settings`. */

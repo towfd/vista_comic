@@ -22,6 +22,7 @@ function card(id: number, state: CardState, dueInMinutes = 0, extra: Partial<Lea
     introducedOn: state === 'new' ? null : '2026-08-01',
     dueAt: new Date(NOW.getTime() + dueInMinutes * MINUTE).toISOString(),
     createdAt: new Date(NOW.getTime() - id * MINUTE).toISOString(),
+    hasAudio: false,
     ...extra,
   }
 }

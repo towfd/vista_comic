@@ -20,6 +20,7 @@ function card(sourceText: string, translation: string, extra: Partial<LearningCa
     introducedOn: '2026-08-01',
     dueAt: inMinutes(0),
     createdAt: inMinutes(-1),
+    hasAudio: false,
     ...extra,
   }
 }

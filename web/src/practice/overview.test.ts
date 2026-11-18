@@ -17,6 +17,7 @@ function card(state: CardState, dueAt: Date): LearningCard {
     introducedOn: '2026-08-01',
     dueAt: dueAt.toISOString(),
     createdAt: dueAt.toISOString(),
+    hasAudio: false,
   }
 }
 
