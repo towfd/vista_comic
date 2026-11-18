@@ -156,10 +156,14 @@ def comprehension_db(_progress_engine):
     nullable foreign key to ``comprehension_record``, and Postgres refuses to
     truncate a referenced table on its own. Naming both in one ``TRUNCATE`` is
     preferred to ``CASCADE``, which would silently reach any table added later.
+    The tables that reference ``learning_card`` come along for the same reason.
     """
     with _progress_engine.begin() as conn:
         conn.execute(
-            text("TRUNCATE TABLE card_review, learning_card, comprehension_record")
+            text(
+                "TRUNCATE TABLE card_audio, card_review, learning_card, "
+                "comprehension_record"
+            )
         )
         conn.execute(text("TRUNCATE TABLE comprehend_usage"))
     return _progress_engine
@@ -177,11 +181,11 @@ def line_analysis_db(_progress_engine):
 def learning_card_db(_progress_engine):
     """Truncate the ``learning_card`` table before each test that uses it."""
     with _progress_engine.begin() as conn:
-        # `card_review` joins it because it references `learning_card`, and
-        # Postgres refuses to truncate a referenced table on its own. Naming
-        # both is preferred to CASCADE, which would silently reach whatever is
-        # added later.
-        conn.execute(text("TRUNCATE TABLE card_review, learning_card"))
+        # `card_review` and `card_audio` join it because they reference
+        # `learning_card`, and Postgres refuses to truncate a referenced table
+        # on its own. Naming them is preferred to CASCADE, which would silently
+        # reach whatever is added later.
+        conn.execute(text("TRUNCATE TABLE card_audio, card_review, learning_card"))
         # Settings are global rather than per-card, so nothing above reaches
         # them — and a test that shortens the learning steps would otherwise
         # reschedule every test after it. The store seeds the defaults again on

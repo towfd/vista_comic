@@ -42,6 +42,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from . import (
@@ -58,9 +59,11 @@ from .comprehension_worker import ComprehensionWorker
 from .line_analysis_worker import LineAnalysisWorker
 from .config import get_library_root
 from .db import (
+    CardAudio,
     ComprehensionRecord,
     LearningCard,
     LineAnalysis,
+    card_audio_is_current,
     init_engine,
     new_session,
     upgrade_schema,
@@ -1075,6 +1078,7 @@ def _to_card_response(row: LearningCard) -> LearningCardResponse:
             else None
         ),
         createdAt=progress_store.iso_utc(row.created_at),
+        hasAudio=row.has_audio,
     )
 
 
@@ -1231,9 +1235,54 @@ def reset_card(card_id: int) -> LearningCardResponse:
     with _card_session() as session:
         found = learning_card_store.reset(session, card_id)
         row = learning_card_store.get(session, card_id) if found else None
-    if row is None:
-        raise HTTPException(status_code=404, detail="Learning card not found")
-    return _to_card_response(row)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Learning card not found")
+        # Built before the session closes. The reset wrote the card, which
+        # expires ``has_audio`` (see ``db``), and reading it on a closed
+        # session fails. Today ``get`` happens to reload the row, but only
+        # because nothing kept the written one alive.
+        return _to_card_response(row)
+
+
+@app.get(
+    "/cards/{card_id}/audio",
+    response_class=Response,
+    responses={
+        200: {"description": "The recording", "content": {"audio/mpeg": {}}},
+        304: {"description": "The client's copy is current"},
+        404: {"description": "No card, no recording, or a stale one"},
+    },
+)
+def get_card_audio(card_id: int, request: Request) -> Response:
+    """The card's recording, made outside this repo (see ``db.CardAudio``).
+
+    **404 for a stale recording**, the same as for none: one made before the
+    source text was corrected says the old text, and ``hasAudio`` already reads
+    false for it. The comparison is ``db.card_audio_is_current``, shared with
+    that flag, so the two cannot disagree. A missing card is a 404 too.
+
+    Cached the way ``_image_response`` caches images: ``no-cache`` plus an
+    ETag, because the URL stays the same when the writer regenerates the
+    recording. The ETag is built from ``created_at``, which every regeneration
+    changes, and a matching ``If-None-Match`` is answered 304 before the bytes
+    are read at all -- they are deferred on the model, and this is the one
+    place that loads them.
+    """
+    with _card_session() as session:
+        row = session.execute(
+            select(CardAudio)
+            .join(LearningCard, card_audio_is_current)
+            .where(CardAudio.card_id == card_id)
+        ).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Audio not found")
+        # In UTC, so the tag does not change with the connection's time zone.
+        basis = f"{row.card_id}\0{row.created_at.astimezone(timezone.utc).isoformat()}"
+        etag = f'"{hashlib.sha1(basis.encode()).hexdigest()}"'
+        headers = {"Cache-Control": "no-cache", "ETag": etag}
+        if _etag_matches(request.headers.get("if-none-match"), etag):
+            return Response(status_code=304, headers=headers)
+        return Response(content=row.audio, media_type=row.mime_type, headers=headers)
 
 
 def _to_review_response(row) -> CardReviewResponse:
