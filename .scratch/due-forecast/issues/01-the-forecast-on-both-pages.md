@@ -1,4 +1,4 @@
-Status: implemented — awaiting PR and deploy (2026-11-22)
+Status: deployed — awaiting the owner's phone and Mac check (2026-11-22)
 
 # 01 — The forecast on 字卡庫 and on the practice overview
 
@@ -47,3 +47,5 @@ Decisions made while implementing:
 - 看全部 was 36 high with no padding to 44: now padded with `before:-inset-1`, as 7.1 asks. No visible change.
 - The tiles' bottom padding was 9px, off the spacing scale: now 8 (`pb-2`).
 - 「只看：3 天（2–3 天後）・32 張」 uses a 中點, which §4 avoids: kept, as the owner saw and approved that line in the preview; recorded as a §12 exception.
+
+2026-11-22: merged as #170 (`ca9c3ef`) and deployed on this machine, which is the deploy host (`agent-Aspire-TC-1750`; SSH to it failed host key verification on both addresses, so the deploy ran locally). Only `web` rebuilt, with `--no-deps` (the change touched `web/`, docs and `.scratch/`); `api` and `postgres` stayed healthy and were not restarted. `localhost:8080/`, `/deck?due=d3` and `/practice` answer 200; the served bundle (`index-BkjhBSo3.js`) carries 接下來要複習, 之後幾天要複習 and 這一格沒有卡片 and no longer 明天到期; the stylesheet carries both container queries.
