@@ -2,9 +2,11 @@
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDeckStore } from '../stores/deck'
-import { bubbleLayout, bubblesHeight, bubblesLabel, distributionLabel, dueTomorrow, stageDistribution } from '../practice/overview'
+import { bubbleLayout, bubblesHeight, bubblesLabel, distributionLabel, stageDistribution } from '../practice/overview'
+import { dueForecast, dueLaterToday, hasDueDates, type DueBucketKey } from '../practice/forecast'
 import type { CardState } from '../api/types'
 import AppIcon from '../components/AppIcon.vue'
+import DueForecast from '../components/DueForecast.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 import LoadingState from '../components/LoadingState.vue'
@@ -27,7 +29,19 @@ const bubbleTone = {
 
 // Counted from the moment the held deck is true for, the same moment the
 // counts above come from, so the two never disagree about which day it is.
-const tomorrow = computed(() => (loadedAt.value ? dueTomorrow(cards.value, loadedAt.value) : 0))
+const now = () => loadedAt.value ?? new Date()
+
+// The days after today: today is what the page above already says, and a
+// 今天 tile would not match it (the bubbles count new cards, and leave out
+// what comes due later today).
+const ahead = computed(() => dueForecast(cards.value, now()).filter(({ bucket }) => bucket.key !== 'today'))
+const aheadNote = computed(() => {
+  const later = dueLaterToday(cards.value, now())
+  const fresh = cards.value.some((card) => card.state === 'new')
+  return [later > 0 && `今天晚點還有 ${later} 張會到期。`, fresh && '新卡還沒排日期，不算在裡面。'].filter(Boolean).join('')
+})
+const toDeck = (key: DueBucketKey) => ({ name: 'deck', query: { due: key } })
+
 const stages = computed(() => stageDistribution(cards.value))
 
 const stageGraphic: Record<CardState, string> = {
@@ -80,14 +94,16 @@ const settingsButton =
           <p class="mt-1 text-meta text-ink-soft">到期的卡片都複習過了，今天的新卡也用完了。明天再來。</p>
         </div>
 
-        <section class="mt-4.5 rounded-panel bg-blush px-4.5 py-4">
-          <p class="flex items-center gap-2 rounded-tile bg-paper px-3.5 py-2 text-body text-ink-soft">
-            <AppIcon name="calendar" class="size-5 text-brand" />
-            明天到期
-            <span class="ml-auto text-label font-black text-ink tabular-nums">{{ tomorrow }}</span>
-            張
-          </p>
-        </section>
+        <!-- Its 1 天 tile is what 明天到期 used to say on its own. -->
+        <DueForecast
+          v-if="hasDueDates(cards)"
+          class="mt-4.5"
+          title="之後幾天要複習"
+          hint="點一格到字卡庫看是哪幾張"
+          :counts="ahead"
+          :to="toDeck"
+          :note="aheadNote"
+        />
 
         <section class="mt-4.5 rounded-card bg-paper px-4.5 py-4 inset-ring-2 inset-ring-line" aria-labelledby="deck-stages-heading">
           <div class="flex items-center justify-between gap-3">
@@ -114,34 +130,46 @@ const settingsButton =
         </section>
       </template>
 
-      <section v-else class="mt-1 rounded-panel bg-blush px-5 pt-5.5 pb-6">
-        <h2 class="text-headline text-ink">
-          今天有 <span class="text-page font-black text-brand tabular-nums">{{ standing.remaining }}</span> 張要複習
-        </h2>
-        <div
-          class="relative mt-2.5"
-          :style="{ height: `${bubblesHeight(bubbles)}px` }"
-          role="img"
-          :aria-label="bubblesLabel(standing.counts)"
-        >
+      <template v-else>
+        <section class="mt-1 rounded-panel bg-blush px-5 pt-5.5 pb-6">
+          <h2 class="text-headline text-ink">
+            今天有 <span class="text-page font-black text-brand tabular-nums">{{ standing.remaining }}</span> 張要複習
+          </h2>
           <div
-            v-for="bubble in bubbles"
-            :key="bubble.key"
-            class="absolute flex flex-col items-center justify-center rounded-full text-caption"
-            :class="bubbleTone[bubble.key]"
-            :style="{
-              left: `calc(50% + ${bubble.left}px)`,
-              top: `${bubble.top}px`,
-              width: `${bubble.diameter}px`,
-              height: `${bubble.diameter}px`,
-            }"
+            class="relative mt-2.5"
+            :style="{ height: `${bubblesHeight(bubbles)}px` }"
+            role="img"
+            :aria-label="bubblesLabel(standing.counts)"
           >
-            <span class="leading-none font-black tabular-nums" :class="bubble.numberSize">{{ bubble.count }}</span>
-            <span class="mt-0.75">{{ bubble.label }}</span>
+            <div
+              v-for="bubble in bubbles"
+              :key="bubble.key"
+              class="absolute flex flex-col items-center justify-center rounded-full text-caption"
+              :class="bubbleTone[bubble.key]"
+              :style="{
+                left: `calc(50% + ${bubble.left}px)`,
+                top: `${bubble.top}px`,
+                width: `${bubble.diameter}px`,
+                height: `${bubble.diameter}px`,
+              }"
+            >
+              <span class="leading-none font-black tabular-nums" :class="bubble.numberSize">{{ bubble.count }}</span>
+              <span class="mt-0.75">{{ bubble.label }}</span>
+            </div>
           </div>
-        </div>
-        <RouterLink :to="{ name: 'practice-session' }" :class="[primaryLg, 'mt-3.5']">開始複習</RouterLink>
-      </section>
+          <RouterLink :to="{ name: 'practice-session' }" :class="[primaryLg, 'mt-3.5']">開始複習</RouterLink>
+        </section>
+
+        <DueForecast
+          v-if="hasDueDates(cards)"
+          class="mt-4.5"
+          title="之後幾天要複習"
+          hint="點一格到字卡庫看是哪幾張"
+          :counts="ahead"
+          :to="toDeck"
+          :note="aheadNote"
+        />
+      </template>
     </template>
   </main>
 </template>

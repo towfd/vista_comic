@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CardState, LearningCard } from '../api/types'
-import { bubbleLayout, bubblesHeight, bubblesLabel, distributionLabel, dueTomorrow, stageDistribution } from './overview'
+import { bubbleLayout, bubblesHeight, bubblesLabel, distributionLabel, stageDistribution } from './overview'
 
 let nextId = 1
 function card(state: CardState, dueAt: Date): LearningCard {
@@ -24,31 +24,6 @@ function card(state: CardState, dueAt: Date): LearningCard {
 // Local times, so the tests mean the same thing in any time zone.
 const local = (day: number, hour: number, minute = 0) => new Date(2026, 7, day, hour, minute)
 const NOW = local(31, 20, 7)
-
-describe('dueTomorrow', () => {
-  it('counts cards due on the next local date, at any hour of it', () => {
-    const deck = [card('review', local(32, 0, 0)), card('review', local(32, 23, 59)), card('learning', local(32, 9))]
-    expect(dueTomorrow(deck, NOW)).toBe(3)
-  })
-
-  it('leaves out cards due today, overdue, or the day after', () => {
-    const deck = [card('review', local(31, 23, 59)), card('review', local(20, 9)), card('review', local(33, 0, 0))]
-    expect(dueTomorrow(deck, NOW)).toBe(0)
-  })
-
-  it('leaves out new cards, whose due date means nothing', () => {
-    expect(dueTomorrow([card('new', local(32, 9))], NOW)).toBe(0)
-  })
-
-  it('rolls over a month end', () => {
-    // 31 August, so tomorrow is 1 September.
-    expect(dueTomorrow([card('relearning', new Date(2026, 8, 1, 12))], NOW)).toBe(1)
-  })
-
-  it('is zero for an empty deck', () => {
-    expect(dueTomorrow([], NOW)).toBe(0)
-  })
-})
 
 describe('stageDistribution', () => {
   it('counts every stage in legend order, zeros included', () => {

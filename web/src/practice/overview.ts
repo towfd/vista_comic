@@ -1,20 +1,10 @@
 // What the practice overview draws beyond the queue's own counts: the three
-// bubbles, and -- once the day is done -- what tomorrow holds and where the
-// whole deck stands. Free of the DOM and of Vue; nothing here reads the clock.
+// bubbles, and -- once the day is done -- where the whole deck stands. The
+// days ahead are forecast.ts's. Free of the DOM and of Vue; nothing here
+// reads the clock.
 
 import type { CardState, LearningCard } from '../api/types'
-import { localDay, type Waiting } from './queue'
-
-/**
- * How many cards fall due on the reader's local tomorrow. New cards are left
- * out: they have no due date of their own, only the day's allowance.
- */
-export function dueTomorrow(deck: readonly LearningCard[], now: Date): number {
-  // Built from the calendar fields, not by adding 24 hours, so a day that is
-  // 23 or 25 hours long still lands on the next date.
-  const tomorrow = localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))
-  return deck.filter((card) => card.state !== 'new' && localDay(new Date(card.dueAt)) === tomorrow).length
-}
+import type { Waiting } from './queue'
 
 /** The deck counted by stage, in the order the legend reads. */
 export interface StageCount {
