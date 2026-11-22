@@ -105,14 +105,14 @@
 |---|---|---|---|---|---|---|---|
 | color.bg.canvas | `#FFFFFF` | `#1E1F45` | `--color-paper` | 頁面底 | text.primary | 15.81 | 14.35 |
 | color.bg.surface | `#FFFFFF` | `#1E1F45` | `--color-paper` | 卡片、分頁列、頂端列、面板、提示框 | text.primary | 15.81 | 14.35 |
-| color.bg.tint | `#FFF0F5` | `#2C2560` | `--color-blush` | 淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側 | primary / secondary / muted / brand | 14.33 / 6.18 / 5.26 / 5.05 | 12.45 / 8.49 / 6.17 / 5.85 |
-| color.bg.tint-strong | `#FFE0EC` | `#3D3080` | `--color-blush-strong` | 選中分頁的圖示底、按下、停用按鈕、「畢業」標籤、封面載入中 | primary / secondary / muted / brand | 12.90 / 5.56 / 4.73 / 4.54 | 9.92 / 6.77 / 4.92 / 4.66 |
+| color.bg.tint | `#FFF0F5` | `#2C2560` | `--color-blush` | 淡粉頂區、練習大卡、搜尋框、柔和按鈕、唯讀輸入框、寬螢幕閱讀欄兩側、到期統計面板（7.20） | primary / secondary / muted / brand | 14.33 / 6.18 / 5.26 / 5.05 | 12.45 / 8.49 / 6.17 / 5.85 |
+| color.bg.tint-strong | `#FFE0EC` | `#3D3080` | `--color-blush-strong` | 選中分頁的圖示底、按下、停用按鈕、「畢業」標籤、封面載入中、字卡庫的篩選列（7.20） | primary / secondary / muted / brand | 12.90 / 5.56 / 4.73 / 4.54 | 9.92 / 6.77 / 4.92 / 4.66 |
 | color.bg.muted | `#F5EEF1` | `#262852` | `--color-mist` | 看過的數字格、封面載入失敗、漫畫頁佔位 | primary / secondary / muted | 13.84 / 5.97 / 5.08 | 12.72 / 8.68 / 6.31 |
 | color.bg.muted-swatch（新） | `#F5EEF1` | `#3D3080` | `--color-mist-swatch` | 只給章節頁圖例「看過」的小方塊；數字格本身仍用 `mist` | — | 白 1.14（例外，旁邊有字） | paper 1.45（例外，旁邊有字） |
 | color.bg.scrim | `#2B1F27` 45% | `#0C0C24` 60% | `--color-scrim` | 強制回應的面板後的遮罩（目前沒有頁面用到） | — | — | — |
 | color.text.primary | `#2B1F27` | `#F6F3FF` | `--color-ink` | 主要文字、標題 | — | 白 15.81 | paper 14.35 |
 | color.text.secondary | `#6A5560` | `#CCC8F0` | `--color-ink-soft` | 次要說明、中文翻譯、話數、文字按鈕 | — | 白 6.82 | paper 9.79 |
-| color.text.muted | `#765F6B` | `#AEA9DC` | `--color-ink-faint` | 看過的數字、到期時間、未選分頁、提示字、停用文字 | — | 白 5.80 | paper 7.11 |
+| color.text.muted | `#765F6B` | `#AEA9DC` | `--color-ink-faint` | 看過的數字、到期時間、未選分頁、提示字、停用文字、到期統計的範圍字與 0 張（7.20） | — | 白 5.80 | paper 7.11 |
 | color.text.brand | `#C81A60` | `#FF80B5` | `--color-brand` | 粉色文字（數量、正在看的話數、強調數字）、發音鈕待播放的圖示（7.19） | — | 白 5.57 | paper 6.74 |
 | color.text.on-fill（新） | `#FFFFFF` | `#24102A` | `--color-on-fill` | brand／danger／warning 實心底上的字與圖示、開關的圓鈕 | — | 深粉 5.57 | 亮粉 7.62 |
 | color.brand.primary | `#C81A60` | `#FF80B5` | `--color-brand` | 主要按鈕、選中、正在看的數字格、開關開、分段選擇的選中、發音鈕播放中（7.19） | on-fill | 5.57 | 7.62 |
@@ -167,7 +167,7 @@
 | 重新學習 relearning | `#FF948A` | `#4B2E4D` | `#FF6B6B` | 7.37 | 5.48 | 6.40 | 5.66 | 4.91 |
 | 間隔複習 review | `#6EDCA2` | `#244050` | `#3CC47E` | 9.29 | 6.46 | 8.06 | 7.02 | 6.09 |
 
-- **文字色**：狀態標籤的字、泡泡的數字與外框、「已到期」（用 relearning）。兩套的 paper、自己的淡底、blush 都 ≥ 4.5。
+- **文字色**：狀態標籤的字、泡泡的數字與外框、「已到期」（用 relearning）、到期統計「今天」格的數字（用 relearning，7.20）。兩套的 paper、自己的淡底、blush 都 ≥ 4.5。
 - **圖形色**：比例條每一段、圖例圓點、作答欄的對錯外框（答對 review、答錯 relearning）。兩套的 paper 與 blush 都 ≥ 3。
 - 「答對」用 review、「答錯」用 relearning、「畢業」用 brand 字＋tint-strong 底（亮 4.54、暗 4.66）。
 - 成功／錯誤／提醒訊息框和狀態色是同一組顏色（success = review、danger = relearning、warning = learning），所以語意 token 分開取名、色碼共用。
@@ -295,6 +295,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | dock | ≥ 1344 | — | — | — | 收卡、深入查詢面板靠在閱讀欄右側（既有） |
 
 - 斷點沿用 Tailwind 預設（sm 40rem、md 48rem、lg 64rem、xl 80rem、2xl 96rem）與既有的 `dock: 84rem`。
+- **容器查詢**（2026-11-22）：目前只有到期統計（7.20）用。它在字卡庫和練習總覽兩頁的寬度不同，所以欄數看面板自己的內寬（`@container`＋`@min-[…]:`），不看上表的視窗斷點。
 - **版寬 token**（`max-w-*`）：
 
 | token | 值 | Tailwind | 用在 |
@@ -314,9 +315,9 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 | token | 值 | Tailwind | 用在 |
 |---|---|---|---|
-| radius.sm | 16px | `rounded-tile` | 數字格、貼紙封面外框、訊息框、提示小卡、訊息框裡的白色小框、閱讀器泡泡框、淡粉卡裡的白色單列 |
+| radius.sm | 16px | `rounded-tile` | 數字格、到期統計的格子、貼紙封面外框、訊息框、提示小卡、訊息框裡的白色小框、閱讀器泡泡框、淡粉卡裡的白色單列 |
 | radius.md | 20px | `rounded-card` | 書庫封面、字卡、白卡（含繼續看卡）、輸入框、閱讀器提示框、寬螢幕側邊面板 |
-| radius.lg | 28px | `rounded-panel` | 淡粉頂區下緣、淡粉大卡、分頁列與面板上緣、閱讀器頂端列與章節頁小頂列下緣 |
+| radius.lg | 28px | `rounded-panel` | 淡粉頂區下緣、淡粉大卡、到期統計面板、分頁列與面板上緣、閱讀器頂端列與章節頁小頂列下緣 |
 | radius.full | 9999px | `rounded-full` | 按鈕、狀態標籤、徽章、搜尋框、開關、進度條、分段選擇、圓形圖示鈕、「已加入」膠囊 |
 
 層級規則：越大的面越圓；**封面 ≤ 20、卡片 20、面板 28、能按的東西全圓**（數字格例外，見第 12 節）。貼紙封面的外框 16、白邊 4px，裡面的圖片自然是 12，不用另外設。
@@ -425,7 +426,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - 組：放在白卡或淡粉卡裡，列之間 `divide-y divide-line`（1px）。
 - 列：`flex min-h-13 items-center gap-3 py-2.5 text-body`；左邊標題 `text-ink`、右邊數值 `ml-auto font-extrabold tabular-nums`。
 - 開關列：整列是 `role="switch"` 的按鈕（7.9）。
-- 淡粉卡裡的單列（「明天到期 9 張」）：`flex items-center gap-2 rounded-tile bg-paper px-3.5 py-2 text-body text-ink-soft`，左邊圖示 `text-brand`，數字 `ml-auto text-label font-black text-ink`。
+- 淡粉卡裡的單列：`flex items-center gap-2 rounded-tile bg-paper px-3.5 py-2 text-body text-ink-soft`，左邊圖示 `text-brand`，數字 `ml-auto text-label font-black text-ink`。**目前沒有頁面用到**：原本只用在練習總覽「今天做完了」的「明天到期 9 張」，2026-11-22 那一列換成到期統計（7.20），「1 天」格就是同一個數字。樣式留著，之後要用再照這裡寫。
 - 深入查詢的單字列：`py-2.5`，右側 soft 按鈕「加入」。
 - 可點的列：`active:bg-blush`；右邊不加箭頭字元。
 
@@ -677,6 +678,142 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 **圖示**：`speaker`、`stop` 加在 `web/src/components/AppIcon.vue`，和其他圖示同一套（24 格、2px 圓頭線條）。`stop` 在發音鈕裡加 `fill-current`，填成實心方塊。
 
+### 7.20 到期統計（新）
+
+接下來幾天各有幾張卡到期：淡粉面板裡一排白色數字格。2026-11-22 加的。
+
+- 程式：元件 `web/src/components/DueForecast.vue`，分格算法 `web/src/practice/forecast.ts`。規格 `.scratch/due-forecast/spec.md`。
+- 用在兩頁：字卡庫有 6 格，按一格就只看那幾張；練習總覽有 5 格，按一格會到字卡庫，而且已經只看那一格。
+- **token**：全部用既有的，沒有新增。
+
+**面板**
+
+| 部位 | 樣式 |
+|---|---|
+| 面板 | `@container rounded-panel bg-blush px-4 pt-4 pb-3.5`（內距比淡粉大卡 7.5 小一號） |
+| 標題列 | `flex items-baseline justify-between gap-2 px-1`：左邊標題 `<h2>` `text-body font-extrabold text-ink`，右邊提示 `text-caption text-ink-soft` |
+| 格子列 | `mt-2.5 grid gap-2`，欄數見下面「欄數」 |
+| 說明行（選用） | `mx-1 mt-2.5 text-caption text-ink-soft`；沒有要說的就不放 |
+
+- 標題用 `text-body`，不用 `text-heading`：和練習總覽「所有字卡」同一級，比上面的「今天有 N 張要複習」（`text-headline`）小兩階。
+
+**每一格**
+
+- 共用：`flex flex-col items-center rounded-tile bg-paper px-1 pt-2 pb-2 text-center transition-[scale,box-shadow] duration-120 ease-standard active:scale-96 motion-reduce:active:scale-100`。
+- 由上到下三行：
+
+| 行 | 樣式 | 例 |
+|---|---|---|
+| 數字 | `text-headline leading-tight font-black tabular-nums`，顏色見下表 | 32 |
+| 名稱 | `text-meta font-extrabold text-ink` | 3 天 |
+| 範圍 | `text-caption leading-snug text-ink-faint` | 2–3 天後 |
+
+| 數字的條件 | 顏色 | 亮色 | 暗色 |
+|---|---|---|---|
+| 0 張 | `text-ink-faint` | 5.80 | 7.11 |
+| 「今天」格有卡 | `text-st-relearn`（和「已到期」同一個紅） | 5.32 | 7.37 |
+| 其他 | `text-ink` | 15.81 | 14.35 |
+
+- 名稱和範圍的顏色不隨張數改變。
+
+**兩種格子**
+
+| | 字卡庫（`/deck`） | 練習總覽（`/practice`） |
+|---|---|---|
+| 元素 | `<button type="button">`＋`aria-pressed` | 連結（`RouterLink`），連到 `/deck?due=<key>` |
+| 按下去 | 只看這一格的卡；再按同一格取消 | 到字卡庫，已經只看這一格 |
+| 選中 | `inset-ring-3 inset-ring-brand`（亮 5.57、暗 6.74） | 沒有選中 |
+| 格數 | 6：今天～更久 | 5：1 天～更久，沒有「今天」 |
+
+- 狀態：
+  - default：見上面「每一格」。
+  - 按下：縮到 96%；減少動態時不縮。
+  - focus-visible：全站外框。外框落在淡粉面板上，亮 5.05、暗 5.85。
+  - 選中：只有字卡庫有。
+  - 沒有 hover 樣式。
+  - 沒有 disabled：0 張的格子照樣能按，字卡庫會顯示「這一格沒有卡片。」。
+  - 沒有 loading：資料到了才畫面板。
+- `aria-label`：「{名稱}（{範圍}）{N} 張」，例如「3 天（2–3 天後）32 張」。
+- 格子和面板之間的邊界不負責辨識（白對淡粉亮 1.10、暗 1.15）。格子靠裡面的字辨識，選中靠 3px 主粉框加 `aria-pressed`。
+
+**欄數**：用容器查詢，量面板的內寬，不量視窗（第 6 節），因為兩頁的寬度不同。
+
+| 格數 | 預設 | 面板內寬 ≥ 24rem | 面板內寬 ≥ 29rem |
+|---|---|---|---|
+| 6（字卡庫） | 3 欄，兩排 | 3 欄 | 6 欄，一排（`@min-[29rem]:grid-cols-6`） |
+| 5（練習總覽） | 3 欄，3＋2 | 5 欄，一排（`@min-[24rem]:grid-cols-5`） | 5 欄 |
+
+- 29rem 是一排 6 格時，最長的範圍「8–21 天後」在每一格都放得下的寬度。
+- 390 寬的 iPhone：兩頁的面板內寬約 326px（20.4rem），都是 3 欄。
+- 字卡庫在視窗約 ≥ 528px 時變成一排 6 格；練習總覽在視窗約 ≥ 448px 時變成一排 5 格。
+
+**分格**（`forecast.ts` 的 `DUE_BUCKETS`）
+
+| key | 名稱 | 範圍 | 離今天幾天 |
+|---|---|---|---|
+| `today` | 今天 | 含已到期 | ≤ 0（含已到期、學習中幾分鐘後到期的） |
+| `d1` | 1 天 | 明天 | 1 |
+| `d3` | 3 天 | 2–3 天後 | 2–3 |
+| `d7` | 7 天 | 4–7 天後 | 4–7 |
+| `d21` | 21 天 | 8–21 天後 | 8–21 |
+| `later` | 更久 | 22 天以上 | ≥ 22 |
+
+- 照本地日曆日算，不是 24 小時：今晚 23:00 到明天 09:00 算 1 天。
+- 每張卡只算一格：「3 天」是 2–3 天後，不是 3 天內。使用者選的是「每格分開算」，不是累計。
+- 新卡沒有到期日，不算在任何一格。
+- 整副卡都是新卡（沒有任何卡有到期日）時，兩頁都不放這個面板。
+- 統計數字永遠是整副卡，不受字卡庫的搜尋和篩選影響。
+
+**兩頁的內容**
+
+| | 字卡庫 | 練習總覽 |
+|---|---|---|
+| 位置 | 頁名列下、搜尋框上（`mt-4`） | 還有卡要複習時：「今天有 N 張要複習」淡粉大卡下面（`mt-4.5`）。今天做完了：完成貼紙和說明下面、「所有字卡」白卡上面（`mt-4.5`），取代原本的「明天到期」 |
+| 標題 | 接下來要複習 | 之後幾天要複習 |
+| 提示 | 點一格只看那幾張 | 點一格到字卡庫看是哪幾張 |
+| 說明行 | 有新卡時：「另有新卡 N 張還沒排日期，不算在裡面。」有學習中或重新學習的卡時，接著寫：「學習中的卡幾分鐘後就到期，算在「今天」。」 | 今天晚點還有卡會到期時：「今天晚點還有 N 張會到期。」有新卡時，接著寫：「新卡還沒排日期，不算在裡面。」 |
+
+- 練習總覽不放「今天」格，原因有兩個：
+  - 上面已經寫了今天有幾張。
+  - 上面的數字含新卡，也不含今天晚點才到期的卡，放一個「今天」格會對不上。
+- 「今天晚點還有 N 張」算的是今天會到期、但現在還沒輪到的卡：
+  - 複習卡：到期時間在現在之後。
+  - 學習中的卡：到期時間在 20 分鐘提前窗之後。
+
+**字卡庫：只看一格**
+
+- 選中的格子記在網址：`/deck?due=d3`。
+  - 用 replace，不進上一頁紀錄。
+  - 練習總覽的格子就是連到這個網址。
+  - 網址裡的 key 不認得時，當作沒選。
+- 清單只列那一格的卡，最快到期的排前面。分組標題旁的張數跟著篩選和搜尋。
+- **篩選列**：選了一格時，放在搜尋框下面。
+  - 列：`mt-3 flex items-center gap-2 rounded-full bg-blush-strong py-1 pr-1 pl-4 text-meta text-ink`。
+  - 左邊的字 `min-w-0`：「只看：3 天（2–3 天後）・32 張」。張數是篩選和搜尋之後，清單裡的張數。「・」見第 12 節例外。
+  - 右邊「看全部」：`relative ml-auto h-9 shrink-0 rounded-full bg-paper px-3.5 text-caption font-extrabold text-ink-soft before:absolute before:-inset-1 before:content-[''] hover:text-ink active:bg-blush`。按了回到全部，和再按一次選中的格子一樣。
+  - 「看全部」是 36 高，用 `before:-inset-1` 把觸控區補到 44（7.1、第 8 節）。
+- **篩選後沒有卡**（例如今天 0 張）：沿用搜尋沒有結果的版面（放大鏡 32＋一行 `text-meta text-ink-soft`）。
+  - 沒有搜尋字：「這一格沒有卡片。」
+  - 有搜尋字：照舊「沒有符合「…」的卡片。」
+
+**對比**（contrast-report 第 9 節）：
+
+| 組合 | 亮色 | 暗色 | 門檻 |
+|---|---|---|---|
+| 標題 `text-ink` 在 `bg-blush` 上 | 14.33 | 12.45 | 4.5 |
+| 提示、說明行 `text-ink-soft` 在 `bg-blush` 上 | 6.18 | 8.49 | 4.5 |
+| 數字、名稱 `text-ink` 在 `bg-paper` 上 | 15.81 | 14.35 | 4.5 |
+| 範圍、0 張 `text-ink-faint` 在 `bg-paper` 上 | 5.80 | 7.11 | 4.5 |
+| 「今天」數字 `text-st-relearn` 在 `bg-paper` 上 | 5.32 | 7.37 | 4.5 |
+| 選中框 `inset-ring-brand` 對 `bg-paper` | 5.57 | 6.74 | 3.0 |
+| focus 外框 `brand` 對 `bg-blush` | 5.05 | 5.85 | 3.0 |
+| 篩選列 `text-ink` 在 `bg-blush-strong` 上 | 12.90 | 9.92 | 4.5 |
+| 「看全部」`text-ink-soft` 在 `bg-paper` 上（按下時在 `bg-blush` 上） | 6.82（6.18） | 9.79（8.49） | 4.5 |
+
+- 「看全部」鈕和篩選列之間的邊界（亮 1.23、暗 1.45）也不負責辨識，靠鈕上的字辨識。
+
+**暗色**：照 token 自動換，不寫 `dark:`。面板是 `#2C2560`，格子是 `#1E1F45`，比面板深。「今天」的數字是淺紅 `#FF948A`，選中框是亮粉。
+
 ## 8. Responsive Guidelines
 
 - **色彩模式**：亮色和暗色兩套，由 `<html>` 的 `data-theme` 決定（第 3 節開頭、7.18）。亮色 `color-scheme: light`、暗色 `color-scheme: dark`，所以表單控制項、捲軸、iPhone 鍵盤會跟著 App 的主題，不是跟著手機。`<meta name="color-scheme" content="light dark">`。
@@ -689,7 +826,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - **字重**：≥ 768px 時 Nunito 內文 600 → 700；Huninn 不變。
 - **手機導覽**：底部分頁列只在三個分頁的第一頁（7.3）；子頁用左上圓形返回鈕。
 - **觸控區** ≥ 44×44px：圓鈕 `size-11`；36 高的按鈕用 `before:-inset-1` 補足；數字格 52 高；分頁格 52 高；開關整列可點。
-- **各斷點的版面**：見第 6 節。寬螢幕不改成側邊欄，分頁列維持在底部（page-design-spec 6.1）。
+- **各斷點的版面**：見第 6 節。寬螢幕不改成側邊欄，分頁列維持在底部（page-design-spec 6.1）。到期統計的欄數看面板寬度，不看斷點（7.20）。
 - **閱讀器**：閱讀欄 800 上限、窄頁不放大（沿用）；≥ dock 面板改到閱讀欄旁邊（沿用）。
 
 ## 9. Interaction and Motion
@@ -707,7 +844,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 
 **可以動的地方**（全部是回應操作；細節見 page-design-spec 第 4 節，時長換成上面的 token）：
 1. 按鈕按下：往下沉、厚邊變薄（fast）。
-2. 數字格、封面、分頁圖示底按下：縮到 94–97%（fast）。
+2. 數字格、到期統計的格子（96%，7.20）、封面、分頁圖示底按下：縮到 94–97%（fast）。
 3. 答對時黃色貼紙「啪」一下：`animate-pop`（60% → 112% → 100%，300ms、emphasized）。「今天做完了」「這一輪做完了」的貼紙出現時也用。
 4. 徽章數字改變：`animate-bump`（100% → 115% → 100%，200ms、emphasized）；變 0 時縮小淡出（fast）。
 5. 進子頁時整頁淡入（只動 opacity，base）；分頁之間、閱讀器不做。
@@ -726,7 +863,7 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 - **兩套主題都要達 AA**：亮色和暗色分開驗算，每一個使用中的組合在兩套裡都要過門檻。class 兩套共用，所以只要一套沒過，那個組合就禁止（第 3 節「不可用的組合」）。新增元件或新組合時，兩套都要跑 `contrast.py`，結果補進 contrast-report。暗色各項的最低值：文字 4.66（亮粉在 `#3D3080` 上）、停用文字 4.92、控制項外框 4.30、圖形 4.66（解析中的滑塊）。
 - **focus**：全站 `:focus-visible` 3px 主粉外框、offset 2px（亮色深粉、暗色亮粉）。輸入框聚焦用 3px 主粉內框（變粗＋變色）。疊在漫畫上的元件用三層框（兩套一樣）。
 - **不只靠顏色**：狀態標籤一定有字；數字格的看過／還沒看差在實心 vs 外框；選中分頁有圖示底塊；泡泡框有翻譯／沒翻譯差在有沒有粉色那圈；錯誤一定有文字；開關有圓鈕位置。這些差異兩套都在，暗色不另外加。
-- **鍵盤**：Tab 順序照視覺順序；Esc 關提示框與面板；開關 `role="switch"`；分段選擇 `role="radio"` 或 `aria-pressed`；數字格是 `<ol>` 裡的連結；分組收合用原生 `<details>`；圓形圖示鈕都有 `aria-label`。主題切換鈕的名稱跟著狀態換（「換成暗色」／「換成亮色」，7.18）。
+- **鍵盤**：Tab 順序照視覺順序；Esc 關提示框與面板；開關 `role="switch"`；分段選擇 `role="radio"` 或 `aria-pressed`；數字格是 `<ol>` 裡的連結；分組收合用原生 `<details>`；圓形圖示鈕都有 `aria-label`。主題切換鈕的名稱跟著狀態換（「換成暗色」／「換成亮色」，7.18）。到期統計的格子在字卡庫是 `aria-pressed` 的按鈕、在練習總覽是連結；`aria-label` 讀出名稱、範圍和張數，例如「3 天（2–3 天後）32 張」（7.20）。
 - **語言**：越南文內容一律 `lang="vi"`（書名、字卡原文、填空句、提示框原文、作答欄、「已加入」的原文）。
 - **alt 文字**：封面 `alt` 用顯示用書名；漫畫頁沿用 `alt="第 n 頁"`；裝飾圖示 `aria-hidden="true"`；泡泡圖、比例條用 `role="img"`＋完整數字的 `aria-label`。
 - **表單錯誤**：`aria-invalid="true"`＋`aria-describedby` 指向錯誤文字；錯誤文字說怎麼修（沿用現有寫法）；失敗 `role="alert"`，成功 `role="status"`。
@@ -785,6 +922,9 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 練習中的「送出」「下一題」 | 放在作答欄下方的一般流排，不做預覽的貼底容器 | iPhone 鍵盤彈出時貼底元素會被蓋住（page-design-spec 2.7） |
 | 發音鈕：載入中（7.19） | 圖示換成轉圈的 `refresh`，而且載入中按下會停止。第 7 節通用的 loading 規則是「文字換成進行式、不加轉圈、不接受第二次按下」 | 只有圖示、沒有字，沒有進行式可以換，所以沿用重新整理鈕的旋轉（7.16）。載入中按下等於取消，名稱寫「停止播放」 |
 | 發音鈕：載入失敗（7.19） | 回到待播放，不顯示錯誤字。第 7 節通用的 error 規則要有文字說明怎麼修 | 主對話實作時定的（工作票 `.scratch/card-audio/issues/02-play-button-on-the-web.md`：「a failed load returns to idle with no crash」）。使用者 2026-11-19 決定維持現狀，不顯示錯誤字（`.scratch/card-audio/issues/03-play-shortcut.md` 的 Comments）。只有 `hasAudio` 是 true 的卡片才放按鈕；再按一次會重新抓 |
+| 到期統計（7.20） | 一排大數字的格子。第 1 節寫「不做大數字統計卡」，第 11 節禁止「大數字統計卡填版面」 | 是使用者 2026-11-22 自己要的資訊。每一格都能按（字卡庫拿來篩選、練習總覽連到字卡庫），用途是導覽，不是拿統計填版面。一頁只有一排；數字用墨色，0 張退成 `ink-faint`，只有「今天」用紅色 |
+| 到期統計：字卡庫選中「今天」格（7.20） | 紅色數字（`st-relearn`）和主粉選中框在同一格裡。第 11 節禁止「紅色和深粉用在同一個元件裡互相緊鄰」 | 兩個顏色的形狀和位置不同：紅色是中間的數字，粉色是 3px 外框，中間隔著內距。紅色永遠跟著「今天／含已到期」的字，選中另外有 `aria-pressed`，不會被讀成同一件事 |
+| 字卡庫的篩選列（7.20） | 「只看：3 天（2–3 天後）・32 張」用「・」隔開張數。第 4 節和 page-design-spec 1.2 都寫「不用中點串接資訊」 | 使用者 2026-11-22 在範例頁看過這行字並同意；只隔兩段，不是串一長串資訊。主對話決定保留（STATUS「還沒決定」該項已結案） |
 
 ## 13. Voice and Microcopy
 
@@ -813,6 +953,9 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 深入查詢 | 分析、AI 解說 |
 | 亮色、暗色（兩種主題）；切換鈕「換成暗色」「換成亮色」 | 深色、淺色、深色模式、夜間模式、黑色主題、dark mode、切換主題 |
 | 發音（字卡越南文的合成發音）；發音鈕「播放發音」「播放這個字」「播放整句」「停止播放」；沒有時「還沒有發音」 | 語音、音檔、朗讀、TTS |
+| 到期統計的格子：「今天」「1 天」「3 天」「7 天」「21 天」「更久」，下面一行寫範圍（「含已到期」「明天」「2–3 天後」「4–7 天後」「8–21 天後」「22 天以上」）；每格分開算 | 「3 天內」「7 天內」（會被讀成累計）、預測、forecast |
+| 只看一格：「只看：…」；取消是「看全部」 | 篩選、清除篩選、重設 |
+| 新卡「還沒排日期」 | 未排程、沒有 due |
 
 - 主題切換鈕的名稱寫按下去會怎樣（「換成暗色」），不寫現在的狀態（「暗色：關」）。
 - 不在介面上出現內部用語（`standing.remaining`、`.env`、`npm run dev`）。現有 `ErrorState` 的「無法通過 Cloudflare 驗證」說明提到 `web/.env` 與 `npm run dev`，是給開發者看的；page-design-spec 決定沿用現有字，這裡只標記，之後要改由使用者決定。
@@ -851,6 +994,9 @@ font-family: "Nunito", "Huninn", "PingFang TC", "Heiti TC", "Microsoft JhengHei"
 | 2026-11-18 | 跟著 7.19 補的地方：7.1 的「播放鈕」註明是書庫繼續看卡那顆；第 3 節 `text.brand`、`brand.primary` 的用途加發音鈕；第 9 節循環動畫從三種變四種；第 10 節加「聲音」；第 12 節加兩個例外（載入中轉圈且可以按、載入失敗不顯示錯誤字）；15.4 加一列 | 兩個元件都叫播放鈕會混；發音鈕的載入中、失敗和第 7 節通用規則不同，照設計審查規則要寫成例外 | design-system-architect |
 | 2026-11-19 | 7.19「行為」加 ⌘3：和按一下發音鈕一樣（待播放時開始播，載入中或播放中時停止，按住只算一次）。接 ⌘3 的是這一題考的那顆：整句題「卡片」、填空題「整句」、單張字卡原文旁，只有它加 `aria-keyshortcuts="Meta+3"`。練習中、單張字卡整頁攔下 ⌘3，其他頁面照瀏覽器原本的做法切分頁；畫面上不寫「⌘3」。第 10 節「聲音」補一句。沒有新增 token，樣式不變 | 使用者想不碰滑鼠就聽發音，鍵是自己挑的（`.scratch/card-audio/issues/03-play-shortcut.md`） | 使用者（鍵、填空題接「整句」）；主對話（攔哪些頁、播放中按下停止、不加提示字） |
 | 2026-11-19 | 第 12 節「發音鈕：載入失敗」的理由改成已決定：維持回到待播放，不顯示錯誤字 | 2026-11-18 留給使用者決定；使用者 2026-11-19 決定維持現狀 | 使用者 |
+| 2026-11-22 | 新增 7.20 到期統計：淡粉面板裡一排白色數字格，算的是「還有幾天到期」，每格分開算（今天、1 天、3 天、7 天、21 天、更久；照本地日曆日，新卡不算）。字卡庫 6 格，按一格只看那幾張（網址 `?due=<key>`），有篩選列和「看全部」；練習總覽 5 格（沒有「今天」），連到字卡庫。整副都是新卡時兩頁都不放。欄數用容器查詢，量面板不量視窗。只用既有 token，對比兩套都過（contrast-report 第 9 節） | 使用者要在字卡庫看到「幾張卡幾天後到期」，例子是 1、3、7、21 天（`.scratch/due-forecast/spec.md`） | 使用者（要求；看過兩版範例頁後選「還有幾天到期、每格分開算」；要求練習總覽也加）；主對話（練習總覽不放「今天」格、拿掉「明天到期」、按格子的行為，使用者在範例頁看過同意） |
+| 2026-11-22 | 7.6「淡粉卡裡的單列」改成目前沒有頁面用到 | 唯一用到它的「明天到期 9 張」換成到期統計，「1 天」格就是同一個數字 | 主對話（使用者在範例頁看過同意） |
+| 2026-11-22 | 跟著 7.20 補的地方：第 3 節 `tint`、`tint-strong`、`muted` 和狀態文字色的用途；第 6 節加容器查詢、圓角用途；第 8、9、10 節各補一句；第 12 節加三個例外（大數字格、選中「今天」時紅粉同格、篩選列的「・」）；第 13 節用詞加三列；15.4 加兩列 | 照設計審查規則，和通用規則不同的地方要寫成例外；新元件要出現在速查表 | design-system-architect |
 
 ---
 
@@ -1185,6 +1331,8 @@ body::before {
 | 圓形圖示鈕 | `grid size-11 place-items-center rounded-full bg-paper text-ink-soft inset-ring-2 inset-ring-line`（淡粉版 `bg-blush` 無框） |
 | 主題切換鈕 | 圓形圖示鈕（`iconButton`）＋月亮或太陽圖示，`aria-label` 「換成暗色」或「換成亮色」（7.18） |
 | 發音鈕 | 共用 `grid size-11 shrink-0 place-items-center rounded-full transition-colors duration-120`；待播放 `bg-paper text-brand inset-ring-2 inset-ring-line hover:bg-blush active:bg-blush`、播放中 `bg-brand text-on-fill`；圖示與名稱見 7.19（`CardAudioButton.vue`） |
+| 到期統計 | 面板 `@container rounded-panel bg-blush px-4 pt-4 pb-3.5`；格子 `flex flex-col items-center rounded-tile bg-paper px-1 pt-2 pb-2 text-center transition-[scale,box-shadow] duration-120 ease-standard active:scale-96 motion-reduce:active:scale-100`，字卡庫選中加 `inset-ring-3 inset-ring-brand`；欄數、數字顏色、文字見 7.20（`DueForecast.vue`） |
+| 字卡庫篩選列 | `mt-3 flex items-center gap-2 rounded-full bg-blush-strong py-1 pr-1 pl-4 text-meta text-ink`；「看全部」`relative ml-auto h-9 shrink-0 rounded-full bg-paper px-3.5 text-caption font-extrabold text-ink-soft before:absolute before:-inset-1 before:content-[''] hover:text-ink active:bg-blush`（7.20） |
 | 設定膠囊鈕 | `inline-flex h-10 items-center gap-1.5 rounded-full bg-paper pr-3.5 pl-3 text-meta text-ink-soft inset-ring-2 inset-ring-line` |
 | 頁名 | `text-page` |
 | 區塊標題 | `text-heading` |

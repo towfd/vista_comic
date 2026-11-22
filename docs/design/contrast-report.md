@@ -1,6 +1,6 @@
 # 對比驗算報告
 
-- 日期：亮色 2026-11-14；暗色 2026-11-16（第 6 節）；圖例例外 2026-11-17（第 7 節）；發音鈕 2026-11-18（第 8 節）
+- 日期：亮色 2026-11-14；暗色 2026-11-16（第 6 節）；圖例例外 2026-11-17（第 7 節）；發音鈕 2026-11-18（第 8 節）；到期統計 2026-11-22（第 9 節）
 - 依據：專案根目錄 `DESIGN.md` 第 3 節、`docs/design/design-tokens.json`
 - 工具：`python3 ~/.claude/skills/website-studio/scripts/contrast.py`（不加 `--large` 為一般文字門檻 4.5；加 `--large` 為大字／圖示／UI 元件門檻 3.0）
 - 標準：一般文字 ≥ 4.5:1；大字（≥ 24px，或 ≥ 18.66px 粗體）、圖示、UI 元件外框、資訊圖形 ≥ 3:1
@@ -14,6 +14,7 @@
 - 兩套共用同一組 class，所以亮色禁止的組合，暗色就算過了也照樣禁止（6.5）。
 - 停用狀態在 WCAG 不要求對比，但本系統的停用文字仍 ≥ 4.5（blush-strong 上 ink-faint：亮 4.73、暗 4.92）。
 - 發音鈕（2026-11-18）：只用既有 token，亮色、暗色的圖示與實心圓全部 ≥ 3:1，「還沒有發音」那句 ≥ 4.5:1。見第 8 節。
+- 到期統計（2026-11-22）：只用既有 token。字全部 ≥ 4.5:1（最低是亮色「今天」的紅數字 5.32），選中框和 focus 外框 ≥ 3:1。見第 9 節。
 
 ## 1. 文字與背景
 
@@ -501,6 +502,74 @@ $ contrast.py "#765F6B" "#FFFFFF" "#AEA9DC" "#1E1F45"
 ```
 
 實心圓對頁面底和「brand 在 paper 上」是同一組顏色，對比是對稱的，直接引用第一行和第四行。
+
+## 9. 到期統計（2026-11-22）
+
+- 元件：DESIGN.md 7.20（`web/src/components/DueForecast.vue`），加上字卡庫的篩選列。只用既有 token，沒有新增顏色。
+- 字都用一般文字的門檻 4.5:1，包括 24px 的數字（它本身是大字，門檻 3:1，但照 4.5 也過）。選中框、focus 外框用 UI 元件的門檻 3:1。
+- 面板是淡粉 `blush`，格子是 `paper`，篩選列是淡粉 2 `blush-strong`，「看全部」是 `paper`。
+
+| 前景 | 背景 | 主題 | 用在哪 | 對比 | 門檻 | 結果 |
+|---|---|---|---|---|---|---|
+| ink `#2B1F27` | blush `#FFF0F5` | 亮色 | 面板標題 | 14.33 | 4.5 | 通過 |
+| ink `#F6F3FF` | blush `#2C2560` | 暗色 | 面板標題 | 12.45 | 4.5 | 通過 |
+| ink-soft `#6A5560` | blush | 亮色 | 提示、說明行 | 6.18 | 4.5 | 通過 |
+| ink-soft `#CCC8F0` | blush | 暗色 | 提示、說明行 | 8.49 | 4.5 | 通過 |
+| ink | paper `#FFFFFF` | 亮色 | 格子的數字、名稱 | 15.81 | 4.5 | 通過 |
+| ink | paper `#1E1F45` | 暗色 | 格子的數字、名稱 | 14.35 | 4.5 | 通過 |
+| ink-faint `#765F6B` | paper | 亮色 | 範圍、0 張的數字 | 5.80 | 4.5 | 通過 |
+| ink-faint `#AEA9DC` | paper | 暗色 | 範圍、0 張的數字 | 7.11 | 4.5 | 通過 |
+| st-relearn `#C8322A` | paper | 亮色 | 「今天」格有卡時的數字 | 5.32 | 4.5 | 通過 |
+| st-relearn `#FF948A` | paper | 暗色 | 「今天」格有卡時的數字 | 7.37 | 4.5 | 通過 |
+| brand `#C81A60` | paper | 亮色 | 字卡庫選中格的 3px 內框 | 5.57 | 3.0 | 通過 |
+| brand `#FF80B5` | paper | 暗色 | 字卡庫選中格的 3px 內框 | 6.74 | 3.0 | 通過 |
+| brand `#C81A60` | blush | 亮色 | 格子的 focus 外框（落在面板上） | 5.05 | 3.0 | 通過 |
+| brand `#FF80B5` | blush | 暗色 | 格子的 focus 外框（落在面板上） | 5.85 | 3.0 | 通過 |
+| ink | blush-strong `#FFE0EC` | 亮色 | 篩選列「只看：…」 | 12.90 | 4.5 | 通過 |
+| ink | blush-strong `#3D3080` | 暗色 | 篩選列「只看：…」 | 9.92 | 4.5 | 通過 |
+| ink-soft | paper | 亮色 | 「看全部」 | 6.82 | 4.5 | 通過 |
+| ink-soft | paper | 暗色 | 「看全部」 | 9.79 | 4.5 | 通過 |
+| ink-soft | blush | 亮色／暗色 | 「看全部」按下 | 6.18／8.49 | 4.5 | 通過 |
+| ink | paper | 亮色／暗色 | 「看全部」hover | 15.81／14.35 | 4.5 | 通過 |
+
+- 「這一格沒有卡片。」沿用搜尋沒有結果的版面：放大鏡 ink-faint、字 ink-soft，都在 paper 上，和第 1 節、6.1、6.3 是同一組（亮 5.80／6.82、暗 7.11／9.79），不另外驗。
+- **只是記錄、不算未過**：
+  - 格子對面板的邊界：白對淡粉亮 1.10、暗 1.15。
+  - 「看全部」對篩選列的邊界：亮 1.23、暗 1.45。
+  - 兩者都不負責辨識：格子和按鈕靠裡面的字辨識，選中靠 3px 主粉框加 `aria-pressed`，和其他白卡、次要按鈕的 `line` 框是同一個道理（第 3 節 `color.border.subtle`）。
+  - 下面第二段原始輸出最後四行就是這些值；指令的結束碼是 1，就是因為這四行。
+
+原始輸出：
+
+```
+$ contrast.py "#2B1F27" "#FFF0F5" "#6A5560" "#FFF0F5" "#2B1F27" "#FFFFFF" "#765F6B" "#FFFFFF" "#C8322A" "#FFFFFF" "#2B1F27" "#FFE0EC" "#6A5560" "#FFFFFF" "#F6F3FF" "#2C2560" "#CCC8F0" "#2C2560" "#F6F3FF" "#1E1F45" "#AEA9DC" "#1E1F45" "#FF948A" "#1E1F45" "#F6F3FF" "#3D3080" "#CCC8F0" "#1E1F45"
+#2B1F27 on #FFF0F5: 14.33:1  AA PASS  AAA PASS
+#6A5560 on #FFF0F5: 6.18:1  AA PASS  AAA FAIL
+#2B1F27 on #FFFFFF: 15.81:1  AA PASS  AAA PASS
+#765F6B on #FFFFFF: 5.80:1  AA PASS  AAA FAIL
+#C8322A on #FFFFFF: 5.32:1  AA PASS  AAA FAIL
+#2B1F27 on #FFE0EC: 12.90:1  AA PASS  AAA PASS
+#6A5560 on #FFFFFF: 6.82:1  AA PASS  AAA FAIL
+#F6F3FF on #2C2560: 12.45:1  AA PASS  AAA PASS
+#CCC8F0 on #2C2560: 8.49:1  AA PASS  AAA PASS
+#F6F3FF on #1E1F45: 14.35:1  AA PASS  AAA PASS
+#AEA9DC on #1E1F45: 7.11:1  AA PASS  AAA PASS
+#FF948A on #1E1F45: 7.37:1  AA PASS  AAA PASS
+#F6F3FF on #3D3080: 9.92:1  AA PASS  AAA PASS
+#CCC8F0 on #1E1F45: 9.79:1  AA PASS  AAA PASS
+
+$ contrast.py --large "#C81A60" "#FFFFFF" "#C81A60" "#FFF0F5" "#FF80B5" "#1E1F45" "#FF80B5" "#2C2560" "#C8322A" "#FFFFFF" "#FF948A" "#1E1F45" "#FFFFFF" "#FFF0F5" "#FFFFFF" "#FFE0EC" "#1E1F45" "#2C2560" "#1E1F45" "#3D3080"
+#C81A60 on #FFFFFF: 5.57:1  AA PASS  AAA PASS  (large text)
+#C81A60 on #FFF0F5: 5.05:1  AA PASS  AAA PASS  (large text)
+#FF80B5 on #1E1F45: 6.74:1  AA PASS  AAA PASS  (large text)
+#FF80B5 on #2C2560: 5.85:1  AA PASS  AAA PASS  (large text)
+#C8322A on #FFFFFF: 5.32:1  AA PASS  AAA PASS  (large text)
+#FF948A on #1E1F45: 7.37:1  AA PASS  AAA PASS  (large text)
+#FFFFFF on #FFF0F5: 1.10:1  AA FAIL  AAA FAIL  (large text)
+#FFFFFF on #FFE0EC: 1.23:1  AA FAIL  AAA FAIL  (large text)
+#1E1F45 on #2C2560: 1.15:1  AA FAIL  AAA FAIL  (large text)
+#1E1F45 on #3D3080: 1.45:1  AA FAIL  AAA FAIL  (large text)
+```
 
 ## 原始輸出（亮色，2026-11-14）
 

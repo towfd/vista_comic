@@ -5,7 +5,7 @@
 - 專案：vista_comic web 前端（越南文漫畫閱讀 + 字卡練習，自用）
 - 專案路徑：/home/agent/Documents/vista_comic（網頁在 `web/`，Vue 3 + Tailwind v4 + Vite）
 - 模式：redesign（整體視覺改版，版型骨架也可以改；主要在 iPhone 上以主畫面 PWA 使用）。2026-11-16 起加暗色模式，是另一輪只換顏色、不動版面的 redesign，工作紀錄在 `docs/design/dark-mode.md`。
-- 建立日期：2026-11-14；最後更新：2026-11-19
+- 建立日期：2026-11-14；最後更新：2026-11-22
 - 開發伺服器：由總控在需要時啟動（`cd web && npm run dev`，http://localhost:5173）。刻意只綁 localhost：`web/vite.config.ts` 的 proxy 帶著 Cloudflare Access 金鑰，綁區網等於把書庫開放給整個區網（`vite.config.ts` 第 32–34 行；`dark-mode.md` 決定紀錄 2026-11-16）。給使用者看畫面用截圖網頁，不改綁定。
 - 部署版：區網 http://192.168.0.45:8080/、Tailscale http://100.84.22.60:8080/（`dark-mode.md`「交付（2026-11-16）」）
 
@@ -16,9 +16,9 @@
 | `/` | `web/src/views/LibraryView.vue` | 書庫：漫畫封面列表 |
 | `/comic/:comicId` | `web/src/views/ComicView.vue` | 章節列表 |
 | `/comic/:comicId/chapter/:chapterId` | `web/src/views/ReaderView.vue` | 閱讀器（全螢幕，無導覽列） |
-| `/deck` | `web/src/views/DeckView.vue` | 字卡庫 |
+| `/deck` | `web/src/views/DeckView.vue` | 字卡庫。上方有到期統計（`web/src/components/DueForecast.vue`，DESIGN.md 7.20）；`/deck?due=<key>` 只看一格（2026-11-22） |
 | `/deck/:cardId` | `web/src/views/DeckCardView.vue` | 單張字卡 |
-| `/practice` | `web/src/views/PracticeView.vue` | 練習總覽 |
+| `/practice` | `web/src/views/PracticeView.vue` | 練習總覽。有到期統計（1 天～更久，同一個元件），按一格到 `/deck?due=<key>`（2026-11-22） |
 | `/practice/session` | `web/src/views/PracticeSessionView.vue` | 練習中 |
 | `/practice/settings` | `web/src/views/PracticeSettingsView.vue` | 練習設定 |
 
@@ -31,7 +31,7 @@
 | 1 Discovery | 沒有另外做 | 查不到 `brief.md` | 現況寫在本檔「現況觀察」；使用者給的參考（Webtoon／LINE 漫畫）在決定紀錄 2026-11-14 |
 | 2 Visual Exploration | 完成 | 亮色：visual-directions.md、previews/round2/direction-{a,b,c}.html、page-design-spec.md。暗色：previews/dark/index.html | 亮色：第 2 輪 A 柿橘連載、B 鈷藍書架、C 粉紅貼紙，使用者選 C。2b 寫完七個預覽畫面的逐頁規格，加上預覽沒畫的畫面與狀態（收卡、深入查詢、泡泡框、單張字卡、練習設定、回饋、這一輪做完了、載入中／錯誤／空）、動態、封面處理、寬螢幕；第 7 節 4 件待決定的結果寫在「待使用者決定」。第 1 輪（深色）已否決，預覽 previews/direction-{a,b,c}.html 保留。暗色（2026-11-16）：A 莓果夜、B 星空藍、C 暮光粉，使用者選 B |
 | ⛔ 選定方向 | 完成 | visual-decision.md；暗色在 dark-mode.md | 亮色選第 2 輪方向 C 粉紅貼紙（2026-11-14）；暗色選 B 星空藍（2026-11-16） |
-| 3 Design System | 完成：亮色 2026-11-14，暗色 2026-11-16，圖例例外 2026-11-17，發音鈕 2026-11-18，發音鈕 ⌘3 2026-11-19 | DESIGN.md（專案根目錄）、design-tokens.json、contrast-report.md | **亮色、暗色兩套**，使用者自己切換，推翻 2026-11-14 的「只做亮色」。暗色只覆寫 `@theme` 的變數，元件 class 兩套共用，不寫 `dark:`（DESIGN.md 第 3 節）。2026-11-16 新增 `on-fill`、`on-sun`、`sticker`，拿掉 `--color-white`；2026-11-17 新增 `mist-swatch`。對比：兩套使用中的組合全部通過，暗色驗算 89 組；有一個例外：章節頁圖例「看過」的小方塊 `mist-swatch`，亮 1.14:1、暗 1.45:1，沒到 3:1（contrast-report.md 第 7 節）。2026-11-14 亮色版的 token 數量：色 31 個語意＋狀態 12 個、字級 8 階、圓角 3＋全圓、陰影 3 層＋厚邊與框 7 種、版寬 6、時長 3＋曲線 2；之後沒有重算總數，增減見 DESIGN.md 第 14 節 Changelog。第 15 節是 Tailwind v4 實作對照與 page-design-spec 數值對照 |
+| 3 Design System | 完成：亮色 2026-11-14，暗色 2026-11-16，圖例例外 2026-11-17，發音鈕 2026-11-18，發音鈕 ⌘3 2026-11-19，到期統計 2026-11-22 | DESIGN.md（專案根目錄）、design-tokens.json、contrast-report.md | **亮色、暗色兩套**，使用者自己切換，推翻 2026-11-14 的「只做亮色」。暗色只覆寫 `@theme` 的變數，元件 class 兩套共用，不寫 `dark:`（DESIGN.md 第 3 節）。2026-11-16 新增 `on-fill`、`on-sun`、`sticker`，拿掉 `--color-white`；2026-11-17 新增 `mist-swatch`。對比：兩套使用中的組合全部通過，暗色驗算 89 組；有一個例外：章節頁圖例「看過」的小方塊 `mist-swatch`，亮 1.14:1、暗 1.45:1，沒到 3:1（contrast-report.md 第 7 節）。2026-11-14 亮色版的 token 數量：色 31 個語意＋狀態 12 個、字級 8 階、圓角 3＋全圓、陰影 3 層＋厚邊與框 7 種、版寬 6、時長 3＋曲線 2；之後沒有重算總數，增減見 DESIGN.md 第 14 節 Changelog。第 15 節是 Tailwind v4 實作對照與 page-design-spec 數值對照 |
 | ⛔ 實作前確認 | 亮色：查不到使用者確認開工的紀錄。暗色：完成，使用者 2026-11-16 同意 | 亮色：`.scratch/web-redesign/spec.md`。暗色：`.scratch/web-dark-mode/spec.md`、previews/dark/plan.html | 亮色 spec 的決定表寫「Made with the owner on 2026-11-14」 |
 | 4 Implementation | 完成 | 亮色：`.scratch/web-redesign/issues/01`～`07`，全部 done（2026-11-14）；PR #146–#152。暗色：`.scratch/web-dark-mode/issues/01`、`02`，done；PR #154、#156 | 亮色 7 張票：01 地基（token、字型、狀態列、底部分頁列）、02 後端顯示用書名、03 書庫、04 章節頁、05 閱讀器、06 字卡庫、07 練習。整合後網頁 24 檔 481 個測試、後端 410 個測試全過（DELIVERY.md）。暗色：01 地基 #154、02 切換鈕 #156（#155 被 GitHub 自動關掉後改開）；網頁 25 檔 492 個測試全過（dark-mode.md 進度表、「交付」） |
 | 5 Visual QA | 完成：亮色第 1 輪、暗色第 1 輪 | 亮色：DELIVERY.md「QA 結果」，截圖 screenshots/r1/。暗色：dark-qa-report.md，截圖 screenshots/dark/r1/（不進版控）；PR #157 | 亮色第 1 輪（390／1440，真實資料）：P0 0、P1 2、P2 1。P1 是沒有空格的長書名溢出卡片、從別頁回書庫不會重抓（繼續看過期）；P2 是缺 favicon。390／1440 都沒有水平捲動。暗色第 1 輪：P0 0、P1 0、P2 3（QA-D01～D03） |
@@ -138,6 +138,10 @@
 | 2026-11-18 | 3 | 發音鈕載入中轉圈且可以按（按了就停）、載入失敗不顯示錯誤字，和 DESIGN.md 第 7 節通用的 loading、error 規則不同，寫進第 12 節例外；第 9 節循環動畫從三種改成四種 | 照設計審查規則，和通用規則不同的地方要寫成例外；載入中轉圈是使用者在預覽看過的；載入失敗回到待播放由主對話定，使用者還沒決定（見待使用者決定） | design-system-architect |
 | 2026-11-19 | 3 | DESIGN.md 7.19「行為」加 ⌘3：和按一下發音鈕一樣，接的是這一題考的那顆（整句題「卡片」、填空題「整句」、單張字卡原文旁），加 `aria-keyshortcuts="Meta+3"`；練習中、單張字卡整頁攔下 ⌘3，其他頁面不攔；畫面上不寫「⌘3」。第 10 節「聲音」補一句。page-design-spec 沒改：2.7、3.5、3.7、第 8 節只寫位置和文字，沒寫按下去會怎樣，和 ⌘3 不衝突。沒有新增 token，樣式不變 | 使用者想不碰滑鼠就聽發音，鍵是自己挑的（`.scratch/card-audio/issues/03-play-shortcut.md` 的 Decisions 表） | 使用者（鍵、填空題接「整句」）；主對話（攔哪些頁、播放中按下停止、不加提示字）；design-system-architect（寫進文件） |
 | 2026-11-19 | 3 | 發音鈕載入失敗維持回到待播放、不顯示錯誤字，回答上面 2026-11-18 兩列的「使用者還沒決定」；DESIGN.md 第 12 節的理由跟著改 | 使用者決定維持現狀（`.scratch/card-audio/issues/03-play-shortcut.md` 的 Comments） | 使用者；design-system-architect（寫進文件） |
+| 2026-11-22 | ⛔（到期統計） | 字卡庫加「到期統計」：幾張卡幾天後到期，分成今天、1 天、3 天、7 天、21 天、更久。算的是**還有幾天到期**（不是卡片在哪一階間隔），**每格分開算**（3 天是 2–3 天後，不是 3 天內）。練習總覽也加 | 使用者要「目前有幾張是哪幾天要到期，例如 1 天 3 天 7 天 21 天」；看過兩版範例頁後選這個讀法（`.scratch/due-forecast/spec.md` 決定表） | 使用者 |
+| 2026-11-22 | ⛔（到期統計） | 練習總覽只放 5 格（1 天～更久，沒有「今天」），下面一行寫今天晚點還有幾張會到期；「今天做完了」拿掉「明天到期 N 張」，「1 天」格就是同一個數字；字卡庫按一格只看那幾張（再按或「看全部」取消），練習總覽按一格到字卡庫、已經只看那一格 | 上面已經寫了今天有幾張，而且那個數字含新卡、不含今天晚點才到期的卡，放「今天」格會對不上 | 主對話（使用者在範例頁看過同意） |
+| 2026-11-22 | ⛔（到期統計） | 「今天做完了……明天再來。」那句不改，即使今天晚點還有卡會到期 | 這句在到期統計之前就有；使用者知道這個小矛盾，這次不改 | 使用者 |
+| 2026-11-22 | 3 | DESIGN.md 新增 7.20 到期統計（面板、格子、兩種格子、欄數用容器查詢、分格、篩選列、對比）；7.6「淡粉卡裡的單列」改成目前沒有頁面用到；第 12 節加三個例外：一排大數字格、字卡庫選中「今天」時紅色數字和主粉框同格、篩選列的「・」；第 13 節用詞加三列；15.4 加兩列。page-design-spec 補 2.4、2.5、2.6、3.4、3.6、3.9、第 4、8 節；contrast-report 加第 9 節。只用既有 token，design-tokens.json 不用改；對比兩套全過 | 元件已經實作、使用者確認過畫面；照設計審查規則，和通用規則不同的地方要寫成例外 | design-system-architect |
 
 ## 現況觀察（2026-11-14，r0 截圖：`docs/design/screenshots/r0/390-*.png`，取自部署版 192.168.0.45:8080）
 
@@ -147,7 +151,7 @@
 2. 導覽在頂端、純文字，像網頁不像 App。**已解決**：改成底部分頁列（書庫／字卡／練習，圖示加徽章），只在三個分頁顯示（`issues/01-foundation.md`）。
 3. 配色只有黑灰加一個天藍，徽章與選中狀態沒有層次。**已解決**：方向 C 粉紅貼紙，亮色、暗色兩套（DESIGN.md 第 3 節）。
 4. 章節列表每行都有「已讀」灰標籤，雜亂；目前進度不顯眼。**已解決**：改成數字格，看過變淡、正在看是粉色，打開時捲到正在看的那話（`issues/04-chapters.md`）。
-5. 字卡庫是純文字長列表；練習完成後整頁空白。**已解決**：字卡庫改成分組的白卡加狀態標籤（`issues/06-deck.md`）；練習做完顯示「今天做完了」，有明天到期和字卡分布（`issues/07-practice.md`）。
+5. 字卡庫是純文字長列表；練習完成後整頁空白。**已解決**：字卡庫改成分組的白卡加狀態標籤（`issues/06-deck.md`）；練習做完顯示「今天做完了」，有明天到期和字卡分布（`issues/07-practice.md`）。2026-11-22「明天到期」換成到期統計（DESIGN.md 7.20）。
 
 ## 提給使用者的改版方向（2026-11-14 提出時尚未確認；後來的結果寫在每條後面）
 
@@ -173,6 +177,10 @@
   8. 暗色時亮粉按鈕和黃色徽章的色感。
   9. P2 修正（2026-11-17 部署）：章節頁圖例「看過」的小方塊，暗色時是紫色實心；字卡頁「刪除卡片」是紅色（亮色、暗色都看）；在閱讀器收一句長的，「已加入」膠囊留在畫面裡。
 - 錯誤畫面（`ErrorState`）「無法通過 Cloudflare 驗證」的說明提到 `web/.env` 與 `npm run dev`，是給開發者看的字。要不要改？（DESIGN.md 第 13 節、DELIVERY.md「建議的下一步」）
+- 到期統計（2026-11-22）有三處和 DESIGN.md 的通用規則不同，是寫文件時發現的。**已決定**（主對話，同一天，部署前）：
+  1. **字卡庫篩選列的「・」**：保留「只看：3 天（2–3 天後）・32 張」。使用者在範例頁看過這行字並同意；只隔兩段，不是一長串。列在 DESIGN.md 第 12 節當例外。
+  2. **「看全部」的觸控區**：已補到 44（`relative before:absolute before:-inset-1 before:content-['']`），外觀不變。
+  3. **格子下內距**：已從 `pb-2.25`（9px）改成 `pb-2`（8），回到第 5 節的間距尺度。
 
 ### page-design-spec 第 7 節的 4 件
 
