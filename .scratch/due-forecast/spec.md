@@ -1,4 +1,4 @@
-Status: in progress — ticket 01
+Status: deployed (2026-11-22) — ticket 01 merged in #170; awaiting the owner's check
 
 # Due forecast: how many cards fall due on which of the coming days
 
