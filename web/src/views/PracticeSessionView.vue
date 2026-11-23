@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { useSessionStore } from '../stores/session'
 import { useDeckStore } from '../stores/deck'
 import { scheduleState } from '../practice/library'
+import { markDifferences } from '../practice/answerDiff'
 import type { CardState } from '../api/types'
 import AppIcon from '../components/AppIcon.vue'
 import CardAudioButton from '../components/CardAudioButton.vue'
@@ -47,6 +48,18 @@ const progress = computed(() => {
   const total = done + remaining.value
   return { done, total, percent: total === 0 ? 0 : (done / total) * 100 }
 })
+
+// The words a wrong answer got wrong, and the card's words it missed -- so the
+// reader need not compare the two a word at a time. Compared as the judge
+// compares, so nothing it ignored is marked. None once 算我對 makes it right.
+const differences = computed(() => {
+  const judged = verdict.value
+  if (!judged || judged.correct || !question.value) return null
+  return markDifferences(judged.given, judged.expected, !question.value.cloze)
+})
+
+/** Red and underlined: the mark must not rest on colour alone. */
+const differingWord = 'text-st-relearn underline decoration-2 underline-offset-4'
 
 const chipTone: Record<CardState, string> = {
   new: 'bg-st-new-tint text-st-new',
@@ -272,12 +285,24 @@ function onNextKeydown(event: KeyboardEvent) {
         <dl class="mt-4 space-y-3">
           <div v-if="!verdict.correct || verdict.overridden">
             <dt class="text-caption text-ink-faint">你的答案</dt>
-            <dd class="mt-0.5 text-heading font-bold break-words text-ink-soft" lang="vi">{{ verdict.given }}</dd>
+            <dd class="mt-0.5 text-heading font-bold break-words text-ink-soft" lang="vi">
+              <template v-if="differences"
+                ><span v-for="(piece, index) in differences.given" :key="index" :class="piece.marked ? differingWord : undefined">{{
+                  piece.text
+                }}</span></template
+              ><template v-else>{{ verdict.given }}</template>
+            </dd>
           </div>
           <div>
             <dt class="text-caption text-ink-faint">{{ verdict.sentence ? '空格裡的字' : '卡片' }}</dt>
             <dd class="mt-0.5 flex items-start gap-3">
-              <span class="min-w-0 flex-1 text-headline font-extrabold break-words text-ink" lang="vi">{{ verdict.expected }}</span>
+              <span class="min-w-0 flex-1 text-headline font-extrabold break-words text-ink" lang="vi">
+                <template v-if="differences"
+                  ><span v-for="(piece, index) in differences.expected" :key="index" :class="piece.marked ? differingWord : undefined">{{
+                    piece.text
+                  }}</span></template
+                ><template v-else>{{ verdict.expected }}</template>
+              </span>
               <CardAudioButton
                 v-if="answerCard?.hasAudio"
                 :card-id="answerCard.id"
