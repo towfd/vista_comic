@@ -49,7 +49,7 @@ const value = (event: Event) => (event.target as HTMLTextAreaElement).value
 
 /** DESIGN 15.4 input. */
 const field =
-  'mt-1.5 w-full resize-none rounded-card bg-paper px-4 py-3 text-body text-ink inset-ring-2 inset-ring-line-strong placeholder:text-ink-faint focus:inset-ring-3 focus:inset-ring-brand focus-visible:outline-none'
+  'mt-1.5 w-full rounded-card bg-paper px-4 py-3 text-body text-ink inset-ring-2 inset-ring-line-strong placeholder:text-ink-faint focus:inset-ring-3 focus:inset-ring-brand focus-visible:outline-none'
 /** DESIGN 7.1 secondary at 36px, its touch area padded to 44. */
 const secondarySm =
   "relative inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-paper px-4 text-meta font-extrabold text-ink inset-ring-2 inset-ring-line before:absolute before:-inset-1 before:content-[''] hover:bg-blush active:bg-blush"
@@ -125,7 +125,7 @@ const secondarySm =
             rows="3"
             :maxlength="SOURCE_TEXT_LIMIT"
             :value="collect.sourceText"
-            :class="[field, 'font-bold']"
+            :class="[field, 'resize-none font-bold']"
             @input="collect.setSourceText(value($event))"
           />
           <p v-if="collect.sourceText.length >= COUNT_FROM" class="mt-1 text-right text-caption text-ink-faint tabular-nums">
@@ -138,7 +138,7 @@ const secondarySm =
             id="collect-translation"
             rows="3"
             :value="collect.translation"
-            :class="field"
+            :class="[field, 'resize-none']"
             @input="collect.setTranslation(value($event))"
           />
         </div>
@@ -146,12 +146,13 @@ const secondarySm =
 
       <div class="mt-3">
         <label for="collect-note" class="block text-caption text-ink-soft">註解<span class="ml-1 text-ink-faint">選填</span></label>
+        <!-- A note can run long: the reader drags it taller or shorter, never below two lines. -->
         <textarea
           id="collect-note"
-          rows="4"
+          rows="6"
           :maxlength="NOTE_LIMIT"
           :value="collect.note"
-          :class="field"
+          :class="[field, 'min-h-20 resize-y']"
           @input="collect.setNote(value($event))"
         />
       </div>
