@@ -306,11 +306,11 @@ function remove() {
             <textarea
               id="card-note"
               v-model="note"
-              rows="3"
+              rows="6"
               :maxlength="NOTE_LIMIT"
               autocomplete="off"
               :disabled="working"
-              :class="[inputClass, 'resize-y']"
+              :class="[inputClass, 'min-h-20 resize-y']"
             />
             <button
               type="button"
