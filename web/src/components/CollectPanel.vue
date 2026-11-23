@@ -148,7 +148,7 @@ const secondarySm =
         <label for="collect-note" class="block text-caption text-ink-soft">註解<span class="ml-1 text-ink-faint">選填</span></label>
         <textarea
           id="collect-note"
-          rows="2"
+          rows="4"
           :maxlength="NOTE_LIMIT"
           :value="collect.note"
           :class="field"

@@ -22,26 +22,27 @@ const PUNCTUATION = /[\p{P}\p{S}]/gu
 const TONE_MARKS = /[̣̀́̃̉]/g
 
 /**
- * A text's syllables, each reduced to its letters and the tone it carries.
+ * One syllable reduced to its letters and the tone it carries -- the form two
+ * syllables are compared in. Case is ignored.
  *
  * Vietnamese has two conventions for which vowel wears the mark -- `hoà` and
  * `hòa` -- and no Unicode normalisation brings them together. Lifting the tone
  * off the vowel does: both become `hoa` with a grave. A wrong or missing tone
  * still differs, as does a missing circumflex or horn.
  */
+export function syllableKey(syllable: string): string {
+  const decomposed = syllable.normalize('NFKC').toLowerCase().normalize('NFD')
+  const tones = (decomposed.match(TONE_MARKS) ?? []).sort().join('')
+  return decomposed.replace(TONE_MARKS, '').normalize('NFC') + '\u0000' + tones
+}
+
+/** A text's syllables, each as its `syllableKey`. */
 function syllables(text: string, ignorePunctuation: boolean): string[] {
   let folded = text.normalize('NFKC').toLowerCase()
   // To a space rather than to nothing, so `Được,cảm` and `Được, cảm` are the
   // same two syllables.
   if (ignorePunctuation) folded = folded.replace(PUNCTUATION, ' ')
-  return folded
-    .split(/\p{White_Space}+/u)
-    .filter(Boolean)
-    .map((syllable) => {
-      const decomposed = syllable.normalize('NFD')
-      const tones = (decomposed.match(TONE_MARKS) ?? []).sort().join('')
-      return decomposed.replace(TONE_MARKS, '').normalize('NFC') + '\u0000' + tones
-    })
+  return folded.split(/\p{White_Space}+/u).filter(Boolean).map(syllableKey)
 }
 
 function sameText(produced: string, expected: string, ignorePunctuation: boolean): boolean {
